@@ -101,4 +101,20 @@
     background: rgba(15, 23, 42, 0.48);
     backdrop-filter: blur(6px);
   }
+
+  .field-control {
+    min-height: 2.5rem;
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    padding: 0.625rem 0.75rem;
+    color: var(--color-foreground);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .field-control::placeholder {
+    color: var(--color-muted);
+  }
 }

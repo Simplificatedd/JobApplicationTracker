@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppShell, type ViewKey } from "./components/AppShell";
+import { AddApplicationModal } from "./features/applications/AddApplicationModal";
 import { ApplicationsPage } from "./features/applications/ApplicationsPage";
 import { ENABLE_BETA_ANALYTICS } from "./lib/constants";
 
@@ -34,8 +35,6 @@ export function App() {
   return (
     <AppShell
       currentView={visibleView}
-      isAddOpen={isAddOpen}
-      onAddClose={() => setIsAddOpen(false)}
       onAddOpen={() => setIsAddOpen(true)}
       onViewChange={setCurrentView}
     >
@@ -53,6 +52,10 @@ export function App() {
           </div>
         </section>
       )}
+      <AddApplicationModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+      />
     </AppShell>
   );
 }

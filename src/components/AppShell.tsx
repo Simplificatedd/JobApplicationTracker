@@ -5,7 +5,6 @@ import {
   FileText,
   Plus,
   Settings,
-  X,
 } from "lucide-react";
 import { type ReactNode } from "react";
 import { APP_NAME, ENABLE_BETA_ANALYTICS } from "../lib/constants";
@@ -15,8 +14,6 @@ export type ViewKey = "applications" | "analytics" | "resumes" | "settings";
 interface AppShellProps {
   children: ReactNode;
   currentView: ViewKey;
-  isAddOpen: boolean;
-  onAddClose: () => void;
   onAddOpen: () => void;
   onViewChange: (view: ViewKey) => void;
 }
@@ -43,8 +40,6 @@ const pageTitle: Record<ViewKey, string> = {
 export function AppShell({
   children,
   currentView,
-  isAddOpen,
-  onAddClose,
   onAddOpen,
   onViewChange,
 }: AppShellProps) {
@@ -137,34 +132,6 @@ export function AppShell({
         </main>
       </div>
 
-      {isAddOpen ? (
-        <div
-          aria-modal="true"
-          className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
-          role="dialog"
-        >
-          <div className="w-full max-w-md rounded-lg bg-surface p-5 shadow-popover">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">
-                Add job
-              </h2>
-              <button className="icon-button" onClick={onAddClose} type="button">
-                <X aria-hidden="true" size={18} />
-                <span className="sr-only">Close</span>
-              </button>
-            </div>
-            <div className="mt-5 flex justify-end">
-              <button
-                className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-slate-50"
-                onClick={onAddClose}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
