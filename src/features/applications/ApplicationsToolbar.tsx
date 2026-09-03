@@ -12,9 +12,9 @@ import { APPLICATION_STATUSES } from "../../lib/constants";
 
 export function ApplicationsToolbar() {
   return (
-    <section className="surface-panel rounded-lg p-3">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <label className="relative block min-w-0 flex-1 xl:max-w-md">
+    <section className="surface-panel rounded-lg p-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(280px,380px)_1fr] lg:items-start">
+        <label className="relative block min-w-0">
           <Search
             aria-hidden="true"
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -28,7 +28,7 @@ export function ApplicationsToolbar() {
           />
         </label>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(152px,1fr))] gap-2">
           <FilterSelect icon={SlidersHorizontal} label="Status">
             <option>Status</option>
             {APPLICATION_STATUSES.map((status) => (
@@ -60,12 +60,12 @@ export function ApplicationsToolbar() {
             <option>Hidden</option>
           </FilterSelect>
 
-          <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground">
+          <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground">
             <input
-              className="h-4 w-4 rounded border-border text-primary"
+              className="h-4 w-4 shrink-0 rounded border-border text-primary"
               type="checkbox"
             />
-            <span>Needs attention</span>
+            <span className="truncate">Needs attention</span>
           </label>
         </div>
       </div>
@@ -83,14 +83,14 @@ function FilterSelect({
   label: string;
 }) {
   return (
-    <label className="relative block">
+    <label className="relative block min-w-0">
       <Icon
         aria-hidden="true"
         className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
         size={16}
       />
       <span className="sr-only">{label}</span>
-      <select className="h-10 min-w-[150px] appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground">
+      <select className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground">
         {children}
       </select>
       <ChevronDown
