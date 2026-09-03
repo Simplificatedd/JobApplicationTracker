@@ -233,7 +233,7 @@ export function AddApplicationModal({
                 }
                 value={form.status}
               >
-                <option value="">Blank</option>
+                <option value=""></option>
                 {APPLICATION_STATUSES.map((status) => (
                   <option key={status} value={status}>
                     {status}
