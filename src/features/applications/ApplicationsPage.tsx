@@ -2,6 +2,15 @@ import { useMemo, useState } from "react";
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { ApplicationsTable } from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
+import {
+  applyApplicationFilters,
+  DEFAULT_APPLICATION_FILTERS,
+  DEFAULT_SORT_STATE,
+  isNeedsAttention,
+  sortApplications,
+  type ApplicationFilters,
+  type SortColumn,
+} from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
@@ -10,8 +19,7 @@ import type {
   ApplicationContact,
   ResumeMetadata,
 } from "../../types/application";
-
-type ArchivedFilter = "active" | "archived" | "all";
+import type { UserSettings } from "../../types/settings";
 
 interface ApplicationsPageProps {
   activities: Activity[];
@@ -22,6 +30,7 @@ interface ApplicationsPageProps {
   enableDeleteActiveApplications: boolean;
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
+  settings: UserSettings;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
 }
 
@@ -34,32 +43,32 @@ export function ApplicationsPage({
   enableDeleteActiveApplications,
   restoreApplication,
   resumes,
+  settings,
   updateApplication,
 }: ApplicationsPageProps) {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
     string | null
   >(null);
-  const [archivedFilter, setArchivedFilter] =
-    useState<ArchivedFilter>("active");
+  const [filters, setFilters] = useState<ApplicationFilters>(
+    DEFAULT_APPLICATION_FILTERS,
+  );
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sort, setSort] = useState(DEFAULT_SORT_STATE);
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
-  const archivedFilteredApplications = applications.filter((application) => {
-    if (archivedFilter === "archived") {
-      return Boolean(application.archivedAt);
-    }
-
-    if (archivedFilter === "all") {
-      return true;
-    }
-
-    return !application.archivedAt;
-  });
-  const visibleApplications = searchApplications(
-    archivedFilteredApplications,
-    searchQuery,
+  const searchedApplications = searchApplications(applications, searchQuery);
+  const filteredApplications = applyApplicationFilters(
+    searchedApplications,
+    filters,
   );
+  const focusedApplications = needsAttentionOnly
+    ? filteredApplications.filter((application) =>
+        isNeedsAttention(application, settings),
+      )
+    : filteredApplications;
+  const visibleApplications = sortApplications(focusedApplications, sort);
   const attentionCount = activeApplications.filter(
     (application) => application.followUpNeeded || application.interviewDateTime,
   ).length;
@@ -87,8 +96,19 @@ export function ApplicationsPage({
       </section>
 
       <ApplicationsToolbar
-        archivedFilter={archivedFilter}
-        onArchivedFilterChange={setArchivedFilter}
+        filters={filters}
+        needsAttentionOnly={needsAttentionOnly}
+        onFilterChange={(nextFilters) =>
+          setFilters((current) => ({
+            ...current,
+            ...nextFilters,
+          }))
+        }
+        onNeedsAttentionOnlyChange={setNeedsAttentionOnly}
+        onResetFilters={() => {
+          setFilters(DEFAULT_APPLICATION_FILTERS);
+          setNeedsAttentionOnly(false);
+        }}
         onSearchQueryChange={setSearchQuery}
         searchQuery={searchQuery}
       />
@@ -111,8 +131,10 @@ export function ApplicationsPage({
         }}
         onOpenApplication={setSelectedApplicationId}
         onRestoreApplication={restoreApplication}
+        onSortChange={(column) => setSort((current) => nextSort(current, column))}
         onUpdateApplication={updateApplication}
         resumes={resumes}
+        sort={sort}
       />
 
       {selectedApplication ? (
@@ -136,6 +158,23 @@ export function ApplicationsPage({
       ) : null}
     </div>
   );
+}
+
+function nextSort(
+  current: typeof DEFAULT_SORT_STATE,
+  column: SortColumn,
+): typeof DEFAULT_SORT_STATE {
+  if (current.column === column && current.direction === "descending") {
+    return {
+      column,
+      direction: "ascending",
+    };
+  }
+
+  return {
+    column,
+    direction: "descending",
+  };
 }
 
 function SummaryMetric({

@@ -20,6 +20,7 @@ import { StatusBadge } from "./StatusBadge";
 import { formatUpdatedAt } from "../../lib/format";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
+import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
@@ -30,22 +31,24 @@ interface ApplicationsTableProps {
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
+  onSortChange: (column: SortColumn) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
+  sort: SortState;
 }
 
 const columns: Array<{
+  key?: SortColumn;
   label: string;
-  sort?: "ascending" | "descending" | "none";
 }> = [
-  { label: "Job Title", sort: "ascending" },
-  { label: "Company", sort: "none" },
-  { label: "Status", sort: "none" },
-  { label: "Follow-up", sort: "descending" },
-  { label: "Interview Date/Time", sort: "none" },
+  { key: "jobTitle", label: "Job Title" },
+  { key: "company", label: "Company" },
+  { key: "status", label: "Status" },
+  { key: "followUpDate", label: "Follow-up" },
+  { key: "interviewDateTime", label: "Interview Date/Time" },
   { label: "Resume" },
   { label: "Contacts" },
-  { label: "Last Updated", sort: "descending" },
+  { key: "updatedAt", label: "Last Updated" },
   { label: "Actions" },
 ];
 
@@ -58,8 +61,10 @@ export function ApplicationsTable({
   onDeleteApplication,
   onOpenApplication,
   onRestoreApplication,
+  onSortChange,
   onUpdateApplication,
   resumes,
+  sort,
 }: ApplicationsTableProps) {
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
 
@@ -94,14 +99,31 @@ export function ApplicationsTable({
               <tr>
                 {columns.map((column) => (
                   <th
+                    aria-sort={
+                      column.key && sort.column === column.key
+                        ? sort.direction
+                        : undefined
+                    }
                     className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
                     key={column.label}
                     scope="col"
                   >
-                    <span className="flex items-center gap-1.5">
+                    {column.key ? (
+                      <button
+                        className="flex items-center gap-1.5 text-left hover:text-foreground"
+                        onClick={() => onSortChange(column.key as SortColumn)}
+                        type="button"
+                      >
+                        <span>{column.label}</span>
+                        <SortIcon
+                          state={
+                            sort.column === column.key ? sort.direction : "none"
+                          }
+                        />
+                      </button>
+                    ) : (
                       <span>{column.label}</span>
-                      {column.sort ? <SortIcon state={column.sort} /> : null}
-                    </span>
+                    )}
                   </th>
                 ))}
               </tr>

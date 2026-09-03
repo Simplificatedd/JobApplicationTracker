@@ -4,26 +4,49 @@ import {
   ChevronDown,
   ClipboardCheck,
   FileText,
+  MapPin,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
+import type { ApplicationFilters } from "./applicationFilters";
+import type { JobType, Priority, WorkMode } from "../../types/application";
 
 interface ApplicationsToolbarProps {
-  archivedFilter?: "active" | "archived" | "all";
-  onArchivedFilterChange?: (value: "active" | "archived" | "all") => void;
+  filters?: ApplicationFilters;
+  needsAttentionOnly?: boolean;
+  onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+  onNeedsAttentionOnlyChange?: (value: boolean) => void;
+  onResetFilters?: () => void;
   onSearchQueryChange?: (value: string) => void;
   searchQuery?: string;
 }
 
 export function ApplicationsToolbar({
-  archivedFilter = "active",
-  onArchivedFilterChange,
+  filters,
+  needsAttentionOnly = false,
+  onFilterChange,
+  onNeedsAttentionOnlyChange,
+  onResetFilters,
   onSearchQueryChange,
   searchQuery = "",
 }: ApplicationsToolbarProps) {
+  const currentFilters = filters ?? {
+    archived: "active",
+    followUp: "",
+    interview: "",
+    jobType: "",
+    location: "",
+    priority: "",
+    resume: "",
+    source: "",
+    status: "",
+    workMode: "",
+  };
+
   return (
     <section className="surface-panel rounded-lg p-4">
       <div className="grid gap-3 lg:grid-cols-[minmax(280px,380px)_1fr] lg:items-start">
@@ -54,53 +77,174 @@ export function ApplicationsToolbar({
         </label>
 
         <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(152px,1fr))] gap-2">
-          <FilterSelect icon={SlidersHorizontal} label="Status">
-            <option>Status</option>
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Status"
+            onChange={(value) =>
+              onFilterChange?.({
+                status: value as ApplicationFilters["status"],
+              })
+            }
+            value={currentFilters.status}
+          >
+            <option value="">Status</option>
             {APPLICATION_STATUSES.map((status) => (
-              <option key={status}>{status}</option>
+              <option key={status} value={status}>
+                {status}
+              </option>
             ))}
           </FilterSelect>
 
-          <FilterSelect icon={ClipboardCheck} label="Follow-up">
-            <option>Follow-up</option>
-            <option>Needed</option>
-            <option>Optional</option>
+          <FilterSelect
+            icon={ClipboardCheck}
+            label="Follow-up"
+            onChange={(value) =>
+              onFilterChange?.({
+                followUp: value as ApplicationFilters["followUp"],
+              })
+            }
+            value={currentFilters.followUp}
+          >
+            <option value="">Follow-up</option>
+            <option value="needed">Needed</option>
+            <option value="optional">Optional</option>
           </FilterSelect>
 
-          <FilterSelect icon={CalendarDays} label="Interview date">
-            <option>Interview date</option>
-            <option>Scheduled</option>
-            <option>Not scheduled</option>
+          <FilterSelect
+            icon={CalendarDays}
+            label="Interview date"
+            onChange={(value) =>
+              onFilterChange?.({
+                interview: value as ApplicationFilters["interview"],
+              })
+            }
+            value={currentFilters.interview}
+          >
+            <option value="">Interview date</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="unscheduled">Not scheduled</option>
           </FilterSelect>
 
-          <FilterSelect icon={FileText} label="Resume">
-            <option>Resume</option>
-            <option>Assigned</option>
-            <option>Unassigned</option>
+          <FilterSelect
+            icon={FileText}
+            label="Resume"
+            onChange={(value) =>
+              onFilterChange?.({
+                resume: value as ApplicationFilters["resume"],
+              })
+            }
+            value={currentFilters.resume}
+          >
+            <option value="">Resume</option>
+            <option value="assigned">Assigned</option>
+            <option value="unassigned">Unassigned</option>
           </FilterSelect>
 
           <FilterSelect
             icon={Archive}
             label="Archived"
             onChange={(value) =>
-              onArchivedFilterChange?.(
-                value as "active" | "archived" | "all",
-              )
+              onFilterChange?.({
+                archived: value as ApplicationFilters["archived"],
+              })
             }
-            value={archivedFilter}
+            value={currentFilters.archived}
           >
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="all">All</option>
           </FilterSelect>
 
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Source"
+            onChange={(value) => onFilterChange?.({ source: value })}
+            value={currentFilters.source}
+          >
+            <option value="">Source</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Referral">Referral</option>
+            <option value="Company site">Company site</option>
+            <option value="Career fair">Career fair</option>
+            <option value="School portal">School portal</option>
+          </FilterSelect>
+
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Job type"
+            onChange={(value) =>
+              onFilterChange?.({ jobType: value as JobType | "" })
+            }
+            value={currentFilters.jobType}
+          >
+            <option value="">Job type</option>
+            <option value="internship">Internship</option>
+            <option value="part-time">Part-time</option>
+            <option value="full-time">Full-time</option>
+            <option value="contract">Contract</option>
+            <option value="other">Other</option>
+          </FilterSelect>
+
+          <FilterSelect
+            icon={MapPin}
+            label="Location"
+            onChange={(value) => onFilterChange?.({ location: value })}
+            value={currentFilters.location}
+          >
+            <option value="">Location</option>
+            <option value="Singapore">Singapore</option>
+            <option value="Remote">Remote</option>
+          </FilterSelect>
+
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Priority"
+            onChange={(value) =>
+              onFilterChange?.({ priority: value as Priority | "" })
+            }
+            value={currentFilters.priority}
+          >
+            <option value="">Priority</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </FilterSelect>
+
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Work mode"
+            onChange={(value) =>
+              onFilterChange?.({ workMode: value as WorkMode | "" })
+            }
+            value={currentFilters.workMode}
+          >
+            <option value="">Work mode</option>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="onsite">Onsite</option>
+            <option value="unknown">Unknown</option>
+          </FilterSelect>
+
           <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground">
             <input
+              checked={needsAttentionOnly}
               className="h-4 w-4 shrink-0 rounded border-border text-primary"
+              onChange={(event) =>
+                onNeedsAttentionOnlyChange?.(event.target.checked)
+              }
               type="checkbox"
             />
             <span className="truncate">Needs attention</span>
           </label>
+
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            onClick={onResetFilters}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={16} />
+            Reset
+          </button>
         </div>
       </div>
     </section>

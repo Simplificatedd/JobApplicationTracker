@@ -50,6 +50,7 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         }
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
+        settings={tracker.settings}
         updateApplication={tracker.updateApplication}
       />
     );
