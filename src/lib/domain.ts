@@ -26,6 +26,19 @@ export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [
   "actions",
 ];
 
+export const APPLICATION_SOURCES = [
+  "LinkedIn",
+  "Referral",
+  "Company site",
+  "Career fair",
+  "School portal",
+  "Indeed",
+  "Glassdoor",
+  "Handshake",
+  "Recruiter outreach",
+  "Other",
+];
+
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultFollowUpPromptDays: 7,
   contactsDisplayMode: "side_panel",

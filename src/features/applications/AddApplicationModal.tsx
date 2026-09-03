@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
+import { APPLICATION_SOURCES } from "../../lib/domain";
 import type { ApplicationInput } from "../../store/useTrackerStore";
 import type {
   ApplicationStatus,
@@ -336,12 +337,18 @@ export function AddApplicationModal({
             </Field>
 
             <Field label="Source">
-              <input
+              <select
                 className="field-control"
                 onChange={(event) => updateForm("source", event.target.value)}
-                type="text"
                 value={form.source}
-              />
+              >
+                <option value=""></option>
+                {APPLICATION_SOURCES.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
             </Field>
 
             <Field label="Application URL">

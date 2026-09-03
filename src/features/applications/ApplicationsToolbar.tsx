@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
+import { APPLICATION_SOURCES } from "../../lib/domain";
 import type { ApplicationFilters } from "./applicationFilters";
 import type { JobType, Priority, WorkMode } from "../../types/application";
 
@@ -162,11 +163,11 @@ export function ApplicationsToolbar({
             value={currentFilters.source}
           >
             <option value="">Source</option>
-            <option value="LinkedIn">LinkedIn</option>
-            <option value="Referral">Referral</option>
-            <option value="Company site">Company site</option>
-            <option value="Career fair">Career fair</option>
-            <option value="School portal">School portal</option>
+            {APPLICATION_SOURCES.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
           </FilterSelect>
 
           <FilterSelect

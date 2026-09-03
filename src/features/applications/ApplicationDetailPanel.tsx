@@ -1,6 +1,7 @@
 import { Check, ExternalLink, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
+import { APPLICATION_SOURCES } from "../../lib/domain";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
@@ -372,11 +373,18 @@ function EditForm({
         </select>
       </Field>
       <Field label="Source">
-        <input
+        <select
           className="field-control"
           onChange={(event) => updateDraft("source", event.target.value)}
           value={draft.source}
-        />
+        >
+          <option value=""></option>
+          {APPLICATION_SOURCES.map((source) => (
+            <option key={source} value={source}>
+              {source}
+            </option>
+          ))}
+        </select>
       </Field>
       <Field label="Application URL">
         <input
