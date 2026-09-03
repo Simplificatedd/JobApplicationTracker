@@ -7,13 +7,15 @@ import {
   Settings,
 } from "lucide-react";
 import { type ReactNode } from "react";
-import { APP_NAME, ENABLE_BETA_ANALYTICS } from "../lib/constants";
+import { APP_NAME } from "../lib/constants";
 
 export type ViewKey = "applications" | "analytics" | "resumes" | "settings";
 
 interface AppShellProps {
   children: ReactNode;
   currentView: ViewKey;
+  enableBetaAnalytics: boolean;
+  enableNotificationBell: boolean;
   onAddOpen: () => void;
   onViewChange: (view: ViewKey) => void;
 }
@@ -40,11 +42,13 @@ const pageTitle: Record<ViewKey, string> = {
 export function AppShell({
   children,
   currentView,
+  enableBetaAnalytics,
+  enableNotificationBell,
   onAddOpen,
   onViewChange,
 }: AppShellProps) {
   const visibleNavigation = navigationItems.filter(
-    (item) => !item.beta || ENABLE_BETA_ANALYTICS,
+    (item) => !item.beta || enableBetaAnalytics,
   );
   const showAddButton = currentView !== "settings";
   const addLabel = currentView === "resumes" ? "Upload resume" : "Add job";
@@ -62,10 +66,12 @@ export function AppShell({
                 Internship command center
               </p>
             </div>
-            <button className="icon-button lg:hidden" type="button">
-              <Bell aria-hidden="true" size={18} />
-              <span className="sr-only">Notifications</span>
-            </button>
+            {enableNotificationBell ? (
+              <button className="icon-button lg:hidden" type="button">
+                <Bell aria-hidden="true" size={18} />
+                <span className="sr-only">Notifications</span>
+              </button>
+            ) : null}
           </div>
 
           <nav
@@ -106,14 +112,16 @@ export function AppShell({
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  className="icon-button relative hidden lg:inline-flex"
-                  type="button"
-                >
-                  <Bell aria-hidden="true" size={18} />
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-warning" />
-                  <span className="sr-only">Notifications</span>
-                </button>
+                {enableNotificationBell ? (
+                  <button
+                    className="icon-button relative hidden lg:inline-flex"
+                    type="button"
+                  >
+                    <Bell aria-hidden="true" size={18} />
+                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-warning" />
+                    <span className="sr-only">Notifications</span>
+                  </button>
+                ) : null}
                 {showAddButton ? (
                   <button
                     className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700"

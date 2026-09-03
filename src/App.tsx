@@ -5,7 +5,6 @@ import { ApplicationsPage } from "./features/applications/ApplicationsPage";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { ResumesPage } from "./features/resumes/ResumesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
-import { ENABLE_BETA_ANALYTICS } from "./lib/constants";
 import { useTrackerStore } from "./store/useTrackerStore";
 
 export function App() {
@@ -14,13 +13,15 @@ export function App() {
   const tracker = useTrackerStore();
 
   const visibleView =
-    currentView === "analytics" && !ENABLE_BETA_ANALYTICS
+    currentView === "analytics" && !tracker.settings.betaAnalyticsEnabled
       ? "applications"
       : currentView;
 
   return (
     <AppShell
       currentView={visibleView}
+      enableBetaAnalytics={tracker.settings.betaAnalyticsEnabled}
+      enableNotificationBell={tracker.settings.enableNotificationBell}
       onAddOpen={() => setIsAddOpen(true)}
       onViewChange={setCurrentView}
     >
@@ -67,5 +68,11 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
     return <ResumesPage />;
   }
 
-  return <SettingsPage />;
+  return (
+    <SettingsPage
+      onResetSettings={tracker.resetSettings}
+      onUpdateSettings={tracker.updateSettings}
+      settings={tracker.settings}
+    />
+  );
 }
