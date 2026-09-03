@@ -61,7 +61,7 @@ export function AppShell({
   const showAddButton = currentView !== "settings";
   const addLabel = currentView === "resumes" ? "Upload resume" : "Add job";
   const headerTitlePadding =
-    !isTopNavigation && !isNavigationHidden ? "lg:pl-0" : "lg:pl-12";
+    !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
   const ToggleIcon = isTopNavigation
     ? isNavigationHidden
       ? PanelTopOpen
@@ -89,12 +89,12 @@ export function AppShell({
         <ToggleIcon aria-hidden="true" size={18} />
       </button>
       <div
-        className={`app-container flex min-h-screen flex-col ${
-          isTopNavigation ? "" : "lg:flex-row"
+        className={`app-container flex min-h-screen min-w-0 flex-col ${
+          isTopNavigation ? "" : "xl:flex-row"
         }`}
       >
         {!isTopNavigation && !isNavigationHidden ? (
-          <aside className="border-b border-border bg-surface px-4 py-3 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+          <aside className="border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-72 xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6">
             <NavigationBrand enableNotificationBell={enableNotificationBell} />
             <NavigationButtons
               currentView={currentView}
@@ -106,9 +106,9 @@ export function AppShell({
         ) : null}
 
         {isTopNavigation && !isNavigationHidden ? (
-          <div className="border-b border-border bg-surface px-4 py-3 lg:px-8">
-            <div className="flex min-w-0 items-center gap-3 pl-12">
-              <div className="min-w-[11rem] shrink-0">
+          <div className="border-b border-border bg-surface px-4 py-3 lg:px-6 xl:px-8">
+            <div className="flex min-w-0 flex-wrap items-center gap-3 pl-12 sm:flex-nowrap">
+              <div className="min-w-0 flex-1 sm:max-w-64 sm:shrink-0 sm:flex-none">
                 <p className="truncate text-lg font-semibold text-foreground">
                   {APP_NAME}
                 </p>
@@ -133,7 +133,7 @@ export function AppShell({
         ) : null}
 
         <main className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-8">
+          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-6 xl:px-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div
                 className={`flex min-w-0 items-center gap-3 pl-12 ${headerTitlePadding}`}
@@ -146,7 +146,7 @@ export function AppShell({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                 {enableNotificationBell ? (
                   <button
                     className="icon-button relative hidden lg:inline-flex"
@@ -171,7 +171,9 @@ export function AppShell({
             </div>
           </header>
 
-          <div className="px-4 py-5 lg:px-8 lg:py-8">{children}</div>
+          <div className="min-w-0 px-4 py-5 lg:px-6 lg:py-7 xl:px-8 xl:py-8">
+            {children}
+          </div>
         </main>
       </div>
 
@@ -185,17 +187,17 @@ function NavigationBrand({
   enableNotificationBell: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 pl-12 lg:block">
+    <div className="flex items-center justify-between gap-3 pl-12 xl:block">
       <div className="min-w-0">
         <p className="truncate text-lg font-semibold text-foreground">
           {APP_NAME}
         </p>
-        <p className="mt-1 hidden text-sm text-muted lg:block">
+        <p className="mt-1 hidden text-sm text-muted xl:block">
           Internship command center
         </p>
       </div>
       {enableNotificationBell ? (
-        <button className="icon-button lg:hidden" type="button">
+        <button className="icon-button xl:hidden" type="button">
           <Bell aria-hidden="true" size={18} />
           <span className="sr-only">Notifications</span>
         </button>
@@ -217,8 +219,8 @@ function NavigationButtons({
 }) {
   const navClass =
     layout === "top"
-      ? "flex min-w-0 flex-1 gap-2 overflow-x-auto"
-      : "mt-4 grid grid-cols-4 gap-2 lg:mt-8 lg:grid-cols-1";
+      ? "flex min-w-0 basis-full flex-1 gap-2 overflow-x-auto sm:basis-auto"
+      : "mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:mt-8 xl:grid-cols-1";
 
   return (
     <nav aria-label="Primary navigation" className={navClass}>
@@ -228,7 +230,7 @@ function NavigationButtons({
         const buttonLayout =
           layout === "top"
             ? "shrink-0 justify-center"
-            : "justify-center lg:justify-start";
+            : "justify-center xl:justify-start";
 
         return (
           <button

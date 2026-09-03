@@ -1,5 +1,5 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ArrowDownWideNarrow,
   ArrowUpDown,
@@ -84,19 +84,40 @@ export function ApplicationsTable({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-[1120px] table-fixed border-collapse text-left">
-            <colgroup>
-              <col className="w-[260px]" />
-              <col className="w-[150px]" />
-              <col className="w-[180px]" />
-              <col className="w-[150px]" />
-              <col className="w-[185px]" />
-              <col className="w-[170px]" />
-              <col className="w-[120px]" />
-              <col className="w-[155px]" />
-              <col className="w-[90px]" />
-            </colgroup>
+        <>
+          <div className="grid gap-3 p-3 xl:hidden">
+            {applications.map((application) => (
+              <ApplicationCard
+                application={application}
+                enableDeleteActiveApplications={enableDeleteActiveApplications}
+                key={application.id}
+                onArchiveApplication={onArchiveApplication}
+                onDeleteApplication={onDeleteApplication}
+                onOpenApplication={onOpenApplication}
+                onOpenContacts={onOpenContacts}
+                onRestoreApplication={onRestoreApplication}
+                onUpdateApplication={onUpdateApplication}
+                resume={
+                  application.resumeId
+                    ? resumeById.get(application.resumeId)
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto xl:block">
+            <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
+              <colgroup>
+                <col className="w-[19%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[10%]" />
+                <col className="w-[13%]" />
+                <col className="w-[8%]" />
+                <col className="w-[7%]" />
+                <col className="w-[11%]" />
+                <col className="w-[7%]" />
+              </colgroup>
             <thead className="border-b border-border bg-slate-50">
               <tr>
                 {columns.map((column) => (
@@ -151,7 +172,8 @@ export function ApplicationsTable({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </section>
   );
@@ -255,6 +277,105 @@ function ApplicationRow({
         />
       </td>
     </tr>
+  );
+}
+
+function ApplicationCard({
+  application,
+  enableDeleteActiveApplications,
+  onArchiveApplication,
+  onDeleteApplication,
+  onOpenApplication,
+  onOpenContacts,
+  onRestoreApplication,
+  onUpdateApplication,
+  resume,
+}: {
+  application: JobApplication;
+  enableDeleteActiveApplications: boolean;
+  onArchiveApplication: (applicationId: string) => void;
+  onDeleteApplication: (applicationId: string) => void;
+  onOpenApplication: (applicationId: string) => void;
+  onOpenContacts: (applicationId: string) => void;
+  onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+  resume?: ResumeFile;
+}) {
+  return (
+    <article className="rounded-lg border border-border bg-surface px-4 py-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground hover:text-primary"
+            onClick={() => onOpenApplication(application.id)}
+            type="button"
+          >
+            {application.jobTitle}
+          </button>
+          <p className="mt-1 truncate text-xs font-medium text-muted">
+            {application.company || "Company blank"}
+          </p>
+        </div>
+        <RowActionsMenu
+          application={application}
+          enableDeleteActiveApplications={enableDeleteActiveApplications}
+          onArchiveApplication={onArchiveApplication}
+          onDeleteApplication={onDeleteApplication}
+          onRestoreApplication={onRestoreApplication}
+        />
+      </div>
+
+      <DescriptionPreview description={application.jobDescription} />
+
+      <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+        <CardField label="Status">
+          <InlineStatusEditor
+            application={application}
+            onUpdateApplication={onUpdateApplication}
+          />
+        </CardField>
+        <CardField label="Follow-up">
+          <InlineFollowUpEditor
+            application={application}
+            onUpdateApplication={onUpdateApplication}
+          />
+        </CardField>
+        <CardField label="Interview">
+          <InterviewCell application={application} />
+        </CardField>
+        <CardField label="Resume">
+          <ResumeCell resume={resume} />
+        </CardField>
+        <CardField label="Contacts">
+          <ContactsButton
+            count={application.contactsCount}
+            onClick={() => onOpenContacts(application.id)}
+          />
+        </CardField>
+        <CardField label="Updated">
+          <p className="text-sm text-foreground">
+            {formatUpdatedAt(application.updatedAt)}
+          </p>
+        </CardField>
+      </div>
+    </article>
+  );
+}
+
+function CardField({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+        {label}
+      </p>
+      {children}
+    </div>
   );
 }
 

@@ -253,7 +253,7 @@ function ToggleField({
       <SettingLabel description={description} label={label} />
       <input
         checked={checked}
-        className="h-4 w-4 rounded border-border text-primary"
+        className="h-4 w-4 shrink-0 rounded border-border text-primary"
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
@@ -277,11 +277,11 @@ function ToggleButtonField({
   onLabel: string;
 }) {
   return (
-    <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground">
+    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
       <SettingLabel description={description} label={label} />
       <button
         aria-pressed={checked}
-        className={`h-8 min-w-32 rounded-md px-3 text-sm font-semibold transition ${
+        className={`h-8 w-full rounded-md px-3 text-sm font-semibold transition sm:w-auto sm:min-w-32 ${
           checked
             ? "bg-primary text-primary-foreground hover:bg-blue-700"
             : "bg-slate-100 text-foreground hover:bg-slate-200"
@@ -340,7 +340,7 @@ function SettingLabel({
 }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <span className="min-w-0">{label}</span>
+      <span className="min-w-0 break-words">{label}</span>
       <InfoTooltip description={description} />
     </span>
   );
@@ -353,7 +353,7 @@ function InfoTooltip({ description }: { description: string }) {
         <Info aria-hidden="true" size={13} />
         <span className="sr-only">Setting explanation</span>
       </span>
-      <span className="pointer-events-none absolute left-1/2 top-7 z-30 hidden w-64 -translate-x-1/2 rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-medium leading-5 text-white shadow-popover group-hover:block">
+      <span className="pointer-events-none absolute right-0 top-7 z-30 hidden w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-medium leading-5 text-white shadow-popover group-hover:block sm:left-1/2 sm:w-64 sm:-translate-x-1/2">
         {description}
       </span>
     </span>
