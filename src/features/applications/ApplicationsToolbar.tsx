@@ -6,6 +6,7 @@ import {
   FileText,
   Search,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
@@ -13,11 +14,15 @@ import { APPLICATION_STATUSES } from "../../lib/constants";
 interface ApplicationsToolbarProps {
   archivedFilter?: "active" | "archived" | "all";
   onArchivedFilterChange?: (value: "active" | "archived" | "all") => void;
+  onSearchQueryChange?: (value: string) => void;
+  searchQuery?: string;
 }
 
 export function ApplicationsToolbar({
   archivedFilter = "active",
   onArchivedFilterChange,
+  onSearchQueryChange,
+  searchQuery = "",
 }: ApplicationsToolbarProps) {
   return (
     <section className="surface-panel rounded-lg p-4">
@@ -31,9 +36,21 @@ export function ApplicationsToolbar({
           <span className="sr-only">Search applications</span>
           <input
             className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
+            onChange={(event) => onSearchQueryChange?.(event.target.value)}
             placeholder="Search jobs or descriptions"
             type="search"
+            value={searchQuery}
           />
+          {searchQuery ? (
+            <button
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
+              onClick={() => onSearchQueryChange?.("")}
+              type="button"
+            >
+              <X aria-hidden="true" size={15} />
+              <span className="sr-only">Clear search</span>
+            </button>
+          ) : null}
         </label>
 
         <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(152px,1fr))] gap-2">

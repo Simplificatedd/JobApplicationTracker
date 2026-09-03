@@ -23,6 +23,8 @@ import type { ApplicationUpdate } from "../../store/useTrackerStore";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  emptyBody?: string;
+  emptyTitle?: string;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
@@ -49,6 +51,8 @@ const columns: Array<{
 
 export function ApplicationsTable({
   applications,
+  emptyBody = "New entries will appear here once they are added.",
+  emptyTitle = "No applications yet",
   enableDeleteActiveApplications,
   onArchiveApplication,
   onDeleteApplication,
@@ -65,10 +69,10 @@ export function ApplicationsTable({
         <div className="flex min-h-[280px] items-center justify-center px-6 py-12 text-center">
           <div className="max-w-sm">
             <h2 className="text-xl font-semibold text-foreground">
-              No applications yet
+              {emptyTitle}
             </h2>
             <p className="mt-2 text-sm text-muted">
-              New entries will appear here once they are added.
+              {emptyBody}
             </p>
           </div>
         </div>

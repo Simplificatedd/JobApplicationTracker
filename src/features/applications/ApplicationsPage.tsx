@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { ApplicationsTable } from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
+import { searchApplications } from "./applicationSearch";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
   Activity,
@@ -40,10 +41,11 @@ export function ApplicationsPage({
   >(null);
   const [archivedFilter, setArchivedFilter] =
     useState<ArchivedFilter>("active");
+  const [searchQuery, setSearchQuery] = useState("");
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
-  const visibleApplications = applications.filter((application) => {
+  const archivedFilteredApplications = applications.filter((application) => {
     if (archivedFilter === "archived") {
       return Boolean(application.archivedAt);
     }
@@ -54,6 +56,10 @@ export function ApplicationsPage({
 
     return !application.archivedAt;
   });
+  const visibleApplications = searchApplications(
+    archivedFilteredApplications,
+    searchQuery,
+  );
   const attentionCount = activeApplications.filter(
     (application) => application.followUpNeeded || application.interviewDateTime,
   ).length;
@@ -83,10 +89,18 @@ export function ApplicationsPage({
       <ApplicationsToolbar
         archivedFilter={archivedFilter}
         onArchivedFilterChange={setArchivedFilter}
+        onSearchQueryChange={setSearchQuery}
+        searchQuery={searchQuery}
       />
 
       <ApplicationsTable
         applications={visibleApplications}
+        emptyBody={
+          searchQuery
+            ? "No applications match that title or description."
+            : "New entries will appear here once they are added."
+        }
+        emptyTitle={searchQuery ? "No matching applications" : "No applications yet"}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={(id) => {
