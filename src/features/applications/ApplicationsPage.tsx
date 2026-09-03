@@ -1,16 +1,33 @@
+import { useMemo, useState } from "react";
+import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { ApplicationsTable } from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
-import type { Application, ResumeMetadata } from "../../types/application";
+import type { ApplicationUpdate } from "../../store/useTrackerStore";
+import type {
+  Activity,
+  Application,
+  ApplicationContact,
+  ResumeMetadata,
+} from "../../types/application";
 
 interface ApplicationsPageProps {
+  activities: Activity[];
   applications: Application[];
+  contacts: ApplicationContact[];
   resumes: ResumeMetadata[];
+  updateApplication: (id: string, input: ApplicationUpdate) => void;
 }
 
 export function ApplicationsPage({
+  activities,
   applications,
+  contacts,
   resumes,
+  updateApplication,
 }: ApplicationsPageProps) {
+  const [selectedApplicationId, setSelectedApplicationId] = useState<
+    string | null
+  >(null);
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
@@ -20,6 +37,13 @@ export function ApplicationsPage({
   const interviewCount = activeApplications.filter(
     (application) => application.interviewDateTime,
   ).length;
+  const selectedApplication = useMemo(
+    () =>
+      applications.find(
+        (application) => application.id === selectedApplicationId,
+      ),
+    [applications, selectedApplicationId],
+  );
 
   return (
     <div className="space-y-5">
@@ -37,8 +61,29 @@ export function ApplicationsPage({
 
       <ApplicationsTable
         applications={activeApplications}
+        onOpenApplication={setSelectedApplicationId}
         resumes={resumes}
       />
+
+      {selectedApplication ? (
+        <ApplicationDetailPanel
+          activities={activities.filter(
+            (activity) => activity.applicationId === selectedApplication.id,
+          )}
+          application={selectedApplication}
+          contacts={contacts.filter(
+            (contact) => contact.applicationId === selectedApplication.id,
+          )}
+          onClose={() => setSelectedApplicationId(null)}
+          onUpdate={updateApplication}
+          resume={
+            selectedApplication.resumeId
+              ? resumes.find((resume) => resume.id === selectedApplication.resumeId)
+              : undefined
+          }
+          resumes={resumes}
+        />
+      ) : null}
     </div>
   );
 }

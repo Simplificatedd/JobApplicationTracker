@@ -17,6 +17,7 @@ import { formatUpdatedAt } from "../../lib/format";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  onOpenApplication: (applicationId: string) => void;
   resumes: ResumeFile[];
 }
 
@@ -37,6 +38,7 @@ const columns: Array<{
 
 export function ApplicationsTable({
   applications,
+  onOpenApplication,
   resumes,
 }: ApplicationsTableProps) {
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
@@ -89,6 +91,7 @@ export function ApplicationsTable({
                 <ApplicationRow
                   application={application}
                   key={application.id}
+                  onOpenApplication={onOpenApplication}
                   resume={
                     application.resumeId
                       ? resumeById.get(application.resumeId)
@@ -122,18 +125,24 @@ function SortIcon({
 
 function ApplicationRow({
   application,
+  onOpenApplication,
   resume,
 }: {
   application: JobApplication;
+  onOpenApplication: (applicationId: string) => void;
   resume?: ResumeFile;
 }) {
   return (
     <tr className="table-row-hover align-top">
       <td className="px-4 py-4">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground">
+          <button
+            className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:text-primary"
+            onClick={() => onOpenApplication(application.id)}
+            type="button"
+          >
             {application.jobTitle}
-          </p>
+          </button>
           <DescriptionPreview description={application.jobDescription} />
         </div>
       </td>

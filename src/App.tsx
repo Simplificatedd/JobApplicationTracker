@@ -40,8 +40,11 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
   if (view === "applications") {
     return (
       <ApplicationsPage
+        activities={tracker.activities}
         applications={tracker.applications}
+        contacts={tracker.contacts}
         resumes={tracker.resumes}
+        updateApplication={tracker.updateApplication}
       />
     );
   }
