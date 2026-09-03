@@ -1,5 +1,10 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
 import {
+  ArrowDownWideNarrow,
+  ArrowUpDown,
+  ArrowUpWideNarrow,
+} from "lucide-react";
+import {
   ContactsButton,
   DescriptionPreview,
   FollowUpCell,
@@ -15,16 +20,19 @@ interface ApplicationsTableProps {
   resumes: ResumeFile[];
 }
 
-const columns = [
-  "Job Title",
-  "Company",
-  "Status",
-  "Follow-up",
-  "Interview Date/Time",
-  "Resume",
-  "Contacts",
-  "Last Updated",
-  "Actions",
+const columns: Array<{
+  label: string;
+  sort?: "ascending" | "descending" | "none";
+}> = [
+  { label: "Job Title", sort: "ascending" },
+  { label: "Company", sort: "none" },
+  { label: "Status", sort: "none" },
+  { label: "Follow-up", sort: "descending" },
+  { label: "Interview Date/Time", sort: "none" },
+  { label: "Resume" },
+  { label: "Contacts" },
+  { label: "Last Updated", sort: "descending" },
+  { label: "Actions" },
 ];
 
 export function ApplicationsTable({
@@ -65,10 +73,13 @@ export function ApplicationsTable({
                 {columns.map((column) => (
                   <th
                     className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
-                    key={column}
+                    key={column.label}
                     scope="col"
                   >
-                    {column}
+                    <span className="flex items-center gap-1.5">
+                      <span>{column.label}</span>
+                      {column.sort ? <SortIcon state={column.sort} /> : null}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -91,6 +102,22 @@ export function ApplicationsTable({
       )}
     </section>
   );
+}
+
+function SortIcon({
+  state,
+}: {
+  state: "ascending" | "descending" | "none";
+}) {
+  if (state === "ascending") {
+    return <ArrowUpWideNarrow aria-hidden="true" size={14} />;
+  }
+
+  if (state === "descending") {
+    return <ArrowDownWideNarrow aria-hidden="true" size={14} />;
+  }
+
+  return <ArrowUpDown aria-hidden="true" size={14} />;
 }
 
 function ApplicationRow({

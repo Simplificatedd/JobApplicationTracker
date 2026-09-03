@@ -1,4 +1,5 @@
 import { ApplicationsTable } from "./ApplicationsTable";
+import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { mockApplications, mockResumes } from "../../lib/mockData";
 
 export function ApplicationsPage() {
@@ -9,6 +10,8 @@ export function ApplicationsPage() {
         <SummaryMetric label="Needs attention" value="3" tone="warning" />
         <SummaryMetric label="Interviews" value="2" tone="info" />
       </section>
+
+      <ApplicationsToolbar />
 
       <ApplicationsTable
         applications={mockApplications}
