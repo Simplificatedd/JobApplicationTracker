@@ -62,6 +62,7 @@ export function ApplicationsPage({
       <ApplicationsTable
         applications={activeApplications}
         onOpenApplication={setSelectedApplicationId}
+        onUpdateApplication={updateApplication}
         resumes={resumes}
       />
 

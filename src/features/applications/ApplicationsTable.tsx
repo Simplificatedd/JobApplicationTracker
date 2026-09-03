@@ -1,8 +1,12 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
+import { useState } from "react";
 import {
   ArrowDownWideNarrow,
   ArrowUpDown,
   ArrowUpWideNarrow,
+  Check,
+  Pencil,
+  X,
 } from "lucide-react";
 import {
   ContactsButton,
@@ -14,10 +18,13 @@ import {
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
 import { formatUpdatedAt } from "../../lib/format";
+import { APPLICATION_STATUSES } from "../../lib/constants";
+import type { ApplicationUpdate } from "../../store/useTrackerStore";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
   onOpenApplication: (applicationId: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
 }
 
@@ -39,6 +46,7 @@ const columns: Array<{
 export function ApplicationsTable({
   applications,
   onOpenApplication,
+  onUpdateApplication,
   resumes,
 }: ApplicationsTableProps) {
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
@@ -92,6 +100,7 @@ export function ApplicationsTable({
                   application={application}
                   key={application.id}
                   onOpenApplication={onOpenApplication}
+                  onUpdateApplication={onUpdateApplication}
                   resume={
                     application.resumeId
                       ? resumeById.get(application.resumeId)
@@ -126,10 +135,12 @@ function SortIcon({
 function ApplicationRow({
   application,
   onOpenApplication,
+  onUpdateApplication,
   resume,
 }: {
   application: JobApplication;
   onOpenApplication: (applicationId: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
 }) {
   return (
@@ -155,10 +166,16 @@ function ApplicationRow({
         </p>
       </td>
       <td className="px-4 py-4">
-        <StatusBadge status={application.status} />
+        <InlineStatusEditor
+          application={application}
+          onUpdateApplication={onUpdateApplication}
+        />
       </td>
       <td className="px-4 py-4">
-        <FollowUpCell application={application} />
+        <InlineFollowUpEditor
+          application={application}
+          onUpdateApplication={onUpdateApplication}
+        />
       </td>
       <td className="px-4 py-4">
         <InterviewCell application={application} />
@@ -178,5 +195,140 @@ function ApplicationRow({
         <RowActionsMenu />
       </td>
     </tr>
+  );
+}
+
+function InlineStatusEditor({
+  application,
+  onUpdateApplication,
+}: {
+  application: JobApplication;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftStatus, setDraftStatus] = useState(application.status);
+
+  function startEditing() {
+    setDraftStatus(application.status);
+    setIsEditing(true);
+  }
+
+  function confirm() {
+    onUpdateApplication(application.id, { status: draftStatus });
+    setIsEditing(false);
+  }
+
+  if (!isEditing) {
+    return (
+      <div className="flex items-center gap-2">
+        <StatusBadge status={application.status} />
+        <button className="icon-button h-8 w-8" onClick={startEditing} type="button">
+          <Pencil aria-hidden="true" size={15} />
+          <span className="sr-only">Edit status</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <select
+        className="field-control min-h-9 px-2 py-1 text-xs"
+        onChange={(event) =>
+          setDraftStatus(event.target.value as JobApplication["status"])
+        }
+        value={draftStatus}
+      >
+        {APPLICATION_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {status}
+          </option>
+        ))}
+      </select>
+      <button className="icon-button h-8 w-8" onClick={confirm} type="button">
+        <Check aria-hidden="true" size={15} />
+        <span className="sr-only">Confirm status</span>
+      </button>
+      <button
+        className="icon-button h-8 w-8"
+        onClick={() => setIsEditing(false)}
+        type="button"
+      >
+        <X aria-hidden="true" size={15} />
+        <span className="sr-only">Cancel status edit</span>
+      </button>
+    </div>
+  );
+}
+
+function InlineFollowUpEditor({
+  application,
+  onUpdateApplication,
+}: {
+  application: JobApplication;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
+  const [draftDate, setDraftDate] = useState(application.followUpDate ?? "");
+
+  function startEditing() {
+    setDraftNeeded(application.followUpNeeded);
+    setDraftDate(application.followUpDate ?? "");
+    setIsEditing(true);
+  }
+
+  function confirm() {
+    onUpdateApplication(application.id, {
+      followUpNeeded: draftNeeded,
+      followUpDate: draftDate || undefined,
+    });
+    setIsEditing(false);
+  }
+
+  if (!isEditing) {
+    return (
+      <div className="flex items-start gap-2">
+        <FollowUpCell application={application} />
+        <button className="icon-button h-8 w-8" onClick={startEditing} type="button">
+          <Pencil aria-hidden="true" size={15} />
+          <span className="sr-only">Edit follow-up</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        className="field-control min-h-9 px-2 py-1 text-xs"
+        onChange={(event) => setDraftDate(event.target.value)}
+        type="date"
+        value={draftDate}
+      />
+      <label className="flex items-center gap-2 text-xs font-medium text-foreground">
+        <input
+          checked={draftNeeded}
+          className="h-4 w-4 rounded border-border text-primary"
+          onChange={(event) => setDraftNeeded(event.target.checked)}
+          type="checkbox"
+        />
+        Needed
+      </label>
+      <div className="flex gap-1.5">
+        <button className="icon-button h-8 w-8" onClick={confirm} type="button">
+          <Check aria-hidden="true" size={15} />
+          <span className="sr-only">Confirm follow-up</span>
+        </button>
+        <button
+          className="icon-button h-8 w-8"
+          onClick={() => setIsEditing(false)}
+          type="button"
+        >
+          <X aria-hidden="true" size={15} />
+          <span className="sr-only">Cancel follow-up edit</span>
+        </button>
+      </div>
+    </div>
   );
 }
