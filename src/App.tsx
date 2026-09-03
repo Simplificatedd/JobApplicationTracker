@@ -26,8 +26,11 @@ export function App() {
     >
       {renderView(visibleView, tracker)}
       <AddApplicationModal
+        defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
+        onCreate={tracker.createApplication}
+        resumes={tracker.resumes}
       />
     </AppShell>
   );
