@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { ApplicationsTable } from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
+import { ContactsPanel } from "./ContactsPanel";
 import {
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
@@ -13,6 +14,7 @@ import {
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
+import type { ContactInput } from "../../store/useTrackerStore";
 import type {
   Activity,
   Application,
@@ -23,30 +25,39 @@ import type { UserSettings } from "../../types/settings";
 
 interface ApplicationsPageProps {
   activities: Activity[];
+  addContact: (input: ContactInput) => ApplicationContact;
   applications: Application[];
   archiveApplication: (id: string) => void;
   contacts: ApplicationContact[];
   deleteApplication: (id: string) => void;
+  deleteContact: (id: string) => void;
   enableDeleteActiveApplications: boolean;
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   settings: UserSettings;
+  updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
 }
 
 export function ApplicationsPage({
   activities,
+  addContact,
   applications,
   archiveApplication,
   contacts,
   deleteApplication,
+  deleteContact,
   enableDeleteActiveApplications,
   restoreApplication,
   resumes,
   settings,
+  updateContact,
   updateApplication,
 }: ApplicationsPageProps) {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
+    string | null
+  >(null);
+  const [contactsApplicationId, setContactsApplicationId] = useState<
     string | null
   >(null);
   const [filters, setFilters] = useState<ApplicationFilters>(
@@ -81,6 +92,13 @@ export function ApplicationsPage({
         (application) => application.id === selectedApplicationId,
       ),
     [applications, selectedApplicationId],
+  );
+  const contactsApplication = useMemo(
+    () =>
+      applications.find(
+        (application) => application.id === contactsApplicationId,
+      ),
+    [applications, contactsApplicationId],
   );
 
   return (
@@ -130,6 +148,7 @@ export function ApplicationsPage({
           }
         }}
         onOpenApplication={setSelectedApplicationId}
+        onOpenContacts={setContactsApplicationId}
         onRestoreApplication={restoreApplication}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
         onUpdateApplication={updateApplication}
@@ -154,6 +173,20 @@ export function ApplicationsPage({
               : undefined
           }
           resumes={resumes}
+        />
+      ) : null}
+
+      {contactsApplication ? (
+        <ContactsPanel
+          application={contactsApplication}
+          contacts={contacts.filter(
+            (contact) => contact.applicationId === contactsApplication.id,
+          )}
+          displayMode={settings.contactsDisplayMode}
+          onAddContact={addContact}
+          onClose={() => setContactsApplicationId(null)}
+          onDeleteContact={deleteContact}
+          onUpdateContact={updateContact}
         />
       ) : null}
     </div>

@@ -30,6 +30,7 @@ interface ApplicationsTableProps {
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
+  onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
@@ -60,6 +61,7 @@ export function ApplicationsTable({
   onArchiveApplication,
   onDeleteApplication,
   onOpenApplication,
+  onOpenContacts,
   onRestoreApplication,
   onSortChange,
   onUpdateApplication,
@@ -137,6 +139,7 @@ export function ApplicationsTable({
                   onArchiveApplication={onArchiveApplication}
                   onDeleteApplication={onDeleteApplication}
                   onOpenApplication={onOpenApplication}
+                  onOpenContacts={onOpenContacts}
                   onRestoreApplication={onRestoreApplication}
                   onUpdateApplication={onUpdateApplication}
                   resume={
@@ -176,6 +179,7 @@ function ApplicationRow({
   onArchiveApplication,
   onDeleteApplication,
   onOpenApplication,
+  onOpenContacts,
   onRestoreApplication,
   onUpdateApplication,
   resume,
@@ -185,6 +189,7 @@ function ApplicationRow({
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
+  onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
@@ -230,7 +235,10 @@ function ApplicationRow({
         <ResumeCell resume={resume} />
       </td>
       <td className="px-4 py-4">
-        <ContactsButton count={application.contactsCount} />
+        <ContactsButton
+          count={application.contactsCount}
+          onClick={() => onOpenContacts(application.id)}
+        />
       </td>
       <td className="px-4 py-4">
         <p className="text-sm text-foreground">

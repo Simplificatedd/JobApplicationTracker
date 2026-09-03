@@ -82,10 +82,17 @@ export function ResumeCell({ resume }: { resume?: ResumeFile }) {
   );
 }
 
-export function ContactsButton({ count }: { count: number }) {
+export function ContactsButton({
+  count,
+  onClick,
+}: {
+  count: number;
+  onClick?: () => void;
+}) {
   return (
     <button
       className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50"
+      onClick={onClick}
       type="button"
     >
       <MessageSquareText aria-hidden="true" size={16} />
