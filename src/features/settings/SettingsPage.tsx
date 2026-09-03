@@ -1,4 +1,4 @@
-import { RotateCcw, Settings } from "lucide-react";
+import { Info, RotateCcw, Settings } from "lucide-react";
 import { useState } from "react";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { UserSettings } from "../../types/settings";
@@ -72,26 +72,30 @@ export function SettingsPage({
         <SettingsGroup title="General Preferences">
           <ToggleButtonField
             checked={settings.navigationDisplayMode === "top"}
-            label="Place navigation at top"
-            offLabel="Side navigation"
+            description="Choose whether the main navigation sits on the left edge or across the top of the workspace."
+            label="Show navigation as:"
+            offLabel="Side navbar"
             onChange={(checked) =>
               onUpdateSettings({
                 navigationDisplayMode: checked ? "top" : "side",
               })
             }
-            onLabel="Top navigation"
+            onLabel="Top navbar"
           />
           <NumberField
-            label="Default follow-up prompt days"
+            description="Sets the default number of days before a newly added application should prompt you to follow up."
+            label="Follow-up prompt after:"
             min={1}
             onChange={(value) =>
               onUpdateSettings({ defaultFollowUpPromptDays: value })
             }
+            suffix="days"
             value={settings.defaultFollowUpPromptDays}
           />
           <ToggleButtonField
             checked={settings.addJobFormLayout === "stepped"}
-            label="Use step-by-step add job flow"
+            description="Choose between one long form or a guided step-by-step flow for adding applications."
+            label="Add job form as:"
             offLabel="Single form"
             onChange={(checked) =>
               onUpdateSettings({
@@ -102,8 +106,9 @@ export function SettingsPage({
           />
           <ToggleButtonField
             checked={settings.addJobPresentation === "page"}
-            label="Open add job as full page"
-            offLabel="Pop-up dialog"
+            description="Choose whether the add job experience opens over the current page or as its own page."
+            label="Open add job as:"
+            offLabel="Dialog"
             onChange={(checked) =>
               onUpdateSettings({
                 addJobPresentation: checked ? "page" : "modal",
@@ -116,7 +121,8 @@ export function SettingsPage({
         <SettingsGroup title="Contacts And Safety">
           <ToggleButtonField
             checked={settings.contactsDisplayMode === "modal"}
-            label="Open contacts as dialog"
+            description="Choose whether contacts open beside the application list or centered over the page."
+            label="Open contacts as:"
             offLabel="Side panel"
             onChange={(checked) =>
               onUpdateSettings({
@@ -127,7 +133,8 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.enableDeleteActiveApplications}
-            label="Allow deleting active applications"
+            description="When off, permanent delete is only available after an application has been archived."
+            label="Allow active application deletion"
             onChange={(checked) =>
               onUpdateSettings({ enableDeleteActiveApplications: checked })
             }
@@ -137,6 +144,7 @@ export function SettingsPage({
         <SettingsGroup title="Table Preferences">
           <ToggleField
             checked={settings.rememberTableState}
+            description="Keeps your current search, filters, and sorting preferences during the session."
             label="Remember table view"
             onChange={(checked) =>
               onUpdateSettings({ rememberTableState: checked })
@@ -144,7 +152,8 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.enableDraggableColumnWidths}
-            label="Draggable column widths"
+            description="Allows table columns to be resized manually once column resizing is supported."
+            label="Allow column resizing"
             onChange={(checked) =>
               onUpdateSettings({ enableDraggableColumnWidths: checked })
             }
@@ -153,6 +162,9 @@ export function SettingsPage({
             {DEFAULT_VISIBLE_APPLICATION_COLUMNS.map((column) => (
               <ToggleField
                 checked={settings.visibleApplicationColumns.includes(column)}
+                description={`Show or hide the ${formatColumnLabel(
+                  column,
+                ).toLowerCase()} column in the applications table.`}
                 key={column}
                 label={formatColumnLabel(column)}
                 onChange={(checked) => updateColumn(column, checked)}
@@ -164,6 +176,7 @@ export function SettingsPage({
         <SettingsGroup title="Alerts And Labs">
           <ToggleField
             checked={settings.enableNotificationBell}
+            description="Shows the notification button in the workspace header when reminders are available."
             label="Show notification bell"
             onChange={(checked) =>
               onUpdateSettings({ enableNotificationBell: checked })
@@ -171,6 +184,7 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.enableGroupedNotifications}
+            description="Groups reminder notifications into sections so related alerts are easier to scan."
             label="Group notifications by type"
             onChange={(checked) =>
               onUpdateSettings({ enableGroupedNotifications: checked })
@@ -178,7 +192,8 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.includeUpcomingInterviewsInAttention}
-            label="Upcoming interviews in needs-attention"
+            description="Adds upcoming interviews to the needs-attention filter, using the due-soon window below."
+            label="Include upcoming interviews in attention"
             onChange={(checked) =>
               onUpdateSettings({
                 includeUpcomingInterviewsInAttention: checked,
@@ -186,13 +201,16 @@ export function SettingsPage({
             }
           />
           <NumberField
-            label="Due-soon window days"
+            description="Controls how many days ahead counts as due soon for follow-ups and interviews."
+            label="Due soon means within:"
             min={1}
             onChange={(value) => onUpdateSettings({ dueSoonDays: value })}
+            suffix="days"
             value={settings.dueSoonDays}
           />
           <ToggleField
             checked={settings.betaAnalyticsEnabled}
+            description="Shows the experimental Analytics section in navigation."
             label="Enable analytics lab"
             onChange={(checked) =>
               onUpdateSettings({ betaAnalyticsEnabled: checked })
@@ -221,16 +239,18 @@ function SettingsGroup({
 
 function ToggleField({
   checked,
+  description,
   label,
   onChange,
 }: {
   checked: boolean;
+  description: string;
   label: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground">
-      <span>{label}</span>
+      <SettingLabel description={description} label={label} />
       <input
         checked={checked}
         className="h-4 w-4 rounded border-border text-primary"
@@ -243,12 +263,14 @@ function ToggleField({
 
 function ToggleButtonField({
   checked,
+  description,
   label,
   offLabel,
   onChange,
   onLabel,
 }: {
   checked: boolean;
+  description: string;
   label: string;
   offLabel: string;
   onChange: (checked: boolean) => void;
@@ -256,7 +278,7 @@ function ToggleButtonField({
 }) {
   return (
     <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground">
-      <span>{label}</span>
+      <SettingLabel description={description} label={label} />
       <button
         aria-pressed={checked}
         className={`h-8 min-w-32 rounded-md px-3 text-sm font-semibold transition ${
@@ -274,23 +296,25 @@ function ToggleButtonField({
 }
 
 function NumberField({
+  description,
   label,
   min,
   onChange,
+  suffix,
   value,
 }: {
+  description: string;
   label: string;
   min: number;
   onChange: (value: number) => void;
+  suffix?: string;
   value: number;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-foreground">
-        {label}
-      </span>
+    <label className="block rounded-lg border border-border bg-surface px-3 py-2">
+      <SettingLabel description={description} label={label} />
       <input
-        className="field-control"
+        className="field-control mt-2"
         min={min}
         onChange={(event) =>
           onChange(Math.max(min, Number(event.target.value) || min))
@@ -298,7 +322,41 @@ function NumberField({
         type="number"
         value={value}
       />
+      {suffix ? (
+        <span className="mt-1 block text-xs font-medium text-muted">
+          {suffix}
+        </span>
+      ) : null}
     </label>
+  );
+}
+
+function SettingLabel({
+  description,
+  label,
+}: {
+  description: string;
+  label: string;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0">{label}</span>
+      <InfoTooltip description={description} />
+    </span>
+  );
+}
+
+function InfoTooltip({ description }: { description: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0">
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-raised text-muted">
+        <Info aria-hidden="true" size={13} />
+        <span className="sr-only">Setting explanation</span>
+      </span>
+      <span className="pointer-events-none absolute left-1/2 top-7 z-30 hidden w-64 -translate-x-1/2 rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-medium leading-5 text-white shadow-popover group-hover:block">
+        {description}
+      </span>
+    </span>
   );
 }
 
