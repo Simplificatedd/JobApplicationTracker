@@ -1,4 +1,10 @@
-import type { JobApplication, ResumeFile } from "../types/application";
+import type {
+  Activity,
+  ApplicationContact,
+  Interview,
+  JobApplication,
+  ResumeFile,
+} from "../types/application";
 
 export const mockResumes: ResumeFile[] = [
   {
@@ -183,5 +189,143 @@ export const mockApplications: JobApplication[] = [
     contactsCount: 0,
     updatedAt: "2026-09-02T08:25:00+08:00",
     createdAt: "2026-08-29T11:50:00+08:00",
+  },
+];
+
+export const mockContacts: ApplicationContact[] = [
+  {
+    id: "contact-01",
+    applicationId: "app-01",
+    name: "Irene Koh",
+    role: "Recruiter",
+    email: "irene.koh@example.com",
+    phone: "+65 6123 4567",
+    linkedInUrl: "https://www.linkedin.com/in/example-irene",
+    notes: "Initial phone screen coordinator.",
+    createdAt: "2026-08-22T21:20:00+08:00",
+    updatedAt: "2026-08-30T10:00:00+08:00",
+  },
+  {
+    id: "contact-02",
+    applicationId: "app-01",
+    name: "Daniel Chua",
+    role: "Frontend Lead",
+    email: "daniel.chua@example.com",
+    notes: "Likely technical interviewer.",
+    createdAt: "2026-08-31T11:00:00+08:00",
+    updatedAt: "2026-08-31T11:00:00+08:00",
+  },
+  {
+    id: "contact-03",
+    applicationId: "app-02",
+    name: "Maya Tan",
+    role: "Referral contact",
+    linkedInUrl: "https://www.linkedin.com/in/example-maya",
+    notes: "Asked for a follow-up after one week.",
+    createdAt: "2026-08-25T20:35:00+08:00",
+    updatedAt: "2026-08-25T20:35:00+08:00",
+  },
+  {
+    id: "contact-04",
+    applicationId: "app-04",
+    name: "Sophia Lim",
+    role: "Hiring manager",
+    email: "sophia.lim@example.com",
+    createdAt: "2026-08-05T18:30:00+08:00",
+    updatedAt: "2026-08-26T16:10:00+08:00",
+  },
+  {
+    id: "contact-05",
+    applicationId: "app-04",
+    name: "Marcus Lee",
+    role: "Engineering mentor",
+    notes: "Discussed prototype expectations.",
+    createdAt: "2026-08-26T16:00:00+08:00",
+    updatedAt: "2026-08-26T16:00:00+08:00",
+  },
+  {
+    id: "contact-06",
+    applicationId: "app-04",
+    name: "Priya Nair",
+    role: "Recruiting coordinator",
+    email: "priya.nair@example.com",
+    createdAt: "2026-08-05T18:40:00+08:00",
+    updatedAt: "2026-08-05T18:40:00+08:00",
+  },
+  {
+    id: "contact-07",
+    applicationId: "app-05",
+    name: "Calvin Ong",
+    role: "Recruiter",
+    email: "calvin.ong@example.com",
+    createdAt: "2026-08-11T13:45:00+08:00",
+    updatedAt: "2026-08-28T16:00:00+08:00",
+  },
+];
+
+export const mockInterviews: Interview[] = [
+  {
+    id: "interview-01",
+    applicationId: "app-01",
+    dateTime: "2026-09-08T10:30:00+08:00",
+    type: "technical",
+    mode: "video",
+    platform: "Zoom",
+    proctored: false,
+    createdAt: "2026-08-31T11:05:00+08:00",
+    updatedAt: "2026-08-31T11:05:00+08:00",
+  },
+  {
+    id: "interview-02",
+    applicationId: "app-04",
+    dateTime: "2026-08-26T14:00:00+08:00",
+    type: "face-to-face",
+    mode: "onsite",
+    location: "Singapore office",
+    proctored: false,
+    createdAt: "2026-08-12T09:00:00+08:00",
+    updatedAt: "2026-08-26T16:00:00+08:00",
+  },
+  {
+    id: "interview-03",
+    applicationId: "app-06",
+    dateTime: "2026-09-06T23:59:00+08:00",
+    type: "HireVue",
+    mode: "video",
+    platform: "HireVue",
+    proctored: true,
+    createdAt: "2026-08-30T12:20:00+08:00",
+    updatedAt: "2026-08-30T12:20:00+08:00",
+  },
+];
+
+export const mockActivities: Activity[] = [
+  {
+    id: "activity-01",
+    applicationId: "app-01",
+    type: "created",
+    message: "Created application for Frontend Engineering Intern.",
+    createdAt: "2026-08-22T21:10:00+08:00",
+  },
+  {
+    id: "activity-02",
+    applicationId: "app-01",
+    type: "status_changed",
+    message: "Status changed to Pending Interview - Technical.",
+    createdAt: "2026-08-31T11:05:00+08:00",
+  },
+  {
+    id: "activity-03",
+    applicationId: "app-02",
+    type: "created",
+    message: "Created application for Software Engineer Intern.",
+    createdAt: "2026-08-25T20:20:00+08:00",
+  },
+  {
+    id: "activity-04",
+    applicationId: "app-04",
+    type: "status_changed",
+    message: "Status changed to Offered.",
+    createdAt: "2026-08-30T12:10:00+08:00",
   },
 ];

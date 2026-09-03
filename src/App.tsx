@@ -6,10 +6,12 @@ import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { ResumesPage } from "./features/resumes/ResumesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ENABLE_BETA_ANALYTICS } from "./lib/constants";
+import { useTrackerStore } from "./store/useTrackerStore";
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const tracker = useTrackerStore();
 
   const visibleView =
     currentView === "analytics" && !ENABLE_BETA_ANALYTICS
@@ -22,7 +24,7 @@ export function App() {
       onAddOpen={() => setIsAddOpen(true)}
       onViewChange={setCurrentView}
     >
-      {renderView(visibleView)}
+      {renderView(visibleView, tracker)}
       <AddApplicationModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
@@ -31,9 +33,14 @@ export function App() {
   );
 }
 
-function renderView(view: ViewKey) {
+function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) {
   if (view === "applications") {
-    return <ApplicationsPage />;
+    return (
+      <ApplicationsPage
+        applications={tracker.applications}
+        resumes={tracker.resumes}
+      />
+    );
   }
 
   if (view === "analytics") {

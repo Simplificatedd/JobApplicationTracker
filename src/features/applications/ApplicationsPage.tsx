@@ -1,21 +1,43 @@
 import { ApplicationsTable } from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
-import { mockApplications, mockResumes } from "../../lib/mockData";
+import type { Application, ResumeMetadata } from "../../types/application";
 
-export function ApplicationsPage() {
+interface ApplicationsPageProps {
+  applications: Application[];
+  resumes: ResumeMetadata[];
+}
+
+export function ApplicationsPage({
+  applications,
+  resumes,
+}: ApplicationsPageProps) {
+  const activeApplications = applications.filter(
+    (application) => !application.archivedAt,
+  );
+  const attentionCount = activeApplications.filter(
+    (application) => application.followUpNeeded || application.interviewDateTime,
+  ).length;
+  const interviewCount = activeApplications.filter(
+    (application) => application.interviewDateTime,
+  ).length;
+
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-3">
-        <SummaryMetric label="Active" value="4" />
-        <SummaryMetric label="Needs attention" value="3" tone="warning" />
-        <SummaryMetric label="Interviews" value="2" tone="info" />
+        <SummaryMetric label="Active" value={String(activeApplications.length)} />
+        <SummaryMetric
+          label="Needs attention"
+          value={String(attentionCount)}
+          tone="warning"
+        />
+        <SummaryMetric label="Interviews" value={String(interviewCount)} tone="info" />
       </section>
 
       <ApplicationsToolbar />
 
       <ApplicationsTable
-        applications={mockApplications}
-        resumes={mockResumes}
+        applications={activeApplications}
+        resumes={resumes}
       />
     </div>
   );
