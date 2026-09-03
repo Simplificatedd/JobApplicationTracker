@@ -22,6 +22,7 @@ export function App() {
       currentView={visibleView}
       enableBetaAnalytics={tracker.settings.betaAnalyticsEnabled}
       enableNotificationBell={tracker.settings.enableNotificationBell}
+      navigationDisplayMode={tracker.settings.navigationDisplayMode}
       onAddOpen={() => setIsAddOpen(true)}
       onViewChange={setCurrentView}
     >

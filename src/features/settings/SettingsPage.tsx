@@ -44,6 +44,19 @@ export function SettingsPage({
 
       <section className="grid gap-4 lg:grid-cols-2">
         <SettingsGroup title="Application Entry">
+          <SelectField
+            label="Navigation placement"
+            onChange={(value) =>
+              onUpdateSettings({
+                navigationDisplayMode:
+                  value as UserSettings["navigationDisplayMode"],
+              })
+            }
+            value={settings.navigationDisplayMode}
+          >
+            <option value="side">Side</option>
+            <option value="top">Top</option>
+          </SelectField>
           <NumberField
             label="Default follow-up prompt days"
             min={1}

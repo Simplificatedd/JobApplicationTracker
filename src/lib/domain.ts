@@ -29,6 +29,7 @@ export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultFollowUpPromptDays: 7,
   contactsDisplayMode: "side_panel",
+  navigationDisplayMode: "side",
   addJobFormLayout: "long_form",
   addJobPresentation: "modal",
   visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,

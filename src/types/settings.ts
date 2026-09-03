@@ -1,6 +1,7 @@
 export interface UserSettings {
   defaultFollowUpPromptDays: number;
   contactsDisplayMode: "side_panel" | "modal";
+  navigationDisplayMode: "side" | "top";
   addJobFormLayout: "long_form" | "stepped";
   addJobPresentation: "modal" | "page";
   visibleApplicationColumns: string[];
