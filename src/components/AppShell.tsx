@@ -107,22 +107,14 @@ export function AppShell({
 
         {isTopNavigation && !isNavigationHidden ? (
           <div className="border-b border-border bg-surface px-4 py-3 lg:px-8">
-            <div className="pl-12">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-lg font-semibold text-foreground">
-                    {APP_NAME}
-                  </p>
-                  <p className="hidden text-sm text-muted sm:block">
-                    Internship command center
-                  </p>
-                </div>
-                {enableNotificationBell ? (
-                  <button className="icon-button lg:hidden" type="button">
-                    <Bell aria-hidden="true" size={18} />
-                    <span className="sr-only">Notifications</span>
-                  </button>
-                ) : null}
+            <div className="flex min-w-0 items-center gap-3 pl-12">
+              <div className="min-w-[11rem] shrink-0">
+                <p className="truncate text-lg font-semibold text-foreground">
+                  {APP_NAME}
+                </p>
+                <p className="hidden truncate text-sm text-muted sm:block">
+                  Internship command center
+                </p>
               </div>
               <NavigationButtons
                 currentView={currentView}
@@ -130,6 +122,12 @@ export function AppShell({
                 layout="top"
                 onViewChange={onViewChange}
               />
+              {enableNotificationBell ? (
+                <button className="icon-button shrink-0 lg:hidden" type="button">
+                  <Bell aria-hidden="true" size={18} />
+                  <span className="sr-only">Notifications</span>
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -219,7 +217,7 @@ function NavigationButtons({
 }) {
   const navClass =
     layout === "top"
-      ? "mt-3 flex gap-2 overflow-x-auto pb-1"
+      ? "flex min-w-0 flex-1 gap-2 overflow-x-auto"
       : "mt-4 grid grid-cols-4 gap-2 lg:mt-8 lg:grid-cols-1";
 
   return (
