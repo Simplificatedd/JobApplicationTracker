@@ -128,7 +128,11 @@ export function AppShell({
         <main className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3 pl-12 lg:pl-0">
+              <div
+                className={`flex min-w-0 items-center gap-3 pl-12 ${
+                  isNavigationHidden ? "lg:pl-12" : "lg:pl-0"
+                }`}
+              >
                 <div className="min-w-0">
                   <p className="text-sm text-muted">Workspace</p>
                   <h1 className="truncate text-2xl font-semibold text-foreground">
