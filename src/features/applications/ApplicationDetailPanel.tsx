@@ -45,6 +45,8 @@ export function ApplicationDetailPanel({
   }
 
   function saveChanges() {
+    const isInterviewing = draft.status === "Interviewing";
+
     onUpdate(application.id, {
       company: draft.company.trim(),
       jobTitle: draft.jobTitle.trim() || application.jobTitle,
@@ -55,22 +57,33 @@ export function ApplicationDetailPanel({
       jobType: draft.jobType,
       source: trimOptional(draft.source),
       applicationUrl: trimOptional(draft.applicationUrl),
-      dateFound: trimOptional(draft.dateFound),
       dateApplied: trimOptional(draft.dateApplied),
       deadline: trimOptional(draft.deadline),
       roleStartDate: trimOptional(draft.roleStartDate),
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
-      interviewDateTime: trimOptional(draft.interviewDateTime),
-      interviewType: draft.interviewType,
-      interviewMode: draft.interviewMode,
-      interviewLocation: trimOptional(draft.interviewLocation),
-      interviewMeetingUrl: trimOptional(draft.interviewMeetingUrl),
-      interviewPlatform: trimOptional(draft.interviewPlatform),
-      interviewProctored: draft.interviewProctored,
-      interviewDeadline: trimOptional(draft.interviewDeadline),
-      nextAction: trimOptional(draft.nextAction),
+      interviewRound: isInterviewing
+        ? Number(draft.interviewRound) || undefined
+        : undefined,
+      interviewDateTime: isInterviewing
+        ? trimOptional(draft.interviewDateTime)
+        : undefined,
+      interviewType: isInterviewing ? draft.interviewType : undefined,
+      interviewMode: isInterviewing ? draft.interviewMode : undefined,
+      interviewLocation: isInterviewing
+        ? trimOptional(draft.interviewLocation)
+        : undefined,
+      interviewMeetingUrl: isInterviewing
+        ? trimOptional(draft.interviewMeetingUrl)
+        : undefined,
+      interviewPlatform: isInterviewing
+        ? trimOptional(draft.interviewPlatform)
+        : undefined,
+      interviewProctored: false,
+      interviewDeadline: isInterviewing
+        ? trimOptional(draft.interviewDeadline)
+        : undefined,
       priority: draft.priority,
       resumeId: trimOptional(draft.resumeId),
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
@@ -175,7 +188,6 @@ function ReadOnlyDetails({
         <DetailRow label="Work mode" value={application.workMode} />
         <DetailRow label="Job type" value={application.jobType} />
         <DetailRow label="Source" value={application.source} />
-        <DetailRow label="Date found" value={formatDate(application.dateFound)} />
         <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
         <DetailRow label="Deadline" value={formatDate(application.deadline)} />
         <DetailRow
@@ -194,7 +206,7 @@ function ReadOnlyDetails({
         />
         <DetailRow
           label="Interview"
-          value={`${formatDateTime(application.interviewDateTime)} / ${
+          value={`${application.interviewRound ? `Round ${application.interviewRound} / ` : ""}${formatDateTime(application.interviewDateTime)} / ${
             application.interviewType ?? "Type blank"
           }`}
         />
@@ -216,7 +228,6 @@ function ReadOnlyDetails({
 
       <TextBlock label="Job description" value={application.jobDescription} />
       <TextBlock label="Notes" value={application.notes} />
-      <TextBlock label="Next action" value={application.nextAction} />
 
       <section>
         <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
@@ -394,7 +405,6 @@ function EditForm({
           value={draft.applicationUrl}
         />
       </Field>
-      <DateField label="Date Found" name="dateFound" draft={draft} setDraft={setDraft} />
       <DateField
         label="Date Applied"
         name="dateApplied"
@@ -420,31 +430,44 @@ function EditForm({
         draft={draft}
         setDraft={setDraft}
       />
-      <Field label="Interview Date/Time">
-        <input
-          className="field-control"
-          onChange={(event) =>
-            updateDraft("interviewDateTime", event.target.value)
-          }
-          type="datetime-local"
-          value={draft.interviewDateTime}
-        />
-      </Field>
-      <Field label="Interview Type">
-        <select
-          className="field-control"
-          onChange={(event) =>
-            updateDraft("interviewType", event.target.value as InterviewType)
-          }
-          value={draft.interviewType}
-        >
-          <option value="unknown">Unknown</option>
-          <option value="technical">Technical</option>
-          <option value="face-to-face">Face-to-face</option>
-          <option value="HireVue">HireVue</option>
-          <option value="other">Other</option>
-        </select>
-      </Field>
+      {draft.status === "Interviewing" ? (
+        <>
+          <Field label="Interview Number">
+            <input
+              className="field-control"
+              min="1"
+              onChange={(event) => updateDraft("interviewRound", event.target.value)}
+              type="number"
+              value={draft.interviewRound}
+            />
+          </Field>
+          <Field label="Interview Type">
+            <select
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewType", event.target.value as InterviewType)
+              }
+              value={draft.interviewType}
+            >
+              <option value="unknown"></option>
+              <option value="technical">Technical</option>
+              <option value="face-to-face">Face-to-face</option>
+              <option value="HireVue">HireVue</option>
+              <option value="other">Other</option>
+            </select>
+          </Field>
+          <Field label="Interview Date/Time">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewDateTime", event.target.value)
+              }
+              type="datetime-local"
+              value={draft.interviewDateTime}
+            />
+          </Field>
+        </>
+      ) : null}
       <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
         <input
           checked={draft.followUpNeeded}
@@ -453,17 +476,6 @@ function EditForm({
           type="checkbox"
         />
         <span>Follow-up Needed</span>
-      </label>
-      <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-        <input
-          checked={draft.interviewProctored}
-          className="h-4 w-4 rounded border-border text-primary"
-          onChange={(event) =>
-            updateDraft("interviewProctored", event.target.checked)
-          }
-          type="checkbox"
-        />
-        <span>Proctored</span>
       </label>
       <Field className="md:col-span-2" label="Job Description">
         <textarea
@@ -479,13 +491,6 @@ function EditForm({
           value={draft.notes}
         />
       </Field>
-      <Field className="md:col-span-2" label="Next Action">
-        <textarea
-          className="field-control min-h-20 resize-y"
-          onChange={(event) => updateDraft("nextAction", event.target.value)}
-          value={draft.nextAction}
-        />
-      </Field>
     </div>
   );
 }
@@ -499,7 +504,6 @@ function DateField({
   draft: ApplicationDraft;
   label: string;
   name:
-    | "dateFound"
     | "dateApplied"
     | "deadline"
     | "roleStartDate"
@@ -590,22 +594,22 @@ function toDraft(application: Application) {
     jobType: application.jobType,
     source: application.source ?? "",
     applicationUrl: application.applicationUrl ?? "",
-    dateFound: application.dateFound ?? "",
     dateApplied: application.dateApplied ?? "",
     deadline: application.deadline ?? "",
     roleStartDate: application.roleStartDate ?? "",
     roleEndDate: application.roleEndDate ?? "",
     followUpNeeded: application.followUpNeeded,
     followUpDate: application.followUpDate ?? "",
+    interviewRound: application.interviewRound
+      ? String(application.interviewRound)
+      : "",
     interviewDateTime: toDateTimeLocal(application.interviewDateTime),
     interviewType: application.interviewType ?? "unknown",
     interviewMode: application.interviewMode ?? "other",
     interviewLocation: application.interviewLocation ?? "",
     interviewMeetingUrl: application.interviewMeetingUrl ?? "",
     interviewPlatform: application.interviewPlatform ?? "",
-    interviewProctored: application.interviewProctored,
     interviewDeadline: toDateTimeLocal(application.interviewDeadline),
-    nextAction: application.nextAction ?? "",
     priority: application.priority,
     resumeId: application.resumeId ?? "",
     coverLetterVersion: application.coverLetterVersion ?? "",

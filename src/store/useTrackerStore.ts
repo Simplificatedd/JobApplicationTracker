@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -87,6 +87,48 @@ export function useTrackerStore(): TrackerStore {
     DEFAULT_NOTIFICATION_STATE,
   );
 
+  useEffect(() => {
+    const now = new Date();
+    const transitionedApplications = applications.filter(
+      (application) =>
+        application.status === "Just Applied" &&
+        application.dateApplied &&
+        daysSince(application.dateApplied, now) >=
+          (application.followUpPromptDays ?? settings.defaultFollowUpPromptDays),
+    );
+
+    if (transitionedApplications.length === 0) {
+      return;
+    }
+
+    const updatedAt = createTimestamp(now);
+
+    setApplications((current) =>
+      current.map((application) =>
+        transitionedApplications.some(
+          (transitioned) => transitioned.id === application.id,
+        )
+          ? {
+              ...application,
+              status: "Awaiting Response",
+              updatedAt,
+            }
+          : application,
+      ),
+    );
+    setActivities((current) => [
+      ...transitionedApplications.map((application) => ({
+        id: createId("activity"),
+        applicationId: application.id,
+        type: "status_changed" as const,
+        message:
+          "Status changed to Awaiting Response after the follow-up window elapsed.",
+        createdAt: updatedAt,
+      })),
+      ...current,
+    ]);
+  }, [applications, settings.defaultFollowUpPromptDays]);
+
   function appendActivity(
     applicationId: string,
     type: Activity["type"],
@@ -110,7 +152,7 @@ export function useTrackerStore(): TrackerStore {
       ...input,
       id: createId("app"),
       dateApplied: input.dateApplied || createDateStamp(),
-      status: input.status || "Applied",
+      status: input.status || "Just Applied",
       contactsCount: 0,
       createdAt,
       updatedAt: createdAt,
@@ -129,6 +171,7 @@ export function useTrackerStore(): TrackerStore {
           id: createId("interview"),
           applicationId: application.id,
           dateTime: application.interviewDateTime,
+          round: application.interviewRound,
           type: application.interviewType ?? "unknown",
           mode: application.interviewMode ?? "other",
           location: application.interviewLocation,
@@ -168,7 +211,11 @@ export function useTrackerStore(): TrackerStore {
       }),
     );
 
-    if (input.interviewDateTime !== undefined || input.interviewType) {
+    if (
+      "interviewDateTime" in input ||
+      "interviewRound" in input ||
+      "interviewType" in input
+    ) {
       setInterviews((current) => {
         const existing = current.find(
           (interview) => interview.applicationId === id,
@@ -184,6 +231,7 @@ export function useTrackerStore(): TrackerStore {
               id: createId("interview"),
               applicationId: id,
               dateTime: input.interviewDateTime,
+              round: input.interviewRound,
               type: input.interviewType ?? "unknown",
               mode: input.interviewMode ?? "other",
               location: input.interviewLocation,
@@ -203,6 +251,7 @@ export function useTrackerStore(): TrackerStore {
             ? {
                 ...interview,
                 dateTime: input.interviewDateTime,
+                round: input.interviewRound ?? interview.round,
                 type: input.interviewType ?? interview.type,
                 mode: input.interviewMode ?? interview.mode,
                 location: input.interviewLocation,
@@ -225,7 +274,6 @@ export function useTrackerStore(): TrackerStore {
   function archiveApplication(id: string) {
     updateApplication(id, {
       archivedAt: createTimestamp(),
-      status: "Archived",
     });
     appendActivity(id, "archived", "Archived application.");
   }
@@ -233,7 +281,6 @@ export function useTrackerStore(): TrackerStore {
   function restoreApplication(id: string) {
     updateApplication(id, {
       archivedAt: undefined,
-      status: "Applied",
     });
     appendActivity(id, "restored", "Restored application.");
   }
@@ -374,4 +421,11 @@ export function useTrackerStore(): TrackerStore {
     updateSettings,
     resetSettings,
   };
+}
+
+function daysSince(dateStamp: string, now: Date) {
+  const date = new Date(dateStamp);
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+  return Math.floor((now.getTime() - date.getTime()) / millisecondsPerDay);
 }

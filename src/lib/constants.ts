@@ -11,13 +11,10 @@ export const STATUS_TONE: Record<
   ApplicationStatus,
   "info" | "warning" | "success" | "neutral" | "danger"
 > = {
-  Applied: "info",
+  "Just Applied": "info",
   "Awaiting Response": "warning",
-  "Pending Interview - Technical": "warning",
-  "Pending Interview - Face-to-Face": "warning",
-  "Pending Interview - HireVue": "warning",
+  Interviewing: "warning",
   Offered: "success",
   Rejected: "danger",
   Withdrawn: "neutral",
-  Archived: "neutral",
 };

@@ -31,7 +31,6 @@ interface AddApplicationFormState {
   jobType: JobType;
   source: string;
   applicationUrl: string;
-  dateFound: string;
   dateApplied: string;
   deadline: string;
   deadlineEntryMode: DeadlineEntryMode;
@@ -40,15 +39,9 @@ interface AddApplicationFormState {
   followUpNeeded: boolean;
   followUpDate: string;
   followUpPromptDays: string;
+  interviewRound: string;
   interviewDateTime: string;
   interviewType: ApplicationInput["interviewType"];
-  interviewMode: ApplicationInput["interviewMode"];
-  interviewLocation: string;
-  interviewMeetingUrl: string;
-  interviewPlatform: string;
-  interviewProctored: boolean;
-  interviewDeadline: string;
-  nextAction: string;
   priority: Priority;
   resumeId: string;
   coverLetterVersion: string;
@@ -66,7 +59,6 @@ const initialFormState: AddApplicationFormState = {
   jobType: "internship",
   source: "",
   applicationUrl: "",
-  dateFound: "",
   dateApplied: "",
   deadline: "",
   deadlineEntryMode: "exact",
@@ -75,15 +67,9 @@ const initialFormState: AddApplicationFormState = {
   followUpNeeded: false,
   followUpDate: "",
   followUpPromptDays: "",
+  interviewRound: "",
   interviewDateTime: "",
   interviewType: "unknown",
-  interviewMode: "other",
-  interviewLocation: "",
-  interviewMeetingUrl: "",
-  interviewPlatform: "",
-  interviewProctored: false,
-  interviewDeadline: "",
-  nextAction: "",
   priority: "medium",
   resumeId: "",
   coverLetterVersion: "",
@@ -132,17 +118,18 @@ export function AddApplicationModal({
       return;
     }
 
+    const isInterviewing = form.status === "Interviewing";
+
     onCreate({
       company: trimOptional(form.company) ?? "",
       jobTitle: trimmedTitle,
       jobDescription: trimOptional(form.jobDescription) ?? "",
-      status: form.status || "Applied",
+      status: form.status || "Just Applied",
       location: trimOptional(form.location),
       workMode: form.workMode,
       jobType: form.jobType,
       source: trimOptional(form.source),
       applicationUrl: trimOptional(form.applicationUrl),
-      dateFound: trimOptional(form.dateFound),
       dateApplied: trimOptional(form.dateApplied),
       deadline: trimOptional(form.deadline),
       deadlineEntryMode: form.deadlineEntryMode,
@@ -152,15 +139,18 @@ export function AddApplicationModal({
       followUpDate: trimOptional(form.followUpDate),
       followUpPromptDays:
         Number(form.followUpPromptDays) || defaultFollowUpPromptDays,
-      interviewDateTime: trimOptional(form.interviewDateTime),
-      interviewType: form.interviewType,
-      interviewMode: form.interviewMode,
-      interviewLocation: trimOptional(form.interviewLocation),
-      interviewMeetingUrl: trimOptional(form.interviewMeetingUrl),
-      interviewPlatform: trimOptional(form.interviewPlatform),
-      interviewProctored: form.interviewProctored,
-      interviewDeadline: trimOptional(form.interviewDeadline),
-      nextAction: trimOptional(form.nextAction),
+      interviewRound:
+        isInterviewing ? Number(form.interviewRound) || undefined : undefined,
+      interviewDateTime: isInterviewing
+        ? trimOptional(form.interviewDateTime)
+        : undefined,
+      interviewType: isInterviewing ? form.interviewType : undefined,
+      interviewMode: undefined,
+      interviewLocation: undefined,
+      interviewMeetingUrl: undefined,
+      interviewPlatform: undefined,
+      interviewProctored: false,
+      interviewDeadline: undefined,
       priority: form.priority,
       resumeId: trimOptional(form.resumeId),
       coverLetterVersion: trimOptional(form.coverLetterVersion),
@@ -217,6 +207,16 @@ export function AddApplicationModal({
               ) : null}
             </Field>
 
+            <Field className="md:col-span-2" label="Job Description">
+              <textarea
+                className="field-control min-h-28 resize-y"
+                onChange={(event) =>
+                  updateForm("jobDescription", event.target.value)
+                }
+                value={form.jobDescription}
+              />
+            </Field>
+
             <Field label="Company">
               <input
                 className="field-control"
@@ -242,6 +242,42 @@ export function AddApplicationModal({
                 ))}
               </select>
             </Field>
+
+            {form.status === "Interviewing" ? (
+              <>
+                <Field label="Interview Number">
+                  <input
+                    className="field-control"
+                    min="1"
+                    onChange={(event) =>
+                      updateForm("interviewRound", event.target.value)
+                    }
+                    type="number"
+                    value={form.interviewRound}
+                  />
+                </Field>
+
+                <Field label="Interview Type">
+                  <select
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm(
+                        "interviewType",
+                        event.target
+                          .value as AddApplicationFormState["interviewType"],
+                      )
+                    }
+                    value={form.interviewType}
+                  >
+                    <option value="unknown"></option>
+                    <option value="technical">Technical</option>
+                    <option value="face-to-face">Face-to-face</option>
+                    <option value="HireVue">HireVue</option>
+                    <option value="other">Other</option>
+                  </select>
+                </Field>
+              </>
+            ) : null}
 
             <Field label="Applied Date">
               <input
@@ -270,16 +306,18 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Interview Date/Time">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("interviewDateTime", event.target.value)
-                }
-                type="datetime-local"
-                value={form.interviewDateTime}
-              />
-            </Field>
+            {form.status === "Interviewing" ? (
+              <Field label="Interview Date/Time">
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("interviewDateTime", event.target.value)
+                  }
+                  type="datetime-local"
+                  value={form.interviewDateTime}
+                />
+              </Field>
+            ) : null}
 
             <Field label="Resume">
               <select
@@ -360,15 +398,6 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Date Found">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("dateFound", event.target.value)}
-                type="date"
-                value={form.dateFound}
-              />
-            </Field>
-
             <Field label="Role Start Date">
               <input
                 className="field-control"
@@ -431,109 +460,6 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Interview Type">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm(
-                    "interviewType",
-                    event.target.value as AddApplicationFormState["interviewType"],
-                  )
-                }
-                value={form.interviewType}
-              >
-                <option value="unknown">Unknown</option>
-                <option value="technical">Technical</option>
-                <option value="face-to-face">Face-to-face</option>
-                <option value="HireVue">HireVue</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
-
-            <Field label="Interview Mode">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm(
-                    "interviewMode",
-                    event.target.value as AddApplicationFormState["interviewMode"],
-                  )
-                }
-                value={form.interviewMode}
-              >
-                <option value="other">Other</option>
-                <option value="phone">Phone</option>
-                <option value="video">Video</option>
-                <option value="onsite">Onsite</option>
-                <option value="take-home">Take-home</option>
-              </select>
-            </Field>
-
-            <Field label="Interview Location">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("interviewLocation", event.target.value)
-                }
-                type="text"
-                value={form.interviewLocation}
-              />
-            </Field>
-
-            <Field label="Meeting URL">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("interviewMeetingUrl", event.target.value)
-                }
-                type="url"
-                value={form.interviewMeetingUrl}
-              />
-            </Field>
-
-            <Field label="Platform">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("interviewPlatform", event.target.value)
-                }
-                type="text"
-                value={form.interviewPlatform}
-              />
-            </Field>
-
-            <Field label="Interview Deadline">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("interviewDeadline", event.target.value)
-                }
-                type="datetime-local"
-                value={form.interviewDeadline}
-              />
-            </Field>
-
-            <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-              <input
-                checked={form.interviewProctored}
-                className="h-4 w-4 rounded border-border text-primary"
-                onChange={(event) =>
-                  updateForm("interviewProctored", event.target.checked)
-                }
-                type="checkbox"
-              />
-              <span>Proctored</span>
-            </label>
-
-            <Field label="Next Action">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("nextAction", event.target.value)}
-                type="text"
-                value={form.nextAction}
-              />
-            </Field>
-
             <Field label="Priority">
               <select
                 className="field-control"
@@ -565,16 +491,6 @@ export function AddApplicationModal({
                 onChange={(event) => updateForm("salary", event.target.value)}
                 type="text"
                 value={form.salary}
-              />
-            </Field>
-
-            <Field className="md:col-span-2" label="Job Description">
-              <textarea
-                className="field-control min-h-32 resize-y"
-                onChange={(event) =>
-                  updateForm("jobDescription", event.target.value)
-                }
-                value={form.jobDescription}
               />
             </Field>
 

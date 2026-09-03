@@ -3,15 +3,12 @@ import type { ApplicationStatus } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [
-  "Applied",
+  "Just Applied",
   "Awaiting Response",
-  "Pending Interview - Technical",
-  "Pending Interview - Face-to-Face",
-  "Pending Interview - HireVue",
+  "Interviewing",
   "Offered",
   "Rejected",
   "Withdrawn",
-  "Archived",
 ];
 
 export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [

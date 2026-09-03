@@ -1,13 +1,10 @@
 export type ApplicationStatus =
-  | "Applied"
+  | "Just Applied"
   | "Awaiting Response"
-  | "Pending Interview - Technical"
-  | "Pending Interview - Face-to-Face"
-  | "Pending Interview - HireVue"
+  | "Interviewing"
   | "Offered"
   | "Rejected"
-  | "Withdrawn"
-  | "Archived";
+  | "Withdrawn";
 
 export type WorkMode = "remote" | "hybrid" | "onsite" | "unknown";
 
@@ -59,6 +56,7 @@ export interface Application {
   followUpNeeded: boolean;
   followUpDate?: string;
   followUpPromptDays?: number;
+  interviewRound?: number;
   interviewDateTime?: string;
   interviewType?: InterviewType;
   interviewMode?: InterviewMode;
@@ -101,6 +99,7 @@ export interface Interview {
   id: string;
   applicationId: string;
   dateTime?: string;
+  round?: number;
   type: InterviewType;
   mode: InterviewMode;
   location?: string;
