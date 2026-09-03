@@ -1,20 +1,11 @@
 import type { ApplicationStatus } from "../types/application";
+import { APPLICATION_STATUSES as DOMAIN_APPLICATION_STATUSES } from "./domain";
 
 export const ENABLE_BETA_ANALYTICS = true;
 
 export const APP_NAME = "Job Application Tracker";
 
-export const APPLICATION_STATUSES: ApplicationStatus[] = [
-  "Applied",
-  "Awaiting Response",
-  "Pending Interview - Technical",
-  "Pending Interview - Face-to-Face",
-  "Pending Interview - HireVue",
-  "Offered",
-  "Rejected",
-  "Withdrawn",
-  "Archived",
-];
+export const APPLICATION_STATUSES = DOMAIN_APPLICATION_STATUSES;
 
 export const STATUS_TONE: Record<
   ApplicationStatus,
