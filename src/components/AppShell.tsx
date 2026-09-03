@@ -5,6 +5,8 @@ import {
   FileText,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelTopClose,
+  PanelTopOpen,
   Plus,
   Settings,
 } from "lucide-react";
@@ -60,23 +62,31 @@ export function AppShell({
   const addLabel = currentView === "resumes" ? "Upload resume" : "Add job";
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "lg:pl-0" : "lg:pl-12";
+  const ToggleIcon = isTopNavigation
+    ? isNavigationHidden
+      ? PanelTopOpen
+      : PanelTopClose
+    : isNavigationHidden
+      ? PanelLeftOpen
+      : PanelLeftClose;
+  const toggleLabel = isTopNavigation
+    ? isNavigationHidden
+      ? "Show top navigation"
+      : "Hide top navigation"
+    : isNavigationHidden
+      ? "Show side navigation"
+      : "Hide side navigation";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <button
         aria-pressed={!isNavigationHidden}
+        aria-label={toggleLabel}
         className="icon-button fixed left-4 top-4 z-50 bg-surface shadow-sm"
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
       >
-        {isNavigationHidden ? (
-          <PanelLeftOpen aria-hidden="true" size={18} />
-        ) : (
-          <PanelLeftClose aria-hidden="true" size={18} />
-        )}
-        <span className="sr-only">
-          {isNavigationHidden ? "Show navigation" : "Hide navigation"}
-        </span>
+        <ToggleIcon aria-hidden="true" size={18} />
       </button>
       <div
         className={`app-container flex min-h-screen flex-col ${
