@@ -1,10 +1,11 @@
 import {
+  Archive,
   CalendarClock,
   FileText,
   MoreHorizontal,
   MessageSquareText,
+  RotateCcw,
   Trash2,
-  Archive,
 } from "lucide-react";
 import { formatDate, formatDateTime } from "../../lib/format";
 import type { JobApplication, ResumeFile } from "../../types/application";
@@ -93,7 +94,31 @@ export function ContactsButton({ count }: { count: number }) {
   );
 }
 
-export function RowActionsMenu() {
+export function RowActionsMenu({
+  application,
+  enableDeleteActiveApplications,
+  onArchiveApplication,
+  onDeleteApplication,
+  onRestoreApplication,
+}: {
+  application: JobApplication;
+  enableDeleteActiveApplications: boolean;
+  onArchiveApplication: (applicationId: string) => void;
+  onDeleteApplication: (applicationId: string) => void;
+  onRestoreApplication: (applicationId: string) => void;
+}) {
+  const canDelete = Boolean(application.archivedAt) || enableDeleteActiveApplications;
+
+  function confirmDelete() {
+    const confirmed = window.confirm(
+      `Delete "${application.jobTitle}" permanently? This also removes linked contacts, interviews, and activity.`,
+    );
+
+    if (confirmed) {
+      onDeleteApplication(application.id);
+    }
+  }
+
   return (
     <details className="group relative">
       <summary className="icon-button list-none [&::-webkit-details-marker]:hidden">
@@ -101,20 +126,35 @@ export function RowActionsMenu() {
         <span className="sr-only">Open row actions</span>
       </summary>
       <div className="absolute right-0 top-11 z-10 w-44 rounded-lg border border-border bg-surface p-1 shadow-popover">
-        <button
-          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
-          type="button"
-        >
-          <Archive aria-hidden="true" size={16} />
-          Archive
-        </button>
-        <button
-          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive hover:bg-red-50"
-          type="button"
-        >
-          <Trash2 aria-hidden="true" size={16} />
-          Delete
-        </button>
+        {application.archivedAt ? (
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+            onClick={() => onRestoreApplication(application.id)}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={16} />
+            Restore
+          </button>
+        ) : (
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+            onClick={() => onArchiveApplication(application.id)}
+            type="button"
+          >
+            <Archive aria-hidden="true" size={16} />
+            Archive
+          </button>
+        )}
+        {canDelete ? (
+          <button
+            className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700"
+            onClick={confirmDelete}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" size={16} />
+            Delete
+          </button>
+        ) : null}
       </div>
     </details>
   );

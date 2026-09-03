@@ -10,7 +10,15 @@ import {
 import type { ReactNode } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 
-export function ApplicationsToolbar() {
+interface ApplicationsToolbarProps {
+  archivedFilter?: "active" | "archived" | "all";
+  onArchivedFilterChange?: (value: "active" | "archived" | "all") => void;
+}
+
+export function ApplicationsToolbar({
+  archivedFilter = "active",
+  onArchivedFilterChange,
+}: ApplicationsToolbarProps) {
   return (
     <section className="surface-panel rounded-lg p-4">
       <div className="grid gap-3 lg:grid-cols-[minmax(280px,380px)_1fr] lg:items-start">
@@ -54,10 +62,19 @@ export function ApplicationsToolbar() {
             <option>Unassigned</option>
           </FilterSelect>
 
-          <FilterSelect icon={Archive} label="Archived">
-            <option>Archived</option>
-            <option>Visible</option>
-            <option>Hidden</option>
+          <FilterSelect
+            icon={Archive}
+            label="Archived"
+            onChange={(value) =>
+              onArchivedFilterChange?.(
+                value as "active" | "archived" | "all",
+              )
+            }
+            value={archivedFilter}
+          >
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="all">All</option>
           </FilterSelect>
 
           <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground">
@@ -77,10 +94,14 @@ function FilterSelect({
   children,
   icon: Icon,
   label,
+  onChange,
+  value,
 }: {
   children: ReactNode;
   icon: typeof SlidersHorizontal;
   label: string;
+  onChange?: (value: string) => void;
+  value?: string;
 }) {
   return (
     <label className="relative block min-w-0">
@@ -90,7 +111,11 @@ function FilterSelect({
         size={16}
       />
       <span className="sr-only">{label}</span>
-      <select className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground">
+      <select
+        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground"
+        onChange={(event) => onChange?.(event.target.value)}
+        value={value}
+      >
         {children}
       </select>
       <ChevronDown

@@ -23,7 +23,11 @@ import type { ApplicationUpdate } from "../../store/useTrackerStore";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  enableDeleteActiveApplications: boolean;
+  onArchiveApplication: (applicationId: string) => void;
+  onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
+  onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
 }
@@ -45,7 +49,11 @@ const columns: Array<{
 
 export function ApplicationsTable({
   applications,
+  enableDeleteActiveApplications,
+  onArchiveApplication,
+  onDeleteApplication,
   onOpenApplication,
+  onRestoreApplication,
   onUpdateApplication,
   resumes,
 }: ApplicationsTableProps) {
@@ -98,8 +106,12 @@ export function ApplicationsTable({
               {applications.map((application) => (
                 <ApplicationRow
                   application={application}
+                  enableDeleteActiveApplications={enableDeleteActiveApplications}
                   key={application.id}
+                  onArchiveApplication={onArchiveApplication}
+                  onDeleteApplication={onDeleteApplication}
                   onOpenApplication={onOpenApplication}
+                  onRestoreApplication={onRestoreApplication}
                   onUpdateApplication={onUpdateApplication}
                   resume={
                     application.resumeId
@@ -134,12 +146,20 @@ function SortIcon({
 
 function ApplicationRow({
   application,
+  enableDeleteActiveApplications,
+  onArchiveApplication,
+  onDeleteApplication,
   onOpenApplication,
+  onRestoreApplication,
   onUpdateApplication,
   resume,
 }: {
   application: JobApplication;
+  enableDeleteActiveApplications: boolean;
+  onArchiveApplication: (applicationId: string) => void;
+  onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
+  onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
 }) {
@@ -192,7 +212,13 @@ function ApplicationRow({
         </p>
       </td>
       <td className="px-4 py-4">
-        <RowActionsMenu />
+        <RowActionsMenu
+          application={application}
+          enableDeleteActiveApplications={enableDeleteActiveApplications}
+          onArchiveApplication={onArchiveApplication}
+          onDeleteApplication={onDeleteApplication}
+          onRestoreApplication={onRestoreApplication}
+        />
       </td>
     </tr>
   );

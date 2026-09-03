@@ -30,7 +30,9 @@ export type ApplicationInput = Omit<
   "id" | "contactsCount" | "createdAt" | "updatedAt" | "archivedAt"
 >;
 
-export type ApplicationUpdate = Partial<ApplicationInput>;
+export type ApplicationUpdate = Partial<
+  Omit<Application, "id" | "contactsCount" | "createdAt" | "updatedAt">
+>;
 
 export type ContactInput = Omit<
   ApplicationContact,
@@ -224,7 +226,7 @@ export function useTrackerStore(): TrackerStore {
     updateApplication(id, {
       archivedAt: createTimestamp(),
       status: "Archived",
-    } as ApplicationUpdate);
+    });
     appendActivity(id, "archived", "Archived application.");
   }
 
@@ -232,7 +234,7 @@ export function useTrackerStore(): TrackerStore {
     updateApplication(id, {
       archivedAt: undefined,
       status: "Applied",
-    } as ApplicationUpdate);
+    });
     appendActivity(id, "restored", "Restored application.");
   }
 

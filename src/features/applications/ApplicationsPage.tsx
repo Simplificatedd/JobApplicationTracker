@@ -10,10 +10,16 @@ import type {
   ResumeMetadata,
 } from "../../types/application";
 
+type ArchivedFilter = "active" | "archived" | "all";
+
 interface ApplicationsPageProps {
   activities: Activity[];
   applications: Application[];
+  archiveApplication: (id: string) => void;
   contacts: ApplicationContact[];
+  deleteApplication: (id: string) => void;
+  enableDeleteActiveApplications: boolean;
+  restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   updateApplication: (id: string, input: ApplicationUpdate) => void;
 }
@@ -21,16 +27,33 @@ interface ApplicationsPageProps {
 export function ApplicationsPage({
   activities,
   applications,
+  archiveApplication,
   contacts,
+  deleteApplication,
+  enableDeleteActiveApplications,
+  restoreApplication,
   resumes,
   updateApplication,
 }: ApplicationsPageProps) {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
     string | null
   >(null);
+  const [archivedFilter, setArchivedFilter] =
+    useState<ArchivedFilter>("active");
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
+  const visibleApplications = applications.filter((application) => {
+    if (archivedFilter === "archived") {
+      return Boolean(application.archivedAt);
+    }
+
+    if (archivedFilter === "all") {
+      return true;
+    }
+
+    return !application.archivedAt;
+  });
   const attentionCount = activeApplications.filter(
     (application) => application.followUpNeeded || application.interviewDateTime,
   ).length;
@@ -57,11 +80,23 @@ export function ApplicationsPage({
         <SummaryMetric label="Interviews" value={String(interviewCount)} tone="info" />
       </section>
 
-      <ApplicationsToolbar />
+      <ApplicationsToolbar
+        archivedFilter={archivedFilter}
+        onArchivedFilterChange={setArchivedFilter}
+      />
 
       <ApplicationsTable
-        applications={activeApplications}
+        applications={visibleApplications}
+        enableDeleteActiveApplications={enableDeleteActiveApplications}
+        onArchiveApplication={archiveApplication}
+        onDeleteApplication={(id) => {
+          deleteApplication(id);
+          if (id === selectedApplicationId) {
+            setSelectedApplicationId(null);
+          }
+        }}
         onOpenApplication={setSelectedApplicationId}
+        onRestoreApplication={restoreApplication}
         onUpdateApplication={updateApplication}
         resumes={resumes}
       />

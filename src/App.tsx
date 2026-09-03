@@ -42,7 +42,13 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
       <ApplicationsPage
         activities={tracker.activities}
         applications={tracker.applications}
+        archiveApplication={tracker.archiveApplication}
         contacts={tracker.contacts}
+        deleteApplication={tracker.deleteApplication}
+        enableDeleteActiveApplications={
+          tracker.settings.enableDeleteActiveApplications
+        }
+        restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         updateApplication={tracker.updateApplication}
       />
