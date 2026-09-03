@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AppShell, type ViewKey } from "./components/AppShell";
+import { ApplicationsPage } from "./features/applications/ApplicationsPage";
 import { ENABLE_BETA_ANALYTICS } from "./lib/constants";
 
 const pageCopy: Record<ViewKey, { title: string; eyebrow: string }> = {
@@ -38,16 +39,20 @@ export function App() {
       onAddOpen={() => setIsAddOpen(true)}
       onViewChange={setCurrentView}
     >
-      <section className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed border-border bg-surface px-6 py-12 text-center">
-        <div className="max-w-md">
-          <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted">
-            {pageCopy[visibleView].title}
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold text-foreground">
-            {pageCopy[visibleView].eyebrow}
-          </h1>
-        </div>
-      </section>
+      {visibleView === "applications" ? (
+        <ApplicationsPage />
+      ) : (
+        <section className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed border-border bg-surface px-6 py-12 text-center">
+          <div className="max-w-md">
+            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted">
+              {pageCopy[visibleView].title}
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-foreground">
+              {pageCopy[visibleView].eyebrow}
+            </h2>
+          </div>
+        </section>
+      )}
     </AppShell>
   );
 }
