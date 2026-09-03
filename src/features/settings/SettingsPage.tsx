@@ -1,4 +1,5 @@
 import { RotateCcw, Settings } from "lucide-react";
+import { useState } from "react";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { UserSettings } from "../../types/settings";
 
@@ -13,6 +14,8 @@ export function SettingsPage({
   onUpdateSettings,
   settings,
 }: SettingsPageProps) {
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+
   function updateColumn(column: string, checked: boolean) {
     onUpdateSettings({
       visibleApplicationColumns: checked
@@ -31,32 +34,53 @@ export function SettingsPage({
               Tracker preferences
             </h2>
           </div>
-          <button
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-            onClick={onResetSettings}
-            type="button"
-          >
-            <RotateCcw aria-hidden="true" size={16} />
-            Reset
-          </button>
+          {isConfirmingReset ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                onClick={() => {
+                  onResetSettings();
+                  setIsConfirmingReset(false);
+                }}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" size={16} />
+                Confirm reset
+              </button>
+              <button
+                className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                onClick={() => setIsConfirmingReset(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              onClick={() => setIsConfirmingReset(true)}
+              type="button"
+            >
+              <RotateCcw aria-hidden="true" size={16} />
+              Reset
+            </button>
+          )}
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <SettingsGroup title="Application Entry">
-          <SelectField
-            label="Navigation placement"
-            onChange={(value) =>
+        <SettingsGroup title="General Preferences">
+          <ToggleButtonField
+            checked={settings.navigationDisplayMode === "top"}
+            label="Place navigation at top"
+            offLabel="Side navigation"
+            onChange={(checked) =>
               onUpdateSettings({
-                navigationDisplayMode:
-                  value as UserSettings["navigationDisplayMode"],
+                navigationDisplayMode: checked ? "top" : "side",
               })
             }
-            value={settings.navigationDisplayMode}
-          >
-            <option value="side">Side</option>
-            <option value="top">Top</option>
-          </SelectField>
+            onLabel="Top navigation"
+          />
           <NumberField
             label="Default follow-up prompt days"
             min={1}
@@ -65,59 +89,55 @@ export function SettingsPage({
             }
             value={settings.defaultFollowUpPromptDays}
           />
-          <SelectField
-            label="Add-job form layout"
-            onChange={(value) =>
+          <ToggleButtonField
+            checked={settings.addJobFormLayout === "stepped"}
+            label="Use step-by-step add job flow"
+            offLabel="Single form"
+            onChange={(checked) =>
               onUpdateSettings({
-                addJobFormLayout: value as UserSettings["addJobFormLayout"],
+                addJobFormLayout: checked ? "stepped" : "long_form",
               })
             }
-            value={settings.addJobFormLayout}
-          >
-            <option value="long_form">Long form</option>
-            <option value="stepped">Stepped</option>
-          </SelectField>
-          <SelectField
-            label="Add-job presentation"
-            onChange={(value) =>
+            onLabel="Step-by-step"
+          />
+          <ToggleButtonField
+            checked={settings.addJobPresentation === "page"}
+            label="Open add job as full page"
+            offLabel="Pop-up dialog"
+            onChange={(checked) =>
               onUpdateSettings({
-                addJobPresentation: value as UserSettings["addJobPresentation"],
+                addJobPresentation: checked ? "page" : "modal",
               })
             }
-            value={settings.addJobPresentation}
-          >
-            <option value="modal">Modal</option>
-            <option value="page">Page</option>
-          </SelectField>
+            onLabel="Full page"
+          />
         </SettingsGroup>
 
-        <SettingsGroup title="Contacts And Deletion">
-          <SelectField
-            label="Contacts display"
-            onChange={(value) =>
+        <SettingsGroup title="Contacts And Safety">
+          <ToggleButtonField
+            checked={settings.contactsDisplayMode === "modal"}
+            label="Open contacts as dialog"
+            offLabel="Side panel"
+            onChange={(checked) =>
               onUpdateSettings({
-                contactsDisplayMode:
-                  value as UserSettings["contactsDisplayMode"],
+                contactsDisplayMode: checked ? "modal" : "side_panel",
               })
             }
-            value={settings.contactsDisplayMode}
-          >
-            <option value="side_panel">Side panel</option>
-            <option value="modal">Modal</option>
-          </SelectField>
+            onLabel="Dialog"
+          />
           <ToggleField
             checked={settings.enableDeleteActiveApplications}
-            label="Enable deletion in non-archived entries"
+            label="Allow deleting active applications"
             onChange={(checked) =>
               onUpdateSettings({ enableDeleteActiveApplications: checked })
             }
           />
         </SettingsGroup>
 
-        <SettingsGroup title="Table Behavior">
+        <SettingsGroup title="Table Preferences">
           <ToggleField
             checked={settings.rememberTableState}
-            label="Remember table search/filter/sort"
+            label="Remember table view"
             onChange={(checked) =>
               onUpdateSettings({ rememberTableState: checked })
             }
@@ -141,17 +161,17 @@ export function SettingsPage({
           </div>
         </SettingsGroup>
 
-        <SettingsGroup title="Notifications And Analytics">
+        <SettingsGroup title="Alerts And Labs">
           <ToggleField
             checked={settings.enableNotificationBell}
-            label="Notification bell"
+            label="Show notification bell"
             onChange={(checked) =>
               onUpdateSettings({ enableNotificationBell: checked })
             }
           />
           <ToggleField
             checked={settings.enableGroupedNotifications}
-            label="Grouped notification sections"
+            label="Group notifications by type"
             onChange={(checked) =>
               onUpdateSettings({ enableGroupedNotifications: checked })
             }
@@ -173,7 +193,7 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.betaAnalyticsEnabled}
-            label="Beta analytics"
+            label="Enable analytics lab"
             onChange={(checked) =>
               onUpdateSettings({ betaAnalyticsEnabled: checked })
             }
@@ -221,30 +241,35 @@ function ToggleField({
   );
 }
 
-function SelectField({
-  children,
+function ToggleButtonField({
+  checked,
   label,
+  offLabel,
   onChange,
-  value,
+  onLabel,
 }: {
-  children: React.ReactNode;
+  checked: boolean;
   label: string;
-  onChange: (value: string) => void;
-  value: string;
+  offLabel: string;
+  onChange: (checked: boolean) => void;
+  onLabel: string;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-foreground">
-        {label}
-      </span>
-      <select
-        className="field-control"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
+    <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground">
+      <span>{label}</span>
+      <button
+        aria-pressed={checked}
+        className={`h-8 min-w-32 rounded-md px-3 text-sm font-semibold transition ${
+          checked
+            ? "bg-primary text-primary-foreground hover:bg-blue-700"
+            : "bg-slate-100 text-foreground hover:bg-slate-200"
+        }`}
+        onClick={() => onChange(!checked)}
+        type="button"
       >
-        {children}
-      </select>
-    </label>
+        {checked ? onLabel : offLabel}
+      </button>
+    </div>
   );
 }
 
