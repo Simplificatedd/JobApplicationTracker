@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
-import { ApplicationsTable } from "./ApplicationsTable";
+import {
+  ApplicationsTable,
+  DEFAULT_COLUMN_WIDTHS,
+  type ApplicationColumnWidths,
+} from "./ApplicationsTable";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { ContactsPanel } from "./ContactsPanel";
 import {
@@ -13,6 +17,7 @@ import {
   type SortColumn,
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
+import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type {
@@ -22,6 +27,7 @@ import type {
   ResumeMetadata,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import type { TablePreferences } from "../../types/tablePreferences";
 
 interface ApplicationsPageProps {
   activities: Activity[];
@@ -35,10 +41,13 @@ interface ApplicationsPageProps {
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   settings: UserSettings;
+  tablePreferences: TablePreferences | null;
   viewMode?: "active" | "archive";
+  resetTablePreferences: () => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
+  updateTablePreferences: (preferences: Partial<TablePreferences>) => void;
 }
 
 export function ApplicationsPage({
@@ -53,10 +62,13 @@ export function ApplicationsPage({
   restoreApplication,
   resumes,
   settings,
+  tablePreferences,
   viewMode = "active",
+  resetTablePreferences,
   updateContact,
   updateApplication,
   updateSettings,
+  updateTablePreferences,
 }: ApplicationsPageProps) {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
     string | null
@@ -64,12 +76,23 @@ export function ApplicationsPage({
   const [contactsApplicationId, setContactsApplicationId] = useState<
     string | null
   >(null);
-  const [filters, setFilters] = useState<ApplicationFilters>(
-    DEFAULT_APPLICATION_FILTERS,
+  const rememberedTablePreferences =
+    settings.rememberTableState ? tablePreferences : null;
+  const [columnWidths, setColumnWidths] = useState<ApplicationColumnWidths>(
+    mergeColumnWidths(rememberedTablePreferences?.columnWidths),
   );
-  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sort, setSort] = useState(DEFAULT_SORT_STATE);
+  const [filters, setFilters] = useState<ApplicationFilters>(
+    rememberedTablePreferences?.filters ?? DEFAULT_APPLICATION_FILTERS,
+  );
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
+    rememberedTablePreferences?.needsAttentionOnly ?? false,
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    rememberedTablePreferences?.searchQuery ?? "",
+  );
+  const [sort, setSort] = useState(
+    rememberedTablePreferences?.sort ?? DEFAULT_SORT_STATE,
+  );
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
@@ -110,6 +133,41 @@ export function ApplicationsPage({
     [applications, contactsApplicationId],
   );
 
+  useEffect(() => {
+    if (!settings.rememberTableState) {
+      return;
+    }
+
+    updateTablePreferences({
+      columnWidths,
+      filters,
+      needsAttentionOnly,
+      searchQuery,
+      sort,
+      visibleApplicationColumns: settings.visibleApplicationColumns,
+    });
+  }, [
+    columnWidths,
+    filters,
+    needsAttentionOnly,
+    searchQuery,
+    settings.rememberTableState,
+    settings.visibleApplicationColumns,
+    sort,
+  ]);
+
+  function resetTableView() {
+    setColumnWidths(mergeColumnWidths(null));
+    setFilters(DEFAULT_APPLICATION_FILTERS);
+    setNeedsAttentionOnly(false);
+    setSearchQuery("");
+    setSort(DEFAULT_SORT_STATE);
+    updateSettings({
+      visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
+    });
+    resetTablePreferences();
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-3">
@@ -139,8 +197,7 @@ export function ApplicationsPage({
         }
         onNeedsAttentionOnlyChange={setNeedsAttentionOnly}
         onResetFilters={() => {
-          setFilters(DEFAULT_APPLICATION_FILTERS);
-          setNeedsAttentionOnly(false);
+          resetTableView();
         }}
         onSearchQueryChange={setSearchQuery}
         searchQuery={searchQuery}
@@ -149,6 +206,7 @@ export function ApplicationsPage({
 
       <ApplicationsTable
         applications={visibleApplications}
+        columnWidths={columnWidths}
         emptyBody={
           searchQuery
             ? "No applications match that title or description."
@@ -174,6 +232,7 @@ export function ApplicationsPage({
         }}
         onOpenApplication={setSelectedApplicationId}
         onOpenContacts={setContactsApplicationId}
+        onColumnWidthsChange={setColumnWidths}
         onRestoreApplication={restoreApplication}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
         resumes={resumes}
@@ -216,6 +275,15 @@ export function ApplicationsPage({
       ) : null}
     </div>
   );
+}
+
+function mergeColumnWidths(
+  columnWidths: Record<string, number> | null | undefined,
+) {
+  return {
+    ...DEFAULT_COLUMN_WIDTHS,
+    ...columnWidths,
+  };
 }
 
 function nextSort(

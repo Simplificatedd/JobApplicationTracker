@@ -9,6 +9,7 @@ import type {
   ResumeMetadata,
 } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
+import type { TablePreferences } from "../types/tablePreferences";
 import {
   createDateStamp,
   createId,
@@ -45,6 +46,7 @@ export interface TrackerStore {
   retryStorage: () => void;
   settings: UserSettings;
   storageError: string | null;
+  tablePreferences: TablePreferences | null;
   addContact: (input: ContactInput) => ApplicationContact;
   appendActivity: (
     applicationId: string,
@@ -56,10 +58,12 @@ export interface TrackerStore {
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
   resetSettings: () => void;
+  resetTablePreferences: () => void;
   restoreApplication: (id: string) => void;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateSettings: (input: Partial<UserSettings>) => void;
+  updateTablePreferences: (input: Partial<TablePreferences>) => void;
 }
 
 export function useTrackerStore(): TrackerStore {
@@ -79,6 +83,8 @@ export function useTrackerStore(): TrackerStore {
   );
   const [storageError, setStorageError] = useState<string | null>(null);
   const [storageRetryKey, setStorageRetryKey] = useState(0);
+  const [tablePreferences, setTablePreferences] =
+    useState<TablePreferences | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -103,6 +109,7 @@ export function useTrackerStore(): TrackerStore {
         setNotificationState(snapshot.notificationState);
         setResumes(snapshot.resumes);
         setSettings(snapshot.settings);
+        setTablePreferences(snapshot.tablePreferences);
         setIsStorageLoading(false);
       })
       .catch((error: unknown) => {
@@ -492,6 +499,23 @@ export function useTrackerStore(): TrackerStore {
     persist(indexedDbStorageAdapter.resetSettings());
   }
 
+  function updateTablePreferences(input: Partial<TablePreferences>) {
+    const updatedTablePreferences = {
+      ...tablePreferences,
+      ...input,
+    } as TablePreferences;
+
+    setTablePreferences(updatedTablePreferences);
+    persist(
+      indexedDbStorageAdapter.saveTablePreferences(updatedTablePreferences),
+    );
+  }
+
+  function resetTablePreferences() {
+    setTablePreferences(null);
+    persist(indexedDbStorageAdapter.resetTablePreferences());
+  }
+
   function persist(promise: Promise<unknown>) {
     void promise.catch((error: unknown) => {
       setStorageError(getStorageErrorMessage(error));
@@ -514,6 +538,7 @@ export function useTrackerStore(): TrackerStore {
     retryStorage,
     settings,
     storageError,
+    tablePreferences,
     addContact,
     appendActivity,
     archiveApplication,
@@ -521,10 +546,12 @@ export function useTrackerStore(): TrackerStore {
     deleteApplication,
     deleteContact,
     resetSettings,
+    resetTablePreferences,
     restoreApplication,
     updateApplication,
     updateContact,
     updateSettings,
+    updateTablePreferences,
   };
 }
 

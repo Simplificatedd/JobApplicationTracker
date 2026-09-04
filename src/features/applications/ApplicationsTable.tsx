@@ -26,6 +26,7 @@ import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  columnWidths: ApplicationColumnWidths;
   emptyBody?: string;
   emptyTitle?: string;
   enableDraggableColumnWidths: boolean;
@@ -34,6 +35,7 @@ interface ApplicationsTableProps {
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onColumnWidthsChange: (widths: ApplicationColumnWidths) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
   resumes: ResumeFile[];
@@ -305,16 +307,19 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
   },
 ];
 
-const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
+export type ApplicationColumnWidths = Record<ApplicationColumnId, number>;
+
+export const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   (widths, column) => ({
     ...widths,
     [column.id]: column.width,
   }),
-  {} as Record<ApplicationColumnId, number>,
+  {} as ApplicationColumnWidths,
 );
 
 export function ApplicationsTable({
   applications,
+  columnWidths,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
@@ -323,13 +328,13 @@ export function ApplicationsTable({
   onDeleteApplication,
   onOpenApplication,
   onOpenContacts,
+  onColumnWidthsChange,
   onRestoreApplication,
   onSortChange,
   resumes,
   sort,
   visibleApplicationColumns,
 }: ApplicationsTableProps) {
-  const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
@@ -370,10 +375,10 @@ export function ApplicationsTable({
       return;
     }
 
-    setColumnWidths((current) =>
+    onColumnWidthsChange(
       stretchColumnWidthsToViewport(
         visibleColumns,
-        current,
+        columnWidths,
         tableViewportWidth,
       ),
     );
@@ -395,7 +400,7 @@ export function ApplicationsTable({
       return;
     }
 
-    setColumnWidths((current) => {
+    updateColumnWidths((current) => {
       const nextWidths = getColumnPairWidths({
         delta,
         leftColumn,
@@ -416,7 +421,7 @@ export function ApplicationsTable({
     leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
     rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
   ) {
-    setColumnWidths((current) => {
+    updateColumnWidths((current) => {
       const pairWidth = current[leftColumn.id] + current[rightColumn.id];
       const defaultPairWidth = leftColumn.width + rightColumn.width;
       const leftTargetWidth = Math.round(
@@ -439,13 +444,19 @@ export function ApplicationsTable({
   }
 
   function resetColumnWidths() {
-    setColumnWidths(
+    onColumnWidthsChange(
       stretchColumnWidthsToViewport(
         visibleColumns,
         DEFAULT_COLUMN_WIDTHS,
         tableViewportRef.current?.clientWidth ?? tableViewportWidth,
       ),
     );
+  }
+
+  function updateColumnWidths(
+    updater: (current: ApplicationColumnWidths) => ApplicationColumnWidths,
+  ) {
+    onColumnWidthsChange(updater(columnWidths));
   }
 
   function startColumnResize(
@@ -482,7 +493,7 @@ export function ApplicationsTable({
         rightWidth: startRightWidth,
       });
 
-      setColumnWidths((current) => ({
+      updateColumnWidths((current) => ({
         ...current,
         [leftColumnId]: nextWidths.leftWidth,
         [rightColumnId]: nextWidths.rightWidth,

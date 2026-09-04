@@ -107,10 +107,13 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         settings={tracker.settings}
+        tablePreferences={tracker.tablePreferences}
         viewMode={view === "archive" ? "archive" : "active"}
+        resetTablePreferences={tracker.resetTablePreferences}
         updateContact={tracker.updateContact}
         updateApplication={tracker.updateApplication}
         updateSettings={tracker.updateSettings}
+        updateTablePreferences={tracker.updateTablePreferences}
       />
     );
   }
