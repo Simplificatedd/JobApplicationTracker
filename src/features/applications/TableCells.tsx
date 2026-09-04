@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { formatDate, formatDateTime } from "../../lib/format";
 import type { JobApplication, ResumeFile } from "../../types/application";
 
@@ -115,6 +116,34 @@ export function RowActionsMenu({
   onRestoreApplication: (applicationId: string) => void;
 }) {
   const canDelete = Boolean(application.archivedAt) || enableDeleteActiveApplications;
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
 
   function confirmDelete() {
     const confirmed = window.confirm(
@@ -122,21 +151,36 @@ export function RowActionsMenu({
     );
 
     if (confirmed) {
+      setIsOpen(false);
       onDeleteApplication(application.id);
     }
   }
 
   return (
-    <details className="group relative">
-      <summary className="icon-button list-none [&::-webkit-details-marker]:hidden">
+    <div className="relative" ref={menuRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className="icon-button"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
         <MoreHorizontal aria-hidden="true" size={18} />
         <span className="sr-only">Open row actions</span>
-      </summary>
-      <div className="absolute right-0 top-11 z-10 w-44 rounded-lg border border-border bg-surface p-1 shadow-popover">
+      </button>
+      {isOpen ? (
+      <div
+        className="absolute right-0 top-11 z-10 w-44 rounded-lg border border-border bg-surface p-1 shadow-popover"
+        role="menu"
+      >
         {application.archivedAt ? (
           <button
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
-            onClick={() => onRestoreApplication(application.id)}
+            onClick={() => {
+              setIsOpen(false);
+              onRestoreApplication(application.id);
+            }}
+            role="menuitem"
             type="button"
           >
             <RotateCcw aria-hidden="true" size={16} />
@@ -145,7 +189,11 @@ export function RowActionsMenu({
         ) : (
           <button
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
-            onClick={() => onArchiveApplication(application.id)}
+            onClick={() => {
+              setIsOpen(false);
+              onArchiveApplication(application.id);
+            }}
+            role="menuitem"
             type="button"
           >
             <Archive aria-hidden="true" size={16} />
@@ -156,6 +204,7 @@ export function RowActionsMenu({
           <button
             className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700"
             onClick={confirmDelete}
+            role="menuitem"
             type="button"
           >
             <Trash2 aria-hidden="true" size={16} />
@@ -163,6 +212,7 @@ export function RowActionsMenu({
           </button>
         ) : null}
       </div>
-    </details>
+      ) : null}
+    </div>
   );
 }
