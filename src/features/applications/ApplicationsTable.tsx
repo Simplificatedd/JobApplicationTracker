@@ -175,7 +175,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "deadlineEntryMode",
     key: "deadlineEntryMode",
-    label: "Deadline Entry Mode",
+    label: "Deadline Timing",
     minWidth: 96,
     width: 170,
   },

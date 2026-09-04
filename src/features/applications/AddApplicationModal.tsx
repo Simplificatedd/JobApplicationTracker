@@ -416,7 +416,7 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Deadline Entry Mode">
+            <Field label="Deadline Timing">
               <select
                 className="field-control"
                 onChange={(event) =>
