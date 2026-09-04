@@ -157,6 +157,7 @@ export function ApplicationsPage({
               ? "No archived applications"
               : "No applications yet"
         }
+        enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={(id) => {

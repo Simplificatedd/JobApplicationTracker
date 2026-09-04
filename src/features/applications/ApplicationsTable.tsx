@@ -1,5 +1,10 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
-import { type ReactNode, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useState,
+} from "react";
 import {
   ArrowDownWideNarrow,
   ArrowUpDown,
@@ -26,6 +31,7 @@ interface ApplicationsTableProps {
   applications: JobApplication[];
   emptyBody?: string;
   emptyTitle?: string;
+  enableDraggableColumnWidths: boolean;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
@@ -38,25 +44,84 @@ interface ApplicationsTableProps {
   sort: SortState;
 }
 
+type ColumnId =
+  | "jobTitle"
+  | "company"
+  | "status"
+  | "followUp"
+  | "interview"
+  | "resume"
+  | "contacts"
+  | "updatedAt"
+  | "actions";
+
 const columns: Array<{
+  id: ColumnId;
   key?: SortColumn;
   label: string;
+  minWidth: number;
+  width: number;
 }> = [
-  { key: "jobTitle", label: "Job Title" },
-  { key: "company", label: "Company" },
-  { key: "status", label: "Status" },
-  { key: "followUpDate", label: "Follow-up" },
-  { key: "interviewDateTime", label: "Interview Date/Time" },
-  { label: "Resume" },
-  { label: "Contacts" },
-  { key: "updatedAt", label: "Last Updated" },
-  { label: "Actions" },
+  {
+    id: "jobTitle",
+    key: "jobTitle",
+    label: "Job Title",
+    minWidth: 180,
+    width: 260,
+  },
+  {
+    id: "company",
+    key: "company",
+    label: "Company",
+    minWidth: 130,
+    width: 160,
+  },
+  {
+    id: "status",
+    key: "status",
+    label: "Status",
+    minWidth: 150,
+    width: 180,
+  },
+  {
+    id: "followUp",
+    key: "followUpDate",
+    label: "Follow-up",
+    minWidth: 130,
+    width: 150,
+  },
+  {
+    id: "interview",
+    key: "interviewDateTime",
+    label: "Interview Date/Time",
+    minWidth: 150,
+    width: 190,
+  },
+  { id: "resume", label: "Resume", minWidth: 120, width: 150 },
+  { id: "contacts", label: "Contacts", minWidth: 95, width: 115 },
+  {
+    id: "updatedAt",
+    key: "updatedAt",
+    label: "Last Updated",
+    minWidth: 125,
+    width: 150,
+  },
+  { id: "actions", label: "Actions", minWidth: 90, width: 100 },
 ];
+
+const DEFAULT_COLUMN_WIDTHS = columns.reduce(
+  (widths, column) => ({
+    ...widths,
+    [column.id]: column.width,
+  }),
+  {} as Record<ColumnId, number>,
+);
 
 export function ApplicationsTable({
   applications,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
+  enableDraggableColumnWidths,
   enableDeleteActiveApplications,
   onArchiveApplication,
   onDeleteApplication,
@@ -68,7 +133,54 @@ export function ApplicationsTable({
   resumes,
   sort,
 }: ApplicationsTableProps) {
+  const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
+  const tableWidth = columns.reduce(
+    (width, column) => width + columnWidths[column.id],
+    0,
+  );
+
+  function resizeColumn(columnId: ColumnId, nextWidth: number) {
+    const column = columns.find((currentColumn) => currentColumn.id === columnId);
+
+    if (!column) {
+      return;
+    }
+
+    setColumnWidths((current) => ({
+      ...current,
+      [columnId]: Math.max(column.minWidth, nextWidth),
+    }));
+  }
+
+  function startColumnResize(
+    columnId: ColumnId,
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = columnWidths[columnId];
+
+    function handlePointerMove(pointerEvent: PointerEvent) {
+      resizeColumn(columnId, startWidth + pointerEvent.clientX - startX);
+    }
+
+    function stopColumnResize() {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", stopColumnResize);
+      document.removeEventListener("pointercancel", stopColumnResize);
+    }
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", stopColumnResize);
+    document.addEventListener("pointercancel", stopColumnResize);
+  }
 
   return (
     <section className="surface-panel overflow-hidden rounded-lg">
@@ -106,72 +218,113 @@ export function ApplicationsTable({
             ))}
           </div>
           <div className="hidden overflow-x-auto xl:block">
-            <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
+            <table
+              className="table-fixed border-collapse text-left"
+              style={
+                {
+                  minWidth: "100%",
+                  width: `${tableWidth}px`,
+                } as CSSProperties
+              }
+            >
               <colgroup>
-                <col className="w-[19%]" />
-                <col className="w-[11%]" />
-                <col className="w-[14%]" />
-                <col className="w-[10%]" />
-                <col className="w-[13%]" />
-                <col className="w-[8%]" />
-                <col className="w-[7%]" />
-                <col className="w-[11%]" />
-                <col className="w-[7%]" />
-              </colgroup>
-            <thead className="border-b border-border bg-slate-50">
-              <tr>
                 {columns.map((column) => (
-                  <th
-                    aria-sort={
-                      column.key && sort.column === column.key
-                        ? sort.direction
+                  <col
+                    key={column.id}
+                    style={{ width: `${columnWidths[column.id]}px` }}
+                  />
+                ))}
+              </colgroup>
+              <thead className="border-b border-border bg-slate-50">
+                <tr>
+                  {columns.map((column) => (
+                    <th
+                      aria-sort={
+                        column.key && sort.column === column.key
+                          ? sort.direction
+                          : undefined
+                      }
+                      className="relative px-4 py-3 pr-5 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                      key={column.id}
+                      scope="col"
+                    >
+                      {column.key ? (
+                        <button
+                          className="flex items-center gap-1.5 text-left hover:text-foreground"
+                          onClick={() => onSortChange(column.key as SortColumn)}
+                          type="button"
+                        >
+                          <span>{column.label}</span>
+                          <SortIcon
+                            state={
+                              sort.column === column.key
+                                ? sort.direction
+                                : "none"
+                            }
+                          />
+                        </button>
+                      ) : (
+                        <span>{column.label}</span>
+                      )}
+                      {enableDraggableColumnWidths ? (
+                        <button
+                          aria-label={`Resize ${column.label} column`}
+                          aria-orientation="vertical"
+                          aria-valuemin={column.minWidth}
+                          aria-valuenow={columnWidths[column.id]}
+                          className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15"
+                          onDoubleClick={() =>
+                            resizeColumn(column.id, column.width)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "ArrowLeft") {
+                              resizeColumn(
+                                column.id,
+                                columnWidths[column.id] - 16,
+                              );
+                            }
+
+                            if (event.key === "ArrowRight") {
+                              resizeColumn(
+                                column.id,
+                                columnWidths[column.id] + 16,
+                              );
+                            }
+                          }}
+                          onPointerDown={(event) =>
+                            startColumnResize(column.id, event)
+                          }
+                          role="separator"
+                          type="button"
+                        />
+                      ) : null}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface">
+                {applications.map((application) => (
+                  <ApplicationRow
+                    application={application}
+                    enableDeleteActiveApplications={
+                      enableDeleteActiveApplications
+                    }
+                    key={application.id}
+                    onArchiveApplication={onArchiveApplication}
+                    onDeleteApplication={onDeleteApplication}
+                    onOpenApplication={onOpenApplication}
+                    onOpenContacts={onOpenContacts}
+                    onRestoreApplication={onRestoreApplication}
+                    onUpdateApplication={onUpdateApplication}
+                    resume={
+                      application.resumeId
+                        ? resumeById.get(application.resumeId)
                         : undefined
                     }
-                    className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
-                    key={column.label}
-                    scope="col"
-                  >
-                    {column.key ? (
-                      <button
-                        className="flex items-center gap-1.5 text-left hover:text-foreground"
-                        onClick={() => onSortChange(column.key as SortColumn)}
-                        type="button"
-                      >
-                        <span>{column.label}</span>
-                        <SortIcon
-                          state={
-                            sort.column === column.key ? sort.direction : "none"
-                          }
-                        />
-                      </button>
-                    ) : (
-                      <span>{column.label}</span>
-                    )}
-                  </th>
+                  />
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-surface">
-              {applications.map((application) => (
-                <ApplicationRow
-                  application={application}
-                  enableDeleteActiveApplications={enableDeleteActiveApplications}
-                  key={application.id}
-                  onArchiveApplication={onArchiveApplication}
-                  onDeleteApplication={onDeleteApplication}
-                  onOpenApplication={onOpenApplication}
-                  onOpenContacts={onOpenContacts}
-                  onRestoreApplication={onRestoreApplication}
-                  onUpdateApplication={onUpdateApplication}
-                  resume={
-                    application.resumeId
-                      ? resumeById.get(application.resumeId)
-                      : undefined
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
           </div>
         </>
       )}

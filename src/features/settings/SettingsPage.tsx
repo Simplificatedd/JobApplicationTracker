@@ -152,7 +152,7 @@ export function SettingsPage({
           />
           <ToggleField
             checked={settings.enableDraggableColumnWidths}
-            description="Allows table columns to be resized manually once column resizing is supported."
+            description="Shows draggable edges in the desktop applications table so each column can be widened or narrowed."
             label="Allow column resizing"
             onChange={(checked) =>
               onUpdateSettings({ enableDraggableColumnWidths: checked })
