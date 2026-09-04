@@ -14,7 +14,7 @@ import type { JobApplication, ResumeFile } from "../../types/application";
 export function DescriptionPreview({ description }: { description: string }) {
   return (
     <button
-      className="mt-1 line-clamp-2 max-w-full text-left text-xs leading-5 text-muted hover:text-foreground"
+      className="mt-1 line-clamp-2 w-full min-w-0 max-w-full text-left text-xs leading-5 text-muted hover:text-foreground"
       type="button"
     >
       {description}
@@ -28,15 +28,15 @@ export function FollowUpCell({
   application: JobApplication;
 }) {
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-hidden">
       <p
-        className={`text-sm font-medium ${
+        className={`truncate text-sm font-medium ${
           application.followUpNeeded ? "text-warning" : "text-foreground"
         }`}
       >
         {formatDate(application.followUpDate)}
       </p>
-      <p className="mt-1 text-xs text-muted">
+      <p className="mt-1 truncate text-xs text-muted">
         {application.followUpNeeded ? "Needed" : "Optional"}
       </p>
     </div>
@@ -49,14 +49,14 @@ export function InterviewCell({
   application: JobApplication;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex min-w-0 max-w-full gap-2 overflow-hidden">
       <CalendarClock
         aria-hidden="true"
         className="mt-0.5 shrink-0 text-muted"
         size={16}
       />
       <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">
+        <p className="truncate text-sm font-medium text-foreground">
           {formatDateTime(application.interviewDateTime)}
         </p>
         <p className="mt-1 truncate text-xs text-muted">
@@ -69,12 +69,12 @@ export function InterviewCell({
 
 export function ResumeCell({ resume }: { resume?: ResumeFile }) {
   if (!resume) {
-    return <p className="text-sm text-muted">Unassigned</p>;
+    return <p className="truncate text-sm text-muted">Unassigned</p>;
   }
 
   return (
     <button
-      className="flex max-w-full items-center gap-2 rounded-md text-left text-sm font-medium text-foreground hover:text-primary"
+      className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md text-left text-sm font-medium text-foreground hover:text-primary"
       type="button"
     >
       <FileText aria-hidden="true" className="shrink-0 text-muted" size={16} />
@@ -92,12 +92,12 @@ export function ContactsButton({
 }) {
   return (
     <button
-      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50"
+      className="inline-flex h-9 max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-border px-2 text-sm font-medium text-foreground hover:bg-slate-50"
       onClick={onClick}
       type="button"
     >
       <MessageSquareText aria-hidden="true" size={16} />
-      <span>{count}</span>
+      <span className="truncate">{count}</span>
     </button>
   );
 }
@@ -161,7 +161,7 @@ export function RowActionsMenu({
       <button
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        className="icon-button"
+        className="icon-button h-9 w-9 max-w-full"
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >

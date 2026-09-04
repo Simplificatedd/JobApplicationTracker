@@ -643,22 +643,48 @@ function ApplicationRow({
   return (
     <tr className="table-row-hover align-top">
       {visibleColumnIds.map((columnId) => (
-        <td className="px-2.5 py-4" key={columnId}>
-          <ApplicationColumnCell
-            application={application}
-            columnId={columnId}
-            enableDeleteActiveApplications={enableDeleteActiveApplications}
-            onArchiveApplication={onArchiveApplication}
-            onDeleteApplication={onDeleteApplication}
-            onOpenApplication={onOpenApplication}
-            onOpenContacts={onOpenContacts}
-            onRestoreApplication={onRestoreApplication}
-            resume={resume}
-          />
+        <td className={getCellClassName(columnId)} key={columnId}>
+          <div className={getCellContentClassName(columnId)}>
+            <ApplicationColumnCell
+              application={application}
+              columnId={columnId}
+              enableDeleteActiveApplications={enableDeleteActiveApplications}
+              onArchiveApplication={onArchiveApplication}
+              onDeleteApplication={onDeleteApplication}
+              onOpenApplication={onOpenApplication}
+              onOpenContacts={onOpenContacts}
+              onRestoreApplication={onRestoreApplication}
+              resume={resume}
+            />
+          </div>
         </td>
       ))}
     </tr>
   );
+}
+
+function getCellClassName(columnId: ApplicationColumnId) {
+  const isActions = columnId === "actions";
+  const isUtilityCell = isActions || columnId === "contacts";
+
+  return [
+    "py-4 align-top",
+    isUtilityCell ? "px-1" : "overflow-hidden px-2.5",
+    isActions ? "overflow-visible" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getCellContentClassName(columnId: ApplicationColumnId) {
+  const isUtilityCell = columnId === "actions" || columnId === "contacts";
+
+  return [
+    "min-w-0 max-w-full",
+    isUtilityCell
+      ? "flex justify-center"
+      : "overflow-hidden",
+  ].join(" ");
 }
 
 function ApplicationColumnCell({
