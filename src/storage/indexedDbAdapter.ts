@@ -78,11 +78,22 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
   }
 
   async function listApplications() {
-    return getAll<Application>(await getDatabase(), "applications");
+    const applications = await getAll<Application>(
+      await getDatabase(),
+      "applications",
+    );
+
+    return applications.map(normalizeApplication);
   }
 
   async function getApplication(id: string) {
-    return getByKey<Application>(await getDatabase(), "applications", id);
+    const application = await getByKey<Application>(
+      await getDatabase(),
+      "applications",
+      id,
+    );
+
+    return application ? normalizeApplication(application) : undefined;
   }
 
   async function createApplication(application: Application) {
@@ -216,12 +227,12 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
   }
 
   async function getSettings() {
-    return (
-      (await getStoredValue<UserSettings>(
+    return normalizeSettings(
+      await getStoredValue<UserSettings>(
         await getDatabase(),
         "settings",
         SETTINGS_KEY,
-      )) ?? DEFAULT_USER_SETTINGS
+      ),
     );
   }
 
@@ -235,12 +246,12 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
   }
 
   async function getNotificationState() {
-    return (
-      (await getStoredValue<NotificationState>(
+    return normalizeNotificationState(
+      await getStoredValue<NotificationState>(
         await getDatabase(),
         "notificationState",
         NOTIFICATION_STATE_KEY,
-      )) ?? DEFAULT_NOTIFICATION_STATE
+      ),
     );
   }
 
@@ -254,12 +265,12 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
   }
 
   async function getAnalyticsSettings() {
-    return (
-      (await getStoredValue<AnalyticsSettings>(
+    return normalizeAnalyticsSettings(
+      await getStoredValue<AnalyticsSettings>(
         await getDatabase(),
         "analyticsSettings",
         ANALYTICS_SETTINGS_KEY,
-      )) ?? DEFAULT_ANALYTICS_SETTINGS
+      ),
     );
   }
 
@@ -432,8 +443,8 @@ function openDatabase() {
       );
     };
 
-    request.onupgradeneeded = () => {
-      upgradeDatabase(request.result);
+    request.onupgradeneeded = (event) => {
+      upgradeDatabase(request.result, event.oldVersion);
     };
 
     request.onsuccess = () => {
@@ -448,7 +459,7 @@ function openDatabase() {
   });
 }
 
-function upgradeDatabase(database: IDBDatabase) {
+function upgradeDatabase(database: IDBDatabase, oldVersion: number) {
   if (!database.objectStoreNames.contains("applications")) {
     const store = database.createObjectStore("applications", { keyPath: "id" });
     store.createIndex("status", "status", { unique: false });
@@ -492,6 +503,16 @@ function upgradeDatabase(database: IDBDatabase) {
 
   if (!database.objectStoreNames.contains("analyticsSettings")) {
     database.createObjectStore("analyticsSettings", { keyPath: "key" });
+  }
+
+  runMigrations(database, oldVersion);
+}
+
+function runMigrations(database: IDBDatabase, oldVersion: number) {
+  void database;
+
+  if (oldVersion < TRACKER_DB_VERSION) {
+    // Future schema migrations should be additive and guarded by oldVersion.
   }
 }
 
@@ -608,6 +629,60 @@ function putMany<T>(store: IDBObjectStore, records: T[]) {
   for (const record of records) {
     store.put(record);
   }
+}
+
+function normalizeApplication(application: Partial<Application>): Application {
+  const timestamp =
+    application.updatedAt ?? application.createdAt ?? new Date().toISOString();
+
+  return {
+    ...application,
+    company: application.company ?? "",
+    contactsCount: application.contactsCount ?? 0,
+    createdAt: application.createdAt ?? timestamp,
+    deadlineEntryMode: application.deadlineEntryMode ?? "exact",
+    followUpNeeded: application.followUpNeeded ?? false,
+    id: application.id ?? `app-${timestamp}`,
+    interviewProctored: application.interviewProctored ?? false,
+    jobDescription: application.jobDescription ?? "",
+    jobTitle: application.jobTitle ?? "Untitled application",
+    jobType: application.jobType ?? "internship",
+    priority: application.priority ?? "medium",
+    status: application.status ?? "Just Applied",
+    updatedAt: timestamp,
+    workMode: application.workMode ?? "unknown",
+  };
+}
+
+function normalizeSettings(settings?: Partial<UserSettings>): UserSettings {
+  return {
+    ...DEFAULT_USER_SETTINGS,
+    ...settings,
+    visibleApplicationColumns:
+      settings?.visibleApplicationColumns ??
+      DEFAULT_USER_SETTINGS.visibleApplicationColumns,
+  };
+}
+
+function normalizeNotificationState(
+  state?: Partial<NotificationState>,
+): NotificationState {
+  return {
+    ...DEFAULT_NOTIFICATION_STATE,
+    ...state,
+    dismissedNotificationIds: state?.dismissedNotificationIds ?? [],
+  };
+}
+
+function normalizeAnalyticsSettings(
+  settings?: Partial<AnalyticsSettings>,
+): AnalyticsSettings {
+  return {
+    ...DEFAULT_ANALYTICS_SETTINGS,
+    ...settings,
+    visibleCharts:
+      settings?.visibleCharts ?? DEFAULT_ANALYTICS_SETTINGS.visibleCharts,
+  };
 }
 
 function deleteRecordsByApplicationId(
