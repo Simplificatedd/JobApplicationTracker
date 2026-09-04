@@ -469,17 +469,17 @@ export function ApplicationsTable({
                           ? sort.direction
                           : undefined
                       }
-                      className="relative px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                      className="relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
                       key={column.id}
                       scope="col"
                     >
                       {column.key ? (
                         <button
-                          className="flex min-w-0 items-center gap-1.5 text-left hover:text-foreground"
+                          className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
                           onClick={() => onSortChange(column.key as SortColumn)}
                           type="button"
                         >
-                          <span className="truncate">{column.label}</span>
+                          <span className="min-w-0 truncate">{column.label}</span>
                           <SortIcon
                             state={
                               sort.column === column.key
@@ -489,7 +489,9 @@ export function ApplicationsTable({
                           />
                         </button>
                       ) : (
-                        <span className="block truncate">{column.label}</span>
+                        <span className="block min-w-0 truncate">
+                          {column.label}
+                        </span>
                       )}
                       {enableDraggableColumnWidths ? (
                         <button
@@ -603,14 +605,18 @@ function SortIcon({
   state: "ascending" | "descending" | "none";
 }) {
   if (state === "ascending") {
-    return <ArrowUpWideNarrow aria-hidden="true" size={14} />;
+    return (
+      <ArrowUpWideNarrow aria-hidden="true" className="shrink-0" size={14} />
+    );
   }
 
   if (state === "descending") {
-    return <ArrowDownWideNarrow aria-hidden="true" size={14} />;
+    return (
+      <ArrowDownWideNarrow aria-hidden="true" className="shrink-0" size={14} />
+    );
   }
 
-  return <ArrowUpDown aria-hidden="true" size={14} />;
+  return <ArrowUpDown aria-hidden="true" className="shrink-0" size={14} />;
 }
 
 function ApplicationRow({
