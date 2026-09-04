@@ -154,21 +154,6 @@ export function ApplicationsToolbar({
           </button>
 
           <button
-            aria-haspopup="dialog"
-            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-            onClick={() => setIsColumnsOpen(true)}
-            type="button"
-          >
-            <Columns3 aria-hidden="true" size={16} />
-            <span className="truncate">Columns</span>
-            {hiddenColumnCount > 0 ? (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-                {hiddenColumnCount}
-              </span>
-            ) : null}
-          </button>
-
-          <button
             className="applications-toolbar-reset h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onResetFilters}
             type="button"
@@ -177,6 +162,23 @@ export function ApplicationsToolbar({
             Reset
           </button>
         </div>
+      </div>
+
+      <div className="mt-3 flex justify-end border-t border-border pt-3">
+        <button
+          aria-haspopup="dialog"
+          className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+          onClick={() => setIsColumnsOpen(true)}
+          type="button"
+        >
+          <Columns3 aria-hidden="true" size={16} />
+          <span className="truncate">Columns</span>
+          {hiddenColumnCount > 0 ? (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+              {hiddenColumnCount}
+            </span>
+          ) : null}
+        </button>
       </div>
 
       {isMoreFiltersOpen ? (
