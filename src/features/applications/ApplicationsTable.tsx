@@ -393,6 +393,7 @@ export function ApplicationsTable({
   function startColumnResize(
     columnId: ApplicationColumnId,
     event: ReactPointerEvent<HTMLButtonElement>,
+    edge: "left" | "right" = "right",
   ) {
     event.preventDefault();
     event.stopPropagation();
@@ -401,7 +402,12 @@ export function ApplicationsTable({
     const startWidth = columnWidths[columnId];
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      resizeColumn(columnId, startWidth + pointerEvent.clientX - startX);
+      const pointerDelta =
+        edge === "left"
+          ? startX - pointerEvent.clientX
+          : pointerEvent.clientX - startX;
+
+      resizeColumn(columnId, startWidth + pointerDelta);
     }
 
     function stopColumnResize() {
@@ -484,77 +490,97 @@ export function ApplicationsTable({
               </colgroup>
               <thead className="border-b border-border bg-slate-50">
                 <tr>
-                  {visibleColumns.map((column, columnIndex) => (
-                    <th
-                      aria-sort={
-                        column.key && sort.column === column.key
-                          ? sort.direction
-                          : undefined
-                      }
-                      className={getHeaderClassName()}
-                      key={column.id}
-                      scope="col"
-                    >
-                      {column.key ? (
-                        <button
-                          className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
-                          onClick={() => onSortChange(column.key as SortColumn)}
-                          type="button"
-                        >
-                          <span className="min-w-0 truncate">
+                  {visibleColumns.map((column, columnIndex) => {
+                    const resizeHandle = getResizeHandle(
+                      visibleColumns,
+                      columnIndex,
+                      enableDraggableColumnWidths,
+                    );
+
+                    return (
+                      <th
+                        aria-sort={
+                          column.key && sort.column === column.key
+                            ? sort.direction
+                            : undefined
+                        }
+                        className={getHeaderClassName()}
+                        key={column.id}
+                        scope="col"
+                      >
+                        {column.key ? (
+                          <button
+                            className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
+                            onClick={() =>
+                              onSortChange(column.key as SortColumn)
+                            }
+                            type="button"
+                          >
+                            <span className="min-w-0 truncate">
+                              {column.label}
+                            </span>
+                            <SortIcon
+                              state={
+                                sort.column === column.key
+                                  ? sort.direction
+                                  : "none"
+                              }
+                            />
+                          </button>
+                        ) : (
+                          <span className="block min-w-0 truncate">
                             {column.label}
                           </span>
-                          <SortIcon
-                            state={
-                              sort.column === column.key
-                                ? sort.direction
-                                : "none"
+                        )}
+                        {resizeHandle ? (
+                          <button
+                            aria-label={`Resize ${resizeHandle.column.label} column`}
+                            aria-orientation="vertical"
+                            aria-valuemin={resizeHandle.column.minWidth}
+                            aria-valuenow={
+                              columnWidths[resizeHandle.column.id]
                             }
-                          />
-                        </button>
-                      ) : (
-                        <span className="block min-w-0 truncate">
-                          {column.label}
-                        </span>
-                      )}
-                      {shouldShowResizeHandle(
-                        visibleColumns,
-                        columnIndex,
-                        enableDraggableColumnWidths,
-                      ) ? (
-                        <button
-                          aria-label={`Resize ${column.label} column`}
-                          aria-orientation="vertical"
-                          aria-valuemin={column.minWidth}
-                          aria-valuenow={columnWidths[column.id]}
-                          className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
-                          onDoubleClick={() =>
-                            resizeColumn(column.id, column.width)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "ArrowLeft") {
+                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
+                            onDoubleClick={() =>
                               resizeColumn(
-                                column.id,
-                                columnWidths[column.id] - 16,
-                              );
+                                resizeHandle.column.id,
+                                resizeHandle.column.width,
+                              )
                             }
+                            onKeyDown={(event) => {
+                              const directionMultiplier =
+                                resizeHandle.edge === "left" ? -1 : 1;
 
-                            if (event.key === "ArrowRight") {
-                              resizeColumn(
-                                column.id,
-                                columnWidths[column.id] + 16,
-                              );
+                              if (event.key === "ArrowLeft") {
+                                resizeColumn(
+                                  resizeHandle.column.id,
+                                  columnWidths[resizeHandle.column.id] -
+                                    16 * directionMultiplier,
+                                );
+                              }
+
+                              if (event.key === "ArrowRight") {
+                                resizeColumn(
+                                  resizeHandle.column.id,
+                                  columnWidths[resizeHandle.column.id] +
+                                    16 * directionMultiplier,
+                                );
+                              }
+                            }}
+                            onPointerDown={(event) =>
+                              startColumnResize(
+                                resizeHandle.column.id,
+                                event,
+                                resizeHandle.edge,
+                              )
                             }
-                          }}
-                          onPointerDown={(event) =>
-                            startColumnResize(column.id, event)
-                          }
-                          role="separator"
-                          type="button"
-                        />
-                      ) : null}
-                    </th>
-                  ))}
+                            role="separator"
+                            type="button"
+                          />
+                        ) : null}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-surface">
@@ -695,7 +721,7 @@ function ApplicationRow({
   );
 }
 
-function shouldShowResizeHandle(
+function getResizeHandle(
   visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
   columnIndex: number,
   enableDraggableColumnWidths: boolean,
@@ -703,12 +729,25 @@ function shouldShowResizeHandle(
   const column = visibleColumns[columnIndex];
   const nextColumn = visibleColumns[columnIndex + 1];
 
-  return Boolean(
-    enableDraggableColumnWidths &&
-      nextColumn &&
-      !STRETCH_EXCLUDED_COLUMNS.includes(column.id) &&
-      !STRETCH_EXCLUDED_COLUMNS.includes(nextColumn.id),
-  );
+  if (!enableDraggableColumnWidths || !nextColumn) {
+    return null;
+  }
+
+  if (nextColumn.id === "actions") {
+    return {
+      column: nextColumn,
+      edge: "left" as const,
+    };
+  }
+
+  if (STRETCH_EXCLUDED_COLUMNS.includes(column.id)) {
+    return null;
+  }
+
+  return {
+    column,
+    edge: "right" as const,
+  };
 }
 
 function getCellClassName(columnId: ApplicationColumnId) {
