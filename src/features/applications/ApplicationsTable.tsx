@@ -513,9 +513,7 @@ export function ApplicationsTable({
                             ? sort.direction
                             : undefined
                         }
-                        className={getHeaderClassName(
-                          columnIndex === visibleColumns.length - 1,
-                        )}
+                        className={getHeaderClassName()}
                         scope="col"
                       >
                         {column.key ? (
@@ -677,13 +675,8 @@ function SortIcon({
   return <ArrowUpDown aria-hidden="true" className="shrink-0" size={14} />;
 }
 
-function getHeaderClassName(isRightMostColumn: boolean) {
-  return [
-    "relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted",
-    isRightMostColumn ? "sticky right-0 z-20 bg-slate-50" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+function getHeaderClassName() {
+  return "relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted";
 }
 
 function ApplicationRow({
@@ -710,7 +703,7 @@ function ApplicationRow({
   visibleColumnIds: ApplicationColumnId[];
 }) {
   return (
-    <tr className="group table-row-hover align-top">
+    <tr className="table-row-hover align-top">
       {visibleColumnIds.map((columnId, columnIndex) => {
         const isRightMostColumn = columnIndex === visibleColumnIds.length - 1;
 
@@ -723,7 +716,7 @@ function ApplicationRow({
             ) ? (
               <td aria-hidden="true" className="bg-surface" />
             ) : null}
-            <td className={getCellClassName(columnId, isRightMostColumn)}>
+            <td className={getCellClassName(columnId)}>
               <div
                 className={getCellContentClassName(
                   columnId,
@@ -752,7 +745,6 @@ function ApplicationRow({
 
 function getCellClassName(
   columnId: ApplicationColumnId,
-  isRightMostColumn: boolean,
 ) {
   const isActions = columnId === "actions";
   const isUtilityCell = isActions || columnId === "contacts";
@@ -760,10 +752,7 @@ function getCellClassName(
   return [
     "py-4 align-top",
     isUtilityCell ? "px-1" : "overflow-hidden px-2.5",
-    isRightMostColumn
-      ? "sticky right-0 z-10 bg-surface group-hover:bg-slate-50"
-      : "",
-    isActions || isRightMostColumn ? "overflow-visible" : "",
+    isActions ? "overflow-visible" : "",
   ]
     .filter(Boolean)
     .join(" ");
