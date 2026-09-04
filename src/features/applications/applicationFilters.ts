@@ -7,7 +7,6 @@ import type {
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
 
-export type ArchivedFilter = "active" | "archived" | "all";
 export type FollowUpFilter = "" | "needed" | "optional";
 export type InterviewFilter = "" | "scheduled" | "unscheduled";
 export type ResumeFilter = "" | "assigned" | "unassigned";
@@ -21,7 +20,6 @@ export type SortColumn =
 export type SortDirection = "ascending" | "descending";
 
 export interface ApplicationFilters {
-  archived: ArchivedFilter;
   followUp: FollowUpFilter;
   interview: InterviewFilter;
   jobType: JobType | "";
@@ -39,7 +37,6 @@ export interface SortState {
 }
 
 export const DEFAULT_APPLICATION_FILTERS: ApplicationFilters = {
-  archived: "active",
   followUp: "",
   interview: "",
   jobType: "",
@@ -61,14 +58,6 @@ export function applyApplicationFilters(
   filters: ApplicationFilters,
 ) {
   return applications.filter((application) => {
-    if (filters.archived === "archived" && !application.archivedAt) {
-      return false;
-    }
-
-    if (filters.archived === "active" && application.archivedAt) {
-      return false;
-    }
-
     if (filters.status && application.status !== filters.status) {
       return false;
     }

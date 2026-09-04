@@ -1,4 +1,5 @@
 import {
+  Archive,
   BarChart3,
   Bell,
   BriefcaseBusiness,
@@ -13,7 +14,12 @@ import {
 import { type ReactNode, useState } from "react";
 import { APP_NAME } from "../lib/constants";
 
-export type ViewKey = "applications" | "analytics" | "resumes" | "settings";
+export type ViewKey =
+  | "applications"
+  | "archive"
+  | "analytics"
+  | "resumes"
+  | "settings";
 
 interface AppShellProps {
   children: ReactNode;
@@ -32,6 +38,7 @@ const navigationItems: Array<{
   beta?: boolean;
 }> = [
   { key: "applications", label: "Applications", icon: BriefcaseBusiness },
+  { key: "archive", label: "Archive", icon: Archive },
   { key: "analytics", label: "Analytics", icon: BarChart3, beta: true },
   { key: "resumes", label: "Resumes", icon: FileText },
   { key: "settings", label: "Settings", icon: Settings },
@@ -39,6 +46,7 @@ const navigationItems: Array<{
 
 const pageTitle: Record<ViewKey, string> = {
   applications: "Applications",
+  archive: "Archive",
   analytics: "Analytics",
   resumes: "Resumes",
   settings: "Settings",
@@ -58,7 +66,7 @@ export function AppShell({
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
-  const showAddButton = currentView !== "settings";
+  const showAddButton = currentView !== "settings" && currentView !== "archive";
   const addLabel = currentView === "resumes" ? "Upload resume" : "Add job";
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";

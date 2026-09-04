@@ -39,7 +39,7 @@ export function App() {
 }
 
 function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) {
-  if (view === "applications") {
+  if (view === "applications" || view === "archive") {
     return (
       <ApplicationsPage
         activities={tracker.activities}
@@ -55,6 +55,7 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         settings={tracker.settings}
+        viewMode={view === "archive" ? "archive" : "active"}
         updateContact={tracker.updateContact}
         updateApplication={tracker.updateApplication}
       />

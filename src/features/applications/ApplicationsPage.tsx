@@ -35,6 +35,7 @@ interface ApplicationsPageProps {
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   settings: UserSettings;
+  viewMode?: "active" | "archive";
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
 }
@@ -51,6 +52,7 @@ export function ApplicationsPage({
   restoreApplication,
   resumes,
   settings,
+  viewMode = "active",
   updateContact,
   updateApplication,
 }: ApplicationsPageProps) {
@@ -69,7 +71,12 @@ export function ApplicationsPage({
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,
   );
-  const searchedApplications = searchApplications(applications, searchQuery);
+  const archivedApplications = applications.filter(
+    (application) => application.archivedAt,
+  );
+  const baseApplications =
+    viewMode === "archive" ? archivedApplications : activeApplications;
+  const searchedApplications = searchApplications(baseApplications, searchQuery);
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
     filters,
@@ -80,10 +87,10 @@ export function ApplicationsPage({
       )
     : filteredApplications;
   const visibleApplications = sortApplications(focusedApplications, sort);
-  const attentionCount = activeApplications.filter(
+  const attentionCount = baseApplications.filter(
     (application) => application.followUpNeeded || application.interviewDateTime,
   ).length;
-  const interviewCount = activeApplications.filter(
+  const interviewCount = baseApplications.filter(
     (application) => application.interviewDateTime,
   ).length;
   const selectedApplication = useMemo(
@@ -104,7 +111,10 @@ export function ApplicationsPage({
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-3">
-        <SummaryMetric label="Active" value={String(activeApplications.length)} />
+        <SummaryMetric
+          label={viewMode === "archive" ? "Archived" : "Active"}
+          value={String(baseApplications.length)}
+        />
         <SummaryMetric
           label="Needs attention"
           value={String(attentionCount)}
@@ -136,9 +146,17 @@ export function ApplicationsPage({
         emptyBody={
           searchQuery
             ? "No applications match that title or description."
-            : "New entries will appear here once they are added."
+            : viewMode === "archive"
+              ? "Archived applications will appear here."
+              : "New entries will appear here once they are added."
         }
-        emptyTitle={searchQuery ? "No matching applications" : "No applications yet"}
+        emptyTitle={
+          searchQuery
+            ? "No matching applications"
+            : viewMode === "archive"
+              ? "No archived applications"
+              : "No applications yet"
+        }
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={(id) => {

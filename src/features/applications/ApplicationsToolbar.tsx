@@ -1,5 +1,4 @@
 import {
-  Archive,
   CalendarDays,
   ChevronDown,
   ClipboardCheck,
@@ -36,7 +35,6 @@ export function ApplicationsToolbar({
   searchQuery = "",
 }: ApplicationsToolbarProps) {
   const currentFilters = filters ?? {
-    archived: "active",
     followUp: "",
     interview: "",
     jobType: "",
@@ -139,21 +137,6 @@ export function ApplicationsToolbar({
             <option value="">Resume</option>
             <option value="assigned">Assigned</option>
             <option value="unassigned">Unassigned</option>
-          </FilterSelect>
-
-          <FilterSelect
-            icon={Archive}
-            label="Archived"
-            onChange={(value) =>
-              onFilterChange?.({
-                archived: value as ApplicationFilters["archived"],
-              })
-            }
-            value={currentFilters.archived}
-          >
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="all">All</option>
           </FilterSelect>
 
           <FilterSelect
