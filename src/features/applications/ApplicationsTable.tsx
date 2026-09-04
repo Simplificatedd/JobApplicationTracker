@@ -1,6 +1,5 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
 import {
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useState,
@@ -11,6 +10,7 @@ import {
   ArrowUpWideNarrow,
   Check,
   Pencil,
+  RotateCcw,
   X,
 } from "lucide-react";
 import {
@@ -426,15 +426,22 @@ export function ApplicationsTable({
               />
             ))}
           </div>
-          <div className="hidden overflow-x-auto xl:block">
+          {enableDraggableColumnWidths ? (
+            <div className="hidden items-center justify-end border-b border-border px-3 py-2 xl:flex">
+              <button
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                onClick={() => setColumnWidths(DEFAULT_COLUMN_WIDTHS)}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" size={16} />
+                Reset column sizes
+              </button>
+            </div>
+          ) : null}
+          <div className="hidden min-w-0 overflow-x-auto xl:block">
             <table
               className="table-fixed border-collapse text-left"
-              style={
-                {
-                  minWidth: "100%",
-                  width: `${tableWidth}px`,
-                } as CSSProperties
-              }
+              style={{ width: `${tableWidth}px` }}
             >
               <colgroup>
                 {visibleColumns.map((column) => (
