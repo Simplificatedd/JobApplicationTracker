@@ -411,7 +411,7 @@ export function ApplicationsTable({
                           aria-orientation="vertical"
                           aria-valuemin={column.minWidth}
                           aria-valuenow={columnWidths[column.id]}
-                          className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15"
+                          className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
                           onDoubleClick={() =>
                             resizeColumn(column.id, column.width)
                           }
