@@ -1,5 +1,6 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
@@ -41,9 +42,11 @@ export function ContactsPanel({
   onDeleteContact,
   onUpdateContact,
 }: ContactsPanelProps) {
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [newContact, setNewContact] = useState(emptyDraft);
 
-  useEscapeKey(true, onClose);
+  useEscapeKey(!editingContactId && !isDiscardWarningOpen, requestClose);
 
   const panelClass =
     displayMode === "modal"
@@ -69,6 +72,21 @@ export function ContactsPanel({
     setNewContact(emptyDraft);
   }
 
+  function requestClose() {
+    if (isContactDraftDirty(newContact, emptyDraft)) {
+      setIsDiscardWarningOpen(true);
+      return;
+    }
+
+    onClose();
+  }
+
+  function discardAndClose() {
+    setNewContact(emptyDraft);
+    setIsDiscardWarningOpen(false);
+    onClose();
+  }
+
   return (
     <aside
       aria-labelledby="contacts-panel-title"
@@ -89,7 +107,7 @@ export function ContactsPanel({
               Contacts for {application.jobTitle}
             </h2>
           </div>
-          <button className="icon-button" onClick={onClose} type="button">
+          <button className="icon-button" onClick={requestClose} type="button">
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Close contacts</span>
           </button>
@@ -173,6 +191,7 @@ export function ContactsPanel({
                 <ContactCard
                   contact={contact}
                   key={contact.id}
+                  onEditingChange={setEditingContactId}
                   onDeleteContact={onDeleteContact}
                   onUpdateContact={onUpdateContact}
                 />
@@ -180,6 +199,14 @@ export function ContactsPanel({
             )}
           </section>
         </div>
+        {isDiscardWarningOpen ? (
+          <UnsavedChangesDialog
+            body="Discard the new contact draft and close contacts?"
+            confirmLabel="Discard and close"
+            onCancel={() => setIsDiscardWarningOpen(false)}
+            onConfirm={discardAndClose}
+          />
+        ) : null}
       </div>
     </aside>
   );
@@ -187,15 +214,30 @@ export function ContactsPanel({
 
 function ContactCard({
   contact,
+  onEditingChange,
   onDeleteContact,
   onUpdateContact,
 }: {
   contact: ApplicationContact;
+  onEditingChange: (contactId: string | null) => void;
   onDeleteContact: (id: string) => void;
   onUpdateContact: (id: string, input: Partial<ContactInput>) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
+
+  useEscapeKey(isEditing && !isDiscardWarningOpen, requestCancel);
+
+  useEffect(() => {
+    onEditingChange(isEditing ? contact.id : null);
+
+    return () => {
+      if (isEditing) {
+        onEditingChange(null);
+      }
+    };
+  }, [contact.id, isEditing, onEditingChange]);
 
   function confirm() {
     onUpdateContact(contact.id, {
@@ -213,6 +255,15 @@ function ContactCard({
   function cancel() {
     setDraft(toDraft(contact));
     setIsEditing(false);
+  }
+
+  function requestCancel() {
+    if (isContactDraftDirty(draft, toDraft(contact))) {
+      setIsDiscardWarningOpen(true);
+      return;
+    }
+
+    cancel();
   }
 
   function remove() {
@@ -258,11 +309,21 @@ function ContactCard({
             <Check aria-hidden="true" size={18} />
             <span className="sr-only">Confirm contact edit</span>
           </button>
-          <button className="icon-button" onClick={cancel} type="button">
+          <button className="icon-button" onClick={requestCancel} type="button">
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Cancel contact edit</span>
           </button>
         </div>
+        {isDiscardWarningOpen ? (
+          <UnsavedChangesDialog
+            body="Discard unsaved contact edits?"
+            onCancel={() => setIsDiscardWarningOpen(false)}
+            onConfirm={() => {
+              setIsDiscardWarningOpen(false);
+              cancel();
+            }}
+          />
+        ) : null}
       </div>
     );
   }
@@ -358,6 +419,17 @@ function toDraft(contact: ApplicationContact): ContactDraft {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isContactDraftDirty(
+  draft: ContactDraft,
+  initialDraft: ContactDraft,
+) {
+  return Object.entries(draft).some(([key, value]) => {
+    const initialValue = initialDraft[key as keyof ContactDraft];
+
+    return value !== initialValue;
+  });
 }
 
 function labelForContactKey(key: keyof Omit<ContactDraft, "notes">) {

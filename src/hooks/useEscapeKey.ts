@@ -8,6 +8,7 @@ export function useEscapeKey(isActive: boolean, onEscape: () => void) {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         onEscape();
       }
     }
