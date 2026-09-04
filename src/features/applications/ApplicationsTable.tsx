@@ -379,26 +379,62 @@ export function ApplicationsTable({
     );
   }, [tableViewportWidth, visibleColumnKey]);
 
-  function resizeColumn(columnId: ApplicationColumnId, nextWidth: number) {
-    const column = APPLICATION_TABLE_COLUMNS.find(
-      (currentColumn) => currentColumn.id === columnId,
+  function resizeColumnPair(
+    leftColumnId: ApplicationColumnId,
+    rightColumnId: ApplicationColumnId,
+    delta: number,
+  ) {
+    const leftColumn = APPLICATION_TABLE_COLUMNS.find(
+      (currentColumn) => currentColumn.id === leftColumnId,
+    );
+    const rightColumn = APPLICATION_TABLE_COLUMNS.find(
+      (currentColumn) => currentColumn.id === rightColumnId,
     );
 
-    if (!column) {
+    if (!leftColumn || !rightColumn) {
       return;
     }
 
     setColumnWidths((current) => {
-      const resizedWidths = {
-        ...current,
-        [columnId]: Math.max(column.minWidth, nextWidth),
-      };
+      const nextWidths = getColumnPairWidths({
+        delta,
+        leftColumn,
+        leftWidth: current[leftColumnId],
+        rightColumn,
+        rightWidth: current[rightColumnId],
+      });
 
-      return stretchColumnWidthsToViewport(
-        visibleColumns,
-        resizedWidths,
-        tableViewportRef.current?.clientWidth ?? tableViewportWidth,
+      return {
+        ...current,
+        [leftColumnId]: nextWidths.leftWidth,
+        [rightColumnId]: nextWidths.rightWidth,
+      };
+    });
+  }
+
+  function resetColumnPair(
+    leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
+    rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
+  ) {
+    setColumnWidths((current) => {
+      const pairWidth = current[leftColumn.id] + current[rightColumn.id];
+      const defaultPairWidth = leftColumn.width + rightColumn.width;
+      const leftTargetWidth = Math.round(
+        (pairWidth * leftColumn.width) / defaultPairWidth,
       );
+      const nextWidths = getColumnPairWidths({
+        delta: leftTargetWidth - current[leftColumn.id],
+        leftColumn,
+        leftWidth: current[leftColumn.id],
+        rightColumn,
+        rightWidth: current[rightColumn.id],
+      });
+
+      return {
+        ...current,
+        [leftColumn.id]: nextWidths.leftWidth,
+        [rightColumn.id]: nextWidths.rightWidth,
+      };
     });
   }
 
@@ -413,23 +449,44 @@ export function ApplicationsTable({
   }
 
   function startColumnResize(
-    columnId: ApplicationColumnId,
+    leftColumnId: ApplicationColumnId,
+    rightColumnId: ApplicationColumnId,
     event: ReactPointerEvent<HTMLButtonElement>,
-    edge: "left" | "right" = "right",
   ) {
     event.preventDefault();
     event.stopPropagation();
 
     const startX = event.clientX;
-    const startWidth = columnWidths[columnId];
+    const startLeftWidth = columnWidths[leftColumnId];
+    const startRightWidth = columnWidths[rightColumnId];
+    const leftColumn = APPLICATION_TABLE_COLUMNS.find(
+      (currentColumn) => currentColumn.id === leftColumnId,
+    );
+    const rightColumn = APPLICATION_TABLE_COLUMNS.find(
+      (currentColumn) => currentColumn.id === rightColumnId,
+    );
+
+    if (!leftColumn || !rightColumn) {
+      return;
+    }
+
+    const leftColumnDef = leftColumn;
+    const rightColumnDef = rightColumn;
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      const pointerDelta =
-        edge === "left"
-          ? startX - pointerEvent.clientX
-          : pointerEvent.clientX - startX;
+      const nextWidths = getColumnPairWidths({
+        delta: pointerEvent.clientX - startX,
+        leftColumn: leftColumnDef,
+        leftWidth: startLeftWidth,
+        rightColumn: rightColumnDef,
+        rightWidth: startRightWidth,
+      });
 
-      resizeColumn(columnId, startWidth + pointerDelta);
+      setColumnWidths((current) => ({
+        ...current,
+        [leftColumnId]: nextWidths.leftWidth,
+        [rightColumnId]: nextWidths.rightWidth,
+      }));
     }
 
     function stopColumnResize() {
@@ -556,44 +613,41 @@ export function ApplicationsTable({
                         )}
                         {resizeHandle ? (
                           <button
-                            aria-label={`Resize ${resizeHandle.column.label} column`}
+                            aria-label={`Resize ${resizeHandle.leftColumn.label} and ${resizeHandle.rightColumn.label} columns`}
                             aria-orientation="vertical"
-                            aria-valuemin={resizeHandle.column.minWidth}
+                            aria-valuemin={resizeHandle.leftColumn.minWidth}
                             aria-valuenow={
-                              columnWidths[resizeHandle.column.id]
+                              columnWidths[resizeHandle.leftColumn.id]
                             }
                             className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
                             onDoubleClick={() =>
-                              resizeColumn(
-                                resizeHandle.column.id,
-                                resizeHandle.column.width,
+                              resetColumnPair(
+                                resizeHandle.leftColumn,
+                                resizeHandle.rightColumn,
                               )
                             }
                             onKeyDown={(event) => {
-                              const directionMultiplier =
-                                resizeHandle.edge === "left" ? -1 : 1;
-
                               if (event.key === "ArrowLeft") {
-                                resizeColumn(
-                                  resizeHandle.column.id,
-                                  columnWidths[resizeHandle.column.id] -
-                                    16 * directionMultiplier,
+                                resizeColumnPair(
+                                  resizeHandle.leftColumn.id,
+                                  resizeHandle.rightColumn.id,
+                                  -16,
                                 );
                               }
 
                               if (event.key === "ArrowRight") {
-                                resizeColumn(
-                                  resizeHandle.column.id,
-                                  columnWidths[resizeHandle.column.id] +
-                                    16 * directionMultiplier,
+                                resizeColumnPair(
+                                  resizeHandle.leftColumn.id,
+                                  resizeHandle.rightColumn.id,
+                                  16,
                                 );
                               }
                             }}
                             onPointerDown={(event) =>
                               startColumnResize(
-                                resizeHandle.column.id,
+                                resizeHandle.leftColumn.id,
+                                resizeHandle.rightColumn.id,
                                 event,
-                                resizeHandle.edge,
                               )
                             }
                             role="separator"
@@ -675,6 +729,32 @@ function stretchColumnWidthsToViewport(
   return stretchedWidths;
 }
 
+function getColumnPairWidths({
+  delta,
+  leftColumn,
+  leftWidth,
+  rightColumn,
+  rightWidth,
+}: {
+  delta: number;
+  leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number];
+  leftWidth: number;
+  rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number];
+  rightWidth: number;
+}) {
+  const minimumDelta = leftColumn.minWidth - leftWidth;
+  const maximumDelta = rightWidth - rightColumn.minWidth;
+  const clampedDelta = Math.max(
+    minimumDelta,
+    Math.min(maximumDelta, delta),
+  );
+
+  return {
+    leftWidth: leftWidth + clampedDelta,
+    rightWidth: rightWidth - clampedDelta,
+  };
+}
+
 function SortIcon({
   state,
 }: {
@@ -750,23 +830,16 @@ function getResizeHandle(
   columnIndex: number,
   enableDraggableColumnWidths: boolean,
 ) {
-  const column = visibleColumns[columnIndex];
+  const leftColumn = visibleColumns[columnIndex];
   const nextColumn = visibleColumns[columnIndex + 1];
 
-  if (!enableDraggableColumnWidths || !nextColumn) {
+  if (!enableDraggableColumnWidths || !leftColumn || !nextColumn) {
     return null;
   }
 
-  if (nextColumn.id === "actions") {
-    return {
-      column: nextColumn,
-      edge: "left" as const,
-    };
-  }
-
   return {
-    column,
-    edge: "right" as const,
+    leftColumn,
+    rightColumn: nextColumn,
   };
 }
 
