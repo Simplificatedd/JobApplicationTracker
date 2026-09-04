@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   Columns3,
   FileText,
+  Info,
   MapPin,
   RotateCcw,
   Search,
@@ -232,7 +233,10 @@ function ColumnsModal({
                 }`}
                 key={column.id}
               >
-                <span className="truncate">{column.label}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{column.label}</span>
+                  <ColumnInfoTooltip columnId={column.id} />
+                </span>
                 <input
                   checked={checked}
                   className="h-4 w-4 shrink-0 rounded border-border text-primary"
@@ -284,6 +288,54 @@ function ColumnsModal({
     </div>
   );
 }
+
+function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
+  const description = COLUMN_DESCRIPTIONS[columnId];
+
+  return (
+    <span
+      aria-label={description}
+      className="group relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 focus-visible:text-foreground"
+      tabIndex={0}
+    >
+      <Info aria-hidden="true" size={14} />
+      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-56 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs font-medium normal-case leading-5 text-foreground shadow-popover group-hover:block group-focus-visible:block">
+        {description}
+      </span>
+    </span>
+  );
+}
+
+const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
+  actions: "Row menu for archive, restore, and delete actions.",
+  applicationUrl: "Link to the job post or application portal.",
+  company: "Employer, recruiter, or organization name.",
+  contacts: "Number of people linked to this application.",
+  coverLetterVersion: "Cover letter draft or version used for this application.",
+  dateApplied: "Date you submitted the application.",
+  deadline: "Application or assessment deadline.",
+  deadlineEntryMode: "How the deadline timing was entered.",
+  followUp: "Follow-up date and whether the follow-up is needed.",
+  followUpNeeded: "Whether this application needs a follow-up.",
+  followUpPromptDays: "Default reminder timing for follow-up prompts.",
+  interviewDateTime: "Scheduled interview date and time.",
+  interviewRound: "Current interview number for this application.",
+  interviewType: "Interview format, such as technical or face-to-face.",
+  jobDescription: "Saved description or notes from the job posting.",
+  jobTitle: "Role title; clicking it opens the application details.",
+  jobType: "Role category such as internship, full-time, or contract.",
+  location: "Job location or remote location label.",
+  notes: "Private notes about the application.",
+  priority: "Your priority level for this application.",
+  resume: "Resume assigned to this application.",
+  roleEndDate: "Expected end date for the role.",
+  roleStartDate: "Expected start date for the role.",
+  salary: "Salary, stipend, or pay range.",
+  source: "Where you found the opportunity.",
+  status: "Current stage in the application process.",
+  updatedAt: "Most recent edit time for this application.",
+  workMode: "Remote, hybrid, onsite, or unknown work arrangement.",
+};
 
 function StatusFilter({
   currentFilters,
