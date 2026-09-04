@@ -815,6 +815,7 @@ function ApplicationRow({
 }) {
   function openFromRowClick(event: ReactMouseEvent<HTMLTableRowElement>) {
     if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
+      event.currentTarget.blur();
       onOpenApplication(application.id);
     }
   }
@@ -1083,6 +1084,7 @@ function ApplicationCard({
 }) {
   function openFromCardClick(event: ReactMouseEvent<HTMLElement>) {
     if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
+      event.currentTarget.blur();
       onOpenApplication(application.id);
     }
   }
