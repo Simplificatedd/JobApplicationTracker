@@ -38,6 +38,7 @@ interface ApplicationsPageProps {
   viewMode?: "active" | "archive";
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
+  updateSettings: (settings: Partial<UserSettings>) => void;
 }
 
 export function ApplicationsPage({
@@ -55,6 +56,7 @@ export function ApplicationsPage({
   viewMode = "active",
   updateContact,
   updateApplication,
+  updateSettings,
 }: ApplicationsPageProps) {
   const [selectedApplicationId, setSelectedApplicationId] = useState<
     string | null
@@ -126,6 +128,9 @@ export function ApplicationsPage({
       <ApplicationsToolbar
         filters={filters}
         needsAttentionOnly={needsAttentionOnly}
+        onColumnVisibilityChange={(visibleApplicationColumns) =>
+          updateSettings({ visibleApplicationColumns })
+        }
         onFilterChange={(nextFilters) =>
           setFilters((current) => ({
             ...current,
@@ -139,6 +144,7 @@ export function ApplicationsPage({
         }}
         onSearchQueryChange={setSearchQuery}
         searchQuery={searchQuery}
+        visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
       <ApplicationsTable
@@ -173,6 +179,7 @@ export function ApplicationsPage({
         onUpdateApplication={updateApplication}
         resumes={resumes}
         sort={sort}
+        visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
       {selectedApplication ? (

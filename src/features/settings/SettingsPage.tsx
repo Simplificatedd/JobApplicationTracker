@@ -1,6 +1,6 @@
 import { Info, RotateCcw, Settings } from "lucide-react";
 import { useState } from "react";
-import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
+import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
@@ -159,15 +159,21 @@ export function SettingsPage({
             }
           />
           <div className="grid gap-2 sm:grid-cols-2">
-            {DEFAULT_VISIBLE_APPLICATION_COLUMNS.map((column) => (
+            {APPLICATION_TABLE_COLUMNS.map((column) => (
               <ToggleField
-                checked={settings.visibleApplicationColumns.includes(column)}
-                description={`Show or hide the ${formatColumnLabel(
-                  column,
-                ).toLowerCase()} column in the applications table.`}
-                key={column}
-                label={formatColumnLabel(column)}
-                onChange={(checked) => updateColumn(column, checked)}
+                checked={
+                  !column.canHide ||
+                  settings.visibleApplicationColumns.includes(column.id)
+                }
+                description={
+                  column.canHide
+                    ? `Show or hide the ${column.label.toLowerCase()} column in the applications table.`
+                    : `${column.label} stays visible so table actions remain reachable.`
+                }
+                disabled={!column.canHide}
+                key={column.id}
+                label={column.label}
+                onChange={(checked) => updateColumn(column.id, checked)}
               />
             ))}
           </div>
@@ -240,20 +246,27 @@ function SettingsGroup({
 function ToggleField({
   checked,
   description,
+  disabled = false,
   label,
   onChange,
 }: {
   checked: boolean;
   description: string;
+  disabled?: boolean;
   label: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground">
+    <label
+      className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground ${
+        disabled ? "opacity-70" : ""
+      }`}
+    >
       <SettingLabel description={description} label={label} />
       <input
         checked={checked}
         className="h-4 w-4 shrink-0 rounded border-border text-primary"
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
@@ -358,10 +371,4 @@ function InfoTooltip({ description }: { description: string }) {
       </span>
     </span>
   );
-}
-
-function formatColumnLabel(column: string) {
-  return column
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (first) => first.toUpperCase());
 }

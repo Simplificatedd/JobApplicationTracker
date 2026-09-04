@@ -58,6 +58,7 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         viewMode={view === "archive" ? "archive" : "active"}
         updateContact={tracker.updateContact}
         updateApplication={tracker.updateApplication}
+        updateSettings={tracker.updateSettings}
       />
     );
   }

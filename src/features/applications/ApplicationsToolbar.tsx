@@ -2,6 +2,7 @@ import {
   CalendarDays,
   ChevronDown,
   ClipboardCheck,
+  Columns3,
   FileText,
   MapPin,
   RotateCcw,
@@ -12,29 +13,38 @@ import {
 import { type ReactNode, useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
+import {
+  APPLICATION_TABLE_COLUMNS,
+  type ApplicationColumnId,
+} from "./ApplicationsTable";
 import type { ApplicationFilters } from "./applicationFilters";
 import type { JobType, Priority, WorkMode } from "../../types/application";
 
 interface ApplicationsToolbarProps {
   filters?: ApplicationFilters;
   needsAttentionOnly?: boolean;
+  onColumnVisibilityChange?: (columns: string[]) => void;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
   onSearchQueryChange?: (value: string) => void;
   searchQuery?: string;
+  visibleApplicationColumns?: string[];
 }
 
 export function ApplicationsToolbar({
   filters,
   needsAttentionOnly = false,
+  onColumnVisibilityChange,
   onFilterChange,
   onNeedsAttentionOnlyChange,
   onResetFilters,
   onSearchQueryChange,
   searchQuery = "",
+  visibleApplicationColumns = [],
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const currentFilters = filters ?? {
     followUp: "",
     interview: "",
@@ -50,6 +60,10 @@ export function ApplicationsToolbar({
     currentFilters,
     needsAttentionOnly,
   );
+  const hiddenColumnCount = APPLICATION_TABLE_COLUMNS.filter(
+    (column) =>
+      column.canHide && !visibleApplicationColumns.includes(column.id),
+  ).length;
 
   return (
     <section className="surface-panel applications-toolbar rounded-lg p-4">
@@ -118,6 +132,21 @@ export function ApplicationsToolbar({
           </button>
 
           <button
+            aria-haspopup="dialog"
+            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            onClick={() => setIsColumnsOpen(true)}
+            type="button"
+          >
+            <Columns3 aria-hidden="true" size={16} />
+            <span className="truncate">Columns</span>
+            {hiddenColumnCount > 0 ? (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+                {hiddenColumnCount}
+              </span>
+            ) : null}
+          </button>
+
+          <button
             className="applications-toolbar-reset h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onResetFilters}
             type="button"
@@ -138,7 +167,108 @@ export function ApplicationsToolbar({
           onResetFilters={onResetFilters}
         />
       ) : null}
+
+      {isColumnsOpen ? (
+        <ColumnsModal
+          onChange={onColumnVisibilityChange}
+          onClose={() => setIsColumnsOpen(false)}
+          visibleApplicationColumns={visibleApplicationColumns}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function ColumnsModal({
+  onChange,
+  onClose,
+  visibleApplicationColumns,
+}: {
+  onChange?: (columns: string[]) => void;
+  onClose: () => void;
+  visibleApplicationColumns: string[];
+}) {
+  function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
+    if (checked) {
+      onChange?.([...new Set([...visibleApplicationColumns, columnId])]);
+      return;
+    }
+
+    onChange?.(
+      visibleApplicationColumns.filter((currentColumn) => currentColumn !== columnId),
+    );
+  }
+
+  return (
+    <div
+      aria-labelledby="columns-title"
+      aria-modal="true"
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      role="dialog"
+    >
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
+          <h2
+            className="min-w-0 truncate text-lg font-semibold text-foreground"
+            id="columns-title"
+          >
+            Columns
+          </h2>
+          <button className="icon-button" onClick={onClose} type="button">
+            <X aria-hidden="true" size={18} />
+            <span className="sr-only">Close columns</span>
+          </button>
+        </header>
+
+        <div className="grid gap-2 overflow-y-auto px-4 py-5 sm:px-6">
+          {APPLICATION_TABLE_COLUMNS.map((column) => {
+            const checked =
+              !column.canHide || visibleApplicationColumns.includes(column.id);
+
+            return (
+              <label
+                className={`flex h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground ${
+                  column.canHide ? "" : "opacity-70"
+                }`}
+                key={column.id}
+              >
+                <span className="truncate">{column.label}</span>
+                <input
+                  checked={checked}
+                  className="h-4 w-4 shrink-0 rounded border-border text-primary"
+                  disabled={!column.canHide}
+                  onChange={(event) =>
+                    updateColumn(column.id, event.target.checked)
+                  }
+                  type="checkbox"
+                />
+              </label>
+            );
+          })}
+        </div>
+
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
+          <button
+            className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            onClick={() =>
+              onChange?.(
+                APPLICATION_TABLE_COLUMNS.map((column) => column.id),
+              )
+            }
+            type="button"
+          >
+            Show all
+          </button>
+          <button
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            onClick={onClose}
+            type="button"
+          >
+            Done
+          </button>
+        </footer>
+      </div>
+    </div>
   );
 }
 

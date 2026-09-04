@@ -42,27 +42,30 @@ interface ApplicationsTableProps {
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
   sort: SortState;
+  visibleApplicationColumns: string[];
 }
 
-type ColumnId =
+export type ApplicationColumnId =
   | "jobTitle"
   | "company"
   | "status"
   | "followUp"
-  | "interview"
+  | "interviewDateTime"
   | "resume"
   | "contacts"
   | "updatedAt"
   | "actions";
 
-const columns: Array<{
-  id: ColumnId;
+export const APPLICATION_TABLE_COLUMNS: Array<{
+  canHide: boolean;
+  id: ApplicationColumnId;
   key?: SortColumn;
   label: string;
   minWidth: number;
   width: number;
 }> = [
   {
+    canHide: false,
     id: "jobTitle",
     key: "jobTitle",
     label: "Job Title",
@@ -70,6 +73,7 @@ const columns: Array<{
     width: 260,
   },
   {
+    canHide: true,
     id: "company",
     key: "company",
     label: "Company",
@@ -77,6 +81,7 @@ const columns: Array<{
     width: 160,
   },
   {
+    canHide: true,
     id: "status",
     key: "status",
     label: "Status",
@@ -84,6 +89,7 @@ const columns: Array<{
     width: 180,
   },
   {
+    canHide: true,
     id: "followUp",
     key: "followUpDate",
     label: "Follow-up",
@@ -91,30 +97,38 @@ const columns: Array<{
     width: 150,
   },
   {
-    id: "interview",
+    canHide: true,
+    id: "interviewDateTime",
     key: "interviewDateTime",
     label: "Interview Date/Time",
     minWidth: 150,
     width: 190,
   },
-  { id: "resume", label: "Resume", minWidth: 120, width: 150 },
-  { id: "contacts", label: "Contacts", minWidth: 95, width: 115 },
+  { canHide: true, id: "resume", label: "Resume", minWidth: 120, width: 150 },
   {
+    canHide: true,
+    id: "contacts",
+    label: "Contacts",
+    minWidth: 95,
+    width: 115,
+  },
+  {
+    canHide: true,
     id: "updatedAt",
     key: "updatedAt",
     label: "Last Updated",
     minWidth: 125,
     width: 150,
   },
-  { id: "actions", label: "Actions", minWidth: 90, width: 100 },
+  { canHide: false, id: "actions", label: "Actions", minWidth: 90, width: 100 },
 ];
 
-const DEFAULT_COLUMN_WIDTHS = columns.reduce(
+const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   (widths, column) => ({
     ...widths,
     [column.id]: column.width,
   }),
-  {} as Record<ColumnId, number>,
+  {} as Record<ApplicationColumnId, number>,
 );
 
 export function ApplicationsTable({
@@ -132,16 +146,24 @@ export function ApplicationsTable({
   onUpdateApplication,
   resumes,
   sort,
+  visibleApplicationColumns,
 }: ApplicationsTableProps) {
   const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
-  const tableWidth = columns.reduce(
+  const visibleColumns = APPLICATION_TABLE_COLUMNS.filter(
+    (column) =>
+      !column.canHide || visibleApplicationColumns.includes(column.id),
+  );
+  const visibleColumnIds = visibleColumns.map((column) => column.id);
+  const tableWidth = visibleColumns.reduce(
     (width, column) => width + columnWidths[column.id],
     0,
   );
 
-  function resizeColumn(columnId: ColumnId, nextWidth: number) {
-    const column = columns.find((currentColumn) => currentColumn.id === columnId);
+  function resizeColumn(columnId: ApplicationColumnId, nextWidth: number) {
+    const column = APPLICATION_TABLE_COLUMNS.find(
+      (currentColumn) => currentColumn.id === columnId,
+    );
 
     if (!column) {
       return;
@@ -154,7 +176,7 @@ export function ApplicationsTable({
   }
 
   function startColumnResize(
-    columnId: ColumnId,
+    columnId: ApplicationColumnId,
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
     event.preventDefault();
@@ -209,6 +231,7 @@ export function ApplicationsTable({
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
+                visibleColumnIds={visibleColumnIds}
                 resume={
                   application.resumeId
                     ? resumeById.get(application.resumeId)
@@ -228,7 +251,7 @@ export function ApplicationsTable({
               }
             >
               <colgroup>
-                {columns.map((column) => (
+                {visibleColumns.map((column) => (
                   <col
                     key={column.id}
                     style={{ width: `${columnWidths[column.id]}px` }}
@@ -237,7 +260,7 @@ export function ApplicationsTable({
               </colgroup>
               <thead className="border-b border-border bg-slate-50">
                 <tr>
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th
                       aria-sort={
                         column.key && sort.column === column.key
@@ -316,6 +339,7 @@ export function ApplicationsTable({
                     onOpenContacts={onOpenContacts}
                     onRestoreApplication={onRestoreApplication}
                     onUpdateApplication={onUpdateApplication}
+                    visibleColumnIds={visibleColumnIds}
                     resume={
                       application.resumeId
                         ? resumeById.get(application.resumeId)
@@ -358,6 +382,7 @@ function ApplicationRow({
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  visibleColumnIds,
 }: {
   application: JobApplication;
   enableDeleteActiveApplications: boolean;
@@ -368,7 +393,11 @@ function ApplicationRow({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  visibleColumnIds: ApplicationColumnId[];
 }) {
+  const isColumnVisible = (columnId: ApplicationColumnId) =>
+    visibleColumnIds.includes(columnId);
+
   return (
     <tr className="table-row-hover align-top">
       <td className="px-4 py-4">
@@ -383,43 +412,57 @@ function ApplicationRow({
           <DescriptionPreview description={application.jobDescription} />
         </div>
       </td>
-      <td className="px-4 py-4">
-        <p className="truncate text-sm font-medium text-foreground">
-          {application.company}
-        </p>
-        <p className="mt-1 truncate text-xs text-muted">
-          {application.location ?? "Location blank"}
-        </p>
-      </td>
-      <td className="px-4 py-4">
-        <InlineStatusEditor
-          application={application}
-          onUpdateApplication={onUpdateApplication}
-        />
-      </td>
-      <td className="px-4 py-4">
-        <InlineFollowUpEditor
-          application={application}
-          onUpdateApplication={onUpdateApplication}
-        />
-      </td>
-      <td className="px-4 py-4">
-        <InterviewCell application={application} />
-      </td>
-      <td className="px-4 py-4">
-        <ResumeCell resume={resume} />
-      </td>
-      <td className="px-4 py-4">
-        <ContactsButton
-          count={application.contactsCount}
-          onClick={() => onOpenContacts(application.id)}
-        />
-      </td>
-      <td className="px-4 py-4">
-        <p className="text-sm text-foreground">
-          {formatUpdatedAt(application.updatedAt)}
-        </p>
-      </td>
+      {isColumnVisible("company") ? (
+        <td className="px-4 py-4">
+          <p className="truncate text-sm font-medium text-foreground">
+            {application.company}
+          </p>
+          <p className="mt-1 truncate text-xs text-muted">
+            {application.location ?? "Location blank"}
+          </p>
+        </td>
+      ) : null}
+      {isColumnVisible("status") ? (
+        <td className="px-4 py-4">
+          <InlineStatusEditor
+            application={application}
+            onUpdateApplication={onUpdateApplication}
+          />
+        </td>
+      ) : null}
+      {isColumnVisible("followUp") ? (
+        <td className="px-4 py-4">
+          <InlineFollowUpEditor
+            application={application}
+            onUpdateApplication={onUpdateApplication}
+          />
+        </td>
+      ) : null}
+      {isColumnVisible("interviewDateTime") ? (
+        <td className="px-4 py-4">
+          <InterviewCell application={application} />
+        </td>
+      ) : null}
+      {isColumnVisible("resume") ? (
+        <td className="px-4 py-4">
+          <ResumeCell resume={resume} />
+        </td>
+      ) : null}
+      {isColumnVisible("contacts") ? (
+        <td className="px-4 py-4">
+          <ContactsButton
+            count={application.contactsCount}
+            onClick={() => onOpenContacts(application.id)}
+          />
+        </td>
+      ) : null}
+      {isColumnVisible("updatedAt") ? (
+        <td className="px-4 py-4">
+          <p className="text-sm text-foreground">
+            {formatUpdatedAt(application.updatedAt)}
+          </p>
+        </td>
+      ) : null}
       <td className="px-4 py-4">
         <RowActionsMenu
           application={application}
@@ -443,6 +486,7 @@ function ApplicationCard({
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  visibleColumnIds,
 }: {
   application: JobApplication;
   enableDeleteActiveApplications: boolean;
@@ -453,7 +497,11 @@ function ApplicationCard({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  visibleColumnIds: ApplicationColumnId[];
 }) {
+  const isColumnVisible = (columnId: ApplicationColumnId) =>
+    visibleColumnIds.includes(columnId);
+
   return (
     <article className="rounded-lg border border-border bg-surface px-4 py-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -465,9 +513,11 @@ function ApplicationCard({
           >
             {application.jobTitle}
           </button>
-          <p className="mt-1 truncate text-xs font-medium text-muted">
-            {application.company || "Company blank"}
-          </p>
+          {isColumnVisible("company") ? (
+            <p className="mt-1 truncate text-xs font-medium text-muted">
+              {application.company || "Company blank"}
+            </p>
+          ) : null}
         </div>
         <RowActionsMenu
           application={application}
@@ -481,35 +531,47 @@ function ApplicationCard({
       <DescriptionPreview description={application.jobDescription} />
 
       <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-        <CardField label="Status">
-          <InlineStatusEditor
-            application={application}
-            onUpdateApplication={onUpdateApplication}
-          />
-        </CardField>
-        <CardField label="Follow-up">
-          <InlineFollowUpEditor
-            application={application}
-            onUpdateApplication={onUpdateApplication}
-          />
-        </CardField>
-        <CardField label="Interview">
-          <InterviewCell application={application} />
-        </CardField>
-        <CardField label="Resume">
-          <ResumeCell resume={resume} />
-        </CardField>
-        <CardField label="Contacts">
-          <ContactsButton
-            count={application.contactsCount}
-            onClick={() => onOpenContacts(application.id)}
-          />
-        </CardField>
-        <CardField label="Updated">
-          <p className="text-sm text-foreground">
-            {formatUpdatedAt(application.updatedAt)}
-          </p>
-        </CardField>
+        {isColumnVisible("status") ? (
+          <CardField label="Status">
+            <InlineStatusEditor
+              application={application}
+              onUpdateApplication={onUpdateApplication}
+            />
+          </CardField>
+        ) : null}
+        {isColumnVisible("followUp") ? (
+          <CardField label="Follow-up">
+            <InlineFollowUpEditor
+              application={application}
+              onUpdateApplication={onUpdateApplication}
+            />
+          </CardField>
+        ) : null}
+        {isColumnVisible("interviewDateTime") ? (
+          <CardField label="Interview">
+            <InterviewCell application={application} />
+          </CardField>
+        ) : null}
+        {isColumnVisible("resume") ? (
+          <CardField label="Resume">
+            <ResumeCell resume={resume} />
+          </CardField>
+        ) : null}
+        {isColumnVisible("contacts") ? (
+          <CardField label="Contacts">
+            <ContactsButton
+              count={application.contactsCount}
+              onClick={() => onOpenContacts(application.id)}
+            />
+          </CardField>
+        ) : null}
+        {isColumnVisible("updatedAt") ? (
+          <CardField label="Updated">
+            <p className="text-sm text-foreground">
+              {formatUpdatedAt(application.updatedAt)}
+            </p>
+          </CardField>
+        ) : null}
       </div>
     </article>
   );
