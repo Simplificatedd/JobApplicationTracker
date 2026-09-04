@@ -2,6 +2,7 @@ import type { JobApplication, ResumeFile } from "../../types/application";
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useRef,
   useState,
 } from "react";
 import {
@@ -311,6 +312,11 @@ const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   {} as Record<ApplicationColumnId, number>,
 );
 
+const RESET_FILL_EXCLUDED_COLUMNS: ApplicationColumnId[] = [
+  "actions",
+  "contacts",
+];
+
 export function ApplicationsTable({
   applications,
   emptyBody = "New entries will appear here once they are added.",
@@ -328,6 +334,7 @@ export function ApplicationsTable({
   visibleApplicationColumns,
 }: ApplicationsTableProps) {
   const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
+  const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
   const visibleColumns = APPLICATION_TABLE_COLUMNS.filter(
     (column) =>
@@ -352,6 +359,13 @@ export function ApplicationsTable({
       ...current,
       [columnId]: Math.max(column.minWidth, nextWidth),
     }));
+  }
+
+  function resetColumnWidths() {
+    const viewportWidth = tableViewportRef.current?.clientWidth ?? 0;
+    const nextWidths = getResetColumnWidths(visibleColumns, viewportWidth);
+
+    setColumnWidths(nextWidths);
   }
 
   function startColumnResize(
@@ -422,7 +436,7 @@ export function ApplicationsTable({
             <div className="hidden items-center justify-end border-b border-border px-3 py-2 xl:flex">
               <button
                 className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-                onClick={() => setColumnWidths(DEFAULT_COLUMN_WIDTHS)}
+                onClick={resetColumnWidths}
                 type="button"
               >
                 <RotateCcw aria-hidden="true" size={16} />
@@ -430,7 +444,10 @@ export function ApplicationsTable({
               </button>
             </div>
           ) : null}
-          <div className="hidden min-w-0 overflow-x-auto xl:block">
+          <div
+            className="hidden min-w-0 overflow-x-auto xl:block"
+            ref={tableViewportRef}
+          >
             <table
               className="table-fixed border-collapse text-left"
               style={{ width: `${tableWidth}px` }}
@@ -538,6 +555,46 @@ export function ApplicationsTable({
       )}
     </section>
   );
+}
+
+function getResetColumnWidths(
+  visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
+  viewportWidth: number,
+) {
+  const nextWidths = { ...DEFAULT_COLUMN_WIDTHS };
+  const defaultTableWidth = visibleColumns.reduce(
+    (width, column) => width + column.width,
+    0,
+  );
+  const extraWidth = Math.max(0, Math.floor(viewportWidth - defaultTableWidth));
+  const fillColumns = visibleColumns.filter(
+    (column) => !RESET_FILL_EXCLUDED_COLUMNS.includes(column.id),
+  );
+  const fillColumnWidth = fillColumns.reduce(
+    (width, column) => width + column.width,
+    0,
+  );
+
+  if (extraWidth === 0 || fillColumns.length === 0 || fillColumnWidth === 0) {
+    return nextWidths;
+  }
+
+  let assignedExtraWidth = 0;
+
+  fillColumns.forEach((column, index) => {
+    const isLastFillColumn = index === fillColumns.length - 1;
+    const columnExtraWidth = isLastFillColumn
+      ? extraWidth - assignedExtraWidth
+      : Math.floor((extraWidth * column.width) / fillColumnWidth);
+
+    assignedExtraWidth += columnExtraWidth;
+    nextWidths[column.id] = Math.max(
+      column.minWidth,
+      column.width + columnExtraWidth,
+    );
+  });
+
+  return nextWidths;
 }
 
 function SortIcon({
