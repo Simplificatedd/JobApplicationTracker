@@ -462,7 +462,7 @@ export function ApplicationsTable({
               </colgroup>
               <thead className="border-b border-border bg-slate-50">
                 <tr>
-                  {visibleColumns.map((column, columnIndex) => (
+                  {visibleColumns.map((column) => (
                     <th
                       aria-sort={
                         column.key && sort.column === column.key
@@ -493,7 +493,7 @@ export function ApplicationsTable({
                           {column.label}
                         </span>
                       )}
-                      {enableDraggableColumnWidths && columnIndex > 0 ? (
+                      {enableDraggableColumnWidths ? (
                         <button
                           aria-label={`Resize ${column.label} column`}
                           aria-orientation="vertical"
