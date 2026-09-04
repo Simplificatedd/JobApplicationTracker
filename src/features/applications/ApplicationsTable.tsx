@@ -1,6 +1,5 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
 import {
-  Fragment,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
@@ -314,10 +313,7 @@ const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   {} as Record<ApplicationColumnId, number>,
 );
 
-const RESET_FILL_EXCLUDED_COLUMNS: ApplicationColumnId[] = [
-  "actions",
-  "contacts",
-];
+const STRETCH_EXCLUDED_COLUMNS: ApplicationColumnId[] = ["actions"];
 
 export function ApplicationsTable({
   applications,
@@ -344,12 +340,15 @@ export function ApplicationsTable({
       !column.canHide || visibleApplicationColumns.includes(column.id),
   );
   const visibleColumnIds = visibleColumns.map((column) => column.id);
+  const renderedColumnWidths = getRenderedColumnWidths(
+    visibleColumns,
+    columnWidths,
+    tableViewportWidth,
+  );
   const tableWidth = visibleColumns.reduce(
-    (width, column) => width + columnWidths[column.id],
+    (width, column) => width + renderedColumnWidths[column.id],
     0,
   );
-  const spacerWidth = Math.max(0, tableViewportWidth - tableWidth);
-  const renderedTableWidth = tableWidth + spacerWidth;
 
   useEffect(() => {
     const viewport = tableViewportRef.current;
@@ -388,10 +387,7 @@ export function ApplicationsTable({
   }
 
   function resetColumnWidths() {
-    const viewportWidth = tableViewportRef.current?.clientWidth ?? 0;
-    const nextWidths = getResetColumnWidths(visibleColumns, viewportWidth);
-
-    setColumnWidths(nextWidths);
+    setColumnWidths(DEFAULT_COLUMN_WIDTHS);
   }
 
   function startColumnResize(
@@ -476,103 +472,85 @@ export function ApplicationsTable({
           >
             <table
               className="table-fixed border-collapse text-left"
-              style={{ width: `${renderedTableWidth}px` }}
+              style={{ width: `${tableWidth}px` }}
             >
               <colgroup>
-                {visibleColumns.map((column, columnIndex) => (
-                  <Fragment key={column.id}>
-                    {isSpacerBeforeRightMostColumn(
-                      columnIndex,
-                      visibleColumns.length,
-                      spacerWidth,
-                    ) ? (
-                      <col style={{ width: `${spacerWidth}px` }} />
-                    ) : null}
-                    <col style={{ width: `${columnWidths[column.id]}px` }} />
-                  </Fragment>
+                {visibleColumns.map((column) => (
+                  <col
+                    key={column.id}
+                    style={{ width: `${renderedColumnWidths[column.id]}px` }}
+                  />
                 ))}
               </colgroup>
               <thead className="border-b border-border bg-slate-50">
                 <tr>
                   {visibleColumns.map((column, columnIndex) => (
-                    <Fragment key={column.id}>
-                      {isSpacerBeforeRightMostColumn(
-                        columnIndex,
-                        visibleColumns.length,
-                        spacerWidth,
-                      ) ? (
-                        <th
-                          aria-hidden="true"
-                          className="bg-slate-50"
-                          scope="col"
-                        />
-                      ) : null}
-                      <th
-                        aria-sort={
-                          column.key && sort.column === column.key
-                            ? sort.direction
-                            : undefined
-                        }
-                        className={getHeaderClassName()}
-                        scope="col"
-                      >
-                        {column.key ? (
-                          <button
-                            className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
-                            onClick={() => onSortChange(column.key as SortColumn)}
-                            type="button"
-                          >
-                            <span className="min-w-0 truncate">
-                              {column.label}
-                            </span>
-                            <SortIcon
-                              state={
-                                sort.column === column.key
-                                  ? sort.direction
-                                  : "none"
-                              }
-                            />
-                          </button>
-                        ) : (
-                          <span className="block min-w-0 truncate">
+                    <th
+                      aria-sort={
+                        column.key && sort.column === column.key
+                          ? sort.direction
+                          : undefined
+                      }
+                      className={getHeaderClassName()}
+                      key={column.id}
+                      scope="col"
+                    >
+                      {column.key ? (
+                        <button
+                          className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
+                          onClick={() => onSortChange(column.key as SortColumn)}
+                          type="button"
+                        >
+                          <span className="min-w-0 truncate">
                             {column.label}
                           </span>
-                        )}
-                        {enableDraggableColumnWidths &&
-                        columnIndex < visibleColumns.length - 1 ? (
-                          <button
-                            aria-label={`Resize ${column.label} column`}
-                            aria-orientation="vertical"
-                            aria-valuemin={column.minWidth}
-                            aria-valuenow={columnWidths[column.id]}
-                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
-                            onDoubleClick={() =>
-                              resizeColumn(column.id, column.width)
+                          <SortIcon
+                            state={
+                              sort.column === column.key
+                                ? sort.direction
+                                : "none"
                             }
-                            onKeyDown={(event) => {
-                              if (event.key === "ArrowLeft") {
-                                resizeColumn(
-                                  column.id,
-                                  columnWidths[column.id] - 16,
-                                );
-                              }
-
-                              if (event.key === "ArrowRight") {
-                                resizeColumn(
-                                  column.id,
-                                  columnWidths[column.id] + 16,
-                                );
-                              }
-                            }}
-                            onPointerDown={(event) =>
-                              startColumnResize(column.id, event)
-                            }
-                            role="separator"
-                            type="button"
                           />
-                        ) : null}
-                      </th>
-                    </Fragment>
+                        </button>
+                      ) : (
+                        <span className="block min-w-0 truncate">
+                          {column.label}
+                        </span>
+                      )}
+                      {enableDraggableColumnWidths &&
+                      columnIndex < visibleColumns.length - 1 ? (
+                        <button
+                          aria-label={`Resize ${column.label} column`}
+                          aria-orientation="vertical"
+                          aria-valuemin={column.minWidth}
+                          aria-valuenow={columnWidths[column.id]}
+                          className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
+                          onDoubleClick={() =>
+                            resizeColumn(column.id, column.width)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "ArrowLeft") {
+                              resizeColumn(
+                                column.id,
+                                columnWidths[column.id] - 16,
+                              );
+                            }
+
+                            if (event.key === "ArrowRight") {
+                              resizeColumn(
+                                column.id,
+                                columnWidths[column.id] + 16,
+                              );
+                            }
+                          }}
+                          onPointerDown={(event) =>
+                            startColumnResize(column.id, event)
+                          }
+                          role="separator"
+                          type="button"
+                        />
+                      ) : null}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -589,7 +567,6 @@ export function ApplicationsTable({
                     onOpenApplication={onOpenApplication}
                     onOpenContacts={onOpenContacts}
                     onRestoreApplication={onRestoreApplication}
-                    spacerWidth={spacerWidth}
                     visibleColumnIds={visibleColumnIds}
                     resume={
                       application.resumeId
@@ -607,52 +584,42 @@ export function ApplicationsTable({
   );
 }
 
-function getResetColumnWidths(
+function getRenderedColumnWidths(
   visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
+  columnWidths: Record<ApplicationColumnId, number>,
   viewportWidth: number,
 ) {
-  const nextWidths = { ...DEFAULT_COLUMN_WIDTHS };
-  const defaultTableWidth = visibleColumns.reduce(
-    (width, column) => width + column.width,
+  const renderedWidths = { ...columnWidths };
+  const baseTableWidth = visibleColumns.reduce(
+    (width, column) => width + columnWidths[column.id],
     0,
   );
-  const extraWidth = Math.max(0, Math.floor(viewportWidth - defaultTableWidth));
-  const fillColumns = visibleColumns.filter(
-    (column) => !RESET_FILL_EXCLUDED_COLUMNS.includes(column.id),
+  const extraWidth = Math.max(0, Math.floor(viewportWidth - baseTableWidth));
+  const stretchColumns = visibleColumns.filter(
+    (column) => !STRETCH_EXCLUDED_COLUMNS.includes(column.id),
   );
-  const fillColumnWidth = fillColumns.reduce(
-    (width, column) => width + column.width,
+  const stretchBasis = stretchColumns.reduce(
+    (width, column) => width + columnWidths[column.id],
     0,
   );
 
-  if (extraWidth === 0 || fillColumns.length === 0 || fillColumnWidth === 0) {
-    return nextWidths;
+  if (extraWidth === 0 || stretchColumns.length === 0 || stretchBasis === 0) {
+    return renderedWidths;
   }
 
   let assignedExtraWidth = 0;
 
-  fillColumns.forEach((column, index) => {
-    const isLastFillColumn = index === fillColumns.length - 1;
-    const columnExtraWidth = isLastFillColumn
+  stretchColumns.forEach((column, index) => {
+    const isLastStretchColumn = index === stretchColumns.length - 1;
+    const columnExtraWidth = isLastStretchColumn
       ? extraWidth - assignedExtraWidth
-      : Math.floor((extraWidth * column.width) / fillColumnWidth);
+      : Math.floor((extraWidth * columnWidths[column.id]) / stretchBasis);
 
     assignedExtraWidth += columnExtraWidth;
-    nextWidths[column.id] = Math.max(
-      column.minWidth,
-      column.width + columnExtraWidth,
-    );
+    renderedWidths[column.id] = columnWidths[column.id] + columnExtraWidth;
   });
 
-  return nextWidths;
-}
-
-function isSpacerBeforeRightMostColumn(
-  columnIndex: number,
-  columnCount: number,
-  spacerWidth: number,
-) {
-  return spacerWidth > 0 && columnIndex === columnCount - 1;
+  return renderedWidths;
 }
 
 function SortIcon({
@@ -688,7 +655,6 @@ function ApplicationRow({
   onOpenContacts,
   onRestoreApplication,
   resume,
-  spacerWidth,
   visibleColumnIds,
 }: {
   application: JobApplication;
@@ -699,7 +665,6 @@ function ApplicationRow({
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
   resume?: ResumeFile;
-  spacerWidth: number;
   visibleColumnIds: ApplicationColumnId[];
 }) {
   return (
@@ -708,44 +673,30 @@ function ApplicationRow({
         const isRightMostColumn = columnIndex === visibleColumnIds.length - 1;
 
         return (
-          <Fragment key={columnId}>
-            {isSpacerBeforeRightMostColumn(
-              columnIndex,
-              visibleColumnIds.length,
-              spacerWidth,
-            ) ? (
-              <td aria-hidden="true" className="bg-surface" />
-            ) : null}
-            <td className={getCellClassName(columnId)}>
-              <div
-                className={getCellContentClassName(
-                  columnId,
-                  isRightMostColumn,
-                )}
-              >
-                <ApplicationColumnCell
-                  application={application}
-                  columnId={columnId}
-                  enableDeleteActiveApplications={enableDeleteActiveApplications}
-                  onArchiveApplication={onArchiveApplication}
-                  onDeleteApplication={onDeleteApplication}
-                  onOpenApplication={onOpenApplication}
-                  onOpenContacts={onOpenContacts}
-                  onRestoreApplication={onRestoreApplication}
-                  resume={resume}
-                />
-              </div>
-            </td>
-          </Fragment>
+          <td className={getCellClassName(columnId)} key={columnId}>
+            <div
+              className={getCellContentClassName(columnId, isRightMostColumn)}
+            >
+              <ApplicationColumnCell
+                application={application}
+                columnId={columnId}
+                enableDeleteActiveApplications={enableDeleteActiveApplications}
+                onArchiveApplication={onArchiveApplication}
+                onDeleteApplication={onDeleteApplication}
+                onOpenApplication={onOpenApplication}
+                onOpenContacts={onOpenContacts}
+                onRestoreApplication={onRestoreApplication}
+                resume={resume}
+              />
+            </div>
+          </td>
         );
       })}
     </tr>
   );
 }
 
-function getCellClassName(
-  columnId: ApplicationColumnId,
-) {
+function getCellClassName(columnId: ApplicationColumnId) {
   const isActions = columnId === "actions";
   const isUtilityCell = isActions || columnId === "contacts";
 
