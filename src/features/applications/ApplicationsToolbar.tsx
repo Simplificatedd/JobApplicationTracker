@@ -252,6 +252,19 @@ function ColumnsModal({
             className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={() =>
               onChange?.(
+                APPLICATION_TABLE_COLUMNS.filter((column) => !column.canHide).map(
+                  (column) => column.id,
+                ),
+              )
+            }
+            type="button"
+          >
+            Hide all
+          </button>
+          <button
+            className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            onClick={() =>
+              onChange?.(
                 APPLICATION_TABLE_COLUMNS.map((column) => column.id),
               )
             }
