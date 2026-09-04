@@ -92,7 +92,7 @@ export function ContactsButton({
 }) {
   return (
     <button
-      className="inline-flex h-9 max-w-full items-center gap-1.5 overflow-hidden rounded-lg border border-border px-2 text-left text-sm font-medium text-foreground hover:bg-slate-50"
+      className="inline-flex h-9 max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
       onClick={onClick}
       type="button"
     >

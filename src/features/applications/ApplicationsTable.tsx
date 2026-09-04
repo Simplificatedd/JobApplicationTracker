@@ -510,7 +510,7 @@ export function ApplicationsTable({
                       >
                         {column.key ? (
                           <button
-                            className="flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-left hover:text-foreground"
+                            className="flex w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden text-center hover:text-foreground"
                             onClick={() =>
                               onSortChange(column.key as SortColumn)
                             }
@@ -672,7 +672,7 @@ function SortIcon({
 }
 
 function getHeaderClassName() {
-  return "relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted";
+  return "relative overflow-hidden px-2.5 py-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted";
 }
 
 function ApplicationRow({
@@ -698,7 +698,7 @@ function ApplicationRow({
 }) {
   return (
     <tr className="table-row-hover align-top">
-      {visibleColumnIds.map((columnId, columnIndex) => {
+      {visibleColumnIds.map((columnId) => {
         return (
           <td className={getCellClassName(columnId)} key={columnId}>
             <div className={getCellContentClassName(columnId)}>
@@ -769,7 +769,7 @@ function getCellContentClassName(columnId: ApplicationColumnId) {
   return [
     "min-w-0 max-w-full",
     isUtilityCell
-      ? "flex justify-start"
+      ? "flex justify-center"
       : "overflow-hidden",
   ].join(" ");
 }
