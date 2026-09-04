@@ -1,5 +1,6 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
 
@@ -41,6 +42,8 @@ export function ContactsPanel({
   onUpdateContact,
 }: ContactsPanelProps) {
   const [newContact, setNewContact] = useState(emptyDraft);
+
+  useEscapeKey(true, onClose);
 
   const panelClass =
     displayMode === "modal"

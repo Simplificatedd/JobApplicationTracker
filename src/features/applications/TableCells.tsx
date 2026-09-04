@@ -8,17 +8,17 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { formatDate, formatDateTime } from "../../lib/format";
 import type { JobApplication, ResumeFile } from "../../types/application";
 
 export function DescriptionPreview({ description }: { description: string }) {
   return (
-    <button
+    <p
       className="mt-1 line-clamp-2 w-full min-w-0 max-w-full text-left text-xs leading-5 text-muted hover:text-foreground"
-      type="button"
     >
       {description}
-    </button>
+    </p>
   );
 }
 
@@ -73,13 +73,12 @@ export function ResumeCell({ resume }: { resume?: ResumeFile }) {
   }
 
   return (
-    <button
+    <div
       className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md text-left text-sm font-medium text-foreground hover:text-primary"
-      type="button"
     >
       <FileText aria-hidden="true" className="shrink-0 text-muted" size={16} />
       <span className="truncate">{resume.displayName}</span>
-    </button>
+    </div>
   );
 }
 
@@ -119,6 +118,8 @@ export function RowActionsMenu({
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useEscapeKey(isOpen, () => setIsOpen(false));
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -130,18 +131,10 @@ export function RowActionsMenu({
       }
     }
 
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
     document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
 
     return () => {
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isOpen]);
 
@@ -157,7 +150,11 @@ export function RowActionsMenu({
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div
+      className="relative"
+      onClick={(event) => event.stopPropagation()}
+      ref={menuRef}
+    >
       <button
         aria-expanded={isOpen}
         aria-haspopup="menu"

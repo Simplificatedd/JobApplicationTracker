@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationInput } from "../../store/useTrackerStore";
 import type {
   ApplicationStatus,
@@ -86,6 +87,8 @@ export function AddApplicationModal({
 }: AddApplicationModalProps) {
   const [form, setForm] = useState<AddApplicationFormState>(initialFormState);
   const [titleError, setTitleError] = useState("");
+
+  useEscapeKey(isOpen, handleClose);
 
   if (!isOpen) {
     return null;

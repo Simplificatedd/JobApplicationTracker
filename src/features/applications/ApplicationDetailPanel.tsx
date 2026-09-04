@@ -3,6 +3,7 @@ import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
   Activity,
@@ -38,6 +39,8 @@ export function ApplicationDetailPanel({
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
+
+  useEscapeKey(true, onClose);
 
   function startEditing() {
     setDraft(toDraft(application));

@@ -14,6 +14,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
@@ -212,6 +213,8 @@ function ColumnsModal({
   onClose: () => void;
   visibleApplicationColumns: string[];
 }) {
+  useEscapeKey(true, onClose);
+
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
     if (checked) {
       onChange?.([...new Set([...visibleApplicationColumns, columnId])]);
@@ -453,6 +456,8 @@ function MoreFiltersModal({
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
 }) {
+  useEscapeKey(true, onClose);
+
   return (
     <div
       aria-labelledby="more-filters-title"
