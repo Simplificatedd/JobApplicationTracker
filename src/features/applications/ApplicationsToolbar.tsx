@@ -46,14 +46,14 @@ export function ApplicationsToolbar({
     status: "",
     workMode: "",
   };
-  const advancedFilterCount = countAdvancedFilters(
+  const activeFilterCount = countActiveFilters(
     currentFilters,
     needsAttentionOnly,
   );
 
   return (
-    <section className="surface-panel rounded-lg p-4">
-      <div className="grid gap-3 lg:grid-cols-[minmax(280px,380px)_1fr] lg:items-start">
+    <section className="surface-panel applications-toolbar rounded-lg p-4">
+      <div className="applications-toolbar-grid grid gap-3">
         <label className="relative block min-w-0">
           <Search
             aria-hidden="true"
@@ -80,54 +80,27 @@ export function ApplicationsToolbar({
           ) : null}
         </label>
 
-        <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(152px,1fr))] gap-2">
-          <FilterSelect
-            icon={SlidersHorizontal}
-            label="Status"
-            onChange={(value) =>
-              onFilterChange?.({
-                status: value as ApplicationFilters["status"],
-              })
-            }
-            value={currentFilters.status}
-          >
-            <option value="">Status</option>
-            {APPLICATION_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </FilterSelect>
+        <div className="applications-toolbar-controls grid min-w-0 gap-2">
+          <div className="applications-primary-filter min-w-0">
+            <StatusFilter
+              currentFilters={currentFilters}
+              onFilterChange={onFilterChange}
+            />
+          </div>
 
-          <FilterSelect
-            icon={ClipboardCheck}
-            label="Follow-up"
-            onChange={(value) =>
-              onFilterChange?.({
-                followUp: value as ApplicationFilters["followUp"],
-              })
-            }
-            value={currentFilters.followUp}
-          >
-            <option value="">Follow-up</option>
-            <option value="needed">Needed</option>
-            <option value="optional">Optional</option>
-          </FilterSelect>
+          <div className="applications-primary-filter min-w-0">
+            <FollowUpFilter
+              currentFilters={currentFilters}
+              onFilterChange={onFilterChange}
+            />
+          </div>
 
-          <FilterSelect
-            icon={CalendarDays}
-            label="Interview date"
-            onChange={(value) =>
-              onFilterChange?.({
-                interview: value as ApplicationFilters["interview"],
-              })
-            }
-            value={currentFilters.interview}
-          >
-            <option value="">Interview date</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="unscheduled">Not scheduled</option>
-          </FilterSelect>
+          <div className="applications-primary-filter min-w-0">
+            <InterviewDateFilter
+              currentFilters={currentFilters}
+              onFilterChange={onFilterChange}
+            />
+          </div>
 
           <button
             aria-haspopup="dialog"
@@ -136,16 +109,16 @@ export function ApplicationsToolbar({
             type="button"
           >
             <SlidersHorizontal aria-hidden="true" size={16} />
-            <span className="truncate">More filters</span>
-            {advancedFilterCount > 0 ? (
+            <span className="truncate">Filters</span>
+            {activeFilterCount > 0 ? (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-                {advancedFilterCount}
+                {activeFilterCount}
               </span>
             ) : null}
           </button>
 
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="applications-toolbar-reset h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onResetFilters}
             type="button"
           >
@@ -166,6 +139,84 @@ export function ApplicationsToolbar({
         />
       ) : null}
     </section>
+  );
+}
+
+function StatusFilter({
+  currentFilters,
+  onFilterChange,
+}: {
+  currentFilters: ApplicationFilters;
+  onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+}) {
+  return (
+    <FilterSelect
+      icon={SlidersHorizontal}
+      label="Status"
+      onChange={(value) =>
+        onFilterChange?.({
+          status: value as ApplicationFilters["status"],
+        })
+      }
+      value={currentFilters.status}
+    >
+      <option value="">Status</option>
+      {APPLICATION_STATUSES.map((status) => (
+        <option key={status} value={status}>
+          {status}
+        </option>
+      ))}
+    </FilterSelect>
+  );
+}
+
+function FollowUpFilter({
+  currentFilters,
+  onFilterChange,
+}: {
+  currentFilters: ApplicationFilters;
+  onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+}) {
+  return (
+    <FilterSelect
+      icon={ClipboardCheck}
+      label="Follow-up"
+      onChange={(value) =>
+        onFilterChange?.({
+          followUp: value as ApplicationFilters["followUp"],
+        })
+      }
+      value={currentFilters.followUp}
+    >
+      <option value="">Follow-up</option>
+      <option value="needed">Needed</option>
+      <option value="optional">Optional</option>
+    </FilterSelect>
+  );
+}
+
+function InterviewDateFilter({
+  currentFilters,
+  onFilterChange,
+}: {
+  currentFilters: ApplicationFilters;
+  onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+}) {
+  return (
+    <FilterSelect
+      icon={CalendarDays}
+      label="Interview date"
+      onChange={(value) =>
+        onFilterChange?.({
+          interview: value as ApplicationFilters["interview"],
+        })
+      }
+      value={currentFilters.interview}
+    >
+      <option value="">Interview date</option>
+      <option value="scheduled">Scheduled</option>
+      <option value="unscheduled">Not scheduled</option>
+    </FilterSelect>
   );
 }
 
@@ -198,7 +249,7 @@ function MoreFiltersModal({
               className="truncate text-lg font-semibold text-foreground"
               id="more-filters-title"
             >
-              More filters
+              Filters
             </h2>
           </div>
           <button className="icon-button" onClick={onClose} type="button">
@@ -208,6 +259,21 @@ function MoreFiltersModal({
         </header>
 
         <div className="grid gap-3 overflow-y-auto px-4 py-5 sm:grid-cols-2 sm:px-6">
+          <StatusFilter
+            currentFilters={currentFilters}
+            onFilterChange={onFilterChange}
+          />
+
+          <FollowUpFilter
+            currentFilters={currentFilters}
+            onFilterChange={onFilterChange}
+          />
+
+          <InterviewDateFilter
+            currentFilters={currentFilters}
+            onFilterChange={onFilterChange}
+          />
+
           <FilterSelect
             icon={FileText}
             label="Resume"
@@ -328,11 +394,14 @@ function MoreFiltersModal({
   );
 }
 
-function countAdvancedFilters(
+function countActiveFilters(
   filters: ApplicationFilters,
   needsAttentionOnly: boolean,
 ) {
   return [
+    filters.status,
+    filters.followUp,
+    filters.interview,
     filters.resume,
     filters.source,
     filters.jobType,
