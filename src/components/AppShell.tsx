@@ -11,7 +11,12 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useState,
+} from "react";
 import { APP_NAME } from "../lib/constants";
 
 export type ViewKey =
@@ -52,6 +57,10 @@ const pageTitle: Record<ViewKey, string> = {
   settings: "Settings",
 };
 
+const MIN_SIDE_NAVIGATION_WIDTH = 240;
+const DEFAULT_SIDE_NAVIGATION_WIDTH = 288;
+const MAX_SIDE_NAVIGATION_WIDTH = 448;
+
 export function AppShell({
   children,
   currentView,
@@ -62,6 +71,9 @@ export function AppShell({
   onViewChange,
 }: AppShellProps) {
   const [isNavigationHidden, setIsNavigationHidden] = useState(false);
+  const [sideNavigationWidth, setSideNavigationWidth] = useState(
+    DEFAULT_SIDE_NAVIGATION_WIDTH,
+  );
   const isTopNavigation = navigationDisplayMode === "top";
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
@@ -84,6 +96,39 @@ export function AppShell({
     : isNavigationHidden
       ? "Show side navigation"
       : "Hide side navigation";
+  const sideNavigationStyle = {
+    "--side-navigation-width": `${sideNavigationWidth}px`,
+  } as CSSProperties;
+
+  function resizeSideNavigation(nextWidth: number) {
+    setSideNavigationWidth(
+      Math.min(
+        MAX_SIDE_NAVIGATION_WIDTH,
+        Math.max(MIN_SIDE_NAVIGATION_WIDTH, nextWidth),
+      ),
+    );
+  }
+
+  function startResizingSideNavigation(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startWidth = sideNavigationWidth;
+
+    function handlePointerMove(pointerEvent: PointerEvent) {
+      resizeSideNavigation(startWidth + pointerEvent.clientX - startX);
+    }
+
+    function stopResizingSideNavigation() {
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", stopResizingSideNavigation);
+    }
+
+    document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("pointerup", stopResizingSideNavigation);
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -102,13 +147,39 @@ export function AppShell({
         }`}
       >
         {!isTopNavigation && !isNavigationHidden ? (
-          <aside className="border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-72 xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6">
+          <aside
+            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            style={sideNavigationStyle}
+          >
             <NavigationBrand enableNotificationBell={enableNotificationBell} />
             <NavigationButtons
               currentView={currentView}
               items={visibleNavigation}
               layout="side"
               onViewChange={onViewChange}
+            />
+            <button
+              aria-label="Resize side navigation"
+              aria-orientation="vertical"
+              aria-valuemax={MAX_SIDE_NAVIGATION_WIDTH}
+              aria-valuemin={MIN_SIDE_NAVIGATION_WIDTH}
+              aria-valuenow={sideNavigationWidth}
+              className="absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none border-0 bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15 xl:block"
+              onDoubleClick={() =>
+                resizeSideNavigation(DEFAULT_SIDE_NAVIGATION_WIDTH)
+              }
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft") {
+                  resizeSideNavigation(sideNavigationWidth - 16);
+                }
+
+                if (event.key === "ArrowRight") {
+                  resizeSideNavigation(sideNavigationWidth + 16);
+                }
+              }}
+              onPointerDown={startResizingSideNavigation}
+              role="separator"
+              type="button"
             />
           </aside>
         ) : null}
