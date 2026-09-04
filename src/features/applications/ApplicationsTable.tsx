@@ -462,14 +462,16 @@ export function ApplicationsTable({
               </colgroup>
               <thead className="border-b border-border bg-slate-50">
                 <tr>
-                  {visibleColumns.map((column) => (
+                  {visibleColumns.map((column, columnIndex) => (
                     <th
                       aria-sort={
                         column.key && sort.column === column.key
                           ? sort.direction
                           : undefined
                       }
-                      className="relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                      className={getHeaderClassName(
+                        columnIndex === visibleColumns.length - 1,
+                      )}
                       key={column.id}
                       scope="col"
                     >
@@ -493,7 +495,8 @@ export function ApplicationsTable({
                           {column.label}
                         </span>
                       )}
-                      {enableDraggableColumnWidths ? (
+                      {enableDraggableColumnWidths &&
+                      columnIndex < visibleColumns.length - 1 ? (
                         <button
                           aria-label={`Resize ${column.label} column`}
                           aria-orientation="vertical"
@@ -619,6 +622,17 @@ function SortIcon({
   return <ArrowUpDown aria-hidden="true" className="shrink-0" size={14} />;
 }
 
+function getHeaderClassName(isRightMostColumn: boolean) {
+  return [
+    "relative overflow-hidden px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted",
+    isRightMostColumn
+      ? "sticky right-0 z-20 border-l border-border bg-slate-50"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function ApplicationRow({
   application,
   enableDeleteActiveApplications,
@@ -641,47 +655,68 @@ function ApplicationRow({
   visibleColumnIds: ApplicationColumnId[];
 }) {
   return (
-    <tr className="table-row-hover align-top">
-      {visibleColumnIds.map((columnId) => (
-        <td className={getCellClassName(columnId)} key={columnId}>
-          <div className={getCellContentClassName(columnId)}>
-            <ApplicationColumnCell
-              application={application}
-              columnId={columnId}
-              enableDeleteActiveApplications={enableDeleteActiveApplications}
-              onArchiveApplication={onArchiveApplication}
-              onDeleteApplication={onDeleteApplication}
-              onOpenApplication={onOpenApplication}
-              onOpenContacts={onOpenContacts}
-              onRestoreApplication={onRestoreApplication}
-              resume={resume}
-            />
-          </div>
-        </td>
-      ))}
+    <tr className="group table-row-hover align-top">
+      {visibleColumnIds.map((columnId, columnIndex) => {
+        const isRightMostColumn = columnIndex === visibleColumnIds.length - 1;
+
+        return (
+          <td
+            className={getCellClassName(columnId, isRightMostColumn)}
+            key={columnId}
+          >
+            <div
+              className={getCellContentClassName(
+                columnId,
+                isRightMostColumn,
+              )}
+            >
+              <ApplicationColumnCell
+                application={application}
+                columnId={columnId}
+                enableDeleteActiveApplications={enableDeleteActiveApplications}
+                onArchiveApplication={onArchiveApplication}
+                onDeleteApplication={onDeleteApplication}
+                onOpenApplication={onOpenApplication}
+                onOpenContacts={onOpenContacts}
+                onRestoreApplication={onRestoreApplication}
+                resume={resume}
+              />
+            </div>
+          </td>
+        );
+      })}
     </tr>
   );
 }
 
-function getCellClassName(columnId: ApplicationColumnId) {
+function getCellClassName(
+  columnId: ApplicationColumnId,
+  isRightMostColumn: boolean,
+) {
   const isActions = columnId === "actions";
   const isUtilityCell = isActions || columnId === "contacts";
 
   return [
     "py-4 align-top",
     isUtilityCell ? "px-1" : "overflow-hidden px-2.5",
-    isActions ? "overflow-visible" : "",
+    isRightMostColumn
+      ? "sticky right-0 z-10 border-l border-border bg-surface group-hover:bg-slate-50"
+      : "",
+    isActions || isRightMostColumn ? "overflow-visible" : "",
   ]
     .filter(Boolean)
     .join(" ");
 }
 
-function getCellContentClassName(columnId: ApplicationColumnId) {
+function getCellContentClassName(
+  columnId: ApplicationColumnId,
+  isRightMostColumn: boolean,
+) {
   const isUtilityCell = columnId === "actions" || columnId === "contacts";
 
   return [
     "min-w-0 max-w-full",
-    isUtilityCell
+    isUtilityCell || isRightMostColumn
       ? "flex justify-center"
       : "overflow-hidden",
   ].join(" ");
