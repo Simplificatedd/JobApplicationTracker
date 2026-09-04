@@ -517,8 +517,11 @@ export function ApplicationsTable({
                           {column.label}
                         </span>
                       )}
-                      {enableDraggableColumnWidths &&
-                      columnIndex < visibleColumns.length - 1 ? (
+                      {shouldShowResizeHandle(
+                        visibleColumns,
+                        columnIndex,
+                        enableDraggableColumnWidths,
+                      ) ? (
                         <button
                           aria-label={`Resize ${column.label} column`}
                           aria-orientation="vertical"
@@ -670,13 +673,9 @@ function ApplicationRow({
   return (
     <tr className="table-row-hover align-top">
       {visibleColumnIds.map((columnId, columnIndex) => {
-        const isRightMostColumn = columnIndex === visibleColumnIds.length - 1;
-
         return (
           <td className={getCellClassName(columnId)} key={columnId}>
-            <div
-              className={getCellContentClassName(columnId, isRightMostColumn)}
-            >
+            <div className={getCellContentClassName(columnId)}>
               <ApplicationColumnCell
                 application={application}
                 columnId={columnId}
@@ -696,6 +695,22 @@ function ApplicationRow({
   );
 }
 
+function shouldShowResizeHandle(
+  visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
+  columnIndex: number,
+  enableDraggableColumnWidths: boolean,
+) {
+  const column = visibleColumns[columnIndex];
+  const nextColumn = visibleColumns[columnIndex + 1];
+
+  return Boolean(
+    enableDraggableColumnWidths &&
+      nextColumn &&
+      !STRETCH_EXCLUDED_COLUMNS.includes(column.id) &&
+      !STRETCH_EXCLUDED_COLUMNS.includes(nextColumn.id),
+  );
+}
+
 function getCellClassName(columnId: ApplicationColumnId) {
   const isActions = columnId === "actions";
   const isUtilityCell = isActions || columnId === "contacts";
@@ -709,16 +724,13 @@ function getCellClassName(columnId: ApplicationColumnId) {
     .join(" ");
 }
 
-function getCellContentClassName(
-  columnId: ApplicationColumnId,
-  isRightMostColumn: boolean,
-) {
+function getCellContentClassName(columnId: ApplicationColumnId) {
   const isUtilityCell = columnId === "actions" || columnId === "contacts";
 
   return [
     "min-w-0 max-w-full",
-    isUtilityCell || isRightMostColumn
-      ? "flex justify-center"
+    isUtilityCell
+      ? "flex justify-start"
       : "overflow-hidden",
   ].join(" ");
 }
