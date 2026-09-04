@@ -313,8 +313,6 @@ const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   {} as Record<ApplicationColumnId, number>,
 );
 
-const STRETCH_EXCLUDED_COLUMNS: ApplicationColumnId[] = ["actions"];
-
 export function ApplicationsTable({
   applications,
   emptyBody = "New entries will appear here once they are added.",
@@ -340,13 +338,9 @@ export function ApplicationsTable({
       !column.canHide || visibleApplicationColumns.includes(column.id),
   );
   const visibleColumnIds = visibleColumns.map((column) => column.id);
-  const renderedColumnWidths = getRenderedColumnWidths(
-    visibleColumns,
-    columnWidths,
-    tableViewportWidth,
-  );
+  const visibleColumnKey = visibleColumnIds.join("|");
   const tableWidth = visibleColumns.reduce(
-    (width, column) => width + renderedColumnWidths[column.id],
+    (width, column) => width + columnWidths[column.id],
     0,
   );
 
@@ -371,6 +365,20 @@ export function ApplicationsTable({
     return () => resizeObserver.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (tableViewportWidth <= 0) {
+      return;
+    }
+
+    setColumnWidths((current) =>
+      stretchColumnWidthsToViewport(
+        visibleColumns,
+        current,
+        tableViewportWidth,
+      ),
+    );
+  }, [tableViewportWidth, visibleColumnKey]);
+
   function resizeColumn(columnId: ApplicationColumnId, nextWidth: number) {
     const column = APPLICATION_TABLE_COLUMNS.find(
       (currentColumn) => currentColumn.id === columnId,
@@ -387,7 +395,13 @@ export function ApplicationsTable({
   }
 
   function resetColumnWidths() {
-    setColumnWidths(DEFAULT_COLUMN_WIDTHS);
+    setColumnWidths(
+      stretchColumnWidthsToViewport(
+        visibleColumns,
+        DEFAULT_COLUMN_WIDTHS,
+        tableViewportRef.current?.clientWidth ?? tableViewportWidth,
+      ),
+    );
   }
 
   function startColumnResize(
@@ -484,7 +498,7 @@ export function ApplicationsTable({
                 {visibleColumns.map((column) => (
                   <col
                     key={column.id}
-                    style={{ width: `${renderedColumnWidths[column.id]}px` }}
+                    style={{ width: `${columnWidths[column.id]}px` }}
                   />
                 ))}
               </colgroup>
@@ -613,42 +627,44 @@ export function ApplicationsTable({
   );
 }
 
-function getRenderedColumnWidths(
+function stretchColumnWidthsToViewport(
   visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
   columnWidths: Record<ApplicationColumnId, number>,
   viewportWidth: number,
 ) {
-  const renderedWidths = { ...columnWidths };
   const baseTableWidth = visibleColumns.reduce(
     (width, column) => width + columnWidths[column.id],
     0,
   );
   const extraWidth = Math.max(0, Math.floor(viewportWidth - baseTableWidth));
-  const stretchColumns = visibleColumns.filter(
-    (column) => !STRETCH_EXCLUDED_COLUMNS.includes(column.id),
-  );
-  const stretchBasis = stretchColumns.reduce(
+
+  if (extraWidth === 0 || visibleColumns.length === 0) {
+    return columnWidths;
+  }
+
+  const stretchedWidths = { ...columnWidths };
+  const stretchBasis = visibleColumns.reduce(
     (width, column) => width + columnWidths[column.id],
     0,
   );
 
-  if (extraWidth === 0 || stretchColumns.length === 0 || stretchBasis === 0) {
-    return renderedWidths;
+  if (stretchBasis === 0) {
+    return stretchedWidths;
   }
 
   let assignedExtraWidth = 0;
 
-  stretchColumns.forEach((column, index) => {
-    const isLastStretchColumn = index === stretchColumns.length - 1;
+  visibleColumns.forEach((column, index) => {
+    const isLastStretchColumn = index === visibleColumns.length - 1;
     const columnExtraWidth = isLastStretchColumn
       ? extraWidth - assignedExtraWidth
       : Math.floor((extraWidth * columnWidths[column.id]) / stretchBasis);
 
     assignedExtraWidth += columnExtraWidth;
-    renderedWidths[column.id] = columnWidths[column.id] + columnExtraWidth;
+    stretchedWidths[column.id] = columnWidths[column.id] + columnExtraWidth;
   });
 
-  return renderedWidths;
+  return stretchedWidths;
 }
 
 function SortIcon({
@@ -738,10 +754,6 @@ function getResizeHandle(
       column: nextColumn,
       edge: "left" as const,
     };
-  }
-
-  if (STRETCH_EXCLUDED_COLUMNS.includes(column.id)) {
-    return null;
   }
 
   return {
