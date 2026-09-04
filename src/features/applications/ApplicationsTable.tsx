@@ -8,10 +8,7 @@ import {
   ArrowDownWideNarrow,
   ArrowUpDown,
   ArrowUpWideNarrow,
-  Check,
-  Pencil,
   RotateCcw,
-  X,
 } from "lucide-react";
 import {
   ContactsButton,
@@ -23,8 +20,6 @@ import {
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
-import { APPLICATION_STATUSES } from "../../lib/constants";
-import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
@@ -39,7 +34,6 @@ interface ApplicationsTableProps {
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
   sort: SortState;
   visibleApplicationColumns: string[];
@@ -329,7 +323,6 @@ export function ApplicationsTable({
   onOpenContacts,
   onRestoreApplication,
   onSortChange,
-  onUpdateApplication,
   resumes,
   sort,
   visibleApplicationColumns,
@@ -416,7 +409,6 @@ export function ApplicationsTable({
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
-                onUpdateApplication={onUpdateApplication}
                 visibleColumnIds={visibleColumnIds}
                 resume={
                   application.resumeId
@@ -531,7 +523,6 @@ export function ApplicationsTable({
                     onOpenApplication={onOpenApplication}
                     onOpenContacts={onOpenContacts}
                     onRestoreApplication={onRestoreApplication}
-                    onUpdateApplication={onUpdateApplication}
                     visibleColumnIds={visibleColumnIds}
                     resume={
                       application.resumeId
@@ -573,7 +564,6 @@ function ApplicationRow({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
-  onUpdateApplication,
   resume,
   visibleColumnIds,
 }: {
@@ -584,7 +574,6 @@ function ApplicationRow({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
@@ -601,7 +590,6 @@ function ApplicationRow({
             onOpenApplication={onOpenApplication}
             onOpenContacts={onOpenContacts}
             onRestoreApplication={onRestoreApplication}
-            onUpdateApplication={onUpdateApplication}
             resume={resume}
           />
         </td>
@@ -619,7 +607,6 @@ function ApplicationColumnCell({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
-  onUpdateApplication,
   resume,
 }: {
   application: JobApplication;
@@ -630,7 +617,6 @@ function ApplicationColumnCell({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
 }) {
   if (columnId === "jobTitle") {
@@ -674,12 +660,7 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "status") {
-    return (
-      <InlineStatusEditor
-        application={application}
-        onUpdateApplication={onUpdateApplication}
-      />
-    );
+    return <StatusBadge status={application.status} />;
   }
 
   if (columnId === "dateApplied") {
@@ -703,12 +684,7 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "followUp") {
-    return (
-      <InlineFollowUpEditor
-        application={application}
-        onUpdateApplication={onUpdateApplication}
-      />
-    );
+    return <FollowUpCell application={application} />;
   }
 
   if (columnId === "followUpNeeded") {
@@ -791,7 +767,6 @@ function ApplicationCard({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
-  onUpdateApplication,
   resume,
   visibleColumnIds,
 }: {
@@ -802,7 +777,6 @@ function ApplicationCard({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
@@ -864,7 +838,6 @@ function ApplicationCard({
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
-                onUpdateApplication={onUpdateApplication}
                 resume={resume}
               />
             </CardField>
@@ -934,139 +907,4 @@ function formatOption(value?: string) {
     .split(/[-_]/g)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function InlineStatusEditor({
-  application,
-  onUpdateApplication,
-}: {
-  application: JobApplication;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftStatus, setDraftStatus] = useState(application.status);
-
-  function startEditing() {
-    setDraftStatus(application.status);
-    setIsEditing(true);
-  }
-
-  function confirm() {
-    onUpdateApplication(application.id, { status: draftStatus });
-    setIsEditing(false);
-  }
-
-  if (!isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <StatusBadge status={application.status} />
-        <button className="icon-button h-8 w-8" onClick={startEditing} type="button">
-          <Pencil aria-hidden="true" size={15} />
-          <span className="sr-only">Edit status</span>
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <select
-        className="field-control min-h-9 px-2 py-1 text-xs"
-        onChange={(event) =>
-          setDraftStatus(event.target.value as JobApplication["status"])
-        }
-        value={draftStatus}
-      >
-        {APPLICATION_STATUSES.map((status) => (
-          <option key={status} value={status}>
-            {status}
-          </option>
-        ))}
-      </select>
-      <button className="icon-button h-8 w-8" onClick={confirm} type="button">
-        <Check aria-hidden="true" size={15} />
-        <span className="sr-only">Confirm status</span>
-      </button>
-      <button
-        className="icon-button h-8 w-8"
-        onClick={() => setIsEditing(false)}
-        type="button"
-      >
-        <X aria-hidden="true" size={15} />
-        <span className="sr-only">Cancel status edit</span>
-      </button>
-    </div>
-  );
-}
-
-function InlineFollowUpEditor({
-  application,
-  onUpdateApplication,
-}: {
-  application: JobApplication;
-  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
-  const [draftDate, setDraftDate] = useState(application.followUpDate ?? "");
-
-  function startEditing() {
-    setDraftNeeded(application.followUpNeeded);
-    setDraftDate(application.followUpDate ?? "");
-    setIsEditing(true);
-  }
-
-  function confirm() {
-    onUpdateApplication(application.id, {
-      followUpNeeded: draftNeeded,
-      followUpDate: draftDate || undefined,
-    });
-    setIsEditing(false);
-  }
-
-  if (!isEditing) {
-    return (
-      <div className="flex items-start gap-2">
-        <FollowUpCell application={application} />
-        <button className="icon-button h-8 w-8" onClick={startEditing} type="button">
-          <Pencil aria-hidden="true" size={15} />
-          <span className="sr-only">Edit follow-up</span>
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <input
-        className="field-control min-h-9 px-2 py-1 text-xs"
-        onChange={(event) => setDraftDate(event.target.value)}
-        type="date"
-        value={draftDate}
-      />
-      <label className="flex items-center gap-2 text-xs font-medium text-foreground">
-        <input
-          checked={draftNeeded}
-          className="h-4 w-4 rounded border-border text-primary"
-          onChange={(event) => setDraftNeeded(event.target.checked)}
-          type="checkbox"
-        />
-        Needed
-      </label>
-      <div className="flex gap-1.5">
-        <button className="icon-button h-8 w-8" onClick={confirm} type="button">
-          <Check aria-hidden="true" size={15} />
-          <span className="sr-only">Confirm follow-up</span>
-        </button>
-        <button
-          className="icon-button h-8 w-8"
-          onClick={() => setIsEditing(false)}
-          type="button"
-        >
-          <X aria-hidden="true" size={15} />
-          <span className="sr-only">Cancel follow-up edit</span>
-        </button>
-      </div>
-    </div>
-  );
 }
