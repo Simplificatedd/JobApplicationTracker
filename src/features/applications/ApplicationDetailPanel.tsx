@@ -1,4 +1,5 @@
 import { Check, ExternalLink, Pencil, X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
@@ -119,11 +120,18 @@ export function ApplicationDetailPanel({
     onClose();
   }
 
+  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLElement>) {
+    if (event.target === event.currentTarget) {
+      requestClose();
+    }
+  }
+
   return (
     <aside
       aria-labelledby="application-detail-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
+      onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">

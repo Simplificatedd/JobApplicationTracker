@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 
 interface UnsavedChangesDialogProps {
@@ -18,11 +19,18 @@ export function UnsavedChangesDialog({
 }: UnsavedChangesDialogProps) {
   useEscapeKey(true, onCancel);
 
+  function cancelFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onCancel();
+    }
+  }
+
   return (
     <div
       aria-labelledby="unsaved-changes-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={cancelFromBackdrop}
       role="alertdialog"
     >
       <div className="w-full max-w-md rounded-lg bg-surface shadow-popover">

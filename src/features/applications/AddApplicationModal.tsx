@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
@@ -129,6 +130,12 @@ export function AddApplicationModal({
     onClose();
   }
 
+  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      requestClose();
+    }
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -189,6 +196,7 @@ export function AddApplicationModal({
       aria-labelledby="add-application-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
       <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">

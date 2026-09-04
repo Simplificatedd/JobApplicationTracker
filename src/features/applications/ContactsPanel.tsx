@@ -1,4 +1,5 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -73,6 +74,11 @@ export function ContactsPanel({
   }
 
   function requestClose() {
+    if (editingContactId) {
+      setIsDiscardWarningOpen(true);
+      return;
+    }
+
     if (isContactDraftDirty(newContact, emptyDraft)) {
       setIsDiscardWarningOpen(true);
       return;
@@ -87,6 +93,12 @@ export function ContactsPanel({
     onClose();
   }
 
+  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLElement>) {
+    if (event.target === event.currentTarget) {
+      requestClose();
+    }
+  }
+
   return (
     <aside
       aria-labelledby="contacts-panel-title"
@@ -94,6 +106,7 @@ export function ContactsPanel({
       className={`modal-overlay fixed inset-0 z-50 flex p-0 ${
         displayMode === "modal" ? "items-center p-4" : ""
       }`}
+      onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
       <div className={`flex flex-col overflow-hidden bg-surface shadow-popover ${panelClass}`}>
@@ -201,7 +214,11 @@ export function ContactsPanel({
         </div>
         {isDiscardWarningOpen ? (
           <UnsavedChangesDialog
-            body="Discard the new contact draft and close contacts?"
+            body={
+              editingContactId
+                ? "Discard unsaved contact edits and close contacts?"
+                : "Discard the new contact draft and close contacts?"
+            }
             confirmLabel="Discard and close"
             onCancel={() => setIsDiscardWarningOpen(false)}
             onConfirm={discardAndClose}
