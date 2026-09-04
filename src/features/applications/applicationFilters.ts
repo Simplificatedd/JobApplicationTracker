@@ -1,0 +1,473 @@
+import type {
+  Application,
+  ApplicationStatus,
+  DeadlineEntryMode,
+  InterviewType,
+  JobType,
+  Priority,
+  WorkMode,
+} from "../../types/application";
+import type { UserSettings } from "../../types/settings";
+
+export type FollowUpFilter = "" | "needed" | "optional";
+export type InterviewFilter = "" | "scheduled" | "unscheduled";
+export type ContactFilter = "" | "linked" | "none";
+export type DeadlineFilter = "" | "scheduled" | "blank" | "overdue" | "upcoming";
+export type FollowUpPromptFilter = "" | "1" | "3" | "7" | "14_plus";
+export type InterviewRoundFilter = "" | "1" | "2" | "3_plus";
+export type PresenceFilter = "" | "filled" | "blank";
+export type ResumeFilter = "" | "assigned" | "unassigned";
+export type UpdatedAtFilter = "" | "today" | "7_days" | "30_days";
+export type SortColumn =
+  | "jobTitle"
+  | "jobDescription"
+  | "company"
+  | "location"
+  | "workMode"
+  | "jobType"
+  | "source"
+  | "applicationUrl"
+  | "status"
+  | "dateApplied"
+  | "deadline"
+  | "deadlineEntryMode"
+  | "roleStartDate"
+  | "roleEndDate"
+  | "followUp"
+  | "followUpNeeded"
+  | "followUpPromptDays"
+  | "interviewRound"
+  | "interviewDateTime"
+  | "interviewType"
+  | "priority"
+  | "resume"
+  | "contacts"
+  | "coverLetterVersion"
+  | "salary"
+  | "notes"
+  | "updatedAt"
+  | "actions";
+export type SortDirection = "ascending" | "descending";
+
+export interface ApplicationFilters {
+  applicationUrl: PresenceFilter;
+  contacts: ContactFilter;
+  coverLetterVersion: PresenceFilter;
+  dateApplied: PresenceFilter;
+  deadline: DeadlineFilter;
+  deadlineEntryMode: DeadlineEntryMode | "";
+  followUp: FollowUpFilter;
+  followUpPromptDays: FollowUpPromptFilter;
+  interview: InterviewFilter;
+  interviewRound: InterviewRoundFilter;
+  interviewType: InterviewType | "";
+  jobDescription: PresenceFilter;
+  jobType: JobType | "";
+  location: string;
+  notes: PresenceFilter;
+  priority: Priority | "";
+  resume: ResumeFilter;
+  roleEndDate: PresenceFilter;
+  roleStartDate: PresenceFilter;
+  salary: PresenceFilter;
+  source: string;
+  status: ApplicationStatus | "";
+  updatedAt: UpdatedAtFilter;
+  workMode: WorkMode | "";
+}
+
+export interface SortState {
+  column: SortColumn;
+  direction: SortDirection;
+}
+
+export const DEFAULT_APPLICATION_FILTERS: ApplicationFilters = {
+  applicationUrl: "",
+  contacts: "",
+  coverLetterVersion: "",
+  dateApplied: "",
+  deadline: "",
+  deadlineEntryMode: "",
+  followUp: "",
+  followUpPromptDays: "",
+  interview: "",
+  interviewRound: "",
+  interviewType: "",
+  jobDescription: "",
+  jobType: "",
+  location: "",
+  notes: "",
+  priority: "",
+  resume: "",
+  roleEndDate: "",
+  roleStartDate: "",
+  salary: "",
+  source: "",
+  status: "",
+  updatedAt: "",
+  workMode: "",
+};
+
+export const DEFAULT_SORT_STATE: SortState = {
+  column: "updatedAt",
+  direction: "descending",
+};
+
+export function applyApplicationFilters(
+  applications: Application[],
+  filters: ApplicationFilters,
+) {
+  return applications.filter((application) => {
+    if (filters.status && application.status !== filters.status) {
+      return false;
+    }
+
+    if (
+      filters.followUp === "needed" &&
+      !application.followUpNeeded
+    ) {
+      return false;
+    }
+
+    if (
+      filters.followUp === "optional" &&
+      application.followUpNeeded
+    ) {
+      return false;
+    }
+
+    if (filters.interview === "scheduled" && !application.interviewDateTime) {
+      return false;
+    }
+
+    if (filters.interview === "unscheduled" && application.interviewDateTime) {
+      return false;
+    }
+
+    if (
+      filters.applicationUrl &&
+      !matchesPresence(application.applicationUrl, filters.applicationUrl)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.coverLetterVersion &&
+      !matchesPresence(
+        application.coverLetterVersion,
+        filters.coverLetterVersion,
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      filters.dateApplied &&
+      !matchesPresence(application.dateApplied, filters.dateApplied)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.deadline &&
+      !matchesDeadline(application.deadline, filters.deadline)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.deadlineEntryMode &&
+      application.deadlineEntryMode !== filters.deadlineEntryMode
+    ) {
+      return false;
+    }
+
+    if (
+      filters.followUpPromptDays &&
+      !matchesFollowUpPromptDays(
+        application.followUpPromptDays,
+        filters.followUpPromptDays,
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      filters.interviewRound &&
+      !matchesInterviewRound(application.interviewRound, filters.interviewRound)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.interviewType &&
+      application.interviewType !== filters.interviewType
+    ) {
+      return false;
+    }
+
+    if (
+      filters.jobDescription &&
+      !matchesPresence(application.jobDescription, filters.jobDescription)
+    ) {
+      return false;
+    }
+
+    if (filters.notes && !matchesPresence(application.notes, filters.notes)) {
+      return false;
+    }
+
+    if (filters.resume === "assigned" && !application.resumeId) {
+      return false;
+    }
+
+    if (filters.resume === "unassigned" && application.resumeId) {
+      return false;
+    }
+
+    if (filters.source && application.source !== filters.source) {
+      return false;
+    }
+
+    if (filters.jobType && application.jobType !== filters.jobType) {
+      return false;
+    }
+
+    if (filters.location && application.location !== filters.location) {
+      return false;
+    }
+
+    if (filters.priority && application.priority !== filters.priority) {
+      return false;
+    }
+
+    if (filters.workMode && application.workMode !== filters.workMode) {
+      return false;
+    }
+
+    if (
+      filters.roleEndDate &&
+      !matchesPresence(application.roleEndDate, filters.roleEndDate)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.roleStartDate &&
+      !matchesPresence(application.roleStartDate, filters.roleStartDate)
+    ) {
+      return false;
+    }
+
+    if (filters.salary && !matchesPresence(application.salary, filters.salary)) {
+      return false;
+    }
+
+    if (filters.contacts === "linked" && application.contactsCount <= 0) {
+      return false;
+    }
+
+    if (filters.contacts === "none" && application.contactsCount > 0) {
+      return false;
+    }
+
+    if (
+      filters.updatedAt &&
+      !matchesUpdatedAt(application.updatedAt, filters.updatedAt)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function isNeedsAttention(
+  application: Application,
+  settings: UserSettings,
+  now = new Date(),
+) {
+  const today = startOfDay(now);
+  const dueSoon = addDays(today, settings.dueSoonDays);
+
+  if (application.followUpNeeded) {
+    return true;
+  }
+
+  if (application.followUpDate) {
+    const followUpDate = startOfDay(new Date(application.followUpDate));
+
+    if (followUpDate <= dueSoon) {
+      return true;
+    }
+  }
+
+  if (settings.includeUpcomingInterviewsInAttention && application.interviewDateTime) {
+    const interviewDate = new Date(application.interviewDateTime);
+
+    if (interviewDate >= now && interviewDate <= addDays(now, settings.dueSoonDays)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function sortApplications(
+  applications: Application[],
+  sort: SortState,
+) {
+  const directionMultiplier = sort.direction === "ascending" ? 1 : -1;
+
+  return [...applications].sort((left, right) => {
+    const leftValue = getSortValue(left, sort.column);
+    const rightValue = getSortValue(right, sort.column);
+
+    if (leftValue < rightValue) {
+      return -1 * directionMultiplier;
+    }
+
+    if (leftValue > rightValue) {
+      return 1 * directionMultiplier;
+    }
+
+    return left.jobTitle.localeCompare(right.jobTitle);
+  });
+}
+
+function getSortValue(application: Application, column: SortColumn) {
+  if (column === "followUp") {
+    return application.followUpDate ? new Date(application.followUpDate).getTime() : 0;
+  }
+
+  if (
+    column === "dateApplied" ||
+    column === "deadline" ||
+    column === "roleStartDate" ||
+    column === "roleEndDate" ||
+    column === "interviewDateTime" ||
+    column === "updatedAt"
+  ) {
+    return application[column] ? new Date(application[column]).getTime() : 0;
+  }
+
+  if (column === "followUpNeeded") {
+    return application.followUpNeeded ? 1 : 0;
+  }
+
+  if (column === "followUpPromptDays") {
+    return application.followUpPromptDays ?? 0;
+  }
+
+  if (column === "interviewRound") {
+    return application.interviewRound ?? 0;
+  }
+
+  if (column === "contacts") {
+    return application.contactsCount;
+  }
+
+  if (column === "resume") {
+    return application.resumeId ?? "";
+  }
+
+  if (column === "actions") {
+    return application.archivedAt ?? "";
+  }
+
+  return String(application[column] ?? "").toLowerCase();
+}
+
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function matchesPresence(value: string | undefined, filter: PresenceFilter) {
+  const hasValue = Boolean(value?.trim());
+
+  if (filter === "filled") {
+    return hasValue;
+  }
+
+  if (filter === "blank") {
+    return !hasValue;
+  }
+
+  return true;
+}
+
+function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
+  if (filter === "scheduled" || filter === "blank") {
+    return matchesPresence(value, filter === "scheduled" ? "filled" : "blank");
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  const today = startOfDay(new Date());
+  const deadline = startOfDay(new Date(value));
+
+  if (filter === "overdue") {
+    return deadline < today;
+  }
+
+  if (filter === "upcoming") {
+    return deadline >= today && deadline <= addDays(today, 7);
+  }
+
+  return true;
+}
+
+function matchesFollowUpPromptDays(
+  value: number | undefined,
+  filter: FollowUpPromptFilter,
+) {
+  const days = value ?? 7;
+
+  if (filter === "14_plus") {
+    return days >= 14;
+  }
+
+  return days === Number(filter);
+}
+
+function matchesInterviewRound(
+  value: number | undefined,
+  filter: InterviewRoundFilter,
+) {
+  const round = value ?? 0;
+
+  if (filter === "3_plus") {
+    return round >= 3;
+  }
+
+  return round === Number(filter);
+}
+
+function matchesUpdatedAt(value: string, filter: UpdatedAtFilter) {
+  const today = startOfDay(new Date());
+  const updatedAt = startOfDay(new Date(value));
+
+  if (filter === "today") {
+    return updatedAt.getTime() === today.getTime();
+  }
+
+  if (filter === "7_days") {
+    return updatedAt >= addDays(today, -7);
+  }
+
+  if (filter === "30_days") {
+    return updatedAt >= addDays(today, -30);
+  }
+
+  return true;
+}

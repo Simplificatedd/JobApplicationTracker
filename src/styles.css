@@ -58,8 +58,46 @@
 
 @layer components {
   .app-container {
-    width: min(100%, 1440px);
-    margin-inline: auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .applications-toolbar {
+    container-type: inline-size;
+  }
+
+  .applications-toolbar-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .applications-primary-filter,
+  .applications-toolbar-reset {
+    display: none;
+  }
+
+  @container (min-width: 34rem) {
+    .applications-toolbar-controls {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .applications-toolbar-reset {
+      display: inline-flex;
+    }
+  }
+
+  @container (min-width: 84rem) {
+    .applications-toolbar-grid {
+      align-items: start;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+    }
+
+    .applications-toolbar-controls {
+      grid-template-columns: repeat(5, minmax(128px, 1fr));
+    }
+
+    .applications-primary-filter {
+      display: block;
+    }
   }
 
   .surface-panel {
