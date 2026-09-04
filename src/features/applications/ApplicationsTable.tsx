@@ -22,7 +22,7 @@ import {
   RowActionsMenu,
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
-import { formatUpdatedAt } from "../../lib/format";
+import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
@@ -47,12 +47,31 @@ interface ApplicationsTableProps {
 
 export type ApplicationColumnId =
   | "jobTitle"
+  | "jobDescription"
   | "company"
+  | "location"
+  | "workMode"
+  | "jobType"
+  | "source"
+  | "applicationUrl"
   | "status"
+  | "dateApplied"
+  | "deadline"
+  | "deadlineEntryMode"
+  | "roleStartDate"
+  | "roleEndDate"
   | "followUp"
+  | "followUpNeeded"
+  | "followUpPromptDays"
+  | "interviewRound"
   | "interviewDateTime"
+  | "interviewType"
+  | "priority"
   | "resume"
   | "contacts"
+  | "coverLetterVersion"
+  | "salary"
+  | "notes"
   | "updatedAt"
   | "actions";
 
@@ -74,11 +93,41 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
   },
   {
     canHide: true,
+    id: "jobDescription",
+    label: "Job Description",
+    minWidth: 220,
+    width: 280,
+  },
+  {
+    canHide: true,
     id: "company",
     key: "company",
     label: "Company",
     minWidth: 130,
     width: 160,
+  },
+  { canHide: true, id: "location", label: "Location", minWidth: 110, width: 140 },
+  {
+    canHide: true,
+    id: "workMode",
+    label: "Work Mode",
+    minWidth: 95,
+    width: 115,
+  },
+  {
+    canHide: true,
+    id: "jobType",
+    label: "Job Type",
+    minWidth: 105,
+    width: 125,
+  },
+  { canHide: true, id: "source", label: "Source", minWidth: 130, width: 160 },
+  {
+    canHide: true,
+    id: "applicationUrl",
+    label: "Application URL",
+    minWidth: 170,
+    width: 220,
   },
   {
     canHide: true,
@@ -90,10 +139,60 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
   },
   {
     canHide: true,
+    id: "dateApplied",
+    label: "Applied Date",
+    minWidth: 115,
+    width: 135,
+  },
+  { canHide: true, id: "deadline", label: "Deadline", minWidth: 115, width: 135 },
+  {
+    canHide: true,
+    id: "deadlineEntryMode",
+    label: "Deadline Entry Mode",
+    minWidth: 150,
+    width: 170,
+  },
+  {
+    canHide: true,
+    id: "roleStartDate",
+    label: "Role Start Date",
+    minWidth: 120,
+    width: 140,
+  },
+  {
+    canHide: true,
+    id: "roleEndDate",
+    label: "Role End Date",
+    minWidth: 120,
+    width: 140,
+  },
+  {
+    canHide: true,
     id: "followUp",
     key: "followUpDate",
     label: "Follow-up",
     minWidth: 130,
+    width: 150,
+  },
+  {
+    canHide: true,
+    id: "followUpNeeded",
+    label: "Follow-up Needed",
+    minWidth: 135,
+    width: 150,
+  },
+  {
+    canHide: true,
+    id: "followUpPromptDays",
+    label: "Follow-up Prompt Days",
+    minWidth: 165,
+    width: 180,
+  },
+  {
+    canHide: true,
+    id: "interviewRound",
+    label: "Interview Number",
+    minWidth: 135,
     width: 150,
   },
   {
@@ -104,6 +203,14 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     minWidth: 150,
     width: 190,
   },
+  {
+    canHide: true,
+    id: "interviewType",
+    label: "Interview Type",
+    minWidth: 125,
+    width: 145,
+  },
+  { canHide: true, id: "priority", label: "Priority", minWidth: 95, width: 115 },
   { canHide: true, id: "resume", label: "Resume", minWidth: 120, width: 150 },
   {
     canHide: true,
@@ -112,6 +219,15 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     minWidth: 95,
     width: 115,
   },
+  {
+    canHide: true,
+    id: "coverLetterVersion",
+    label: "Cover Letter Version",
+    minWidth: 160,
+    width: 190,
+  },
+  { canHide: true, id: "salary", label: "Salary / Pay", minWidth: 130, width: 160 },
+  { canHide: true, id: "notes", label: "Notes", minWidth: 180, width: 240 },
   {
     canHide: true,
     id: "updatedAt",
@@ -395,84 +511,198 @@ function ApplicationRow({
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
-  const isColumnVisible = (columnId: ApplicationColumnId) =>
-    visibleColumnIds.includes(columnId);
-
   return (
     <tr className="table-row-hover align-top">
-      <td className="px-4 py-4">
-        <div className="min-w-0">
-          <button
-            className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:text-primary"
-            onClick={() => onOpenApplication(application.id)}
-            type="button"
-          >
-            {application.jobTitle}
-          </button>
-          <DescriptionPreview description={application.jobDescription} />
-        </div>
-      </td>
-      {isColumnVisible("company") ? (
-        <td className="px-4 py-4">
-          <p className="truncate text-sm font-medium text-foreground">
-            {application.company}
-          </p>
-          <p className="mt-1 truncate text-xs text-muted">
-            {application.location ?? "Location blank"}
-          </p>
-        </td>
-      ) : null}
-      {isColumnVisible("status") ? (
-        <td className="px-4 py-4">
-          <InlineStatusEditor
+      {visibleColumnIds.map((columnId) => (
+        <td className="px-4 py-4" key={columnId}>
+          <ApplicationColumnCell
             application={application}
+            columnId={columnId}
+            enableDeleteActiveApplications={enableDeleteActiveApplications}
+            onArchiveApplication={onArchiveApplication}
+            onDeleteApplication={onDeleteApplication}
+            onOpenApplication={onOpenApplication}
+            onOpenContacts={onOpenContacts}
+            onRestoreApplication={onRestoreApplication}
             onUpdateApplication={onUpdateApplication}
+            resume={resume}
           />
         </td>
-      ) : null}
-      {isColumnVisible("followUp") ? (
-        <td className="px-4 py-4">
-          <InlineFollowUpEditor
-            application={application}
-            onUpdateApplication={onUpdateApplication}
-          />
-        </td>
-      ) : null}
-      {isColumnVisible("interviewDateTime") ? (
-        <td className="px-4 py-4">
-          <InterviewCell application={application} />
-        </td>
-      ) : null}
-      {isColumnVisible("resume") ? (
-        <td className="px-4 py-4">
-          <ResumeCell resume={resume} />
-        </td>
-      ) : null}
-      {isColumnVisible("contacts") ? (
-        <td className="px-4 py-4">
-          <ContactsButton
-            count={application.contactsCount}
-            onClick={() => onOpenContacts(application.id)}
-          />
-        </td>
-      ) : null}
-      {isColumnVisible("updatedAt") ? (
-        <td className="px-4 py-4">
-          <p className="text-sm text-foreground">
-            {formatUpdatedAt(application.updatedAt)}
-          </p>
-        </td>
-      ) : null}
-      <td className="px-4 py-4">
-        <RowActionsMenu
-          application={application}
-          enableDeleteActiveApplications={enableDeleteActiveApplications}
-          onArchiveApplication={onArchiveApplication}
-          onDeleteApplication={onDeleteApplication}
-          onRestoreApplication={onRestoreApplication}
-        />
-      </td>
+      ))}
     </tr>
+  );
+}
+
+function ApplicationColumnCell({
+  application,
+  columnId,
+  enableDeleteActiveApplications,
+  onArchiveApplication,
+  onDeleteApplication,
+  onOpenApplication,
+  onOpenContacts,
+  onRestoreApplication,
+  onUpdateApplication,
+  resume,
+}: {
+  application: JobApplication;
+  columnId: ApplicationColumnId;
+  enableDeleteActiveApplications: boolean;
+  onArchiveApplication: (applicationId: string) => void;
+  onDeleteApplication: (applicationId: string) => void;
+  onOpenApplication: (applicationId: string) => void;
+  onOpenContacts: (applicationId: string) => void;
+  onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+  resume?: ResumeFile;
+}) {
+  if (columnId === "jobTitle") {
+    return (
+      <button
+        className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:text-primary"
+        onClick={() => onOpenApplication(application.id)}
+        type="button"
+      >
+        {application.jobTitle}
+      </button>
+    );
+  }
+
+  if (columnId === "jobDescription") {
+    return <DescriptionPreview description={application.jobDescription} />;
+  }
+
+  if (columnId === "company") {
+    return <TextCell value={application.company} />;
+  }
+
+  if (columnId === "location") {
+    return <TextCell value={application.location} />;
+  }
+
+  if (columnId === "workMode") {
+    return <TextCell value={formatOption(application.workMode)} />;
+  }
+
+  if (columnId === "jobType") {
+    return <TextCell value={formatOption(application.jobType)} />;
+  }
+
+  if (columnId === "source") {
+    return <TextCell value={application.source} />;
+  }
+
+  if (columnId === "applicationUrl") {
+    return <UrlCell value={application.applicationUrl} />;
+  }
+
+  if (columnId === "status") {
+    return (
+      <InlineStatusEditor
+        application={application}
+        onUpdateApplication={onUpdateApplication}
+      />
+    );
+  }
+
+  if (columnId === "dateApplied") {
+    return <TextCell value={formatDate(application.dateApplied)} />;
+  }
+
+  if (columnId === "deadline") {
+    return <TextCell value={formatDate(application.deadline)} />;
+  }
+
+  if (columnId === "deadlineEntryMode") {
+    return <TextCell value={formatOption(application.deadlineEntryMode)} />;
+  }
+
+  if (columnId === "roleStartDate") {
+    return <TextCell value={formatDate(application.roleStartDate)} />;
+  }
+
+  if (columnId === "roleEndDate") {
+    return <TextCell value={formatDate(application.roleEndDate)} />;
+  }
+
+  if (columnId === "followUp") {
+    return (
+      <InlineFollowUpEditor
+        application={application}
+        onUpdateApplication={onUpdateApplication}
+      />
+    );
+  }
+
+  if (columnId === "followUpNeeded") {
+    return <TextCell value={application.followUpNeeded ? "Yes" : "No"} />;
+  }
+
+  if (columnId === "followUpPromptDays") {
+    return <TextCell value={`${application.followUpPromptDays ?? 7} days`} />;
+  }
+
+  if (columnId === "interviewRound") {
+    return (
+      <TextCell
+        value={
+          application.interviewRound
+            ? `Interview ${application.interviewRound}`
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (columnId === "interviewDateTime") {
+    return <InterviewCell application={application} />;
+  }
+
+  if (columnId === "interviewType") {
+    return <TextCell value={formatOption(application.interviewType)} />;
+  }
+
+  if (columnId === "priority") {
+    return <TextCell value={formatOption(application.priority)} />;
+  }
+
+  if (columnId === "resume") {
+    return <ResumeCell resume={resume} />;
+  }
+
+  if (columnId === "contacts") {
+    return (
+      <ContactsButton
+        count={application.contactsCount}
+        onClick={() => onOpenContacts(application.id)}
+      />
+    );
+  }
+
+  if (columnId === "coverLetterVersion") {
+    return <TextCell value={application.coverLetterVersion} />;
+  }
+
+  if (columnId === "salary") {
+    return <TextCell value={application.salary} />;
+  }
+
+  if (columnId === "notes") {
+    return <LongTextCell value={application.notes} />;
+  }
+
+  if (columnId === "updatedAt") {
+    return <TextCell value={formatUpdatedAt(application.updatedAt)} />;
+  }
+
+  return (
+    <RowActionsMenu
+      application={application}
+      enableDeleteActiveApplications={enableDeleteActiveApplications}
+      onArchiveApplication={onArchiveApplication}
+      onDeleteApplication={onDeleteApplication}
+      onRestoreApplication={onRestoreApplication}
+    />
   );
 }
 
@@ -501,6 +731,10 @@ function ApplicationCard({
 }) {
   const isColumnVisible = (columnId: ApplicationColumnId) =>
     visibleColumnIds.includes(columnId);
+  const detailColumns = visibleColumnIds.filter(
+    (columnId) =>
+      !["jobTitle", "jobDescription", "company", "actions"].includes(columnId),
+  );
 
   return (
     <article className="rounded-lg border border-border bg-surface px-4 py-4">
@@ -528,50 +762,37 @@ function ApplicationCard({
         />
       </div>
 
-      <DescriptionPreview description={application.jobDescription} />
+      {isColumnVisible("jobDescription") ? (
+        <DescriptionPreview description={application.jobDescription} />
+      ) : null}
 
       <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
-        {isColumnVisible("status") ? (
-          <CardField label="Status">
-            <InlineStatusEditor
-              application={application}
-              onUpdateApplication={onUpdateApplication}
-            />
-          </CardField>
-        ) : null}
-        {isColumnVisible("followUp") ? (
-          <CardField label="Follow-up">
-            <InlineFollowUpEditor
-              application={application}
-              onUpdateApplication={onUpdateApplication}
-            />
-          </CardField>
-        ) : null}
-        {isColumnVisible("interviewDateTime") ? (
-          <CardField label="Interview">
-            <InterviewCell application={application} />
-          </CardField>
-        ) : null}
-        {isColumnVisible("resume") ? (
-          <CardField label="Resume">
-            <ResumeCell resume={resume} />
-          </CardField>
-        ) : null}
-        {isColumnVisible("contacts") ? (
-          <CardField label="Contacts">
-            <ContactsButton
-              count={application.contactsCount}
-              onClick={() => onOpenContacts(application.id)}
-            />
-          </CardField>
-        ) : null}
-        {isColumnVisible("updatedAt") ? (
-          <CardField label="Updated">
-            <p className="text-sm text-foreground">
-              {formatUpdatedAt(application.updatedAt)}
-            </p>
-          </CardField>
-        ) : null}
+        {detailColumns.map((columnId) => {
+          const column = APPLICATION_TABLE_COLUMNS.find(
+            (currentColumn) => currentColumn.id === columnId,
+          );
+
+          if (!column) {
+            return null;
+          }
+
+          return (
+            <CardField key={column.id} label={column.label}>
+              <ApplicationColumnCell
+                application={application}
+                columnId={column.id}
+                enableDeleteActiveApplications={enableDeleteActiveApplications}
+                onArchiveApplication={onArchiveApplication}
+                onDeleteApplication={onDeleteApplication}
+                onOpenApplication={onOpenApplication}
+                onOpenContacts={onOpenContacts}
+                onRestoreApplication={onRestoreApplication}
+                onUpdateApplication={onUpdateApplication}
+                resume={resume}
+              />
+            </CardField>
+          );
+        })}
       </div>
     </article>
   );
@@ -592,6 +813,50 @@ function CardField({
       {children}
     </div>
   );
+}
+
+function TextCell({ value }: { value?: string | number }) {
+  return (
+    <p className="truncate text-sm text-foreground">
+      {value === undefined || value === "" ? "Blank" : value}
+    </p>
+  );
+}
+
+function LongTextCell({ value }: { value?: string }) {
+  return (
+    <p className="line-clamp-2 text-sm leading-5 text-foreground">
+      {value || "Blank"}
+    </p>
+  );
+}
+
+function UrlCell({ value }: { value?: string }) {
+  if (!value) {
+    return <TextCell value={undefined} />;
+  }
+
+  return (
+    <a
+      className="block truncate text-sm font-medium text-primary hover:text-blue-700"
+      href={value}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {value}
+    </a>
+  );
+}
+
+function formatOption(value?: string) {
+  if (!value || value === "unknown") {
+    return undefined;
+  }
+
+  return value
+    .split(/[-_]/g)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function InlineStatusEditor({
