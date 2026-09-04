@@ -88,7 +88,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "jobTitle",
     key: "jobTitle",
     label: "Job Title",
-    minWidth: 140,
+    minWidth: 96,
     width: 260,
   },
   {
@@ -96,7 +96,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "jobDescription",
     key: "jobDescription",
     label: "Job Description",
-    minWidth: 150,
+    minWidth: 120,
     width: 280,
   },
   {
@@ -104,7 +104,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "company",
     key: "company",
     label: "Company",
-    minWidth: 90,
+    minWidth: 72,
     width: 160,
   },
   {
@@ -112,7 +112,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "location",
     key: "location",
     label: "Location",
-    minWidth: 90,
+    minWidth: 72,
     width: 140,
   },
   {
@@ -120,7 +120,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "workMode",
     key: "workMode",
     label: "Work Mode",
-    minWidth: 80,
+    minWidth: 64,
     width: 115,
   },
   {
@@ -128,7 +128,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "jobType",
     key: "jobType",
     label: "Job Type",
-    minWidth: 85,
+    minWidth: 68,
     width: 125,
   },
   {
@@ -136,7 +136,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "source",
     key: "source",
     label: "Source",
-    minWidth: 95,
+    minWidth: 72,
     width: 160,
   },
   {
@@ -144,7 +144,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "applicationUrl",
     key: "applicationUrl",
     label: "Application URL",
-    minWidth: 125,
+    minWidth: 88,
     width: 220,
   },
   {
@@ -152,7 +152,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "status",
     key: "status",
     label: "Status",
-    minWidth: 110,
+    minWidth: 88,
     width: 180,
   },
   {
@@ -160,7 +160,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "dateApplied",
     key: "dateApplied",
     label: "Applied Date",
-    minWidth: 95,
+    minWidth: 80,
     width: 135,
   },
   {
@@ -168,7 +168,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "deadline",
     key: "deadline",
     label: "Deadline",
-    minWidth: 95,
+    minWidth: 80,
     width: 135,
   },
   {
@@ -176,7 +176,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "deadlineEntryMode",
     key: "deadlineEntryMode",
     label: "Deadline Entry Mode",
-    minWidth: 120,
+    minWidth: 96,
     width: 170,
   },
   {
@@ -184,7 +184,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "roleStartDate",
     key: "roleStartDate",
     label: "Role Start Date",
-    minWidth: 95,
+    minWidth: 80,
     width: 140,
   },
   {
@@ -192,7 +192,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "roleEndDate",
     key: "roleEndDate",
     label: "Role End Date",
-    minWidth: 95,
+    minWidth: 80,
     width: 140,
   },
   {
@@ -200,7 +200,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "followUp",
     key: "followUp",
     label: "Follow-up",
-    minWidth: 105,
+    minWidth: 84,
     width: 150,
   },
   {
@@ -208,7 +208,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "followUpNeeded",
     key: "followUpNeeded",
     label: "Follow-up Needed",
-    minWidth: 115,
+    minWidth: 92,
     width: 150,
   },
   {
@@ -216,7 +216,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "followUpPromptDays",
     key: "followUpPromptDays",
     label: "Follow-up Prompt Days",
-    minWidth: 130,
+    minWidth: 104,
     width: 180,
   },
   {
@@ -224,7 +224,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "interviewRound",
     key: "interviewRound",
     label: "Interview Number",
-    minWidth: 115,
+    minWidth: 92,
     width: 150,
   },
   {
@@ -232,7 +232,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "interviewDateTime",
     key: "interviewDateTime",
     label: "Interview Date/Time",
-    minWidth: 125,
+    minWidth: 104,
     width: 190,
   },
   {
@@ -240,7 +240,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "interviewType",
     key: "interviewType",
     label: "Interview Type",
-    minWidth: 105,
+    minWidth: 88,
     width: 145,
   },
   {
@@ -248,7 +248,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "priority",
     key: "priority",
     label: "Priority",
-    minWidth: 75,
+    minWidth: 56,
     width: 115,
   },
   {
@@ -256,7 +256,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "resume",
     key: "resume",
     label: "Resume",
-    minWidth: 90,
+    minWidth: 72,
     width: 150,
   },
   {
@@ -264,7 +264,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "contacts",
     key: "contacts",
     label: "Contacts",
-    minWidth: 75,
+    minWidth: 56,
     width: 115,
   },
   {
@@ -272,7 +272,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "coverLetterVersion",
     key: "coverLetterVersion",
     label: "Cover Letter Version",
-    minWidth: 120,
+    minWidth: 96,
     width: 190,
   },
   {
@@ -280,7 +280,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "salary",
     key: "salary",
     label: "Salary / Pay",
-    minWidth: 100,
+    minWidth: 80,
     width: 160,
   },
   {
@@ -288,7 +288,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "notes",
     key: "notes",
     label: "Notes",
-    minWidth: 130,
+    minWidth: 96,
     width: 240,
   },
   {
@@ -296,7 +296,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "updatedAt",
     key: "updatedAt",
     label: "Last Updated",
-    minWidth: 105,
+    minWidth: 88,
     width: 150,
   },
   {
@@ -304,7 +304,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     id: "actions",
     key: "actions",
     label: "Actions",
-    minWidth: 70,
+    minWidth: 56,
     width: 100,
   },
 ];
@@ -453,17 +453,17 @@ export function ApplicationsTable({
                           ? sort.direction
                           : undefined
                       }
-                      className="relative px-4 py-3 pr-5 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                      className="relative px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
                       key={column.id}
                       scope="col"
                     >
                       {column.key ? (
                         <button
-                          className="flex items-center gap-1.5 text-left hover:text-foreground"
+                          className="flex min-w-0 items-center gap-1.5 text-left hover:text-foreground"
                           onClick={() => onSortChange(column.key as SortColumn)}
                           type="button"
                         >
-                          <span>{column.label}</span>
+                          <span className="truncate">{column.label}</span>
                           <SortIcon
                             state={
                               sort.column === column.key
@@ -473,7 +473,7 @@ export function ApplicationsTable({
                           />
                         </button>
                       ) : (
-                        <span>{column.label}</span>
+                        <span className="block truncate">{column.label}</span>
                       )}
                       {enableDraggableColumnWidths ? (
                         <button
@@ -584,7 +584,7 @@ function ApplicationRow({
   return (
     <tr className="table-row-hover align-top">
       {visibleColumnIds.map((columnId) => (
-        <td className="px-4 py-4" key={columnId}>
+        <td className="px-2.5 py-4" key={columnId}>
           <ApplicationColumnCell
             application={application}
             columnId={columnId}
