@@ -388,10 +388,18 @@ export function ApplicationsTable({
       return;
     }
 
-    setColumnWidths((current) => ({
-      ...current,
-      [columnId]: Math.max(column.minWidth, nextWidth),
-    }));
+    setColumnWidths((current) => {
+      const resizedWidths = {
+        ...current,
+        [columnId]: Math.max(column.minWidth, nextWidth),
+      };
+
+      return stretchColumnWidthsToViewport(
+        visibleColumns,
+        resizedWidths,
+        tableViewportRef.current?.clientWidth ?? tableViewportWidth,
+      );
+    });
   }
 
   function resetColumnWidths() {
