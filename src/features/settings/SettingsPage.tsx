@@ -69,6 +69,16 @@ export function SettingsPage({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <SettingsGroup title="Browser Storage">
+          <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm leading-6 text-foreground">
+            <p>
+              Application data is stored in this browser profile. Clearing this
+              site&apos;s browser data can remove saved entries, so keep regular
+              exports once backup tools arrive in Sprint 4.
+            </p>
+          </div>
+        </SettingsGroup>
+
         <SettingsGroup title="General Preferences">
           <ToggleButtonField
             checked={settings.navigationDisplayMode === "top"}
