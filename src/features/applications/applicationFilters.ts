@@ -12,11 +12,33 @@ export type InterviewFilter = "" | "scheduled" | "unscheduled";
 export type ResumeFilter = "" | "assigned" | "unassigned";
 export type SortColumn =
   | "jobTitle"
+  | "jobDescription"
   | "company"
+  | "location"
+  | "workMode"
+  | "jobType"
+  | "source"
+  | "applicationUrl"
   | "status"
-  | "followUpDate"
+  | "dateApplied"
+  | "deadline"
+  | "deadlineEntryMode"
+  | "roleStartDate"
+  | "roleEndDate"
+  | "followUp"
+  | "followUpNeeded"
+  | "followUpPromptDays"
+  | "interviewRound"
   | "interviewDateTime"
-  | "updatedAt";
+  | "interviewType"
+  | "priority"
+  | "resume"
+  | "contacts"
+  | "coverLetterVersion"
+  | "salary"
+  | "notes"
+  | "updatedAt"
+  | "actions";
 export type SortDirection = "ascending" | "descending";
 
 export interface ApplicationFilters {
@@ -170,8 +192,43 @@ export function sortApplications(
 }
 
 function getSortValue(application: Application, column: SortColumn) {
-  if (column === "followUpDate" || column === "interviewDateTime" || column === "updatedAt") {
+  if (column === "followUp") {
+    return application.followUpDate ? new Date(application.followUpDate).getTime() : 0;
+  }
+
+  if (
+    column === "dateApplied" ||
+    column === "deadline" ||
+    column === "roleStartDate" ||
+    column === "roleEndDate" ||
+    column === "interviewDateTime" ||
+    column === "updatedAt"
+  ) {
     return application[column] ? new Date(application[column]).getTime() : 0;
+  }
+
+  if (column === "followUpNeeded") {
+    return application.followUpNeeded ? 1 : 0;
+  }
+
+  if (column === "followUpPromptDays") {
+    return application.followUpPromptDays ?? 0;
+  }
+
+  if (column === "interviewRound") {
+    return application.interviewRound ?? 0;
+  }
+
+  if (column === "contacts") {
+    return application.contactsCount;
+  }
+
+  if (column === "resume") {
+    return application.resumeId ?? "";
+  }
+
+  if (column === "actions") {
+    return application.archivedAt ?? "";
   }
 
   return String(application[column] ?? "").toLowerCase();
