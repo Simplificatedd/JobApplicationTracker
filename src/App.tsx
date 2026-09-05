@@ -123,7 +123,16 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
   }
 
   if (view === "resumes") {
-    return <ResumesPage />;
+    return (
+      <ResumesPage
+        applications={tracker.applications}
+        getResumeFile={tracker.getResumeFile}
+        onDeleteResume={tracker.deleteResume}
+        onUpdateResume={tracker.updateResume}
+        onUploadResume={tracker.uploadResume}
+        resumes={tracker.resumes}
+      />
+    );
   }
 
   return (
