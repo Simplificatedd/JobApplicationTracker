@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Pencil, X } from "lucide-react";
+import { Check, ExternalLink, Pencil, Upload, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
@@ -7,6 +7,7 @@ import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
+import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
 import type {
   Activity,
   Application,
@@ -26,6 +27,10 @@ interface ApplicationDetailPanelProps {
   contacts: ApplicationContact[];
   onClose: () => void;
   onUpdate: (id: string, input: ApplicationUpdate) => void;
+  onUploadResume: (
+    file: File,
+    options?: ResumeUploadOptions,
+  ) => Promise<ResumeUploadResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
 }
@@ -36,22 +41,45 @@ export function ApplicationDetailPanel({
   contacts,
   onClose,
   onUpdate,
+  onUploadResume,
   resume,
   resumes,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
+  const [resumeUploadError, setResumeUploadError] = useState("");
+  const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
   function startEditing() {
     setDraft(toDraft(application));
+    setResumeUploadError("");
+    setResumeUploadFile(null);
     setIsEditing(true);
   }
 
-  function saveChanges() {
+  async function saveChanges() {
     const isInterviewing = draft.status === "Interviewing";
+    let resumeId = trimOptional(draft.resumeId);
+
+    setResumeUploadError("");
+
+    if (resumeUploadFile) {
+      try {
+        const upload = await onUploadResume(resumeUploadFile, {
+          displayName: draft.resumeUploadName,
+          markAsUsed: true,
+          versionLabel: draft.resumeUploadVersion,
+        });
+
+        resumeId = upload.resume.id;
+      } catch (error) {
+        setResumeUploadError(getErrorMessage(error));
+        return;
+      }
+    }
 
     onUpdate(application.id, {
       company: draft.company.trim(),
@@ -91,21 +119,24 @@ export function ApplicationDetailPanel({
         ? trimOptional(draft.interviewDeadline)
         : undefined,
       priority: draft.priority,
-      resumeId: trimOptional(draft.resumeId),
+      resumeId,
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
       salary: trimOptional(draft.salary),
       notes: trimOptional(draft.notes),
     });
+    setResumeUploadFile(null);
     setIsEditing(false);
   }
 
   function cancelEditing() {
     setDraft(toDraft(application));
+    setResumeUploadError("");
+    setResumeUploadFile(null);
     setIsEditing(false);
   }
 
   function requestClose() {
-    if (isEditing && isDraftDirty(draft, application)) {
+    if (isEditing && (isDraftDirty(draft, application) || resumeUploadFile)) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -116,6 +147,8 @@ export function ApplicationDetailPanel({
   function discardAndClose() {
     setIsDiscardWarningOpen(false);
     setDraft(toDraft(application));
+    setResumeUploadError("");
+    setResumeUploadFile(null);
     setIsEditing(false);
     onClose();
   }
@@ -174,7 +207,13 @@ export function ApplicationDetailPanel({
 
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
-            <EditForm draft={draft} resumes={resumes} setDraft={setDraft} />
+            <EditForm
+              draft={draft}
+              resumeUploadError={resumeUploadError}
+              resumes={resumes}
+              setDraft={setDraft}
+              setResumeUploadFile={setResumeUploadFile}
+            />
           ) : (
             <ReadOnlyDetails
               activities={activities}
@@ -247,7 +286,14 @@ function ReadOnlyDetails({
             application.interviewType ?? "Type blank"
           }`}
         />
-        <DetailRow label="Resume" value={resume?.displayName ?? "Unassigned"} />
+        <DetailRow
+          label="Resume"
+          value={
+            resume
+              ? `${resume.displayName} / ${resume.originalFileName}`
+              : "Unassigned"
+          }
+        />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
 
@@ -316,12 +362,16 @@ function ReadOnlyDetails({
 
 function EditForm({
   draft,
+  resumeUploadError,
   resumes,
   setDraft,
+  setResumeUploadFile,
 }: {
   draft: ApplicationDraft;
+  resumeUploadError: string;
   resumes: ResumeMetadata[];
   setDraft: React.Dispatch<React.SetStateAction<ApplicationDraft>>;
+  setResumeUploadFile: (file: File | null) => void;
 }) {
   function updateDraft<Key extends keyof ApplicationDraft>(
     key: Key,
@@ -415,10 +465,49 @@ function EditForm({
           <option value="">Unassigned</option>
           {resumes.map((resume) => (
             <option key={resume.id} value={resume.id}>
-              {resume.displayName}
-            </option>
-          ))}
-        </select>
+            {resume.displayName}
+          </option>
+        ))}
+      </select>
+        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Upload aria-hidden="true" size={16} />
+            Upload new resume
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="field-control sm:col-span-2"
+              onChange={(event) =>
+                setResumeUploadFile(event.target.files?.[0] ?? null)
+              }
+              type="file"
+            />
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("resumeUploadName", event.target.value)
+              }
+              placeholder="Display name"
+              type="text"
+              value={draft.resumeUploadName}
+            />
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("resumeUploadVersion", event.target.value)
+              }
+              placeholder="Version label"
+              type="text"
+              value={draft.resumeUploadVersion}
+            />
+          </div>
+          {resumeUploadError ? (
+            <p className="mt-2 text-xs font-medium text-destructive">
+              {resumeUploadError}
+            </p>
+          ) : null}
+        </div>
       </Field>
       <Field label="Source">
         <select
@@ -649,6 +738,8 @@ function toDraft(application: Application) {
     interviewDeadline: toDateTimeLocal(application.interviewDeadline),
     priority: application.priority,
     resumeId: application.resumeId ?? "",
+    resumeUploadName: "",
+    resumeUploadVersion: "",
     coverLetterVersion: application.coverLetterVersion ?? "",
     salary: application.salary ?? "",
     notes: application.notes ?? "",
@@ -670,4 +761,8 @@ function toDateTimeLocal(value?: string) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Resume upload failed.";
 }

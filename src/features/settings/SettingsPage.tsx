@@ -1,20 +1,112 @@
-import { Info, RotateCcw, Settings } from "lucide-react";
+import {
+  Download,
+  FileDown,
+  FileUp,
+  Info,
+  RotateCcw,
+  Settings,
+} from "lucide-react";
 import { useState } from "react";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
+import type { BackupImportPreview } from "../../lib/backups";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
+  onExportApplicationsCsv: () => Blob;
+  onExportFullBackup: () => Promise<Blob>;
+  onImportFullBackup: (file: File) => Promise<void>;
+  onPreviewBackupImport: (file: File) => Promise<BackupImportPreview>;
   onResetSettings: () => void;
   onUpdateSettings: (settings: Partial<UserSettings>) => void;
   settings: UserSettings;
 }
 
 export function SettingsPage({
+  onExportApplicationsCsv,
+  onExportFullBackup,
+  onImportFullBackup,
+  onPreviewBackupImport,
   onResetSettings,
   onUpdateSettings,
   settings,
 }: SettingsPageProps) {
+  const [backupError, setBackupError] = useState("");
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const [backupPreview, setBackupPreview] =
+    useState<BackupImportPreview | null>(null);
+  const [backupStatus, setBackupStatus] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+
+  async function exportFullBackup() {
+    setBackupError("");
+    setBackupStatus("");
+
+    try {
+      downloadBlob(
+        await onExportFullBackup(),
+        `job-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      );
+      setBackupStatus("Full backup exported.");
+    } catch (error) {
+      setBackupError(getErrorMessage(error));
+    }
+  }
+
+  function exportCsv() {
+    downloadBlob(
+      onExportApplicationsCsv(),
+      `job-applications-${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    setBackupStatus("CSV exported.");
+  }
+
+  async function previewBackup(file: File | undefined) {
+    setBackupError("");
+    setBackupStatus("");
+    setBackupPreview(null);
+    setBackupFile(file ?? null);
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      setBackupPreview(await onPreviewBackupImport(file));
+    } catch (error) {
+      setBackupError(getErrorMessage(error));
+      setBackupFile(null);
+    }
+  }
+
+  async function importBackup() {
+    if (!backupFile) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Replace all local tracker data with this backup?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsImportingBackup(true);
+    setBackupError("");
+    setBackupStatus("");
+
+    try {
+      await onImportFullBackup(backupFile);
+      setBackupStatus("Backup restored.");
+      setBackupFile(null);
+      setBackupPreview(null);
+    } catch (error) {
+      setBackupError(getErrorMessage(error));
+    } finally {
+      setIsImportingBackup(false);
+    }
+  }
 
   function updateColumn(column: string, checked: boolean) {
     onUpdateSettings({
@@ -74,9 +166,61 @@ export function SettingsPage({
             <p>
               Application data is stored in this browser profile. Clearing this
               site&apos;s browser data can remove saved entries, so keep regular
-              exports once backup tools arrive in Sprint 4.
+              backups.
             </p>
           </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ActionButton onClick={exportFullBackup}>
+              <FileDown aria-hidden="true" size={16} />
+              Full backup
+            </ActionButton>
+            <ActionButton onClick={exportCsv}>
+              <Download aria-hidden="true" size={16} />
+              CSV export
+            </ActionButton>
+          </div>
+          <label className="block rounded-lg border border-border bg-surface px-3 py-3">
+            <SettingLabel
+              description="Preview a tracker backup before replacing local data."
+              label="Import backup"
+            />
+            <input
+              accept="application/json,.json"
+              className="field-control mt-3"
+              onChange={(event) => previewBackup(event.target.files?.[0])}
+              type="file"
+            />
+          </label>
+          {backupPreview ? (
+            <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm text-foreground">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <PreviewCount label="Applications" value={backupPreview.applications} />
+                <PreviewCount label="Contacts" value={backupPreview.contacts} />
+                <PreviewCount label="Activities" value={backupPreview.activities} />
+                <PreviewCount label="Interviews" value={backupPreview.interviews} />
+                <PreviewCount label="Resumes" value={backupPreview.resumes} />
+                <PreviewCount label="Files" value={backupPreview.resumeFiles} />
+              </div>
+              <button
+                className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isImportingBackup}
+                onClick={importBackup}
+                type="button"
+              >
+                <FileUp aria-hidden="true" size={16} />
+                Replace local data
+              </button>
+            </div>
+          ) : null}
+          {backupError ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-destructive">
+              {backupError}
+            </p>
+          ) : backupStatus ? (
+            <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-info">
+              {backupStatus}
+            </p>
+          ) : null}
         </SettingsGroup>
 
         <SettingsGroup title="General Preferences">
@@ -236,6 +380,47 @@ export function SettingsPage({
       </section>
     </div>
   );
+}
+
+function ActionButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function PreviewCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md bg-slate-50 px-3 py-2">
+      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Backup action failed.";
 }
 
 function SettingsGroup({

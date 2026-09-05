@@ -39,6 +39,7 @@ export function App() {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onCreate={tracker.createApplication}
+        onUploadResume={tracker.uploadResume}
         resumes={tracker.resumes}
       />
     </AppShell>
@@ -108,6 +109,7 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         resumes={tracker.resumes}
         settings={tracker.settings}
         tablePreferences={tracker.tablePreferences}
+        uploadResume={tracker.uploadResume}
         viewMode={view === "archive" ? "archive" : "active"}
         resetTablePreferences={tracker.resetTablePreferences}
         updateContact={tracker.updateContact}
@@ -123,11 +125,24 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
   }
 
   if (view === "resumes") {
-    return <ResumesPage />;
+    return (
+      <ResumesPage
+        applications={tracker.applications}
+        getResumeFile={tracker.getResumeFile}
+        onDeleteResume={tracker.deleteResume}
+        onUpdateResume={tracker.updateResume}
+        onUploadResume={tracker.uploadResume}
+        resumes={tracker.resumes}
+      />
+    );
   }
 
   return (
     <SettingsPage
+      onExportApplicationsCsv={tracker.exportApplicationsCsv}
+      onExportFullBackup={tracker.exportFullBackup}
+      onImportFullBackup={tracker.importFullBackup}
+      onPreviewBackupImport={tracker.previewBackupImport}
       onResetSettings={tracker.resetSettings}
       onUpdateSettings={tracker.updateSettings}
       settings={tracker.settings}

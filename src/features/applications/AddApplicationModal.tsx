@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -7,6 +7,7 @@ import { APPLICATION_SOURCES } from "../../lib/domain";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationInput } from "../../store/useTrackerStore";
+import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
 import type {
   ApplicationStatus,
   DeadlineEntryMode,
@@ -21,6 +22,10 @@ interface AddApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (input: ApplicationInput) => void;
+  onUploadResume: (
+    file: File,
+    options?: ResumeUploadOptions,
+  ) => Promise<ResumeUploadResult>;
   resumes: ResumeMetadata[];
 }
 
@@ -47,6 +52,8 @@ interface AddApplicationFormState {
   interviewType: ApplicationInput["interviewType"];
   priority: Priority;
   resumeId: string;
+  resumeUploadName: string;
+  resumeUploadVersion: string;
   coverLetterVersion: string;
   salary: string;
   notes: string;
@@ -75,6 +82,8 @@ const initialFormState: AddApplicationFormState = {
   interviewType: "unknown",
   priority: "medium",
   resumeId: "",
+  resumeUploadName: "",
+  resumeUploadVersion: "",
   coverLetterVersion: "",
   salary: "",
   notes: "",
@@ -85,10 +94,13 @@ export function AddApplicationModal({
   isOpen,
   onClose,
   onCreate,
+  onUploadResume,
   resumes,
 }: AddApplicationModalProps) {
   const [form, setForm] = useState<AddApplicationFormState>(initialFormState);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
+  const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [resumeUploadError, setResumeUploadError] = useState("");
   const [titleError, setTitleError] = useState("");
 
   useEscapeKey(isOpen && !isDiscardWarningOpen, requestClose);
@@ -110,7 +122,7 @@ export function AddApplicationModal({
   }
 
   function requestClose() {
-    if (isFormDirty(form)) {
+    if (isFormDirty(form) || resumeUploadFile) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -120,12 +132,15 @@ export function AddApplicationModal({
 
   function closeModal() {
     setTitleError("");
+    setResumeUploadError("");
     onClose();
   }
 
   function discardAndClose() {
     setForm(initialFormState);
+    setResumeUploadFile(null);
     setIsDiscardWarningOpen(false);
+    setResumeUploadError("");
     setTitleError("");
     onClose();
   }
@@ -136,7 +151,7 @@ export function AddApplicationModal({
     }
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedTitle = form.jobTitle.trim();
@@ -147,6 +162,24 @@ export function AddApplicationModal({
     }
 
     const isInterviewing = form.status === "Interviewing";
+    let resumeId = trimOptional(form.resumeId);
+
+    setResumeUploadError("");
+
+    if (resumeUploadFile) {
+      try {
+        const upload = await onUploadResume(resumeUploadFile, {
+          displayName: form.resumeUploadName,
+          markAsUsed: true,
+          versionLabel: form.resumeUploadVersion,
+        });
+
+        resumeId = upload.resume.id;
+      } catch (error) {
+        setResumeUploadError(getErrorMessage(error));
+        return;
+      }
+    }
 
     onCreate({
       company: trimOptional(form.company) ?? "",
@@ -180,13 +213,15 @@ export function AddApplicationModal({
       interviewProctored: false,
       interviewDeadline: undefined,
       priority: form.priority,
-      resumeId: trimOptional(form.resumeId),
+      resumeId,
       coverLetterVersion: trimOptional(form.coverLetterVersion),
       salary: trimOptional(form.salary),
       notes: trimOptional(form.notes),
     });
 
     setForm(initialFormState);
+    setResumeUploadFile(null);
+    setResumeUploadError("");
     setTitleError("");
     onClose();
   }
@@ -361,6 +396,45 @@ export function AddApplicationModal({
                   </option>
                 ))}
               </select>
+              <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Upload aria-hidden="true" size={16} />
+                  Upload new resume
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="field-control sm:col-span-2"
+                    onChange={(event) =>
+                      setResumeUploadFile(event.target.files?.[0] ?? null)
+                    }
+                    type="file"
+                  />
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("resumeUploadName", event.target.value)
+                    }
+                    placeholder="Display name"
+                    type="text"
+                    value={form.resumeUploadName}
+                  />
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("resumeUploadVersion", event.target.value)
+                    }
+                    placeholder="Version label"
+                    type="text"
+                    value={form.resumeUploadVersion}
+                  />
+                </div>
+                {resumeUploadError ? (
+                  <p className="mt-2 text-xs font-medium text-destructive">
+                    {resumeUploadError}
+                  </p>
+                ) : null}
+              </div>
             </Field>
 
             <Field label="Location">
@@ -577,6 +651,10 @@ function isFormDirty(form: AddApplicationFormState) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Resume upload failed.";
 }
 
 function Field({
