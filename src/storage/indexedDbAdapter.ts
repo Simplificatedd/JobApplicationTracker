@@ -20,10 +20,14 @@ import type {
 } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 import type { TablePreferences } from "../types/tablePreferences";
-import type { StorageAdapter, StorageSnapshot } from "./StorageAdapter";
+import type {
+  ResumeBlobRecord,
+  StorageAdapter,
+  StorageSnapshot,
+} from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 1;
+export const TRACKER_DB_VERSION = 2;
 
 type StoreName =
   | "activities"
@@ -33,6 +37,7 @@ type StoreName =
   | "interviews"
   | "notificationState"
   | "resumeMetadata"
+  | "resumeFiles"
   | "settings";
 
 interface StoredValue<T> {
@@ -211,7 +216,12 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
   }
 
   async function listResumeMetadata() {
-    return getAll<ResumeMetadata>(await getDatabase(), "resumeMetadata");
+    const resumes = await getAll<Partial<ResumeMetadata>>(
+      await getDatabase(),
+      "resumeMetadata",
+    );
+
+    return resumes.map(normalizeResumeMetadata);
   }
 
   async function createResumeMetadata(resume: ResumeMetadata) {
@@ -224,6 +234,37 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
 
   async function deleteResumeMetadata(id: string) {
     await deleteRecord(await getDatabase(), "resumeMetadata", id);
+  }
+
+  async function listResumeFiles() {
+    return getAll<ResumeBlobRecord>(await getDatabase(), "resumeFiles");
+  }
+
+  async function saveResumeFile(storageKey: string, file: Blob) {
+    await putRecord(await getDatabase(), "resumeFiles", { storageKey, file });
+  }
+
+  async function getResumeFile(storageKey: string) {
+    const record = await getByKey<ResumeBlobRecord>(
+      await getDatabase(),
+      "resumeFiles",
+      storageKey,
+    );
+
+    return record?.file;
+  }
+
+  async function deleteResumeFile(storageKey: string) {
+    await deleteRecord(await getDatabase(), "resumeFiles", storageKey);
+  }
+
+  async function clearResumeFiles() {
+    const database = await getDatabase();
+    const transaction = database.transaction("resumeFiles", "readwrite");
+
+    transaction.objectStore("resumeFiles").clear();
+
+    await transactionDone(transaction);
   }
 
   async function getSettings() {
@@ -331,6 +372,7 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
         "interviews",
         "notificationState",
         "resumeMetadata",
+        "resumeFiles",
         "settings",
       ],
       "readwrite",
@@ -402,6 +444,11 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     createResumeMetadata,
     updateResumeMetadata,
     deleteResumeMetadata,
+    listResumeFiles,
+    saveResumeFile,
+    getResumeFile,
+    deleteResumeFile,
+    clearResumeFiles,
     getSettings,
     saveSettings,
     resetSettings,
@@ -488,6 +535,10 @@ function upgradeDatabase(database: IDBDatabase, oldVersion: number) {
     database.createObjectStore("resumeMetadata", { keyPath: "id" });
   }
 
+  if (!database.objectStoreNames.contains("resumeFiles")) {
+    database.createObjectStore("resumeFiles", { keyPath: "storageKey" });
+  }
+
   if (!database.objectStoreNames.contains("settings")) {
     database.createObjectStore("settings", { keyPath: "key" });
   }
@@ -526,6 +577,7 @@ async function seedInitialData(database: IDBDatabase) {
       "interviews",
       "notificationState",
       "resumeMetadata",
+      "resumeFiles",
       "settings",
     ],
     "readwrite",
@@ -651,6 +703,36 @@ function normalizeApplication(application: Partial<Application>): Application {
     status: application.status ?? "Just Applied",
     updatedAt: timestamp,
     workMode: application.workMode ?? "unknown",
+  };
+}
+
+function normalizeResumeMetadata(resume: Partial<ResumeMetadata>): ResumeMetadata {
+  const originalFileName = resume.originalFileName ?? "resume.pdf";
+  const fileExtension =
+    resume.fileExtension ??
+    (originalFileName.toLowerCase().endsWith(".docx") ? "docx" : "pdf");
+  const timestamp =
+    resume.updatedAt ?? resume.uploadedAt ?? new Date().toISOString();
+
+  return {
+    id: resume.id ?? `resume-${timestamp}`,
+    displayName: resume.displayName ?? originalFileName,
+    originalFileName,
+    downloadFileName: resume.downloadFileName ?? originalFileName,
+    fileExtension,
+    mimeType:
+      resume.mimeType ??
+      (fileExtension === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    fileSize: resume.fileSize ?? 0,
+    storageKey: resume.storageKey ?? `resume-file-${resume.id ?? timestamp}`,
+    contentHash: resume.contentHash ?? `legacy-${resume.id ?? originalFileName}`,
+    versionLabel: resume.versionLabel,
+    notes: resume.notes,
+    uploadedAt: resume.uploadedAt ?? timestamp,
+    updatedAt: timestamp,
+    lastUsedAt: resume.lastUsedAt,
   };
 }
 

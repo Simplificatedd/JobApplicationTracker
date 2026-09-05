@@ -32,8 +32,16 @@ export interface ResumeMetadata {
   id: string;
   displayName: string;
   originalFileName: string;
+  downloadFileName: string;
   fileExtension: "pdf" | "docx";
+  mimeType: string;
+  fileSize: number;
+  storageKey: string;
+  contentHash: string;
+  versionLabel?: string;
+  notes?: string;
   uploadedAt: string;
+  updatedAt: string;
   lastUsedAt?: string;
 }
 

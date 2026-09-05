@@ -21,6 +21,11 @@ export interface StorageSnapshot {
   tablePreferences: TablePreferences | null;
 }
 
+export interface ResumeBlobRecord {
+  storageKey: string;
+  file: Blob;
+}
+
 export interface StorageAdapter {
   initialize(): Promise<StorageSnapshot>;
 
@@ -51,6 +56,11 @@ export interface StorageAdapter {
   createResumeMetadata(resume: ResumeMetadata): Promise<void>;
   updateResumeMetadata(resume: ResumeMetadata): Promise<void>;
   deleteResumeMetadata(id: string): Promise<void>;
+  listResumeFiles(): Promise<ResumeBlobRecord[]>;
+  saveResumeFile(storageKey: string, file: Blob): Promise<void>;
+  getResumeFile(storageKey: string): Promise<Blob | undefined>;
+  deleteResumeFile(storageKey: string): Promise<void>;
+  clearResumeFiles(): Promise<void>;
 
   getSettings(): Promise<UserSettings>;
   saveSettings(settings: UserSettings): Promise<void>;
