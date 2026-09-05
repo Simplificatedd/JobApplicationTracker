@@ -4,6 +4,7 @@ import type { ResumeMetadata } from "../types/application";
 export interface ResumeUploadOptions {
   displayName?: string;
   downloadFileName?: string;
+  markAsUsed?: boolean;
   notes?: string;
   versionLabel?: string;
 }
@@ -81,6 +82,7 @@ export async function createResumeUploadResult({
       notes: trimOptional(options.notes),
       uploadedAt: timestamp,
       updatedAt: timestamp,
+      lastUsedAt: options.markAsUsed ? timestamp : undefined,
     },
   };
 }

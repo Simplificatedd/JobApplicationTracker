@@ -247,7 +247,14 @@ function ReadOnlyDetails({
             application.interviewType ?? "Type blank"
           }`}
         />
-        <DetailRow label="Resume" value={resume?.displayName ?? "Unassigned"} />
+        <DetailRow
+          label="Resume"
+          value={
+            resume
+              ? `${resume.displayName} / ${resume.originalFileName}`
+              : "Unassigned"
+          }
+        />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
 

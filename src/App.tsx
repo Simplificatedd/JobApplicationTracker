@@ -39,6 +39,7 @@ export function App() {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onCreate={tracker.createApplication}
+        onUploadResume={tracker.uploadResume}
         resumes={tracker.resumes}
       />
     </AppShell>
