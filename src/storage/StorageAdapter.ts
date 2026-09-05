@@ -77,5 +77,8 @@ export interface StorageAdapter {
   resetTablePreferences(): Promise<void>;
 
   exportSnapshot(): Promise<StorageSnapshot>;
-  importSnapshot(snapshot: StorageSnapshot): Promise<void>;
+  importSnapshot(
+    snapshot: StorageSnapshot,
+    resumeFiles?: ResumeBlobRecord[],
+  ): Promise<void>;
 }

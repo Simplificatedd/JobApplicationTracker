@@ -361,7 +361,10 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     };
   }
 
-  async function importSnapshot(snapshot: StorageSnapshot) {
+  async function importSnapshot(
+    snapshot: StorageSnapshot,
+    resumeFiles: ResumeBlobRecord[] = [],
+  ) {
     const database = await getDatabase();
     const transaction = database.transaction(
       [
@@ -387,6 +390,7 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     putMany(transaction.objectStore("contacts"), snapshot.contacts);
     putMany(transaction.objectStore("interviews"), snapshot.interviews);
     putMany(transaction.objectStore("resumeMetadata"), snapshot.resumes);
+    putMany(transaction.objectStore("resumeFiles"), resumeFiles);
 
     transaction.objectStore("analyticsSettings").put({
       key: ANALYTICS_SETTINGS_KEY,
