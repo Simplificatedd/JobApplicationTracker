@@ -53,6 +53,7 @@ export interface StorageAdapter {
   deleteInterviewsForApplication(applicationId: string): Promise<void>;
 
   listResumeMetadata(): Promise<ResumeMetadata[]>;
+  saveResume(resume: ResumeMetadata, file: Blob): Promise<void>;
   createResumeMetadata(resume: ResumeMetadata): Promise<void>;
   updateResumeMetadata(resume: ResumeMetadata): Promise<void>;
   deleteResumeMetadata(id: string): Promise<void>;

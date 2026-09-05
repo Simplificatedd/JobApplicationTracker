@@ -552,8 +552,7 @@ export function useTrackerStore(): TrackerStore {
       options,
     });
 
-    await indexedDbStorageAdapter.saveResumeFile(result.resume.storageKey, file);
-    await indexedDbStorageAdapter.createResumeMetadata(result.resume);
+    await indexedDbStorageAdapter.saveResume(result.resume, file);
     setResumes((current) => sortResumes([result.resume, ...current]));
 
     return result;

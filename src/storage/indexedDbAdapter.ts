@@ -224,6 +224,22 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     return resumes.map(normalizeResumeMetadata);
   }
 
+  async function saveResume(resume: ResumeMetadata, file: Blob) {
+    const database = await getDatabase();
+    const transaction = database.transaction(
+      ["resumeFiles", "resumeMetadata"],
+      "readwrite",
+    );
+
+    transaction.objectStore("resumeFiles").put({
+      storageKey: resume.storageKey,
+      file,
+    });
+    transaction.objectStore("resumeMetadata").put(resume);
+
+    await transactionDone(transaction);
+  }
+
   async function createResumeMetadata(resume: ResumeMetadata) {
     await putRecord(await getDatabase(), "resumeMetadata", resume);
   }
@@ -445,6 +461,7 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     deleteInterview,
     deleteInterviewsForApplication,
     listResumeMetadata,
+    saveResume,
     createResumeMetadata,
     updateResumeMetadata,
     deleteResumeMetadata,
