@@ -35,6 +35,7 @@ import {
   updateResumeMetadata,
 } from "../lib/resumeFiles";
 import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
+import type { ResumeBlobRecord } from "../storage/StorageAdapter";
 
 export type ApplicationInput = Omit<
   Application,
@@ -660,15 +661,14 @@ export function useTrackerStore(): TrackerStore {
 
   async function importFullBackup(file: File) {
     const backup = await parseBackupFile(file);
+    const resumeFiles: ResumeBlobRecord[] = backup.resumeFiles.map(
+      (resumeFile) => ({
+        file: base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),
+        storageKey: resumeFile.storageKey,
+      }),
+    );
 
-    await indexedDbStorageAdapter.importSnapshot(backup.snapshot);
-
-    for (const resumeFile of backup.resumeFiles) {
-      await indexedDbStorageAdapter.saveResumeFile(
-        resumeFile.storageKey,
-        base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),
-      );
-    }
+    await indexedDbStorageAdapter.importSnapshot(backup.snapshot, resumeFiles);
 
     setActivities(sortActivities(backup.snapshot.activities));
     setAnalyticsSettings(backup.snapshot.analyticsSettings);
