@@ -83,11 +83,13 @@ export async function parseBackupFile(file: File) {
     throw new Error("Choose a valid tracker backup JSON file.");
   }
 
-  if (!isTrackerBackup(parsed)) {
-    throw new Error("This backup file does not match the tracker backup schema.");
+  const validationError = getBackupValidationError(parsed);
+
+  if (validationError) {
+    throw new Error(validationError);
   }
 
-  return parsed;
+  return parsed as TrackerBackup;
 }
 
 export function getBackupImportPreview(
@@ -150,21 +152,154 @@ export function createApplicationsCsv({
   return new Blob([csv], { type: "text/csv;charset=utf-8" });
 }
 
-function isTrackerBackup(value: unknown): value is TrackerBackup {
-  const backup = value as Partial<TrackerBackup>;
+function getBackupValidationError(value: unknown) {
+  if (!isRecord(value)) {
+    return "This backup file does not match the tracker backup schema.";
+  }
+
+  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+    return "This backup file uses an unsupported schema version.";
+  }
+
+  if (typeof value.exportedAt !== "string") {
+    return "This backup file is missing an export timestamp.";
+  }
+
+  if (!Array.isArray(value.resumeFiles)) {
+    return "This backup file is missing resume file payloads.";
+  }
+
+  if (!isStorageSnapshot(value.snapshot)) {
+    return "This backup file is missing required tracker data.";
+  }
+
+  const resumeIds = new Set<string>();
+  const uploadedResumeStorageKeys = new Set<string>();
+
+  for (const resume of value.snapshot.resumes) {
+    if (!isResumeMetadata(resume)) {
+      return "This backup file contains invalid resume metadata.";
+    }
+
+    resumeIds.add(resume.id);
+
+    if (resume.fileSize > 0) {
+      uploadedResumeStorageKeys.add(resume.storageKey);
+    }
+  }
+
+  for (const application of value.snapshot.applications) {
+    if (!isApplication(application)) {
+      return "This backup file contains invalid application data.";
+    }
+
+    if (application.resumeId && !resumeIds.has(application.resumeId)) {
+      return "This backup file links an application to a missing resume.";
+    }
+  }
+
+  const resumeFileStorageKeys = new Set<string>();
+
+  for (const resumeFile of value.resumeFiles) {
+    if (!isResumeFileBackup(resumeFile)) {
+      return "This backup file contains invalid resume file data.";
+    }
+
+    resumeFileStorageKeys.add(resumeFile.storageKey);
+  }
+
+  for (const storageKey of uploadedResumeStorageKeys) {
+    if (!resumeFileStorageKeys.has(storageKey)) {
+      return "This backup file is missing a stored resume file.";
+    }
+  }
+
+  return null;
+}
+
+function isStorageSnapshot(value: unknown): value is StorageSnapshot {
+  if (!isRecord(value)) {
+    return false;
+  }
 
   return (
-    Boolean(backup) &&
-    backup.schemaVersion === BACKUP_SCHEMA_VERSION &&
-    typeof backup.exportedAt === "string" &&
-    Array.isArray(backup.resumeFiles) &&
-    Boolean(backup.snapshot) &&
-    Array.isArray(backup.snapshot?.applications) &&
-    Array.isArray(backup.snapshot?.activities) &&
-    Array.isArray(backup.snapshot?.contacts) &&
-    Array.isArray(backup.snapshot?.interviews) &&
-    Array.isArray(backup.snapshot?.resumes)
+    Array.isArray(value.activities) &&
+    isRecord(value.analyticsSettings) &&
+    Array.isArray(value.applications) &&
+    Array.isArray(value.contacts) &&
+    Array.isArray(value.interviews) &&
+    isRecord(value.notificationState) &&
+    Array.isArray(value.resumes) &&
+    isRecord(value.settings) &&
+    (value.tablePreferences === null || isRecord(value.tablePreferences))
   );
+}
+
+function isApplication(value: unknown): value is Application {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.company === "string" &&
+    typeof value.jobTitle === "string" &&
+    typeof value.jobDescription === "string" &&
+    typeof value.status === "string" &&
+    typeof value.followUpNeeded === "boolean" &&
+    typeof value.createdAt === "string" &&
+    typeof value.updatedAt === "string" &&
+    (value.resumeId === undefined || typeof value.resumeId === "string")
+  );
+}
+
+function isResumeMetadata(value: unknown): value is ResumeMetadata {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.displayName === "string" &&
+    typeof value.originalFileName === "string" &&
+    typeof value.downloadFileName === "string" &&
+    (value.fileExtension === "pdf" || value.fileExtension === "docx") &&
+    typeof value.mimeType === "string" &&
+    typeof value.fileSize === "number" &&
+    value.fileSize >= 0 &&
+    typeof value.storageKey === "string" &&
+    typeof value.contentHash === "string" &&
+    typeof value.uploadedAt === "string" &&
+    typeof value.updatedAt === "string"
+  );
+}
+
+function isResumeFileBackup(value: unknown): value is ResumeFileBackup {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.storageKey === "string" &&
+    value.storageKey.trim().length > 0 &&
+    typeof value.mimeType === "string" &&
+    value.mimeType.trim().length > 0 &&
+    typeof value.dataBase64 === "string" &&
+    isValidBase64(value.dataBase64)
+  );
+}
+
+function isValidBase64(value: string) {
+  try {
+    atob(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function toCsvRow(fields: Array<string | undefined>) {
