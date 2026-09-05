@@ -20,6 +20,7 @@ import { searchApplications } from "./applicationSearch";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { ContactInput } from "../../store/useTrackerStore";
+import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
 import type {
   Activity,
   Application,
@@ -42,6 +43,10 @@ interface ApplicationsPageProps {
   resumes: ResumeMetadata[];
   settings: UserSettings;
   tablePreferences: TablePreferences | null;
+  uploadResume: (
+    file: File,
+    options?: ResumeUploadOptions,
+  ) => Promise<ResumeUploadResult>;
   viewMode?: "active" | "archive";
   resetTablePreferences: () => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
@@ -63,6 +68,7 @@ export function ApplicationsPage({
   resumes,
   settings,
   tablePreferences,
+  uploadResume,
   viewMode = "active",
   resetTablePreferences,
   updateContact,
@@ -251,6 +257,7 @@ export function ApplicationsPage({
           )}
           onClose={() => setSelectedApplicationId(null)}
           onUpdate={updateApplication}
+          onUploadResume={uploadResume}
           resume={
             selectedApplication.resumeId
               ? resumes.find((resume) => resume.id === selectedApplication.resumeId)

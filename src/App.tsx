@@ -109,6 +109,7 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         resumes={tracker.resumes}
         settings={tracker.settings}
         tablePreferences={tracker.tablePreferences}
+        uploadResume={tracker.uploadResume}
         viewMode={view === "archive" ? "archive" : "active"}
         resetTablePreferences={tracker.resetTablePreferences}
         updateContact={tracker.updateContact}
