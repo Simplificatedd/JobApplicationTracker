@@ -80,15 +80,24 @@ export function ResumesPage({
       return;
     }
 
+    const previewWindow = window.open("about:blank", "_blank");
+
+    if (!previewWindow) {
+      setUploadError("PDF preview was blocked. Use download instead.");
+      return;
+    }
+
+    previewWindow.opener = null;
     setWorkingResumeId(resume.id);
 
     try {
       const file = await getResumeFile(resume.id);
       const url = URL.createObjectURL(file);
 
-      window.open(url, "_blank", "noopener,noreferrer");
+      previewWindow.location.href = url;
       window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
     } catch (error) {
+      previewWindow.close();
       setUploadError(getErrorMessage(error));
     } finally {
       setWorkingResumeId(null);
