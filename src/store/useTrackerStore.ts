@@ -11,6 +11,15 @@ import type {
 import type { NotificationState, UserSettings } from "../types/settings";
 import type { TablePreferences } from "../types/tablePreferences";
 import {
+  base64ToBlob,
+  blobToBase64,
+  createApplicationsCsv,
+  createBackupFile,
+  getBackupImportPreview,
+  parseBackupFile,
+  type BackupImportPreview,
+} from "../lib/backups";
+import {
   createDateStamp,
   createId,
   createTimestamp,
@@ -69,7 +78,11 @@ export interface TrackerStore {
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
   deleteResume: (id: string) => void;
+  exportApplicationsCsv: () => Blob;
+  exportFullBackup: () => Promise<Blob>;
   getResumeFile: (id: string) => Promise<Blob>;
+  importFullBackup: (file: File) => Promise<void>;
+  previewBackupImport: (file: File) => Promise<BackupImportPreview>;
   resetSettings: () => void;
   resetTablePreferences: () => void;
   restoreApplication: (id: string) => void;
@@ -611,6 +624,69 @@ export function useTrackerStore(): TrackerStore {
     return file;
   }
 
+  async function exportFullBackup() {
+    const snapshot = await indexedDbStorageAdapter.exportSnapshot();
+    const resumeFileBackups = await Promise.all(
+      snapshot.resumes.map(async (resume) => {
+        const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+
+        if (!file) {
+          if (resume.fileSize <= 0) {
+            return null;
+          }
+
+          throw new Error(
+            `The stored file for "${resume.displayName}" is missing.`,
+          );
+        }
+
+        return {
+          dataBase64: await blobToBase64(file),
+          mimeType: file.type || resume.mimeType,
+          storageKey: resume.storageKey,
+        };
+      }),
+    );
+    const resumeFiles = resumeFileBackups.filter(
+      (resumeFile) => resumeFile !== null,
+    );
+
+    return createBackupFile({ resumeFiles, snapshot });
+  }
+
+  async function previewBackupImport(file: File) {
+    return getBackupImportPreview(await parseBackupFile(file));
+  }
+
+  async function importFullBackup(file: File) {
+    const backup = await parseBackupFile(file);
+
+    await indexedDbStorageAdapter.importSnapshot(backup.snapshot);
+
+    for (const resumeFile of backup.resumeFiles) {
+      await indexedDbStorageAdapter.saveResumeFile(
+        resumeFile.storageKey,
+        base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),
+      );
+    }
+
+    setActivities(sortActivities(backup.snapshot.activities));
+    setAnalyticsSettings(backup.snapshot.analyticsSettings);
+    setApplications(
+      withContactCounts(backup.snapshot.applications, backup.snapshot.contacts),
+    );
+    setContacts(backup.snapshot.contacts);
+    setInterviews(backup.snapshot.interviews);
+    setNotificationState(backup.snapshot.notificationState);
+    setResumes(sortResumes(backup.snapshot.resumes));
+    setSettings(backup.snapshot.settings);
+    setTablePreferences(backup.snapshot.tablePreferences);
+  }
+
+  function exportApplicationsCsv() {
+    return createApplicationsCsv({ applications, resumes });
+  }
+
   function updateSettings(input: Partial<UserSettings>) {
     const updatedSettings = {
       ...settings,
@@ -673,7 +749,11 @@ export function useTrackerStore(): TrackerStore {
     deleteApplication,
     deleteContact,
     deleteResume,
+    exportApplicationsCsv,
+    exportFullBackup,
     getResumeFile,
+    importFullBackup,
+    previewBackupImport,
     resetSettings,
     resetTablePreferences,
     restoreApplication,
