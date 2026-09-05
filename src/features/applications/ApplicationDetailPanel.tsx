@@ -1,8 +1,11 @@
 import { Check, ExternalLink, Pencil, X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
   Activity,
@@ -37,7 +40,10 @@ export function ApplicationDetailPanel({
   resumes,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
+
+  useEscapeKey(!isDiscardWarningOpen, requestClose);
 
   function startEditing() {
     setDraft(toDraft(application));
@@ -98,11 +104,34 @@ export function ApplicationDetailPanel({
     setIsEditing(false);
   }
 
+  function requestClose() {
+    if (isEditing && isDraftDirty(draft, application)) {
+      setIsDiscardWarningOpen(true);
+      return;
+    }
+
+    onClose();
+  }
+
+  function discardAndClose() {
+    setIsDiscardWarningOpen(false);
+    setDraft(toDraft(application));
+    setIsEditing(false);
+    onClose();
+  }
+
+  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLElement>) {
+    if (event.target === event.currentTarget) {
+      requestClose();
+    }
+  }
+
   return (
     <aside
       aria-labelledby="application-detail-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
+      onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
@@ -136,7 +165,7 @@ export function ApplicationDetailPanel({
                 <span className="sr-only">Edit</span>
               </button>
             )}
-            <button className="icon-button" onClick={onClose} type="button">
+            <button className="icon-button" onClick={requestClose} type="button">
               <X aria-hidden="true" size={18} />
               <span className="sr-only">Close</span>
             </button>
@@ -155,6 +184,14 @@ export function ApplicationDetailPanel({
             />
           )}
         </div>
+        {isDiscardWarningOpen ? (
+          <UnsavedChangesDialog
+            body="Discard unsaved application edits and close details?"
+            confirmLabel="Discard and close"
+            onCancel={() => setIsDiscardWarningOpen(false)}
+            onConfirm={discardAndClose}
+          />
+        ) : null}
       </div>
     </aside>
   );
@@ -616,6 +653,10 @@ function toDraft(application: Application) {
     salary: application.salary ?? "",
     notes: application.notes ?? "",
   };
+}
+
+function isDraftDirty(draft: ApplicationDraft, application: Application) {
+  return JSON.stringify(draft) !== JSON.stringify(toDraft(application));
 }
 
 function toDateTimeLocal(value?: string) {

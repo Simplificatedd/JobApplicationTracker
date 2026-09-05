@@ -11,9 +11,14 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useState,
+} from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
@@ -212,6 +217,14 @@ function ColumnsModal({
   onClose: () => void;
   visibleApplicationColumns: string[];
 }) {
+  useEscapeKey(true, onClose);
+
+  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
     if (checked) {
       onChange?.([...new Set([...visibleApplicationColumns, columnId])]);
@@ -228,6 +241,7 @@ function ColumnsModal({
       aria-labelledby="columns-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={closeFromBackdrop}
       role="dialog"
     >
       <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
@@ -453,11 +467,20 @@ function MoreFiltersModal({
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
 }) {
+  useEscapeKey(true, onClose);
+
+  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
   return (
     <div
       aria-labelledby="more-filters-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={closeFromBackdrop}
       role="dialog"
     >
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">

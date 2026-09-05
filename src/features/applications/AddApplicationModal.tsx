@@ -1,8 +1,11 @@
 import { X } from "lucide-react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
+import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationInput } from "../../store/useTrackerStore";
 import type {
   ApplicationStatus,
@@ -85,7 +88,10 @@ export function AddApplicationModal({
   resumes,
 }: AddApplicationModalProps) {
   const [form, setForm] = useState<AddApplicationFormState>(initialFormState);
+  const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [titleError, setTitleError] = useState("");
+
+  useEscapeKey(isOpen && !isDiscardWarningOpen, requestClose);
 
   if (!isOpen) {
     return null;
@@ -103,9 +109,31 @@ export function AddApplicationModal({
     }
   }
 
-  function handleClose() {
+  function requestClose() {
+    if (isFormDirty(form)) {
+      setIsDiscardWarningOpen(true);
+      return;
+    }
+
+    closeModal();
+  }
+
+  function closeModal() {
     setTitleError("");
     onClose();
+  }
+
+  function discardAndClose() {
+    setForm(initialFormState);
+    setIsDiscardWarningOpen(false);
+    setTitleError("");
+    onClose();
+  }
+
+  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      requestClose();
+    }
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -168,6 +196,7 @@ export function AddApplicationModal({
       aria-labelledby="add-application-title"
       aria-modal="true"
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
       <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
@@ -178,7 +207,7 @@ export function AddApplicationModal({
           >
             Add job
           </h2>
-          <button className="icon-button" onClick={handleClose} type="button">
+          <button className="icon-button" onClick={requestClose} type="button">
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Close</span>
           </button>
@@ -507,7 +536,7 @@ export function AddApplicationModal({
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
           <button
             className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
-            onClick={handleClose}
+            onClick={requestClose}
             type="button"
           >
             Cancel
@@ -525,9 +554,24 @@ export function AddApplicationModal({
             Save
           </button>
         </div>
+        {isDiscardWarningOpen ? (
+          <UnsavedChangesDialog
+            onCancel={() => setIsDiscardWarningOpen(false)}
+            onConfirm={discardAndClose}
+          />
+        ) : null}
       </div>
     </div>
   );
+}
+
+function isFormDirty(form: AddApplicationFormState) {
+  return Object.entries(form).some(([key, value]) => {
+    const initialValue =
+      initialFormState[key as keyof AddApplicationFormState];
+
+    return value !== initialValue;
+  });
 }
 
 function trimOptional(value: string) {

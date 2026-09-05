@@ -1,5 +1,7 @@
 import type { JobApplication, ResumeFile } from "../../types/application";
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
@@ -26,6 +28,7 @@ import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  columnWidths: ApplicationColumnWidths;
   emptyBody?: string;
   emptyTitle?: string;
   enableDraggableColumnWidths: boolean;
@@ -34,6 +37,7 @@ interface ApplicationsTableProps {
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onColumnWidthsChange: (widths: ApplicationColumnWidths) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
   resumes: ResumeFile[];
@@ -305,16 +309,19 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
   },
 ];
 
-const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
+export type ApplicationColumnWidths = Record<ApplicationColumnId, number>;
+
+export const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
   (widths, column) => ({
     ...widths,
     [column.id]: column.width,
   }),
-  {} as Record<ApplicationColumnId, number>,
+  {} as ApplicationColumnWidths,
 );
 
 export function ApplicationsTable({
   applications,
+  columnWidths,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
@@ -323,13 +330,13 @@ export function ApplicationsTable({
   onDeleteApplication,
   onOpenApplication,
   onOpenContacts,
+  onColumnWidthsChange,
   onRestoreApplication,
   onSortChange,
   resumes,
   sort,
   visibleApplicationColumns,
 }: ApplicationsTableProps) {
-  const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS);
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
@@ -370,10 +377,10 @@ export function ApplicationsTable({
       return;
     }
 
-    setColumnWidths((current) =>
+    onColumnWidthsChange(
       stretchColumnWidthsToViewport(
         visibleColumns,
-        current,
+        columnWidths,
         tableViewportWidth,
       ),
     );
@@ -395,7 +402,7 @@ export function ApplicationsTable({
       return;
     }
 
-    setColumnWidths((current) => {
+    updateColumnWidths((current) => {
       const nextWidths = getColumnPairWidths({
         delta,
         leftColumn,
@@ -416,7 +423,7 @@ export function ApplicationsTable({
     leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
     rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
   ) {
-    setColumnWidths((current) => {
+    updateColumnWidths((current) => {
       const pairWidth = current[leftColumn.id] + current[rightColumn.id];
       const defaultPairWidth = leftColumn.width + rightColumn.width;
       const leftTargetWidth = Math.round(
@@ -439,13 +446,19 @@ export function ApplicationsTable({
   }
 
   function resetColumnWidths() {
-    setColumnWidths(
+    onColumnWidthsChange(
       stretchColumnWidthsToViewport(
         visibleColumns,
         DEFAULT_COLUMN_WIDTHS,
         tableViewportRef.current?.clientWidth ?? tableViewportWidth,
       ),
     );
+  }
+
+  function updateColumnWidths(
+    updater: (current: ApplicationColumnWidths) => ApplicationColumnWidths,
+  ) {
+    onColumnWidthsChange(updater(columnWidths));
   }
 
   function startColumnResize(
@@ -482,7 +495,7 @@ export function ApplicationsTable({
         rightWidth: startRightWidth,
       });
 
-      setColumnWidths((current) => ({
+      updateColumnWidths((current) => ({
         ...current,
         [leftColumnId]: nextWidths.leftWidth,
         [rightColumnId]: nextWidths.rightWidth,
@@ -800,8 +813,32 @@ function ApplicationRow({
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
+  function openFromRowClick(event: ReactMouseEvent<HTMLTableRowElement>) {
+    if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
+      event.currentTarget.blur();
+      onOpenApplication(application.id);
+    }
+  }
+
+  function openFromRowKeyDown(event: ReactKeyboardEvent<HTMLTableRowElement>) {
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      !shouldIgnoreEntryOpen(event.target, event.currentTarget)
+    ) {
+      event.preventDefault();
+      onOpenApplication(application.id);
+    }
+  }
+
   return (
-    <tr className="table-row-hover align-top">
+    <tr
+      aria-label={`Open details for ${application.jobTitle}`}
+      className="table-row-hover cursor-pointer align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      onClick={openFromRowClick}
+      onKeyDown={openFromRowKeyDown}
+      role="button"
+      tabIndex={0}
+    >
       {visibleColumnIds.map((columnId) => {
         return (
           <td className={getCellClassName(columnId)} key={columnId}>
@@ -890,13 +927,9 @@ function ApplicationColumnCell({
 }) {
   if (columnId === "jobTitle") {
     return (
-      <button
-        className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:text-primary"
-        onClick={() => onOpenApplication(application.id)}
-        type="button"
-      >
+      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground">
         {application.jobTitle}
-      </button>
+      </span>
     );
   }
 
@@ -1049,6 +1082,23 @@ function ApplicationCard({
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
+  function openFromCardClick(event: ReactMouseEvent<HTMLElement>) {
+    if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
+      event.currentTarget.blur();
+      onOpenApplication(application.id);
+    }
+  }
+
+  function openFromCardKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      !shouldIgnoreEntryOpen(event.target, event.currentTarget)
+    ) {
+      event.preventDefault();
+      onOpenApplication(application.id);
+    }
+  }
+
   const isColumnVisible = (columnId: ApplicationColumnId) =>
     visibleColumnIds.includes(columnId);
   const detailColumns = visibleColumnIds.filter(
@@ -1057,16 +1107,19 @@ function ApplicationCard({
   );
 
   return (
-    <article className="rounded-lg border border-border bg-surface px-4 py-4">
+    <article
+      aria-label={`Open details for ${application.jobTitle}`}
+      className="cursor-pointer rounded-lg border border-border bg-surface px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      onClick={openFromCardClick}
+      onKeyDown={openFromCardKeyDown}
+      role="button"
+      tabIndex={0}
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <button
-            className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground hover:text-primary"
-            onClick={() => onOpenApplication(application.id)}
-            type="button"
-          >
+          <p className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground">
             {application.jobTitle}
-          </button>
+          </p>
           {isColumnVisible("company") ? (
             <p className="mt-1 truncate text-xs font-medium text-muted">
               {application.company || "Company blank"}
@@ -1115,6 +1168,21 @@ function ApplicationCard({
       </div>
     </article>
   );
+}
+
+function shouldIgnoreEntryOpen(
+  target: EventTarget,
+  currentTarget: EventTarget,
+) {
+  if (!(target instanceof Element) || !(currentTarget instanceof Element)) {
+    return false;
+  }
+
+  const interactiveElement = target.closest(
+    "a,button,input,select,textarea,[role='button'],[role='menuitem'],[role='separator']",
+  );
+
+  return Boolean(interactiveElement && interactiveElement !== currentTarget);
 }
 
 function CardField({
