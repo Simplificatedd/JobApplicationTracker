@@ -18,6 +18,13 @@ import {
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
 } from "../lib/domain";
+import {
+  createResumeUploadResult,
+  markResumeUsed,
+  type ResumeUploadOptions,
+  type ResumeUploadResult,
+  updateResumeMetadata,
+} from "../lib/resumeFiles";
 import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
 
 export type ApplicationInput = Omit<
@@ -32,6 +39,10 @@ export type ApplicationUpdate = Partial<
 export type ContactInput = Omit<
   ApplicationContact,
   "id" | "createdAt" | "updatedAt"
+>;
+
+export type ResumeMetadataUpdate = Partial<
+  Pick<ResumeMetadata, "displayName" | "downloadFileName" | "notes" | "versionLabel">
 >;
 
 export interface TrackerStore {
@@ -57,9 +68,16 @@ export interface TrackerStore {
   createApplication: (input: ApplicationInput) => Application;
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
+  deleteResume: (id: string) => void;
+  getResumeFile: (id: string) => Promise<Blob>;
   resetSettings: () => void;
   resetTablePreferences: () => void;
   restoreApplication: (id: string) => void;
+  updateResume: (id: string, input: ResumeMetadataUpdate) => void;
+  uploadResume: (
+    file: File,
+    options?: ResumeUploadOptions,
+  ) => Promise<ResumeUploadResult>;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateSettings: (input: Partial<UserSettings>) => void;
@@ -230,9 +248,34 @@ export function useTrackerStore(): TrackerStore {
       indexedDbStorageAdapter.createApplication(application),
       indexedDbStorageAdapter.appendActivity(createdActivity),
       ...(interview ? [indexedDbStorageAdapter.saveInterview(interview)] : []),
+      ...markResumeUsedWrites(application.resumeId, createdAt),
     ]);
 
     return application;
+  }
+
+  function markResumeUsedWrites(resumeId: string | undefined, timestamp: string) {
+    if (!resumeId) {
+      return [];
+    }
+
+    const currentResume = resumes.find((resume) => resume.id === resumeId);
+
+    if (!currentResume) {
+      return [];
+    }
+
+    const updatedResume = markResumeUsed(currentResume, timestamp);
+
+    setResumes((current) =>
+      sortResumes(
+        current.map((resume) =>
+          resume.id === resumeId ? updatedResume : resume,
+        ),
+      ),
+    );
+
+    return [indexedDbStorageAdapter.updateResumeMetadata(updatedResume)];
   }
 
   function updateApplication(id: string, input: ApplicationUpdate) {
@@ -252,6 +295,7 @@ export function useTrackerStore(): TrackerStore {
     };
     const storageWrites: Promise<void>[] = [
       indexedDbStorageAdapter.updateApplication(updatedApplication),
+      ...markResumeUsedWrites(input.resumeId, updatedAt),
     ];
     const newActivities = buildApplicationUpdateActivities(
       currentApplication,
@@ -484,6 +528,89 @@ export function useTrackerStore(): TrackerStore {
     ]);
   }
 
+  async function uploadResume(
+    file: File,
+    options: ResumeUploadOptions = {},
+  ): Promise<ResumeUploadResult> {
+    const result = await createResumeUploadResult({
+      existingResumes: resumes,
+      file,
+      options,
+    });
+
+    await indexedDbStorageAdapter.saveResumeFile(result.resume.storageKey, file);
+    await indexedDbStorageAdapter.createResumeMetadata(result.resume);
+    setResumes((current) => sortResumes([result.resume, ...current]));
+
+    return result;
+  }
+
+  function updateResume(id: string, input: ResumeMetadataUpdate) {
+    const currentResume = resumes.find((resume) => resume.id === id);
+
+    if (!currentResume) {
+      return;
+    }
+
+    const updatedResume = updateResumeMetadata(currentResume, input);
+
+    setResumes((current) =>
+      sortResumes(
+        current.map((resume) => (resume.id === id ? updatedResume : resume)),
+      ),
+    );
+    persist(indexedDbStorageAdapter.updateResumeMetadata(updatedResume));
+  }
+
+  function deleteResume(id: string) {
+    const currentResume = resumes.find((resume) => resume.id === id);
+
+    if (!currentResume) {
+      return;
+    }
+
+    const updatedAt = createTimestamp();
+    const linkedApplications = applications.filter(
+      (application) => application.resumeId === id,
+    );
+
+    setResumes((current) => current.filter((resume) => resume.id !== id));
+    setApplications((current) =>
+      current.map((application) =>
+        application.resumeId === id
+          ? { ...application, resumeId: undefined, updatedAt }
+          : application,
+      ),
+    );
+    persistAll([
+      indexedDbStorageAdapter.deleteResumeMetadata(id),
+      indexedDbStorageAdapter.deleteResumeFile(currentResume.storageKey),
+      ...linkedApplications.map((application) =>
+        indexedDbStorageAdapter.updateApplication({
+          ...application,
+          resumeId: undefined,
+          updatedAt,
+        }),
+      ),
+    ]);
+  }
+
+  async function getResumeFile(id: string) {
+    const resume = resumes.find((candidate) => candidate.id === id);
+
+    if (!resume) {
+      throw new Error("Resume metadata could not be found.");
+    }
+
+    const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+
+    if (!file) {
+      throw new Error("The resume file is missing from local storage.");
+    }
+
+    return file;
+  }
+
   function updateSettings(input: Partial<UserSettings>) {
     const updatedSettings = {
       ...settings,
@@ -545,9 +672,13 @@ export function useTrackerStore(): TrackerStore {
     createApplication,
     deleteApplication,
     deleteContact,
+    deleteResume,
+    getResumeFile,
     resetSettings,
     resetTablePreferences,
     restoreApplication,
+    updateResume,
+    uploadResume,
     updateApplication,
     updateContact,
     updateSettings,
@@ -573,6 +704,12 @@ function createActivity(
 function sortActivities(activities: Activity[]) {
   return [...activities].sort((left, right) =>
     right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
+function sortResumes(resumes: ResumeMetadata[]) {
+  return [...resumes].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt),
   );
 }
 
