@@ -274,16 +274,31 @@ function ResumeRow({
     <tr className="text-sm text-foreground">
       <Td>
         {isEditing ? (
-          <input
-            className="field-control"
-            onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                displayName: event.target.value,
-              }))
-            }
-            value={draft.displayName}
-          />
+          <div className="space-y-2">
+            <input
+              aria-label="Display name"
+              className="field-control"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  displayName: event.target.value,
+                }))
+              }
+              value={draft.displayName}
+            />
+            <input
+              aria-label="Version label"
+              className="field-control"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  versionLabel: event.target.value,
+                }))
+              }
+              placeholder="Version label"
+              value={draft.versionLabel}
+            />
+          </div>
         ) : (
           <div className="min-w-0">
             <p className="truncate font-semibold">{resume.displayName}</p>
@@ -293,7 +308,32 @@ function ResumeRow({
           </div>
         )}
       </Td>
-      <Td muted>{resume.originalFileName}</Td>
+      <Td muted>
+        {isEditing ? (
+          <div className="space-y-2">
+            <p className="truncate">{resume.originalFileName}</p>
+            <textarea
+              aria-label="Resume notes"
+              className="field-control min-h-20 resize-y"
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  notes: event.target.value,
+                }))
+              }
+              placeholder="Notes"
+              value={draft.notes}
+            />
+          </div>
+        ) : (
+          <div>
+            <p className="truncate">{resume.originalFileName}</p>
+            {resume.notes ? (
+              <p className="mt-1 line-clamp-2 text-xs text-muted">{resume.notes}</p>
+            ) : null}
+          </div>
+        )}
+      </Td>
       <Td>
         {isEditing ? (
           <input
