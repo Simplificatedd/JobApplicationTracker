@@ -138,6 +138,10 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
 
   return (
     <SettingsPage
+      onExportApplicationsCsv={tracker.exportApplicationsCsv}
+      onExportFullBackup={tracker.exportFullBackup}
+      onImportFullBackup={tracker.importFullBackup}
+      onPreviewBackupImport={tracker.previewBackupImport}
       onResetSettings={tracker.resetSettings}
       onUpdateSettings={tracker.updateSettings}
       settings={tracker.settings}
