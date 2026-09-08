@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { AppShell, type ViewKey } from "./components/AppShell";
 import { AddApplicationModal } from "./features/applications/AddApplicationModal";
@@ -6,12 +6,23 @@ import { ApplicationsPage } from "./features/applications/ApplicationsPage";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { ResumesPage } from "./features/resumes/ResumesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { deriveReminderNotifications } from "./lib/reminders";
 import { useTrackerStore } from "./store/useTrackerStore";
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
+  const notifications = useMemo(
+    () =>
+      deriveReminderNotifications({
+        applications: tracker.applications,
+        notificationState: tracker.notificationState,
+        settings: tracker.settings,
+      }),
+    [tracker.applications, tracker.notificationState, tracker.settings],
+  );
 
   const visibleView =
     currentView === "analytics" && !tracker.settings.betaAnalyticsEnabled
@@ -23,8 +34,17 @@ export function App() {
       currentView={visibleView}
       enableBetaAnalytics={tracker.settings.betaAnalyticsEnabled}
       enableNotificationBell={tracker.settings.enableNotificationBell}
+      groupedNotifications={tracker.settings.enableGroupedNotifications}
       navigationDisplayMode={tracker.settings.navigationDisplayMode}
+      notifications={notifications}
       onAddOpen={() => setIsAddOpen(true)}
+      onDismissNotification={tracker.dismissNotification}
+      onMarkNotificationsOpened={tracker.markNotificationsOpened}
+      onOpenApplicationFromNotification={(id) => {
+        setCurrentView("applications");
+        setOpenApplicationId(id);
+      }}
+      onUpdateApplication={tracker.updateApplication}
       onViewChange={setCurrentView}
     >
       {tracker.storageError ? (
@@ -33,7 +53,13 @@ export function App() {
           onRetry={tracker.retryStorage}
         />
       ) : null}
-      {tracker.isStorageLoading ? <StorageLoading /> : renderView(visibleView, tracker)}
+      {tracker.isStorageLoading ? (
+        <StorageLoading />
+      ) : (
+        renderView(visibleView, tracker, openApplicationId, () =>
+          setOpenApplicationId(null),
+        )
+      )}
       <AddApplicationModal
         defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
         isOpen={isAddOpen}
@@ -91,7 +117,12 @@ function StorageLoading() {
   );
 }
 
-function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) {
+function renderView(
+  view: ViewKey,
+  tracker: ReturnType<typeof useTrackerStore>,
+  openApplicationId: string | null,
+  onOpenApplicationHandled: () => void,
+) {
   if (view === "applications" || view === "archive") {
     return (
       <ApplicationsPage
@@ -105,6 +136,8 @@ function renderView(view: ViewKey, tracker: ReturnType<typeof useTrackerStore>) 
         enableDeleteActiveApplications={
           tracker.settings.enableDeleteActiveApplications
         }
+        openApplicationId={openApplicationId}
+        onOpenApplicationHandled={onOpenApplicationHandled}
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         settings={tracker.settings}

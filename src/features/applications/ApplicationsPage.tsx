@@ -39,6 +39,8 @@ interface ApplicationsPageProps {
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
   enableDeleteActiveApplications: boolean;
+  openApplicationId?: string | null;
+  onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   settings: UserSettings;
@@ -64,6 +66,8 @@ export function ApplicationsPage({
   deleteApplication,
   deleteContact,
   enableDeleteActiveApplications,
+  openApplicationId,
+  onOpenApplicationHandled,
   restoreApplication,
   resumes,
   settings,
@@ -138,6 +142,15 @@ export function ApplicationsPage({
       ),
     [applications, contactsApplicationId],
   );
+
+  useEffect(() => {
+    if (!openApplicationId) {
+      return;
+    }
+
+    setSelectedApplicationId(openApplicationId);
+    onOpenApplicationHandled?.();
+  }, [openApplicationId, onOpenApplicationHandled]);
 
   useEffect(() => {
     if (!settings.rememberTableState) {
