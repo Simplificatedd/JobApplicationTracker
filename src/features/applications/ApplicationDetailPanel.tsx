@@ -1,4 +1,13 @@
-import { Check, ExternalLink, Pencil, Upload, X } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarPlus,
+  CalendarX,
+  Check,
+  ExternalLink,
+  Pencil,
+  Upload,
+  X,
+} from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
@@ -219,6 +228,7 @@ export function ApplicationDetailPanel({
               activities={activities}
               application={application}
               contacts={contacts}
+              onUpdate={onUpdate}
               resume={resume}
             />
           )}
@@ -240,13 +250,52 @@ function ReadOnlyDetails({
   activities,
   application,
   contacts,
+  onUpdate,
   resume,
 }: {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  onUpdate: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeMetadata;
 }) {
+  function changeFollowUpDate() {
+    const nextDate = window.prompt(
+      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpDate ?? "",
+    );
+
+    if (nextDate === null) {
+      return;
+    }
+
+    const trimmedDate = nextDate.trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+      window.alert("Use a date in YYYY-MM-DD format.");
+      return;
+    }
+
+    onUpdate(application.id, {
+      followUpDate: trimmedDate,
+      followUpNeeded: true,
+    });
+  }
+
+  function clearFollowUpDate() {
+    onUpdate(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
+  }
+
+  function markFollowUpDone() {
+    onUpdate(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-3">
@@ -296,6 +345,28 @@ function ReadOnlyDetails({
         />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
+
+      {!application.archivedAt ? (
+        <section>
+          <h3 className="text-sm font-semibold text-foreground">
+            Follow-up actions
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <DetailActionButton onClick={changeFollowUpDate}>
+              <CalendarPlus aria-hidden="true" size={16} />
+              Change date
+            </DetailActionButton>
+            <DetailActionButton onClick={clearFollowUpDate}>
+              <CalendarX aria-hidden="true" size={16} />
+              Clear
+            </DetailActionButton>
+            <DetailActionButton onClick={markFollowUpDone}>
+              <CalendarCheck aria-hidden="true" size={16} />
+              Mark done
+            </DetailActionButton>
+          </div>
+        </section>
+      ) : null}
 
       {application.applicationUrl ? (
         <a
@@ -357,6 +428,24 @@ function ReadOnlyDetails({
         </div>
       </section>
     </div>
+  );
+}
+
+function DetailActionButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
 

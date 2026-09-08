@@ -241,6 +241,7 @@ export function ApplicationsPage({
         onColumnWidthsChange={setColumnWidths}
         onRestoreApplication={restoreApplication}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
+        onUpdateApplication={updateApplication}
         resumes={resumes}
         sort={sort}
         visibleApplicationColumns={settings.visibleApplicationColumns}

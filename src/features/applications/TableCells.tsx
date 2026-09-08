@@ -1,6 +1,9 @@
 import {
   Archive,
+  CalendarCheck,
   CalendarClock,
+  CalendarPlus,
+  CalendarX,
   FileText,
   MoreHorizontal,
   MessageSquareText,
@@ -10,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { formatDate, formatDateTime } from "../../lib/format";
+import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { JobApplication, ResumeFile } from "../../types/application";
 
 export function DescriptionPreview({ description }: { description: string }) {
@@ -107,12 +111,14 @@ export function RowActionsMenu({
   onArchiveApplication,
   onDeleteApplication,
   onRestoreApplication,
+  onUpdateApplication,
 }: {
   application: JobApplication;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
 }) {
   const canDelete = Boolean(application.archivedAt) || enableDeleteActiveApplications;
   const [isOpen, setIsOpen] = useState(false);
@@ -147,6 +153,46 @@ export function RowActionsMenu({
       setIsOpen(false);
       onDeleteApplication(application.id);
     }
+  }
+
+  function changeFollowUpDate() {
+    const nextDate = window.prompt(
+      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpDate ?? "",
+    );
+
+    if (nextDate === null) {
+      return;
+    }
+
+    const trimmedDate = nextDate.trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+      window.alert("Use a date in YYYY-MM-DD format.");
+      return;
+    }
+
+    setIsOpen(false);
+    onUpdateApplication(application.id, {
+      followUpDate: trimmedDate,
+      followUpNeeded: true,
+    });
+  }
+
+  function clearFollowUpDate() {
+    setIsOpen(false);
+    onUpdateApplication(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
+  }
+
+  function markFollowUpDone() {
+    setIsOpen(false);
+    onUpdateApplication(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
   }
 
   return (
@@ -197,6 +243,22 @@ export function RowActionsMenu({
             Archive
           </button>
         )}
+        {!application.archivedAt ? (
+          <>
+            <MenuButton onClick={changeFollowUpDate}>
+              <CalendarPlus aria-hidden="true" size={16} />
+              Change follow-up
+            </MenuButton>
+            <MenuButton onClick={clearFollowUpDate}>
+              <CalendarX aria-hidden="true" size={16} />
+              Clear follow-up
+            </MenuButton>
+            <MenuButton onClick={markFollowUpDone}>
+              <CalendarCheck aria-hidden="true" size={16} />
+              Mark done
+            </MenuButton>
+          </>
+        ) : null}
         {canDelete ? (
           <button
             className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700"
@@ -211,5 +273,24 @@ export function RowActionsMenu({
       </div>
       ) : null}
     </div>
+  );
+}
+
+function MenuButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+      onClick={onClick}
+      role="menuitem"
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
