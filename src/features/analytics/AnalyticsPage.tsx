@@ -7,12 +7,14 @@ import {
 } from "../../lib/reminders";
 import type { AnalyticsSettings } from "../../types/analytics";
 import type { Activity, Application } from "../../types/application";
+import type { UserSettings } from "../../types/settings";
 
 interface AnalyticsPageProps {
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
   onUpdateAnalyticsSettings: (settings: Partial<AnalyticsSettings>) => void;
+  userSettings: UserSettings;
 }
 
 const chartOptions = [
@@ -30,6 +32,7 @@ export function AnalyticsPage({
   analyticsSettings,
   applications,
   onUpdateAnalyticsSettings,
+  userSettings,
 }: AnalyticsPageProps) {
   const scopedApplications = analyticsSettings.includeArchived
     ? applications
@@ -158,7 +161,7 @@ export function AnalyticsPage({
           {visibleCharts.has("followUpLoad") ? (
             <BarChart
               title="Follow-up load"
-              data={deriveFollowUpLoad(scopedApplications)}
+              data={deriveFollowUpLoad(scopedApplications, userSettings)}
             />
           ) : null}
           {visibleCharts.has("statusChangesOverTime") ? (
@@ -298,7 +301,10 @@ function derivePipelineByStatus(applications: Application[]) {
   }));
 }
 
-function deriveFollowUpLoad(applications: Application[]) {
+function deriveFollowUpLoad(
+  applications: Application[],
+  userSettings: UserSettings,
+) {
   const counts = {
     overdue: 0,
     due_today: 0,
@@ -307,13 +313,16 @@ function deriveFollowUpLoad(applications: Application[]) {
   };
 
   applications.forEach((application) => {
-    const dueDate = calculateFollowUpDueDate(application, 7);
+    const dueDate = calculateFollowUpDueDate(
+      application,
+      userSettings.defaultFollowUpPromptDays,
+    );
 
     if (!dueDate) {
       return;
     }
 
-    counts[classifyReminderSeverity(dueDate, 3)] += 1;
+    counts[classifyReminderSeverity(dueDate, userSettings.dueSoonDays)] += 1;
   });
 
   return Object.entries(counts).map(([severity, value]) => ({

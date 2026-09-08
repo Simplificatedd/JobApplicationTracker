@@ -160,6 +160,7 @@ function renderView(
         analyticsSettings={tracker.analyticsSettings}
         applications={tracker.applications}
         onUpdateAnalyticsSettings={tracker.updateAnalyticsSettings}
+        userSettings={tracker.settings}
       />
     );
   }

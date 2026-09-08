@@ -13,6 +13,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { formatDate, formatDateTime } from "../../lib/format";
+import { calculateFollowUpDueDate } from "../../lib/reminders";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { JobApplication, ResumeFile } from "../../types/application";
 
@@ -31,6 +32,11 @@ export function FollowUpCell({
 }: {
   application: JobApplication;
 }) {
+  const dueDate = calculateFollowUpDueDate(
+    application,
+    application.followUpPromptDays ?? 7,
+  );
+
   return (
     <div className="min-w-0 max-w-full overflow-hidden">
       <p
@@ -38,7 +44,7 @@ export function FollowUpCell({
           application.followUpNeeded ? "text-warning" : "text-foreground"
         }`}
       >
-        {formatDate(application.followUpDate)}
+        {formatDate(dueDate)}
       </p>
       <p className="mt-1 truncate text-xs text-muted">
         {application.followUpNeeded ? "Needed" : "Optional"}

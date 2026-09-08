@@ -18,6 +18,7 @@ import {
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
+import { deriveApplicationNotifications } from "../../lib/reminders";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
@@ -123,7 +124,8 @@ export function ApplicationsPage({
     : filteredApplications;
   const visibleApplications = sortApplications(focusedApplications, sort);
   const attentionCount = baseApplications.filter(
-    (application) => application.followUpNeeded || application.interviewDateTime,
+    (application) =>
+      deriveApplicationNotifications(application, settings).length > 0,
   ).length;
   const interviewCount = baseApplications.filter(
     (application) => application.interviewDateTime,
