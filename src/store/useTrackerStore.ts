@@ -95,6 +95,7 @@ export interface TrackerStore {
     options?: ResumeUploadOptions,
   ) => Promise<ResumeUploadResult>;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
+  updateAnalyticsSettings: (input: Partial<AnalyticsSettings>) => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateSettings: (input: Partial<UserSettings>) => void;
   updateTablePreferences: (input: Partial<TablePreferences>) => void;
@@ -721,6 +722,16 @@ export function useTrackerStore(): TrackerStore {
     persist(indexedDbStorageAdapter.saveSettings(updatedSettings));
   }
 
+  function updateAnalyticsSettings(input: Partial<AnalyticsSettings>) {
+    const updatedSettings = {
+      ...analyticsSettings,
+      ...input,
+    };
+
+    setAnalyticsSettings(updatedSettings);
+    persist(indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings));
+  }
+
   function resetSettings() {
     setSettings(DEFAULT_USER_SETTINGS);
     persist(indexedDbStorageAdapter.resetSettings());
@@ -786,6 +797,7 @@ export function useTrackerStore(): TrackerStore {
     updateResume,
     uploadResume,
     updateApplication,
+    updateAnalyticsSettings,
     updateContact,
     updateSettings,
     updateTablePreferences,

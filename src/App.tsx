@@ -154,7 +154,14 @@ function renderView(
   }
 
   if (view === "analytics") {
-    return <AnalyticsPage />;
+    return (
+      <AnalyticsPage
+        activities={tracker.activities}
+        analyticsSettings={tracker.analyticsSettings}
+        applications={tracker.applications}
+        onUpdateAnalyticsSettings={tracker.updateAnalyticsSettings}
+      />
+    );
   }
 
   if (view === "resumes") {
