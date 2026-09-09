@@ -200,8 +200,7 @@ export function deriveApplicationNotifications(
     application.status === "Interviewing" &&
     application.interviewProctored &&
     interviewDeadline &&
-    deadlineDate &&
-    deadlineDate >= now
+    deadlineDate
   ) {
     const severity = classifyReminderSeverity(
       deadlineDate,

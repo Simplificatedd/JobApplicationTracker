@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CheckSquare, Settings2 } from "lucide-react";
+import { BarChart3, CalendarDays, Settings2 } from "lucide-react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -406,29 +406,23 @@ function deriveActivityCalendarDays(
     const key = toDateKey(cursor.toISOString());
     const dayActivities = activityByDate.get(key) ?? [];
     const dayApplications = applicationByDate.get(key) ?? [];
+    const eventCounts = getCalendarEventCounts(dayApplications, dayActivities);
     const summaryParts = [
-      countLabel(dayApplications.length, "job applied"),
-      countLabel(
-        dayActivities.filter((activity) => activity.message.toLowerCase().includes("interview")).length,
-        "interview completed",
-      ),
-      countLabel(
-        dayActivities.filter((activity) => activity.message.toLowerCase().includes("offer")).length,
-        "offer",
-      ),
-      countLabel(
-        dayActivities.filter((activity) => activity.message.toLowerCase().includes("rejected")).length,
-        "rejection",
-      ),
-      countLabel(
-        dayActivities.filter((activity) => activity.type === "status_changed").length,
-        "major status change",
-      ),
+      countLabel(eventCounts.applications, "job applied"),
+      countLabel(eventCounts.interviews, "interview completed"),
+      countLabel(eventCounts.offers, "offer"),
+      countLabel(eventCounts.rejections, "rejection"),
+      countLabel(eventCounts.statusChanges, "major status change"),
     ].filter(Boolean);
-    const hasAnyActivity = summaryParts.length > 0;
+    const primaryActivityCount =
+      eventCounts.applications +
+      eventCounts.interviews +
+      eventCounts.offers +
+      eventCounts.rejections;
+    const hasAnyActivity = primaryActivityCount > 0 || eventCounts.statusChanges > 0;
     const hasOnlyRejections =
-      hasAnyActivity &&
-      summaryParts.every((part) => part?.includes("rejection"));
+      eventCounts.rejections > 0 &&
+      primaryActivityCount === eventCounts.rejections;
 
     days.push({
       colorClass: !hasAnyActivity
@@ -444,6 +438,30 @@ function deriveActivityCalendarDays(
   }
 
   return days;
+}
+
+function getCalendarEventCounts(
+  applications: Application[],
+  activities: Activity[],
+) {
+  const lowerCaseMessages = activities.map((activity) =>
+    activity.message.toLowerCase(),
+  );
+
+  return {
+    applications: applications.length,
+    interviews: lowerCaseMessages.filter((message) =>
+      message.includes("interview"),
+    ).length,
+    offers: lowerCaseMessages.filter((message) => message.includes("offer"))
+      .length,
+    rejections: lowerCaseMessages.filter((message) =>
+      message.includes("rejected"),
+    ).length,
+    statusChanges: activities.filter(
+      (activity) => activity.type === "status_changed",
+    ).length,
+  };
 }
 
 function groupDates(
