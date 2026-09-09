@@ -56,7 +56,12 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 export const DEFAULT_ANALYTICS_SETTINGS: AnalyticsSettings = {
   enabled: false,
   defaultTimeGrouping: "weekly",
-  visibleCharts: ["statusPipeline", "applicationsOverTime", "sourceQuality"],
+  visibleCharts: [
+    "applicationsOverTime",
+    "statusPipeline",
+    "followUpLoad",
+    "activityCalendar",
+  ],
   includeArchived: false,
 };
 

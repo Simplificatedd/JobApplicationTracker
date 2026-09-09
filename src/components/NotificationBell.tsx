@@ -1,0 +1,402 @@
+import {
+  Bell,
+  CalendarCheck,
+  CalendarClock,
+  CalendarPlus,
+  ExternalLink,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useEscapeKey } from "../hooks/useEscapeKey";
+import { formatDate, formatDateTime } from "../lib/format";
+import {
+  severityLabel,
+  type NotificationGroup,
+  type ReminderNotification,
+} from "../lib/reminders";
+import type { ApplicationUpdate } from "../store/useTrackerStore";
+
+interface NotificationBellProps {
+  grouped: boolean;
+  notifications: ReminderNotification[];
+  onDismiss: (id: string) => void;
+  onMarkOpened: () => void;
+  onOpenApplication: (id: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}
+
+const groupLabels: Record<NotificationGroup, string> = {
+  followups: "Follow-ups",
+  interviews: "Interviews",
+  other: "Other",
+};
+
+export function NotificationBell({
+  grouped,
+  notifications,
+  onDismiss,
+  onMarkOpened,
+  onOpenApplication,
+  onUpdateApplication,
+}: NotificationBellProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const count = notifications.length;
+
+  useEscapeKey(isOpen, () => setIsOpen(false));
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!panelRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [isOpen]);
+
+  function togglePanel() {
+    setIsOpen((current) => {
+      const next = !current;
+
+      if (next) {
+        onMarkOpened();
+      }
+
+      return next;
+    });
+  }
+
+  return (
+    <div className="relative shrink-0" ref={panelRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label={`Notifications${count > 0 ? `, ${count} needs attention` : ""}`}
+        className="icon-button relative"
+        onClick={togglePanel}
+        title="Notifications"
+        type="button"
+      >
+        <Bell aria-hidden="true" size={18} />
+        {count > 0 ? (
+          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-warning px-1.5 py-0.5 text-center text-[0.6875rem] font-bold leading-4 text-white">
+            {count > 99 ? "99+" : count}
+          </span>
+        ) : null}
+      </button>
+
+      {isOpen ? (
+        <div
+          aria-label="Notifications"
+          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100vh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
+          role="dialog"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Needs attention
+              </p>
+              <p className="text-xs text-muted">
+                {count === 0 ? "All clear" : `${count} active reminder${count === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <button
+              aria-label="Close notifications"
+              className="icon-button h-8 w-8"
+              onClick={() => setIsOpen(false)}
+              title="Close notifications"
+              type="button"
+            >
+              <X aria-hidden="true" size={16} />
+            </button>
+          </div>
+
+          {count === 0 ? (
+            <div className="px-2 py-8 text-center">
+              <p className="text-sm font-semibold text-foreground">
+                No reminders right now
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Follow-ups, interviews, and assessment deadlines will appear here.
+              </p>
+            </div>
+          ) : grouped ? (
+            <GroupedNotifications
+              notifications={notifications}
+              onDismiss={onDismiss}
+              onOpenApplication={(id) => {
+                setIsOpen(false);
+                onOpenApplication(id);
+              }}
+              onUpdateApplication={onUpdateApplication}
+            />
+          ) : (
+            <div className="mt-3 space-y-2">
+              {notifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onDismiss={onDismiss}
+                  onOpenApplication={(id) => {
+                    setIsOpen(false);
+                    onOpenApplication(id);
+                  }}
+                  onUpdateApplication={onUpdateApplication}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function GroupedNotifications({
+  notifications,
+  onDismiss,
+  onOpenApplication,
+  onUpdateApplication,
+}: {
+  notifications: ReminderNotification[];
+  onDismiss: (id: string) => void;
+  onOpenApplication: (id: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}) {
+  const groups: NotificationGroup[] = ["followups", "interviews", "other"];
+
+  return (
+    <div className="mt-3 space-y-4">
+      {groups.map((group) => {
+        const groupNotifications = notifications.filter(
+          (notification) => notification.group === group,
+        );
+
+        if (groupNotifications.length === 0) {
+          return null;
+        }
+
+        return (
+          <section key={group}>
+            <h3 className="px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+              {groupLabels[group]}
+            </h3>
+            <div className="mt-2 space-y-2">
+              {groupNotifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onDismiss={onDismiss}
+                  onOpenApplication={onOpenApplication}
+                  onUpdateApplication={onUpdateApplication}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function NotificationItem({
+  notification,
+  onDismiss,
+  onOpenApplication,
+  onUpdateApplication,
+}: {
+  notification: ReminderNotification;
+  onDismiss: (id: string) => void;
+  onOpenApplication: (id: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}) {
+  const dueText =
+    notification.type === "follow_up"
+      ? formatDate(notification.dueAt)
+      : formatDateTime(notification.dueAt);
+
+  return (
+    <article
+      className={`rounded-lg border px-3 py-3 ${getNotificationTone(notification.severity)}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">
+            {notification.title}
+          </p>
+          <p className="mt-1 text-xs font-medium text-muted">
+            {severityLabel(notification.severity)} / {dueText}
+          </p>
+          <p className="mt-1 truncate text-xs text-muted">
+            {notification.body}
+          </p>
+        </div>
+        <button
+          aria-label={`Dismiss ${notification.title}`}
+          className="icon-button h-8 w-8 shrink-0 bg-surface"
+          onClick={() => onDismiss(notification.id)}
+          title="Dismiss"
+          type="button"
+        >
+          <X aria-hidden="true" size={15} />
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <SmallActionButton
+          label="Open application"
+          onClick={() => onOpenApplication(notification.applicationId)}
+        >
+          <ExternalLink aria-hidden="true" size={14} />
+          Open
+        </SmallActionButton>
+        {notification.type === "follow_up" || notification.type === "flagged" ? (
+          <>
+            <SmallActionButton
+              label="Mark follow-up done"
+              onClick={() =>
+                onUpdateApplication(notification.applicationId, {
+                  followUpDate: undefined,
+                  followUpNeeded: false,
+                })
+              }
+            >
+              <CalendarCheck aria-hidden="true" size={14} />
+              Done
+            </SmallActionButton>
+            <SmallActionButton
+              label="Change follow-up date"
+              onClick={() =>
+                changeDate(notification, onUpdateApplication, "follow_up")
+              }
+            >
+              <CalendarPlus aria-hidden="true" size={14} />
+              Date
+            </SmallActionButton>
+          </>
+        ) : null}
+        {notification.type === "interview" ? (
+          <SmallActionButton
+            label="Change interview date and time"
+            onClick={() =>
+              changeDate(notification, onUpdateApplication, "interview")
+            }
+          >
+            <CalendarClock aria-hidden="true" size={14} />
+            Time
+          </SmallActionButton>
+        ) : null}
+        {notification.type === "deadline" ? (
+          <SmallActionButton
+            label="Change assessment deadline"
+            onClick={() =>
+              changeDate(notification, onUpdateApplication, "deadline")
+            }
+          >
+            <CalendarClock aria-hidden="true" size={14} />
+            Deadline
+          </SmallActionButton>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function SmallActionButton({
+  children,
+  label,
+  onClick,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={label}
+      className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50"
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function changeDate(
+  notification: ReminderNotification,
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void,
+  mode: "follow_up" | "interview" | "deadline",
+) {
+  const isFollowUp = mode === "follow_up";
+  const nextValue = window.prompt(
+    isFollowUp ? "Set follow-up date (YYYY-MM-DD)" : "Set date/time (YYYY-MM-DDTHH:mm)",
+    isFollowUp
+      ? notification.application.followUpDate ?? ""
+      : (mode === "interview"
+          ? notification.application.interviewDateTime
+          : notification.application.interviewDeadline) ?? "",
+  );
+
+  if (nextValue === null) {
+    return;
+  }
+
+  const trimmedValue = nextValue.trim();
+  const pattern = isFollowUp
+    ? /^\d{4}-\d{2}-\d{2}$/
+    : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+  if (!pattern.test(trimmedValue)) {
+    window.alert(isFollowUp ? "Use YYYY-MM-DD." : "Use YYYY-MM-DDTHH:mm.");
+    return;
+  }
+
+  if (mode === "follow_up") {
+    onUpdateApplication(notification.applicationId, {
+      followUpDate: trimmedValue,
+      followUpNeeded: true,
+    });
+    return;
+  }
+
+  if (mode === "interview") {
+    onUpdateApplication(notification.applicationId, {
+      interviewDateTime: trimmedValue,
+      status: "Interviewing",
+    });
+    return;
+  }
+
+  onUpdateApplication(notification.applicationId, {
+    interviewDeadline: trimmedValue,
+    interviewProctored: true,
+    status: "Interviewing",
+  });
+}
+
+function getNotificationTone(severity: ReminderNotification["severity"]) {
+  if (severity === "overdue") {
+    return "border-red-200 bg-red-50";
+  }
+
+  if (severity === "due_today") {
+    return "border-amber-300 bg-amber-50";
+  }
+
+  if (severity === "due_soon") {
+    return "border-blue-200 bg-blue-50";
+  }
+
+  return "border-border bg-surface";
+}

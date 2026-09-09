@@ -1,4 +1,13 @@
-import { Check, ExternalLink, Pencil, Upload, X } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarPlus,
+  CalendarX,
+  Check,
+  ExternalLink,
+  Pencil,
+  Upload,
+  X,
+} from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
@@ -13,6 +22,8 @@ import type {
   Application,
   ApplicationContact,
   ApplicationStatus,
+  DeadlineEntryMode,
+  InterviewMode,
   InterviewType,
   JobType,
   Priority,
@@ -93,6 +104,7 @@ export function ApplicationDetailPanel({
       applicationUrl: trimOptional(draft.applicationUrl),
       dateApplied: trimOptional(draft.dateApplied),
       deadline: trimOptional(draft.deadline),
+      deadlineEntryMode: draft.deadlineEntryMode,
       roleStartDate: trimOptional(draft.roleStartDate),
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
@@ -114,7 +126,7 @@ export function ApplicationDetailPanel({
       interviewPlatform: isInterviewing
         ? trimOptional(draft.interviewPlatform)
         : undefined,
-      interviewProctored: false,
+      interviewProctored: isInterviewing ? draft.interviewProctored : false,
       interviewDeadline: isInterviewing
         ? trimOptional(draft.interviewDeadline)
         : undefined,
@@ -219,6 +231,7 @@ export function ApplicationDetailPanel({
               activities={activities}
               application={application}
               contacts={contacts}
+              onUpdate={onUpdate}
               resume={resume}
             />
           )}
@@ -240,13 +253,52 @@ function ReadOnlyDetails({
   activities,
   application,
   contacts,
+  onUpdate,
   resume,
 }: {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  onUpdate: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeMetadata;
 }) {
+  function changeFollowUpDate() {
+    const nextDate = window.prompt(
+      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpDate ?? "",
+    );
+
+    if (nextDate === null) {
+      return;
+    }
+
+    const trimmedDate = nextDate.trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+      window.alert("Use a date in YYYY-MM-DD format.");
+      return;
+    }
+
+    onUpdate(application.id, {
+      followUpDate: trimmedDate,
+      followUpNeeded: true,
+    });
+  }
+
+  function clearFollowUpDate() {
+    onUpdate(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
+  }
+
+  function markFollowUpDone() {
+    onUpdate(application.id, {
+      followUpDate: undefined,
+      followUpNeeded: false,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-3">
@@ -296,6 +348,28 @@ function ReadOnlyDetails({
         />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
+
+      {!application.archivedAt ? (
+        <section>
+          <h3 className="text-sm font-semibold text-foreground">
+            Follow-up actions
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <DetailActionButton onClick={changeFollowUpDate}>
+              <CalendarPlus aria-hidden="true" size={16} />
+              Change date
+            </DetailActionButton>
+            <DetailActionButton onClick={clearFollowUpDate}>
+              <CalendarX aria-hidden="true" size={16} />
+              Clear
+            </DetailActionButton>
+            <DetailActionButton onClick={markFollowUpDone}>
+              <CalendarCheck aria-hidden="true" size={16} />
+              Mark done
+            </DetailActionButton>
+          </div>
+        </section>
+      ) : null}
 
       {application.applicationUrl ? (
         <a
@@ -357,6 +431,24 @@ function ReadOnlyDetails({
         </div>
       </section>
     </div>
+  );
+}
+
+function DetailActionButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -592,6 +684,60 @@ function EditForm({
               value={draft.interviewDateTime}
             />
           </Field>
+          <Field label="Interview Mode">
+            <select
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewMode", event.target.value as InterviewMode)
+              }
+              value={draft.interviewMode}
+            >
+              <option value="other">Other</option>
+              <option value="phone">Phone</option>
+              <option value="video">Video</option>
+              <option value="onsite">Onsite</option>
+              <option value="take-home">Take-home</option>
+            </select>
+          </Field>
+          <Field label="Deadline Timing">
+            <select
+              className="field-control"
+              onChange={(event) =>
+                updateDraft(
+                  "deadlineEntryMode",
+                  event.target.value as DeadlineEntryMode,
+                )
+              }
+              value={draft.deadlineEntryMode}
+            >
+              <option value="exact">Exact date/time</option>
+              <option value="1_day">1 day</option>
+              <option value="2_days">2 days</option>
+              <option value="3_days">3 days</option>
+              <option value="72_hours">72 hours</option>
+            </select>
+          </Field>
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
+            <input
+              checked={draft.interviewProctored}
+              className="h-4 w-4 rounded border-border text-primary"
+              onChange={(event) =>
+                updateDraft("interviewProctored", event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span>Proctored assessment</span>
+          </label>
+          <Field label="Assessment Deadline">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewDeadline", event.target.value)
+              }
+              type="datetime-local"
+              value={draft.interviewDeadline}
+            />
+          </Field>
         </>
       ) : null}
       <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
@@ -722,6 +868,7 @@ function toDraft(application: Application) {
     applicationUrl: application.applicationUrl ?? "",
     dateApplied: application.dateApplied ?? "",
     deadline: application.deadline ?? "",
+    deadlineEntryMode: application.deadlineEntryMode,
     roleStartDate: application.roleStartDate ?? "",
     roleEndDate: application.roleEndDate ?? "",
     followUpNeeded: application.followUpNeeded,
@@ -735,6 +882,7 @@ function toDraft(application: Application) {
     interviewLocation: application.interviewLocation ?? "",
     interviewMeetingUrl: application.interviewMeetingUrl ?? "",
     interviewPlatform: application.interviewPlatform ?? "",
+    interviewProctored: application.interviewProctored,
     interviewDeadline: toDateTimeLocal(application.interviewDeadline),
     priority: application.priority,
     resumeId: application.resumeId ?? "",

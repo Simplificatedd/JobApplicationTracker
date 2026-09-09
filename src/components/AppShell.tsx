@@ -1,7 +1,6 @@
 import {
   Archive,
   BarChart3,
-  Bell,
   BriefcaseBusiness,
   FileText,
   PanelLeftClose,
@@ -18,6 +17,9 @@ import {
   useState,
 } from "react";
 import { APP_NAME } from "../lib/constants";
+import { NotificationBell } from "./NotificationBell";
+import type { ReminderNotification } from "../lib/reminders";
+import type { ApplicationUpdate } from "../store/useTrackerStore";
 
 export type ViewKey =
   | "applications"
@@ -31,8 +33,14 @@ interface AppShellProps {
   currentView: ViewKey;
   enableBetaAnalytics: boolean;
   enableNotificationBell: boolean;
+  groupedNotifications: boolean;
+  notifications: ReminderNotification[];
   navigationDisplayMode: "side" | "top";
   onAddOpen: () => void;
+  onDismissNotification: (id: string) => void;
+  onMarkNotificationsOpened: () => void;
+  onOpenApplicationFromNotification: (id: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onViewChange: (view: ViewKey) => void;
 }
 
@@ -66,8 +74,14 @@ export function AppShell({
   currentView,
   enableBetaAnalytics,
   enableNotificationBell,
+  groupedNotifications,
+  notifications,
   navigationDisplayMode,
   onAddOpen,
+  onDismissNotification,
+  onMarkNotificationsOpened,
+  onOpenApplicationFromNotification,
+  onUpdateApplication,
   onViewChange,
 }: AppShellProps) {
   const [isNavigationHidden, setIsNavigationHidden] = useState(false);
@@ -152,6 +166,15 @@ export function AppShell({
             style={sideNavigationStyle}
           >
             <NavigationBrand enableNotificationBell={enableNotificationBell} />
+            <MobileNotificationSlot
+              enableNotificationBell={enableNotificationBell}
+              groupedNotifications={groupedNotifications}
+              notifications={notifications}
+              onDismissNotification={onDismissNotification}
+              onMarkNotificationsOpened={onMarkNotificationsOpened}
+              onOpenApplicationFromNotification={onOpenApplicationFromNotification}
+              onUpdateApplication={onUpdateApplication}
+            />
             <NavigationButtons
               currentView={currentView}
               items={visibleNavigation}
@@ -201,12 +224,15 @@ export function AppShell({
                 layout="top"
                 onViewChange={onViewChange}
               />
-              {enableNotificationBell ? (
-                <button className="icon-button shrink-0 lg:hidden" type="button">
-                  <Bell aria-hidden="true" size={18} />
-                  <span className="sr-only">Notifications</span>
-                </button>
-              ) : null}
+              <MobileNotificationSlot
+                enableNotificationBell={enableNotificationBell}
+                groupedNotifications={groupedNotifications}
+                notifications={notifications}
+                onDismissNotification={onDismissNotification}
+                onMarkNotificationsOpened={onMarkNotificationsOpened}
+                onOpenApplicationFromNotification={onOpenApplicationFromNotification}
+                onUpdateApplication={onUpdateApplication}
+              />
             </div>
           </div>
         ) : null}
@@ -227,14 +253,16 @@ export function AppShell({
 
               <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                 {enableNotificationBell ? (
-                  <button
-                    className="icon-button relative hidden lg:inline-flex"
-                    type="button"
-                  >
-                    <Bell aria-hidden="true" size={18} />
-                    <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-warning" />
-                    <span className="sr-only">Notifications</span>
-                  </button>
+                  <div className="hidden lg:block">
+                    <NotificationBell
+                      grouped={groupedNotifications}
+                      notifications={notifications}
+                      onDismiss={onDismissNotification}
+                      onMarkOpened={onMarkNotificationsOpened}
+                      onOpenApplication={onOpenApplicationFromNotification}
+                      onUpdateApplication={onUpdateApplication}
+                    />
+                  </div>
                 ) : null}
                 {showAddButton ? (
                   <button
@@ -275,12 +303,41 @@ function NavigationBrand({
           Internship command center
         </p>
       </div>
-      {enableNotificationBell ? (
-        <button className="icon-button xl:hidden" type="button">
-          <Bell aria-hidden="true" size={18} />
-          <span className="sr-only">Notifications</span>
-        </button>
-      ) : null}
+    </div>
+  );
+}
+
+function MobileNotificationSlot({
+  enableNotificationBell,
+  groupedNotifications,
+  notifications,
+  onDismissNotification,
+  onMarkNotificationsOpened,
+  onOpenApplicationFromNotification,
+  onUpdateApplication,
+}: {
+  enableNotificationBell: boolean;
+  groupedNotifications: boolean;
+  notifications: ReminderNotification[];
+  onDismissNotification: (id: string) => void;
+  onMarkNotificationsOpened: () => void;
+  onOpenApplicationFromNotification: (id: string) => void;
+  onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+}) {
+  if (!enableNotificationBell) {
+    return null;
+  }
+
+  return (
+    <div className="lg:hidden">
+      <NotificationBell
+        grouped={groupedNotifications}
+        notifications={notifications}
+        onDismiss={onDismissNotification}
+        onMarkOpened={onMarkNotificationsOpened}
+        onOpenApplication={onOpenApplicationFromNotification}
+        onUpdateApplication={onUpdateApplication}
+      />
     </div>
   );
 }

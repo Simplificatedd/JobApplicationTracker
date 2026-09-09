@@ -79,6 +79,7 @@ export interface TrackerStore {
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
   deleteResume: (id: string) => void;
+  dismissNotification: (id: string) => void;
   exportApplicationsCsv: () => Blob;
   exportFullBackup: () => Promise<Blob>;
   getResumeFile: (id: string) => Promise<Blob>;
@@ -87,12 +88,14 @@ export interface TrackerStore {
   resetSettings: () => void;
   resetTablePreferences: () => void;
   restoreApplication: (id: string) => void;
+  markNotificationsOpened: () => void;
   updateResume: (id: string, input: ResumeMetadataUpdate) => void;
   uploadResume: (
     file: File,
     options?: ResumeUploadOptions,
   ) => Promise<ResumeUploadResult>;
   updateApplication: (id: string, input: ApplicationUpdate) => void;
+  updateAnalyticsSettings: (input: Partial<AnalyticsSettings>) => void;
   updateContact: (id: string, input: Partial<ContactInput>) => void;
   updateSettings: (input: Partial<UserSettings>) => void;
   updateTablePreferences: (input: Partial<TablePreferences>) => void;
@@ -686,6 +689,29 @@ export function useTrackerStore(): TrackerStore {
     return createApplicationsCsv({ applications, resumes });
   }
 
+  function dismissNotification(id: string) {
+    const dismissedNotificationIds = Array.from(
+      new Set([...notificationState.dismissedNotificationIds, id]),
+    );
+    const updatedState = {
+      ...notificationState,
+      dismissedNotificationIds,
+    };
+
+    setNotificationState(updatedState);
+    persist(indexedDbStorageAdapter.saveNotificationState(updatedState));
+  }
+
+  function markNotificationsOpened() {
+    const updatedState = {
+      ...notificationState,
+      lastOpenedAt: createTimestamp(),
+    };
+
+    setNotificationState(updatedState);
+    persist(indexedDbStorageAdapter.saveNotificationState(updatedState));
+  }
+
   function updateSettings(input: Partial<UserSettings>) {
     const updatedSettings = {
       ...settings,
@@ -694,6 +720,16 @@ export function useTrackerStore(): TrackerStore {
 
     setSettings(updatedSettings);
     persist(indexedDbStorageAdapter.saveSettings(updatedSettings));
+  }
+
+  function updateAnalyticsSettings(input: Partial<AnalyticsSettings>) {
+    const updatedSettings = {
+      ...analyticsSettings,
+      ...input,
+    };
+
+    setAnalyticsSettings(updatedSettings);
+    persist(indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings));
   }
 
   function resetSettings() {
@@ -748,6 +784,7 @@ export function useTrackerStore(): TrackerStore {
     deleteApplication,
     deleteContact,
     deleteResume,
+    dismissNotification,
     exportApplicationsCsv,
     exportFullBackup,
     getResumeFile,
@@ -756,9 +793,11 @@ export function useTrackerStore(): TrackerStore {
     resetSettings,
     resetTablePreferences,
     restoreApplication,
+    markNotificationsOpened,
     updateResume,
     uploadResume,
     updateApplication,
+    updateAnalyticsSettings,
     updateContact,
     updateSettings,
     updateTablePreferences,

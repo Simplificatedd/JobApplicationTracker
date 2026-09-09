@@ -50,6 +50,9 @@ interface AddApplicationFormState {
   interviewRound: string;
   interviewDateTime: string;
   interviewType: ApplicationInput["interviewType"];
+  interviewMode: ApplicationInput["interviewMode"];
+  interviewProctored: boolean;
+  interviewDeadline: string;
   priority: Priority;
   resumeId: string;
   resumeUploadName: string;
@@ -80,6 +83,9 @@ const initialFormState: AddApplicationFormState = {
   interviewRound: "",
   interviewDateTime: "",
   interviewType: "unknown",
+  interviewMode: "other",
+  interviewProctored: false,
+  interviewDeadline: "",
   priority: "medium",
   resumeId: "",
   resumeUploadName: "",
@@ -206,12 +212,14 @@ export function AddApplicationModal({
         ? trimOptional(form.interviewDateTime)
         : undefined,
       interviewType: isInterviewing ? form.interviewType : undefined,
-      interviewMode: undefined,
+      interviewMode: isInterviewing ? form.interviewMode : undefined,
       interviewLocation: undefined,
       interviewMeetingUrl: undefined,
       interviewPlatform: undefined,
-      interviewProctored: false,
-      interviewDeadline: undefined,
+      interviewProctored: isInterviewing ? form.interviewProctored : false,
+      interviewDeadline: isInterviewing
+        ? trimOptional(form.interviewDeadline)
+        : undefined,
       priority: form.priority,
       resumeId,
       coverLetterVersion: trimOptional(form.coverLetterVersion),
@@ -338,6 +346,26 @@ export function AddApplicationModal({
                     <option value="face-to-face">Face-to-face</option>
                     <option value="HireVue">HireVue</option>
                     <option value="other">Other</option>
+                  </select>
+                </Field>
+
+                <Field label="Interview Mode">
+                  <select
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm(
+                        "interviewMode",
+                        event.target
+                          .value as AddApplicationFormState["interviewMode"],
+                      )
+                    }
+                    value={form.interviewMode}
+                  >
+                    <option value="other">Other</option>
+                    <option value="phone">Phone</option>
+                    <option value="video">Video</option>
+                    <option value="onsite">Onsite</option>
+                    <option value="take-home">Take-home</option>
                   </select>
                 </Field>
               </>
@@ -537,6 +565,33 @@ export function AddApplicationModal({
                 <option value="72_hours">72 hours</option>
               </select>
             </Field>
+
+            {form.status === "Interviewing" ? (
+              <>
+                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
+                  <input
+                    checked={form.interviewProctored}
+                    className="h-4 w-4 rounded border-border text-primary"
+                    onChange={(event) =>
+                      updateForm("interviewProctored", event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span>Proctored assessment</span>
+                </label>
+
+                <Field label="Assessment Deadline">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewDeadline", event.target.value)
+                    }
+                    type="datetime-local"
+                    value={form.interviewDeadline}
+                  />
+                </Field>
+              </>
+            ) : null}
 
             <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground md:col-span-2">
               <input

@@ -8,6 +8,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import { deriveApplicationNotifications } from "../../lib/reminders";
 
 export type FollowUpFilter = "" | "needed" | "optional";
 export type InterviewFilter = "" | "scheduled" | "unscheduled";
@@ -287,30 +288,7 @@ export function isNeedsAttention(
   settings: UserSettings,
   now = new Date(),
 ) {
-  const today = startOfDay(now);
-  const dueSoon = addDays(today, settings.dueSoonDays);
-
-  if (application.followUpNeeded) {
-    return true;
-  }
-
-  if (application.followUpDate) {
-    const followUpDate = startOfDay(new Date(application.followUpDate));
-
-    if (followUpDate <= dueSoon) {
-      return true;
-    }
-  }
-
-  if (settings.includeUpcomingInterviewsInAttention && application.interviewDateTime) {
-    const interviewDate = new Date(application.interviewDateTime);
-
-    if (interviewDate >= now && interviewDate <= addDays(now, settings.dueSoonDays)) {
-      return true;
-    }
-  }
-
-  return false;
+  return deriveApplicationNotifications(application, settings, now).length > 0;
 }
 
 export function sortApplications(

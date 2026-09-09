@@ -18,6 +18,7 @@ import {
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
+import { deriveApplicationNotifications } from "../../lib/reminders";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
@@ -39,6 +40,8 @@ interface ApplicationsPageProps {
   deleteApplication: (id: string) => void;
   deleteContact: (id: string) => void;
   enableDeleteActiveApplications: boolean;
+  openApplicationId?: string | null;
+  onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
   resumes: ResumeMetadata[];
   settings: UserSettings;
@@ -64,6 +67,8 @@ export function ApplicationsPage({
   deleteApplication,
   deleteContact,
   enableDeleteActiveApplications,
+  openApplicationId,
+  onOpenApplicationHandled,
   restoreApplication,
   resumes,
   settings,
@@ -119,7 +124,8 @@ export function ApplicationsPage({
     : filteredApplications;
   const visibleApplications = sortApplications(focusedApplications, sort);
   const attentionCount = baseApplications.filter(
-    (application) => application.followUpNeeded || application.interviewDateTime,
+    (application) =>
+      deriveApplicationNotifications(application, settings).length > 0,
   ).length;
   const interviewCount = baseApplications.filter(
     (application) => application.interviewDateTime,
@@ -138,6 +144,15 @@ export function ApplicationsPage({
       ),
     [applications, contactsApplicationId],
   );
+
+  useEffect(() => {
+    if (!openApplicationId) {
+      return;
+    }
+
+    setSelectedApplicationId(openApplicationId);
+    onOpenApplicationHandled?.();
+  }, [openApplicationId, onOpenApplicationHandled]);
 
   useEffect(() => {
     if (!settings.rememberTableState) {
@@ -241,6 +256,7 @@ export function ApplicationsPage({
         onColumnWidthsChange={setColumnWidths}
         onRestoreApplication={restoreApplication}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
+        onUpdateApplication={updateApplication}
         resumes={resumes}
         sort={sort}
         visibleApplicationColumns={settings.visibleApplicationColumns}

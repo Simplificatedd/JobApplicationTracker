@@ -24,6 +24,7 @@ import {
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
@@ -40,6 +41,7 @@ interface ApplicationsTableProps {
   onColumnWidthsChange: (widths: ApplicationColumnWidths) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
+  onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
   sort: SortState;
   visibleApplicationColumns: string[];
@@ -333,6 +335,7 @@ export function ApplicationsTable({
   onColumnWidthsChange,
   onRestoreApplication,
   onSortChange,
+  onUpdateApplication,
   resumes,
   sort,
   visibleApplicationColumns,
@@ -543,6 +546,7 @@ export function ApplicationsTable({
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
+                onUpdateApplication={onUpdateApplication}
                 visibleColumnIds={visibleColumnIds}
                 resume={
                   application.resumeId
@@ -685,6 +689,7 @@ export function ApplicationsTable({
                     onOpenApplication={onOpenApplication}
                     onOpenContacts={onOpenContacts}
                     onRestoreApplication={onRestoreApplication}
+                    onUpdateApplication={onUpdateApplication}
                     visibleColumnIds={visibleColumnIds}
                     resume={
                       application.resumeId
@@ -800,6 +805,7 @@ function ApplicationRow({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
+  onUpdateApplication,
   resume,
   visibleColumnIds,
 }: {
@@ -810,6 +816,7 @@ function ApplicationRow({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
@@ -852,6 +859,7 @@ function ApplicationRow({
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
+                onUpdateApplication={onUpdateApplication}
                 resume={resume}
               />
             </div>
@@ -913,6 +921,7 @@ function ApplicationColumnCell({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
+  onUpdateApplication,
   resume,
 }: {
   application: JobApplication;
@@ -923,6 +932,7 @@ function ApplicationColumnCell({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
 }) {
   if (columnId === "jobTitle") {
@@ -1057,6 +1067,7 @@ function ApplicationColumnCell({
       onArchiveApplication={onArchiveApplication}
       onDeleteApplication={onDeleteApplication}
       onRestoreApplication={onRestoreApplication}
+      onUpdateApplication={onUpdateApplication}
     />
   );
 }
@@ -1069,6 +1080,7 @@ function ApplicationCard({
   onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
+  onUpdateApplication,
   resume,
   visibleColumnIds,
 }: {
@@ -1079,6 +1091,7 @@ function ApplicationCard({
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
+  onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
 }) {
@@ -1132,6 +1145,7 @@ function ApplicationCard({
           onArchiveApplication={onArchiveApplication}
           onDeleteApplication={onDeleteApplication}
           onRestoreApplication={onRestoreApplication}
+          onUpdateApplication={onUpdateApplication}
         />
       </div>
 
@@ -1160,6 +1174,7 @@ function ApplicationCard({
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
+                onUpdateApplication={onUpdateApplication}
                 resume={resume}
               />
             </CardField>
