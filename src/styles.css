@@ -152,7 +152,4 @@
     line-height: 1.25rem;
   }
 
-  .field-control::placeholder {
-    color: var(--color-muted);
-  }
 }

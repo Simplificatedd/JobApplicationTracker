@@ -183,7 +183,7 @@ export function ApplicationDetailPanel({
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted">
-              {application.company || "Company blank"}
+              {application.company || "No company listed"}
             </p>
             <h2
               className="mt-1 truncate text-xl font-semibold text-foreground"
@@ -335,7 +335,7 @@ function ReadOnlyDetails({
         <DetailRow
           label="Interview"
           value={`${application.interviewRound ? `Round ${application.interviewRound} / ` : ""}${formatDateTime(application.interviewDateTime)} / ${
-            application.interviewType ?? "Type blank"
+            application.interviewType ?? "No type selected"
           }`}
         />
         <DetailRow
@@ -402,7 +402,7 @@ function ReadOnlyDetails({
                 <p className="mt-1 text-sm text-muted">
                   {[contact.role, contact.email, contact.phone]
                     .filter(Boolean)
-                    .join(" / ") || "Contact details blank"}
+                    .join(" / ") || "No contact details listed"}
                 </p>
                 {contact.notes ? (
                   <p className="mt-2 text-sm text-foreground">{contact.notes}</p>
@@ -580,7 +580,6 @@ function EditForm({
               onChange={(event) =>
                 updateDraft("resumeUploadName", event.target.value)
               }
-              placeholder="Display name"
               type="text"
               value={draft.resumeUploadName}
             />
@@ -589,7 +588,6 @@ function EditForm({
               onChange={(event) =>
                 updateDraft("resumeUploadVersion", event.target.value)
               }
-              placeholder="Version label"
               type="text"
               value={draft.resumeUploadVersion}
             />
@@ -818,7 +816,7 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value || "Blank"}</p>
+      <p className="mt-1 text-sm text-foreground">{value || "Not provided"}</p>
     </div>
   );
 }
@@ -828,7 +826,7 @@ function TextBlock({ label, value }: { label: string; value?: string }) {
     <section>
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
       <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm leading-6 text-foreground">
-        {value || "Blank"}
+        {value || "Not provided"}
       </p>
     </section>
   );

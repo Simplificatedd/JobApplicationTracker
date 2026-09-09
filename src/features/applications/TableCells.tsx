@@ -70,7 +70,7 @@ export function InterviewCell({
           {formatDateTime(application.interviewDateTime)}
         </p>
         <p className="mt-1 truncate text-xs text-muted">
-          {application.interviewType ?? "Type blank"}
+          {application.interviewType ?? "No type selected"}
         </p>
       </div>
     </div>

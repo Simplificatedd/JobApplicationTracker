@@ -354,7 +354,7 @@ function ContactCard({
           </p>
           <p className="mt-1 text-sm text-muted">
             {[contact.role, contact.email, contact.phone].filter(Boolean).join(" / ") ||
-              "Contact details blank"}
+              "No contact details listed"}
           </p>
           {contact.linkedInUrl ? (
             <a

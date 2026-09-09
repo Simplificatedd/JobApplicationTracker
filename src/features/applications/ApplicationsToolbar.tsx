@@ -103,9 +103,8 @@ export function ApplicationsToolbar({
           />
           <span className="sr-only">Search applications</span>
           <input
-            className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
+            className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground"
             onChange={(event) => onSearchQueryChange?.(event.target.value)}
-            placeholder="Search jobs or descriptions"
             type="search"
             value={searchQuery}
           />
@@ -557,7 +556,7 @@ function MoreFiltersModal({
           >
             <option value="">Deadline</option>
             <option value="scheduled">Scheduled</option>
-            <option value="blank">Blank</option>
+            <option value="blank">Empty</option>
             <option value="overdue">Overdue</option>
             <option value="upcoming">Next 7 days</option>
           </FilterSelect>
@@ -884,7 +883,7 @@ function PresenceFilterSelect({
     >
       <option value="">{label}</option>
       <option value="filled">Has value</option>
-      <option value="blank">Blank</option>
+      <option value="blank">Empty</option>
     </FilterSelect>
   );
 }

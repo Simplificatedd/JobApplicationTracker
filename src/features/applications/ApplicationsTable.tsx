@@ -1135,7 +1135,7 @@ function ApplicationCard({
           </p>
           {isColumnVisible("company") ? (
             <p className="mt-1 truncate text-xs font-medium text-muted">
-              {application.company || "Company blank"}
+              {application.company || "No company listed"}
             </p>
           ) : null}
         </div>
@@ -1220,7 +1220,7 @@ function CardField({
 function TextCell({ value }: { value?: string | number }) {
   return (
     <p className="truncate text-sm text-foreground">
-      {value === undefined || value === "" ? "Blank" : value}
+      {value === undefined || value === "" ? "Not provided" : value}
     </p>
   );
 }
@@ -1228,7 +1228,7 @@ function TextCell({ value }: { value?: string | number }) {
 function LongTextCell({ value }: { value?: string }) {
   return (
     <p className="line-clamp-2 text-sm leading-5 text-foreground">
-      {value || "Blank"}
+      {value || "Not provided"}
     </p>
   );
 }

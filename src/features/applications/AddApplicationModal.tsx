@@ -443,7 +443,6 @@ export function AddApplicationModal({
                     onChange={(event) =>
                       updateForm("resumeUploadName", event.target.value)
                     }
-                    placeholder="Display name"
                     type="text"
                     value={form.resumeUploadName}
                   />
@@ -452,7 +451,6 @@ export function AddApplicationModal({
                     onChange={(event) =>
                       updateForm("resumeUploadVersion", event.target.value)
                     }
-                    placeholder="Version label"
                     type="text"
                     value={form.resumeUploadVersion}
                   />
@@ -612,7 +610,6 @@ export function AddApplicationModal({
                 onChange={(event) =>
                   updateForm("followUpPromptDays", event.target.value)
                 }
-                placeholder={String(defaultFollowUpPromptDays)}
                 type="number"
                 value={form.followUpPromptDays}
               />
