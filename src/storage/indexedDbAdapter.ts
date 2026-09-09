@@ -27,7 +27,7 @@ import type {
 } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 2;
+export const TRACKER_DB_VERSION = 3;
 
 type StoreName =
   | "activities"
@@ -512,7 +512,7 @@ function openDatabase() {
     };
 
     request.onupgradeneeded = (event) => {
-      upgradeDatabase(request.result, event.oldVersion);
+      upgradeDatabase(request.result, event.oldVersion, request.transaction);
     };
 
     request.onsuccess = () => {
@@ -527,7 +527,11 @@ function openDatabase() {
   });
 }
 
-function upgradeDatabase(database: IDBDatabase, oldVersion: number) {
+function upgradeDatabase(
+  database: IDBDatabase,
+  oldVersion: number,
+  transaction: IDBTransaction | null,
+) {
   if (!database.objectStoreNames.contains("applications")) {
     const store = database.createObjectStore("applications", { keyPath: "id" });
     store.createIndex("status", "status", { unique: false });
@@ -577,14 +581,57 @@ function upgradeDatabase(database: IDBDatabase, oldVersion: number) {
     database.createObjectStore("analyticsSettings", { keyPath: "key" });
   }
 
-  runMigrations(database, oldVersion);
+  runMigrations(database, oldVersion, transaction);
 }
 
-function runMigrations(database: IDBDatabase, oldVersion: number) {
-  void database;
+function runMigrations(
+  database: IDBDatabase,
+  oldVersion: number,
+  transaction: IDBTransaction | null,
+) {
+  if (oldVersion < 3 && transaction) {
+    removeSeededDemoData(database, transaction);
+  }
+}
 
-  if (oldVersion < TRACKER_DB_VERSION) {
-    // Future schema migrations should be additive and guarded by oldVersion.
+function removeSeededDemoData(
+  database: IDBDatabase,
+  transaction: IDBTransaction,
+) {
+  const recordIdsByStore: Partial<Record<StoreName, string[]>> = {
+    activities: ["activity-01", "activity-02", "activity-03", "activity-04"],
+    applications: ["app-01", "app-02", "app-03", "app-04", "app-05", "app-06"],
+    contacts: [
+      "contact-01",
+      "contact-02",
+      "contact-03",
+      "contact-04",
+      "contact-05",
+      "contact-06",
+      "contact-07",
+    ],
+    interviews: ["interview-01", "interview-02", "interview-03"],
+    resumeFiles: ["resume-file-frontend", "resume-file-product"],
+    resumeMetadata: ["resume-frontend", "resume-product"],
+  };
+
+  Object.entries(recordIdsByStore).forEach(([storeName, ids]) => {
+    if (!database.objectStoreNames.contains(storeName)) {
+      return;
+    }
+
+    const store = transaction.objectStore(storeName);
+    ids.forEach((id) => store.delete(id));
+  });
+
+  if (database.objectStoreNames.contains("settings")) {
+    transaction.objectStore("settings").put({
+      key: STORAGE_META_KEY,
+      value: {
+        schemaVersion: TRACKER_DB_VERSION,
+        seededAt: new Date().toISOString(),
+      } satisfies StorageMeta,
+    });
   }
 }
 

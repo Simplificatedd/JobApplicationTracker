@@ -152,6 +152,7 @@ export function ResumesPage({
             <input
               className="field-control"
               onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="Defaults to filename"
               type="text"
               value={displayName}
             />
@@ -160,6 +161,7 @@ export function ResumesPage({
             <input
               className="field-control"
               onChange={(event) => setVersionLabel(event.target.value)}
+              placeholder="Frontend, data, product"
               type="text"
               value={versionLabel}
             />
@@ -293,6 +295,7 @@ function ResumeRow({
                   versionLabel: event.target.value,
                 }))
               }
+              placeholder="Version label"
               value={draft.versionLabel}
             />
           </div>
@@ -318,6 +321,7 @@ function ResumeRow({
                   notes: event.target.value,
                 }))
               }
+              placeholder="Notes"
               value={draft.notes}
             />
           </div>

@@ -14,7 +14,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-SG", {
 
 export function formatDate(value?: string) {
   if (!value) {
-    return "Not set";
+    return "Blank";
   }
 
   return dateFormatter.format(new Date(value));
