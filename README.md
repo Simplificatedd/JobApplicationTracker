@@ -46,26 +46,30 @@ backup.
 
 ## Run Locally
 
+Use the Node.js version recorded in `.nvmrc` (Node 22). With `nvm` installed:
+
 ```bash
-npm install
+nvm use
+npm ci
 npm run dev
 ```
 
-For a production build:
+Run the same verification gate used by CI before committing or deploying:
 
 ```bash
-npm run build
+npm run check
 ```
 
-The build output is written to `dist/`.
+This runs TypeScript checks, linting, unit tests, and a production build. The
+build output is written to `dist/`.
 
 ## Fork Setup
 
 1. Fork the repository.
 2. Clone your fork.
-3. Run `npm install`.
+3. Run `nvm use` and `npm ci`.
 4. Run `npm run dev` for local development.
-5. Run `npm run build` before publishing changes.
+5. Run `npm run check` before publishing changes.
 
 Do not commit real resume files, personal backups, or private deployment
 configuration.
@@ -92,11 +96,18 @@ the Pages project.
 4. Test in a private window before adding real tracker data.
 
 Cloudflare Access protects access to the static app. It does not change the V1
-local-first storage model.
+local-first storage model. Each browser profile still has its own independent
+data, so using the same deployment from another device will not show the first
+device's records.
+
+For a single-user deployment, allow only the owner's identity. Each student who
+wants an independent deployment should create their own fork, Pages project,
+and Access policy rather than sharing one deployment.
 
 ## V2 Roadmap
 
 V2 is intentionally not implemented here. The expected direction is optional
 Cloudflare-backed sync using D1 for structured records and R2 for resume files,
-with explicit migration/import flows from V1 backups. Until that exists, V1
-remains browser-local and backup-driven.
+with server-side authorization that scopes every record and file to the signed-in
+owner, plus explicit migration/import flows from V1 backups. Until that exists,
+V1 remains browser-local and backup-driven.
