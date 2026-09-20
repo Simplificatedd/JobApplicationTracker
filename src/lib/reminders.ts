@@ -18,7 +18,6 @@ export interface ReminderNotification {
   type: NotificationType;
 }
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const FINAL_STATUSES = new Set(["Offered", "Rejected", "Withdrawn"]);
 
 export function calculateFollowUpDueDate(

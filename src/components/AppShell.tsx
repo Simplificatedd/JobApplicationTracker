@@ -165,7 +165,7 @@ export function AppShell({
             className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
             style={sideNavigationStyle}
           >
-            <NavigationBrand enableNotificationBell={enableNotificationBell} />
+            <NavigationBrand />
             <MobileNotificationSlot
               enableNotificationBell={enableNotificationBell}
               groupedNotifications={groupedNotifications}
@@ -288,11 +288,7 @@ export function AppShell({
   );
 }
 
-function NavigationBrand({
-  enableNotificationBell,
-}: {
-  enableNotificationBell: boolean;
-}) {
+function NavigationBrand() {
   return (
     <div className="flex items-center justify-between gap-3 pl-12 xl:block">
       <div className="min-w-0">

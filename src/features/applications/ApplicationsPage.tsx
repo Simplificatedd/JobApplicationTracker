@@ -167,6 +167,9 @@ export function ApplicationsPage({
       sort,
       visibleApplicationColumns: settings.visibleApplicationColumns,
     });
+    // The store currently returns mutation functions by value. Including this
+    // callback would re-run the persistence effect after every store render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     columnWidths,
     filters,

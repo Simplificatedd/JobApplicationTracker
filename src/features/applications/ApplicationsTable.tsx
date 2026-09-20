@@ -23,7 +23,7 @@ import {
   RowActionsMenu,
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
-import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import { formatDate, formatUpdatedAt } from "../../lib/format";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
 
@@ -387,6 +387,9 @@ export function ApplicationsTable({
         tableViewportWidth,
       ),
     );
+    // Width changes should only be recalculated when the viewport or visible
+    // column set changes, not after this effect writes the next widths.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableViewportWidth, visibleColumnKey]);
 
   function resizeColumnPair(
@@ -856,7 +859,6 @@ function ApplicationRow({
                 enableDeleteActiveApplications={enableDeleteActiveApplications}
                 onArchiveApplication={onArchiveApplication}
                 onDeleteApplication={onDeleteApplication}
-                onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
@@ -918,7 +920,6 @@ function ApplicationColumnCell({
   enableDeleteActiveApplications,
   onArchiveApplication,
   onDeleteApplication,
-  onOpenApplication,
   onOpenContacts,
   onRestoreApplication,
   onUpdateApplication,
@@ -929,7 +930,6 @@ function ApplicationColumnCell({
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
-  onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
@@ -1171,7 +1171,6 @@ function ApplicationCard({
                 enableDeleteActiveApplications={enableDeleteActiveApplications}
                 onArchiveApplication={onArchiveApplication}
                 onDeleteApplication={onDeleteApplication}
-                onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}

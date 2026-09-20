@@ -213,6 +213,9 @@ export function useTrackerStore(): TrackerStore {
         indexedDbStorageAdapter.appendActivity(activity),
       ),
     ]);
+    // persistAll is defined by this store render; including it would retrigger
+    // the transition scan even when the underlying application data is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applications,
     isStorageLoading,
