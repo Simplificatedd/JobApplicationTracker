@@ -35,7 +35,18 @@ describe("calculateFollowUpDueDate", () => {
     ).toBe("2026-09-12");
   });
 
-  it.todo("derives a follow-up date from the application date without timezone drift");
+  it("derives a follow-up date from the application date without timezone drift", () => {
+    expect(calculateFollowUpDueDate(baseApplication, 7)).toBe("2026-09-08");
+  });
+
+  it("rejects an invalid application date", () => {
+    expect(
+      calculateFollowUpDueDate(
+        { ...baseApplication, dateApplied: "2026-02-31" },
+        7,
+      ),
+    ).toBeUndefined();
+  });
 });
 
 describe("classifyReminderSeverity", () => {

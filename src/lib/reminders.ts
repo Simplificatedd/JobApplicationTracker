@@ -290,15 +290,41 @@ function buildNotificationId(
 }
 
 function addDaysToDateStamp(value: string, days: number) {
-  const baseDate = new Date(value);
+  const dateStampMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const baseDate = dateStampMatch
+    ? new Date(
+        Date.UTC(
+          Number(dateStampMatch[1]),
+          Number(dateStampMatch[2]) - 1,
+          Number(dateStampMatch[3]),
+        ),
+      )
+    : new Date(value);
 
   if (Number.isNaN(baseDate.getTime())) {
     return undefined;
   }
 
-  const next = addDays(startOfDay(baseDate), days);
+  if (dateStampMatch) {
+    const isValidDateStamp =
+      baseDate.getUTCFullYear() === Number(dateStampMatch[1]) &&
+      baseDate.getUTCMonth() === Number(dateStampMatch[2]) - 1 &&
+      baseDate.getUTCDate() === Number(dateStampMatch[3]);
 
-  return next.toISOString().slice(0, 10);
+    if (!isValidDateStamp) {
+      return undefined;
+    }
+
+    baseDate.setUTCDate(baseDate.getUTCDate() + days);
+    return baseDate.toISOString().slice(0, 10);
+  }
+
+  const localDate = new Date(
+    Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()),
+  );
+  localDate.setUTCDate(localDate.getUTCDate() + days);
+
+  return localDate.toISOString().slice(0, 10);
 }
 
 function addDays(date: Date, days: number) {
