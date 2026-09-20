@@ -3,13 +3,6 @@ import {
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
 } from "../lib/domain";
-import {
-  mockActivities,
-  mockApplications,
-  mockContacts,
-  mockInterviews,
-  mockResumes,
-} from "../lib/mockData";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -638,24 +631,12 @@ function removeSeededDemoData(
 async function seedInitialData(database: IDBDatabase) {
   const transaction = database.transaction(
     [
-      "activities",
       "analyticsSettings",
-      "applications",
-      "contacts",
-      "interviews",
       "notificationState",
-      "resumeMetadata",
-      "resumeFiles",
       "settings",
     ],
     "readwrite",
   );
-
-  putMany(transaction.objectStore("activities"), mockActivities);
-  putMany(transaction.objectStore("applications"), mockApplications);
-  putMany(transaction.objectStore("contacts"), mockContacts);
-  putMany(transaction.objectStore("interviews"), mockInterviews);
-  putMany(transaction.objectStore("resumeMetadata"), mockResumes);
 
   transaction.objectStore("settings").put({
     key: SETTINGS_KEY,
