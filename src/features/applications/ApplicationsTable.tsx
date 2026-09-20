@@ -24,6 +24,7 @@ import {
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
+import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
 
@@ -1233,14 +1234,20 @@ function LongTextCell({ value }: { value?: string }) {
 }
 
 function UrlCell({ value }: { value?: string }) {
+  const safeUrl = getSafeHttpUrl(value);
+
   if (!value) {
     return <TextCell value={undefined} />;
+  }
+
+  if (!safeUrl) {
+    return <TextCell value={value} />;
   }
 
   return (
     <a
       className="block truncate text-sm font-medium text-primary hover:text-blue-700"
-      href={value}
+      href={safeUrl}
       rel="noreferrer"
       target="_blank"
     >

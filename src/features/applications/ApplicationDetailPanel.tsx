@@ -13,6 +13,7 @@ import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import { getSafeHttpUrl } from "../../lib/urls";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -262,6 +263,8 @@ function ReadOnlyDetails({
   onUpdate: (id: string, input: ApplicationUpdate) => void;
   resume?: ResumeMetadata;
 }) {
+  const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
+
   function changeFollowUpDate() {
     const nextDate = window.prompt(
       "Set follow-up date (YYYY-MM-DD)",
@@ -371,10 +374,10 @@ function ReadOnlyDetails({
         </section>
       ) : null}
 
-      {application.applicationUrl ? (
+      {safeApplicationUrl ? (
         <a
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700"
-          href={application.applicationUrl}
+          href={safeApplicationUrl}
           rel="noreferrer"
           target="_blank"
         >
