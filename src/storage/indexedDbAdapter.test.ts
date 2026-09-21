@@ -135,6 +135,37 @@ describe("indexedDbStorageAdapter", () => {
     );
   });
 
+  it("ignores empty write lists when their stores are outside the transaction", async () => {
+    const adapter = createTestStorageAdapter();
+
+    await adapter.initialize();
+    await expect(
+      adapter.commitMutation({
+        activities: [],
+        applications: [application],
+        contacts: [],
+        interviews: [],
+      }),
+    ).resolves.toBeUndefined();
+    await expect(adapter.listApplications()).resolves.toEqual([application]);
+  });
+
+  it("ignores empty delete lists when their stores are outside the transaction", async () => {
+    const adapter = createTestStorageAdapter();
+
+    await adapter.initialize();
+    await adapter.commitMutation({ resumes: [resume] });
+    await expect(
+      adapter.commitMutation({
+        applications: [],
+        deleteContactIds: [],
+        deleteInterviewIds: [],
+        deleteResumeIds: [resume.id],
+      }),
+    ).resolves.toBeUndefined();
+    await expect(adapter.listResumeMetadata()).resolves.toEqual([]);
+  });
+
   it("rolls back partial writes and permits a retry after an injected failure", async () => {
     let failContactWrite = true;
     const adapter = createTestStorageAdapter({

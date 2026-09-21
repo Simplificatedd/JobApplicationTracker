@@ -143,7 +143,7 @@ export function createIndexedDbStorageAdapter(
     storeName: StoreName,
     records?: readonly T[],
   ) {
-    if (!records) {
+    if (!records?.length) {
       return;
     }
 
@@ -160,7 +160,7 @@ export function createIndexedDbStorageAdapter(
     storeName: StoreName,
     keys?: readonly string[],
   ) {
-    if (!keys) {
+    if (!keys?.length) {
       return;
     }
 
