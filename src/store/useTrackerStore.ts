@@ -35,7 +35,11 @@ import {
   type ResumeUploadResult,
   updateResumeMetadata,
 } from "../lib/resumeFiles";
-import { buildInterviewRecord, upsertInterviewHistory } from "../lib/interviews";
+import {
+  buildInterviewRecord,
+  reconcileCanonicalInterviews,
+  upsertInterviewHistory,
+} from "../lib/interviews";
 import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
 import type {
   ResumeBlobRecord,
@@ -156,7 +160,26 @@ export function useTrackerStore(): TrackerStore {
 
     indexedDbStorageAdapter
       .initialize()
-      .then((snapshot) => {
+      .then(async (snapshot) => {
+        if (!isActive) {
+          return;
+        }
+
+        const interviewReconciliation = reconcileCanonicalInterviews(
+          snapshot.applications,
+          snapshot.interviews,
+        );
+
+        if (
+          interviewReconciliation.applicationWrites.length > 0 ||
+          interviewReconciliation.interviewWrites.length > 0
+        ) {
+          await indexedDbStorageAdapter.commitMutation({
+            applications: interviewReconciliation.applicationWrites,
+            interviews: interviewReconciliation.interviewWrites,
+          });
+        }
+
         if (!isActive) {
           return;
         }
@@ -164,10 +187,13 @@ export function useTrackerStore(): TrackerStore {
         setActivities(sortActivities(snapshot.activities));
         setAnalyticsSettings(snapshot.analyticsSettings);
         setApplications(
-          withContactCounts(snapshot.applications, snapshot.contacts),
+          withContactCounts(
+            interviewReconciliation.applications,
+            snapshot.contacts,
+          ),
         );
         setContacts(snapshot.contacts);
-        setInterviews(snapshot.interviews);
+        setInterviews(interviewReconciliation.interviews);
         setNotificationState(snapshot.notificationState);
         setResumes(snapshot.resumes);
         setSettings(snapshot.settings);
@@ -805,7 +831,15 @@ export function useTrackerStore(): TrackerStore {
       backup.snapshot.applications,
       backup.snapshot.contacts,
     );
-    const snapshot = { ...backup.snapshot, applications };
+    const interviewReconciliation = reconcileCanonicalInterviews(
+      applications,
+      backup.snapshot.interviews,
+    );
+    const snapshot = {
+      ...backup.snapshot,
+      applications: interviewReconciliation.applications,
+      interviews: interviewReconciliation.interviews,
+    };
     const resumeFiles: ResumeBlobRecord[] = backup.resumeFiles.map(
       (resumeFile) => ({
         file: base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),

@@ -64,6 +64,7 @@ export interface Application {
   followUpNeeded: boolean;
   followUpDate?: string;
   followUpPromptDays?: number;
+  // Denormalized current-interview projection. Interview records are canonical.
   interviewRound?: number;
   interviewDateTime?: string;
   interviewType?: InterviewType;
@@ -103,6 +104,7 @@ export interface Activity {
   createdAt: string;
 }
 
+// Canonical one-to-many interview history for an application.
 export interface Interview {
   id: string;
   applicationId: string;
