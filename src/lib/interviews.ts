@@ -102,7 +102,9 @@ export function reconcileCanonicalInterviews(
       );
     }
 
-    const currentInterview = selectCurrentInterview(applicationInterviews);
+    const currentInterview = selectCurrentInterview(applicationInterviews, {
+      round: application.interviewRound,
+    });
 
     if (!currentInterview) {
       return application;
@@ -129,12 +131,23 @@ export function reconcileCanonicalInterviews(
   };
 }
 
-export function selectCurrentInterview(interviews: Interview[]) {
-  return [...interviews].sort((left, right) => {
+export function selectCurrentInterview(
+  interviews: Interview[],
+  preferred?: { round?: number },
+) {
+  const sortedInterviews = [...interviews].sort((left, right) => {
     const roundDifference = (right.round ?? 0) - (left.round ?? 0);
 
     return roundDifference || right.updatedAt.localeCompare(left.updatedAt);
-  })[0];
+  });
+
+  return (
+    (preferred
+      ? sortedInterviews.find(
+          (interview) => interview.round === preferred.round,
+        )
+      : undefined) ?? sortedInterviews[0]
+  );
 }
 
 function interviewFromApplicationProjection(

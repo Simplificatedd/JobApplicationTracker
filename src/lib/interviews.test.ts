@@ -107,7 +107,7 @@ describe("reconcileCanonicalInterviews", () => {
     });
   });
 
-  it("projects the latest canonical round without changing application timestamps", () => {
+  it("projects the latest canonical round when no current round is stored", () => {
     const secondRound: Interview = {
       ...firstRound,
       id: "interview-2",
@@ -119,8 +119,10 @@ describe("reconcileCanonicalInterviews", () => {
     };
     const staleApplication = {
       ...application,
-      interviewRound: 1,
-      interviewMode: "video" as const,
+      status: "Offered" as const,
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
     };
     const result = reconcileCanonicalInterviews(
       [staleApplication],
@@ -136,6 +138,28 @@ describe("reconcileCanonicalInterviews", () => {
     });
     expect(result.applicationWrites).toEqual([result.applications[0]]);
     expect(result.interviews).toHaveLength(2);
+  });
+
+  it("keeps an explicitly selected earlier round current across refresh", () => {
+    const secondRound: Interview = {
+      ...firstRound,
+      id: "interview-2",
+      round: 2,
+      type: "face-to-face",
+      mode: "onsite",
+      updatedAt: "2026-09-21T00:00:00.000Z",
+    };
+    const result = reconcileCanonicalInterviews(
+      [application],
+      [firstRound, secondRound],
+    );
+
+    expect(result.applications[0]).toMatchObject({
+      interviewMode: firstRound.mode,
+      interviewRound: 1,
+      interviewType: firstRound.type,
+    });
+    expect(result.applicationWrites).toEqual([]);
   });
 
   it("preserves a newer application-only round when older history exists", () => {
@@ -206,5 +230,18 @@ describe("selectCurrentInterview", () => {
     expect(
       selectCurrentInterview([latestSecondRound, firstRound, olderSecondRound]),
     ).toBe(latestSecondRound);
+  });
+
+  it("uses the persisted round selection before the highest round", () => {
+    const secondRound = {
+      ...firstRound,
+      id: "interview-2",
+      round: 2,
+      updatedAt: "2026-09-21T00:00:00.000Z",
+    };
+
+    expect(
+      selectCurrentInterview([firstRound, secondRound], { round: 1 }),
+    ).toBe(firstRound);
   });
 });
