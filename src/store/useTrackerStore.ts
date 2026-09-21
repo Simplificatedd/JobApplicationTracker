@@ -35,6 +35,7 @@ import {
   type ResumeUploadResult,
   updateResumeMetadata,
 } from "../lib/resumeFiles";
+import { buildInterviewRecord, upsertInterviewHistory } from "../lib/interviews";
 import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
 import type { ResumeBlobRecord } from "../storage/StorageAdapter";
 
@@ -256,7 +257,7 @@ export function useTrackerStore(): TrackerStore {
       `Created application for ${application.jobTitle}.`,
       createdAt,
     );
-    const interview = toInterviewRecord(application, undefined, createdAt);
+    const interview = buildInterviewRecord(application, [], createdAt);
 
     setApplications((current) => [application, ...current]);
     setActivities((current) => sortActivities([createdActivity, ...current]));
@@ -333,29 +334,18 @@ export function useTrackerStore(): TrackerStore {
       ),
     );
 
-    if (hasInterviewChange(input)) {
-      const existingInterview = interviews.find(
-        (interview) => interview.applicationId === id,
-      );
-      const updatedInterview = toInterviewRecord(
+    if (shouldPersistInterviewUpdate(currentApplication, input)) {
+      const updatedInterview = buildInterviewRecord(
         updatedApplication,
-        existingInterview,
+        interviews,
         updatedAt,
       );
 
       if (updatedInterview) {
-        setInterviews((current) => [
-          updatedInterview,
-          ...current.filter((interview) => interview.applicationId !== id),
-        ]);
-        storageWrites.push(indexedDbStorageAdapter.saveInterview(updatedInterview));
-      } else if (existingInterview) {
         setInterviews((current) =>
-          current.filter((interview) => interview.applicationId !== id),
+          upsertInterviewHistory(current, updatedInterview),
         );
-        storageWrites.push(
-          indexedDbStorageAdapter.deleteInterview(existingInterview.id),
-        );
+        storageWrites.push(indexedDbStorageAdapter.saveInterview(updatedInterview));
       }
     }
 
@@ -904,31 +894,14 @@ function hasInterviewChange(input: ApplicationUpdate) {
   ].some((key) => key in input);
 }
 
-function toInterviewRecord(
+function shouldPersistInterviewUpdate(
   application: Application,
-  existing: Interview | undefined,
-  timestamp: string,
+  input: ApplicationUpdate,
 ) {
-  if (!application.interviewDateTime) {
-    return null;
-  }
-
-  return {
-    id: existing?.id ?? createId("interview"),
-    applicationId: application.id,
-    dateTime: application.interviewDateTime,
-    round: application.interviewRound,
-    type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "other",
-    location: application.interviewLocation,
-    meetingUrl: application.interviewMeetingUrl,
-    platform: application.interviewPlatform,
-    proctored: application.interviewProctored,
-    deadline: application.interviewDeadline,
-    notes: existing?.notes,
-    createdAt: existing?.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  } satisfies Interview;
+  return (
+    hasInterviewChange(input) ||
+    (input.status === "Interviewing" && application.status !== "Interviewing")
+  );
 }
 
 function getStorageErrorMessage(error: unknown) {

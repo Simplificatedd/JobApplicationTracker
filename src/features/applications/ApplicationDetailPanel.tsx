@@ -110,27 +110,19 @@ export function ApplicationDetailPanel({
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
-      interviewRound: isInterviewing
-        ? Number(draft.interviewRound) || undefined
-        : undefined,
-      interviewDateTime: isInterviewing
-        ? trimOptional(draft.interviewDateTime)
-        : undefined,
-      interviewType: isInterviewing ? draft.interviewType : undefined,
-      interviewMode: isInterviewing ? draft.interviewMode : undefined,
-      interviewLocation: isInterviewing
-        ? trimOptional(draft.interviewLocation)
-        : undefined,
-      interviewMeetingUrl: isInterviewing
-        ? trimOptional(draft.interviewMeetingUrl)
-        : undefined,
-      interviewPlatform: isInterviewing
-        ? trimOptional(draft.interviewPlatform)
-        : undefined,
-      interviewProctored: isInterviewing ? draft.interviewProctored : false,
-      interviewDeadline: isInterviewing
-        ? trimOptional(draft.interviewDeadline)
-        : undefined,
+      ...(isInterviewing
+        ? {
+            interviewRound: Number(draft.interviewRound) || undefined,
+            interviewDateTime: trimOptional(draft.interviewDateTime),
+            interviewType: draft.interviewType,
+            interviewMode: draft.interviewMode,
+            interviewLocation: trimOptional(draft.interviewLocation),
+            interviewMeetingUrl: trimOptional(draft.interviewMeetingUrl),
+            interviewPlatform: trimOptional(draft.interviewPlatform),
+            interviewProctored: draft.interviewProctored,
+            interviewDeadline: trimOptional(draft.interviewDeadline),
+          }
+        : {}),
       priority: draft.priority,
       resumeId,
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
