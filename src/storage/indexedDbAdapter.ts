@@ -49,12 +49,21 @@ const STORAGE_META_KEY = "storageMeta";
 const ANALYTICS_SETTINGS_KEY = "analyticsSettings";
 const NOTIFICATION_STATE_KEY = "notificationState";
 
-export function createIndexedDbStorageAdapter(): StorageAdapter {
+export interface IndexedDbStorageAdapterOptions {
+  databaseName?: string;
+  indexedDb?: IDBFactory;
+}
+
+export function createIndexedDbStorageAdapter(
+  options: IndexedDbStorageAdapterOptions = {},
+): StorageAdapter {
   let databasePromise: Promise<IDBDatabase> | null = null;
+  const databaseName = options.databaseName ?? TRACKER_DB_NAME;
+  const indexedDb = options.indexedDb ?? globalThis.indexedDB;
 
   function getDatabase() {
     if (!databasePromise) {
-      databasePromise = openDatabase();
+      databasePromise = openDatabase(databaseName, indexedDb);
     }
 
     return databasePromise;
@@ -480,14 +489,14 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
 
 export const indexedDbStorageAdapter = createIndexedDbStorageAdapter();
 
-function openDatabase() {
+function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    if (!("indexedDB" in window)) {
+    if (!indexedDb) {
       reject(new Error("IndexedDB is not available in this browser."));
       return;
     }
 
-    const request = indexedDB.open(TRACKER_DB_NAME, TRACKER_DB_VERSION);
+    const request = indexedDb.open(databaseName, TRACKER_DB_VERSION);
 
     request.onerror = () => {
       reject(
