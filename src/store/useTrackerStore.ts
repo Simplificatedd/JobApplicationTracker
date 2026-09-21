@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -40,6 +40,7 @@ import {
   reconcileCanonicalInterviews,
   upsertInterviewHistory,
 } from "../lib/interviews";
+import { createMutationQueue } from "../lib/mutationQueue";
 import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
 import type {
   ResumeBlobRecord,
@@ -151,6 +152,11 @@ export function useTrackerStore(): TrackerStore {
   const [storageRetryKey, setStorageRetryKey] = useState(0);
   const [tablePreferences, setTablePreferences] =
     useState<TablePreferences | null>(null);
+  const analyticsMutationQueue = useRef(createMutationQueue()).current;
+  const applicationMutationQueue = useRef(createMutationQueue()).current;
+  const notificationMutationQueue = useRef(createMutationQueue()).current;
+  const settingsMutationQueue = useRef(createMutationQueue()).current;
+  const tablePreferencesMutationQueue = useRef(createMutationQueue()).current;
 
   useEffect(() => {
     let isActive = true;
@@ -368,12 +374,18 @@ export function useTrackerStore(): TrackerStore {
     return success(application);
   }
 
-  function getMarkedResume(resumeId: string | undefined, timestamp: string) {
+  function getMarkedResume(
+    resumeId: string | undefined,
+    timestamp: string,
+    availableResumes = resumes,
+  ) {
     if (!resumeId) {
       return undefined;
     }
 
-    const currentResume = resumes.find((resume) => resume.id === resumeId);
+    const currentResume = availableResumes.find(
+      (resume) => resume.id === resumeId,
+    );
 
     if (!currentResume) {
       return undefined;
@@ -387,9 +399,29 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
   ): Promise<MutationResult> {
-    const currentApplication = applications.find(
-      (application) => application.id === id,
-    );
+    return applicationMutationQueue.run(async () => {
+      try {
+        return await updateApplicationNow(id, input, pendingResume);
+      } catch (error) {
+        const message = getStorageErrorMessage(error);
+
+        setStorageError(message);
+        return failure(message);
+      }
+    });
+  }
+
+  async function updateApplicationNow(
+    id: string,
+    input: ApplicationUpdate,
+    pendingResume?: PendingResumeUpload,
+  ): Promise<MutationResult> {
+    const [currentApplication, currentInterviews, currentResumes] =
+      await Promise.all([
+        indexedDbStorageAdapter.getApplication(id),
+        indexedDbStorageAdapter.listInterviews(id),
+        indexedDbStorageAdapter.listResumeMetadata(),
+      ]);
 
     if (!currentApplication) {
       return failure("Application could not be found.");
@@ -400,7 +432,7 @@ export function useTrackerStore(): TrackerStore {
     if (pendingResume) {
       try {
         resumeUpload = await createResumeUploadResult({
-          existingResumes: resumes,
+          existingResumes: currentResumes,
           file: pendingResume.file,
           options: pendingResume.options ?? {},
         });
@@ -428,12 +460,16 @@ export function useTrackerStore(): TrackerStore {
       currentApplication,
       input,
     )
-      ? buildInterviewRecord(updatedApplication, interviews, updatedAt)
+      ? buildInterviewRecord(updatedApplication, currentInterviews, updatedAt)
       : undefined;
     const markedResume = resumeUpload
       ? resumeUpload.resume
       : shouldMarkResumeUsed(currentApplication.resumeId, updatedApplication.resumeId)
-        ? getMarkedResume(updatedApplication.resumeId, updatedAt)
+        ? getMarkedResume(
+            updatedApplication.resumeId,
+            updatedAt,
+            currentResumes,
+          )
         : undefined;
     const result = await commitMutation({
       activities: newActivities,
@@ -865,77 +901,124 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function dismissNotification(id: string) {
-    const dismissedNotificationIds = Array.from(
-      new Set([...notificationState.dismissedNotificationIds, id]),
-    );
-    const updatedState = {
-      ...notificationState,
-      dismissedNotificationIds,
-    };
+    return notificationMutationQueue.run(async () => {
+      try {
+        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const dismissedNotificationIds = Array.from(
+          new Set([...currentState.dismissedNotificationIds, id]),
+        );
+        const updatedState = {
+          ...currentState,
+          dismissedNotificationIds,
+        };
 
-    return persistThenUpdate(
-      indexedDbStorageAdapter.saveNotificationState(updatedState),
-      () => setNotificationState(updatedState),
-    );
+        return persistThenUpdate(
+          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          () => setNotificationState(updatedState),
+        );
+      } catch (error) {
+        setStorageError(getStorageErrorMessage(error));
+        return false;
+      }
+    });
   }
 
   async function markNotificationsOpened() {
-    const updatedState = {
-      ...notificationState,
-      lastOpenedAt: createTimestamp(),
-    };
+    return notificationMutationQueue.run(async () => {
+      try {
+        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const updatedState = {
+          ...currentState,
+          lastOpenedAt: createTimestamp(),
+        };
 
-    return persistThenUpdate(
-      indexedDbStorageAdapter.saveNotificationState(updatedState),
-      () => setNotificationState(updatedState),
-    );
+        return persistThenUpdate(
+          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          () => setNotificationState(updatedState),
+        );
+      } catch (error) {
+        setStorageError(getStorageErrorMessage(error));
+        return false;
+      }
+    });
   }
 
   async function updateSettings(input: Partial<UserSettings>) {
-    const updatedSettings = {
-      ...settings,
-      ...input,
-    };
+    return settingsMutationQueue.run(async () => {
+      try {
+        const currentSettings = await indexedDbStorageAdapter.getSettings();
+        const updatedSettings = {
+          ...currentSettings,
+          ...input,
+        };
 
-    return persistThenUpdate(
-      indexedDbStorageAdapter.saveSettings(updatedSettings),
-      () => setSettings(updatedSettings),
-    );
+        return persistThenUpdate(
+          indexedDbStorageAdapter.saveSettings(updatedSettings),
+          () => setSettings(updatedSettings),
+        );
+      } catch (error) {
+        setStorageError(getStorageErrorMessage(error));
+        return false;
+      }
+    });
   }
 
   async function updateAnalyticsSettings(input: Partial<AnalyticsSettings>) {
-    const updatedSettings = {
-      ...analyticsSettings,
-      ...input,
-    };
+    return analyticsMutationQueue.run(async () => {
+      try {
+        const currentSettings =
+          await indexedDbStorageAdapter.getAnalyticsSettings();
+        const updatedSettings = {
+          ...currentSettings,
+          ...input,
+        };
 
-    return persistThenUpdate(
-      indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings),
-      () => setAnalyticsSettings(updatedSettings),
-    );
+        return persistThenUpdate(
+          indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          () => setAnalyticsSettings(updatedSettings),
+        );
+      } catch (error) {
+        setStorageError(getStorageErrorMessage(error));
+        return false;
+      }
+    });
   }
 
   async function resetSettings() {
-    return persistThenUpdate(indexedDbStorageAdapter.resetSettings(), () =>
-      setSettings(DEFAULT_USER_SETTINGS),
+    return settingsMutationQueue.run(() =>
+      persistThenUpdate(indexedDbStorageAdapter.resetSettings(), () =>
+        setSettings(DEFAULT_USER_SETTINGS),
+      ),
     );
   }
 
   async function updateTablePreferences(input: Partial<TablePreferences>) {
-    const updatedTablePreferences = {
-      ...tablePreferences,
-      ...input,
-    } as TablePreferences;
+    return tablePreferencesMutationQueue.run(async () => {
+      try {
+        const currentPreferences =
+          await indexedDbStorageAdapter.getTablePreferences();
+        const updatedTablePreferences = {
+          ...currentPreferences,
+          ...input,
+        } as TablePreferences;
 
-    return persistThenUpdate(
-      indexedDbStorageAdapter.saveTablePreferences(updatedTablePreferences),
-      () => setTablePreferences(updatedTablePreferences),
-    );
+        return persistThenUpdate(
+          indexedDbStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          () => setTablePreferences(updatedTablePreferences),
+        );
+      } catch (error) {
+        setStorageError(getStorageErrorMessage(error));
+        return false;
+      }
+    });
   }
 
   async function resetTablePreferences() {
-    return persistThenUpdate(indexedDbStorageAdapter.resetTablePreferences(), () =>
-      setTablePreferences(null),
+    return tablePreferencesMutationQueue.run(() =>
+      persistThenUpdate(
+        indexedDbStorageAdapter.resetTablePreferences(),
+        () => setTablePreferences(null),
+      ),
     );
   }
 
