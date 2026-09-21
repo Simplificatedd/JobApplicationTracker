@@ -119,8 +119,12 @@ export function updateResumeMetadata(
     downloadFileName: input.downloadFileName
       ? normalizeDownloadFileName(input.downloadFileName, resume.fileExtension)
       : resume.downloadFileName,
-    versionLabel: trimOptional(input.versionLabel ?? ""),
-    notes: trimOptional(input.notes ?? ""),
+    versionLabel: "versionLabel" in input
+      ? trimOptional(input.versionLabel)
+      : resume.versionLabel,
+    notes: "notes" in input
+      ? trimOptional(input.notes)
+      : resume.notes,
     updatedAt: createTimestamp(),
   } satisfies ResumeMetadata;
 }

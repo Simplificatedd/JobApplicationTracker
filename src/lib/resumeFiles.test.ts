@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { ResumeMetadata } from "../types/application";
 import {
   createResumeUploadResult,
   MAX_RESUME_FILE_BYTES,
+  updateResumeMetadata,
   validateResumeFile,
 } from "./resumeFiles";
 
@@ -59,5 +61,42 @@ describe("createResumeUploadResult", () => {
     });
 
     expect(result.resume.downloadFileName).toBe(".._private_resume.pdf");
+  });
+});
+
+describe("updateResumeMetadata", () => {
+  const resume: ResumeMetadata = {
+    id: "resume-1",
+    displayName: "Frontend resume",
+    originalFileName: "resume.pdf",
+    downloadFileName: "resume.pdf",
+    fileExtension: "pdf",
+    mimeType: "application/pdf",
+    fileSize: PDF_HEADER.length,
+    storageKey: "resume-file-1",
+    contentHash: "hash",
+    versionLabel: "Version 2",
+    notes: "Tailored for frontend roles",
+    uploadedAt: "2026-09-20T00:00:00.000Z",
+    updatedAt: "2026-09-20T00:00:00.000Z",
+  };
+
+  it("preserves optional metadata omitted from a partial update", () => {
+    expect(
+      updateResumeMetadata(resume, { displayName: "Updated resume" }),
+    ).toMatchObject({
+      displayName: "Updated resume",
+      notes: resume.notes,
+      versionLabel: resume.versionLabel,
+    });
+  });
+
+  it("clears optional metadata when blank values are explicit", () => {
+    expect(
+      updateResumeMetadata(resume, { notes: " ", versionLabel: "" }),
+    ).toMatchObject({
+      notes: undefined,
+      versionLabel: undefined,
+    });
   });
 });
