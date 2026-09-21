@@ -62,13 +62,44 @@ export function reconcileCanonicalInterviews(
     let applicationInterviews = nextInterviews.filter(
       (interview) => interview.applicationId === application.id,
     );
+    const projectedInterview = findInterviewRound(
+      applicationInterviews,
+      application.id,
+      application.interviewRound,
+    );
 
-    if (applicationInterviews.length === 0 && hasInterviewProjection(application)) {
+    if (
+      (!projectedInterview && hasExplicitInterviewProjection(application)) ||
+      (applicationInterviews.length === 0 && application.status === "Interviewing")
+    ) {
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
       interviewWrites.push(migratedInterview);
-      applicationInterviews = [migratedInterview];
+      applicationInterviews = [...applicationInterviews, migratedInterview];
+    } else if (
+      projectedInterview &&
+      application.updatedAt > projectedInterview.updatedAt &&
+      hasDifferentInterviewProjection(
+        application,
+        applyInterviewProjection(application, projectedInterview),
+      )
+    ) {
+      const reconciledInterview = interviewFromApplicationProjection(
+        application,
+        projectedInterview,
+      );
+      const interviewIndex = nextInterviews.findIndex(
+        (interview) => interview.id === reconciledInterview.id,
+      );
+
+      nextInterviews[interviewIndex] = reconciledInterview;
+      interviewWrites.push(reconciledInterview);
+      applicationInterviews = applicationInterviews.map((interview) =>
+        interview.id === reconciledInterview.id
+          ? reconciledInterview
+          : interview,
+      );
     }
 
     const currentInterview = selectCurrentInterview(applicationInterviews);
@@ -106,9 +137,12 @@ export function selectCurrentInterview(interviews: Interview[]) {
   })[0];
 }
 
-function interviewFromApplicationProjection(application: Application): Interview {
+function interviewFromApplicationProjection(
+  application: Application,
+  existing?: Interview,
+): Interview {
   return {
-    id: createId("interview"),
+    id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
@@ -119,7 +153,8 @@ function interviewFromApplicationProjection(application: Application): Interview
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
-    createdAt: application.updatedAt,
+    notes: existing?.notes,
+    createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,
   };
 }
@@ -142,10 +177,9 @@ function applyInterviewProjection(
   };
 }
 
-function hasInterviewProjection(application: Application) {
+function hasExplicitInterviewProjection(application: Application) {
   return Boolean(
-    application.status === "Interviewing" ||
-      application.interviewDateTime ||
+    application.interviewDateTime ||
       application.interviewRound ||
       application.interviewType ||
       application.interviewMode ||

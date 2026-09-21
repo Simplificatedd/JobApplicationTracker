@@ -137,6 +137,57 @@ describe("reconcileCanonicalInterviews", () => {
     expect(result.applicationWrites).toEqual([result.applications[0]]);
     expect(result.interviews).toHaveLength(2);
   });
+
+  it("preserves a newer application-only round when older history exists", () => {
+    const secondRoundApplication = {
+      ...application,
+      interviewDateTime: "2026-09-24T14:00",
+      interviewLocation: "Main office",
+      interviewRound: 2,
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    };
+    const result = reconcileCanonicalInterviews(
+      [secondRoundApplication],
+      [firstRound],
+    );
+
+    expect(result.interviews).toHaveLength(2);
+    expect(result.interviewWrites).toEqual([
+      expect.objectContaining({
+        dateTime: "2026-09-24T14:00",
+        location: "Main office",
+        round: 2,
+      }),
+    ]);
+    expect(result.applications[0]).toMatchObject({
+      interviewDateTime: "2026-09-24T14:00",
+      interviewRound: 2,
+    });
+  });
+
+  it("merges a newer application projection without losing interview notes", () => {
+    const newerApplication = {
+      ...application,
+      interviewDateTime: "2026-09-24T14:00",
+      interviewPlatform: "Teams",
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    };
+    const result = reconcileCanonicalInterviews(
+      [newerApplication],
+      [firstRound],
+    );
+
+    expect(result.interviewWrites).toEqual([
+      expect.objectContaining({
+        id: firstRound.id,
+        dateTime: "2026-09-24T14:00",
+        notes: firstRound.notes,
+        platform: "Teams",
+        updatedAt: newerApplication.updatedAt,
+      }),
+    ]);
+    expect(result.applicationWrites).toEqual([]);
+  });
 });
 
 describe("selectCurrentInterview", () => {
