@@ -13,14 +13,20 @@ import { useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
 import { formatFileSize, type ResumeUploadResult } from "../../lib/resumeFiles";
-import type { ResumeMetadataUpdate } from "../../store/useTrackerStore";
+import type {
+  MutationResult,
+  ResumeMetadataUpdate,
+} from "../../store/useTrackerStore";
 import type { Application, ResumeMetadata } from "../../types/application";
 
 interface ResumesPageProps {
   applications: Application[];
   getResumeFile: (id: string) => Promise<Blob>;
-  onDeleteResume: (id: string) => void;
-  onUpdateResume: (id: string, input: ResumeMetadataUpdate) => void;
+  onDeleteResume: (id: string) => Promise<MutationResult>;
+  onUpdateResume: (
+    id: string,
+    input: ResumeMetadataUpdate,
+  ) => Promise<MutationResult>;
   onUploadResume: (
     file: File,
     options?: ResumeMetadataUpdate,
@@ -244,10 +250,12 @@ function ResumeRow({
   onDelete: () => void;
   onDownload: () => void;
   onPreview: () => void;
-  onUpdate: (input: ResumeMetadataUpdate) => void;
+  onUpdate: (input: ResumeMetadataUpdate) => Promise<MutationResult>;
   resume: ResumeMetadata;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [draft, setDraft] = useState({
     displayName: resume.displayName,
     downloadFileName: resume.downloadFileName,
@@ -255,8 +263,17 @@ function ResumeRow({
     versionLabel: resume.versionLabel ?? "",
   });
 
-  function save() {
-    onUpdate(draft);
+  async function save() {
+    setIsSaving(true);
+    setSaveError("");
+    const result = await onUpdate(draft);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setSaveError(result.error);
+      return;
+    }
+
     setIsEditing(false);
   }
 
@@ -371,10 +388,10 @@ function ResumeRow({
         <div className="flex items-center gap-1">
           {isEditing ? (
             <>
-              <IconAction label="Save metadata" onClick={save}>
+              <IconAction disabled={isSaving} label="Save metadata" onClick={save}>
                 <Save aria-hidden="true" size={16} />
               </IconAction>
-              <IconAction label="Cancel edit" onClick={cancel}>
+              <IconAction disabled={isSaving} label="Cancel edit" onClick={cancel}>
                 <X aria-hidden="true" size={16} />
               </IconAction>
             </>
@@ -407,6 +424,11 @@ function ResumeRow({
             </>
           )}
         </div>
+        {saveError ? (
+          <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+            {saveError}
+          </p>
+        ) : null}
       </Td>
     </tr>
   );

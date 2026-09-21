@@ -65,7 +65,6 @@ export function App() {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onCreate={tracker.createApplication}
-        onUploadResume={tracker.uploadResume}
         resumes={tracker.resumes}
       />
     </AppShell>
@@ -142,7 +141,6 @@ function renderView(
         resumes={tracker.resumes}
         settings={tracker.settings}
         tablePreferences={tracker.tablePreferences}
-        uploadResume={tracker.uploadResume}
         viewMode={view === "archive" ? "archive" : "active"}
         resetTablePreferences={tracker.resetTablePreferences}
         updateContact={tracker.updateContact}

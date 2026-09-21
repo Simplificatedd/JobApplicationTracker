@@ -19,9 +19,12 @@ import {
 import { searchApplications } from "./applicationSearch";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { deriveApplicationNotifications } from "../../lib/reminders";
-import type { ApplicationUpdate } from "../../store/useTrackerStore";
-import type { ContactInput } from "../../store/useTrackerStore";
-import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
+import type {
+  ApplicationUpdate,
+  ContactInput,
+  MutationResult,
+  PendingResumeUpload,
+} from "../../store/useTrackerStore";
 import type {
   Activity,
   Application,
@@ -33,12 +36,12 @@ import type { TablePreferences } from "../../types/tablePreferences";
 
 interface ApplicationsPageProps {
   activities: Activity[];
-  addContact: (input: ContactInput) => ApplicationContact;
+  addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
   applications: Application[];
   archiveApplication: (id: string) => void;
   contacts: ApplicationContact[];
-  deleteApplication: (id: string) => void;
-  deleteContact: (id: string) => void;
+  deleteApplication: (id: string) => Promise<MutationResult>;
+  deleteContact: (id: string) => Promise<MutationResult>;
   enableDeleteActiveApplications: boolean;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
@@ -46,14 +49,17 @@ interface ApplicationsPageProps {
   resumes: ResumeMetadata[];
   settings: UserSettings;
   tablePreferences: TablePreferences | null;
-  uploadResume: (
-    file: File,
-    options?: ResumeUploadOptions,
-  ) => Promise<ResumeUploadResult>;
   viewMode?: "active" | "archive";
   resetTablePreferences: () => void;
-  updateContact: (id: string, input: Partial<ContactInput>) => void;
-  updateApplication: (id: string, input: ApplicationUpdate) => void;
+  updateContact: (
+    id: string,
+    input: Partial<ContactInput>,
+  ) => Promise<MutationResult>;
+  updateApplication: (
+    id: string,
+    input: ApplicationUpdate,
+    pendingResume?: PendingResumeUpload,
+  ) => Promise<MutationResult>;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updateTablePreferences: (preferences: Partial<TablePreferences>) => void;
 }
@@ -73,7 +79,6 @@ export function ApplicationsPage({
   resumes,
   settings,
   tablePreferences,
-  uploadResume,
   viewMode = "active",
   resetTablePreferences,
   updateContact,
@@ -248,9 +253,9 @@ export function ApplicationsPage({
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         onArchiveApplication={archiveApplication}
-        onDeleteApplication={(id) => {
-          deleteApplication(id);
-          if (id === selectedApplicationId) {
+        onDeleteApplication={async (id) => {
+          const result = await deleteApplication(id);
+          if (result.ok && id === selectedApplicationId) {
             setSelectedApplicationId(null);
           }
         }}
@@ -276,7 +281,6 @@ export function ApplicationsPage({
           )}
           onClose={() => setSelectedApplicationId(null)}
           onUpdate={updateApplication}
-          onUploadResume={uploadResume}
           resume={
             selectedApplication.resumeId
               ? resumes.find((resume) => resume.id === selectedApplication.resumeId)

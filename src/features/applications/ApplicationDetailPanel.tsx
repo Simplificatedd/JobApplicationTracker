@@ -16,8 +16,11 @@ import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import type { ApplicationUpdate } from "../../store/useTrackerStore";
-import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
+import type {
+  ApplicationUpdate,
+  MutationResult,
+  PendingResumeUpload,
+} from "../../store/useTrackerStore";
 import type {
   Activity,
   Application,
@@ -38,11 +41,11 @@ interface ApplicationDetailPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   onClose: () => void;
-  onUpdate: (id: string, input: ApplicationUpdate) => void;
-  onUploadResume: (
-    file: File,
-    options?: ResumeUploadOptions,
-  ) => Promise<ResumeUploadResult>;
+  onUpdate: (
+    id: string,
+    input: ApplicationUpdate,
+    pendingResume?: PendingResumeUpload,
+  ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
 }
@@ -53,7 +56,6 @@ export function ApplicationDetailPanel({
   contacts,
   onClose,
   onUpdate,
-  onUploadResume,
   resume,
   resumes,
 }: ApplicationDetailPanelProps) {
@@ -62,6 +64,7 @@ export function ApplicationDetailPanel({
   const [draft, setDraft] = useState(() => toDraft(application));
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
@@ -74,26 +77,9 @@ export function ApplicationDetailPanel({
 
   async function saveChanges() {
     const isInterviewing = draft.status === "Interviewing";
-    let resumeId = trimOptional(draft.resumeId);
-
     setResumeUploadError("");
-
-    if (resumeUploadFile) {
-      try {
-        const upload = await onUploadResume(resumeUploadFile, {
-          displayName: draft.resumeUploadName,
-          markAsUsed: true,
-          versionLabel: draft.resumeUploadVersion,
-        });
-
-        resumeId = upload.resume.id;
-      } catch (error) {
-        setResumeUploadError(getErrorMessage(error));
-        return;
-      }
-    }
-
-    onUpdate(application.id, {
+    setIsSaving(true);
+    const result = await onUpdate(application.id, {
       company: draft.company.trim(),
       jobTitle: draft.jobTitle.trim() || application.jobTitle,
       jobDescription: draft.jobDescription.trim(),
@@ -124,16 +110,36 @@ export function ApplicationDetailPanel({
           }
         : {}),
       priority: draft.priority,
-      resumeId,
+      resumeId: trimOptional(draft.resumeId),
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
       salary: trimOptional(draft.salary),
       notes: trimOptional(draft.notes),
-    });
+    }, resumeUploadFile
+      ? {
+          file: resumeUploadFile,
+          options: {
+            displayName: draft.resumeUploadName,
+            markAsUsed: true,
+            versionLabel: draft.resumeUploadVersion,
+          },
+        }
+      : undefined);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setResumeUploadError(result.error);
+      return;
+    }
+
     setResumeUploadFile(null);
     setIsEditing(false);
   }
 
   function cancelEditing() {
+    if (isSaving) {
+      return;
+    }
+
     setDraft(toDraft(application));
     setResumeUploadError("");
     setResumeUploadFile(null);
@@ -141,6 +147,10 @@ export function ApplicationDetailPanel({
   }
 
   function requestClose() {
+    if (isSaving) {
+      return;
+    }
+
     if (isEditing && (isDraftDirty(draft, application) || resumeUploadFile)) {
       setIsDiscardWarningOpen(true);
       return;
@@ -188,11 +198,23 @@ export function ApplicationDetailPanel({
           <div className="flex shrink-0 items-center gap-2">
             {isEditing ? (
               <>
-                <button className="icon-button" onClick={saveChanges} type="button">
+                <button
+                  className="icon-button"
+                  disabled={isSaving}
+                  onClick={saveChanges}
+                  type="button"
+                >
                   <Check aria-hidden="true" size={18} />
-                  <span className="sr-only">Save</span>
+                  <span className="sr-only">
+                    {isSaving ? "Saving" : "Save"}
+                  </span>
                 </button>
-                <button className="icon-button" onClick={cancelEditing} type="button">
+                <button
+                  className="icon-button"
+                  disabled={isSaving}
+                  onClick={cancelEditing}
+                  type="button"
+                >
                   <X aria-hidden="true" size={18} />
                   <span className="sr-only">Cancel</span>
                 </button>
@@ -203,7 +225,12 @@ export function ApplicationDetailPanel({
                 <span className="sr-only">Edit</span>
               </button>
             )}
-            <button className="icon-button" onClick={requestClose} type="button">
+            <button
+              className="icon-button"
+              disabled={isSaving}
+              onClick={requestClose}
+              type="button"
+            >
               <X aria-hidden="true" size={18} />
               <span className="sr-only">Close</span>
             </button>
@@ -252,7 +279,10 @@ function ReadOnlyDetails({
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
-  onUpdate: (id: string, input: ApplicationUpdate) => void;
+  onUpdate: (
+    id: string,
+    input: ApplicationUpdate,
+  ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
@@ -934,8 +964,4 @@ function toDateTimeLocal(value?: string) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Resume upload failed.";
 }

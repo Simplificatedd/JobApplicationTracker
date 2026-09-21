@@ -165,4 +165,61 @@ describe("indexedDbStorageAdapter", () => {
     await expect(adapter.listApplications()).resolves.toEqual([application]);
     await expect(adapter.listContacts()).resolves.toEqual([contact]);
   });
+
+  it("does not leave an application or resume behind when the file write fails", async () => {
+    const adapter = createTestStorageAdapter({
+      beforeMutationWrite(operation) {
+        if (operation.storeName === "resumeFiles") {
+          throw new Error("Injected resume file write failure");
+        }
+      },
+    });
+
+    await adapter.initialize();
+    await expect(
+      adapter.commitMutation({
+        activities: [activity],
+        applications: [{ ...application, resumeId: resume.id }],
+        interviews: [interview],
+        resumes: [resume],
+        resumeFiles: [
+          { storageKey: resume.storageKey, file: new Blob(["%PDF"]) },
+        ],
+      }),
+    ).rejects.toThrow("Injected resume file write failure");
+
+    await expect(adapter.listActivities()).resolves.toEqual([]);
+    await expect(adapter.listApplications()).resolves.toEqual([]);
+    await expect(adapter.listInterviews()).resolves.toEqual([]);
+    await expect(adapter.listResumeMetadata()).resolves.toEqual([]);
+    await expect(adapter.getResumeFile(resume.storageKey)).resolves.toBeUndefined();
+  });
+
+  it("deletes resume records while unlinking applications in one transaction", async () => {
+    const adapter = createTestStorageAdapter();
+    const linkedApplication = { ...application, resumeId: resume.id };
+    const unlinkedApplication = {
+      ...linkedApplication,
+      resumeId: undefined,
+      updatedAt: "2026-09-21T01:00:00.000Z",
+    };
+
+    await adapter.initialize();
+    await adapter.commitMutation({
+      applications: [linkedApplication],
+      resumes: [resume],
+      resumeFiles: [{ storageKey: resume.storageKey, file: new Blob(["%PDF"]) }],
+    });
+    await adapter.commitMutation({
+      applications: [unlinkedApplication],
+      deleteResumeIds: [resume.id],
+      deleteResumeFileKeys: [resume.storageKey],
+    });
+
+    await expect(adapter.listApplications()).resolves.toEqual([
+      unlinkedApplication,
+    ]);
+    await expect(adapter.listResumeMetadata()).resolves.toEqual([]);
+    await expect(adapter.getResumeFile(resume.storageKey)).resolves.toBeUndefined();
+  });
 });
