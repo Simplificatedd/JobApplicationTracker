@@ -30,6 +30,7 @@ import {
 import {
   createResumeUploadResult,
   markResumeUsed,
+  shouldMarkResumeUsed,
   type ResumeUploadOptions,
   type ResumeUploadResult,
   updateResumeMetadata,
@@ -315,7 +316,9 @@ export function useTrackerStore(): TrackerStore {
     };
     const storageWrites: Promise<void>[] = [
       indexedDbStorageAdapter.updateApplication(updatedApplication),
-      ...markResumeUsedWrites(input.resumeId, updatedAt),
+      ...(shouldMarkResumeUsed(currentApplication.resumeId, input.resumeId)
+        ? markResumeUsedWrites(input.resumeId, updatedAt)
+        : []),
     ];
     const newActivities = buildApplicationUpdateActivities(
       currentApplication,

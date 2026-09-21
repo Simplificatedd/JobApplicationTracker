@@ -3,6 +3,7 @@ import type { ResumeMetadata } from "../types/application";
 import {
   createResumeUploadResult,
   MAX_RESUME_FILE_BYTES,
+  shouldMarkResumeUsed,
   updateResumeMetadata,
   validateResumeFile,
 } from "./resumeFiles";
@@ -98,5 +99,15 @@ describe("updateResumeMetadata", () => {
       notes: undefined,
       versionLabel: undefined,
     });
+  });
+});
+
+describe("shouldMarkResumeUsed", () => {
+  it("marks a resume only when a new assignment is added", () => {
+    expect(shouldMarkResumeUsed(undefined, "resume-1")).toBe(true);
+    expect(shouldMarkResumeUsed("resume-1", "resume-2")).toBe(true);
+    expect(shouldMarkResumeUsed("resume-1", "resume-1")).toBe(false);
+    expect(shouldMarkResumeUsed("resume-1", undefined)).toBe(false);
+    expect(shouldMarkResumeUsed(undefined, undefined)).toBe(false);
   });
 });

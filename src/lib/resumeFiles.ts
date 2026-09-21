@@ -137,6 +137,13 @@ export function markResumeUsed(resume: ResumeMetadata, timestamp = createTimesta
   } satisfies ResumeMetadata;
 }
 
+export function shouldMarkResumeUsed(
+  previousResumeId: string | undefined,
+  nextResumeId: string | undefined,
+) {
+  return Boolean(nextResumeId && nextResumeId !== previousResumeId);
+}
+
 export function formatFileSize(bytes: number) {
   if (bytes <= 0) {
     return "Missing file";
