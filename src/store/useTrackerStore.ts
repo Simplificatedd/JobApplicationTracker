@@ -213,6 +213,9 @@ export function useTrackerStore(): TrackerStore {
         indexedDbStorageAdapter.appendActivity(activity),
       ),
     ]);
+    // persistAll is defined by this store render; including it would retrigger
+    // the transition scan even when the underlying application data is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applications,
     isStorageLoading,
@@ -663,6 +666,11 @@ export function useTrackerStore(): TrackerStore {
 
   async function importFullBackup(file: File) {
     const backup = await parseBackupFile(file);
+    const applications = withContactCounts(
+      backup.snapshot.applications,
+      backup.snapshot.contacts,
+    );
+    const snapshot = { ...backup.snapshot, applications };
     const resumeFiles: ResumeBlobRecord[] = backup.resumeFiles.map(
       (resumeFile) => ({
         file: base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),
@@ -670,19 +678,17 @@ export function useTrackerStore(): TrackerStore {
       }),
     );
 
-    await indexedDbStorageAdapter.importSnapshot(backup.snapshot, resumeFiles);
+    await indexedDbStorageAdapter.importSnapshot(snapshot, resumeFiles);
 
-    setActivities(sortActivities(backup.snapshot.activities));
-    setAnalyticsSettings(backup.snapshot.analyticsSettings);
-    setApplications(
-      withContactCounts(backup.snapshot.applications, backup.snapshot.contacts),
-    );
-    setContacts(backup.snapshot.contacts);
-    setInterviews(backup.snapshot.interviews);
-    setNotificationState(backup.snapshot.notificationState);
-    setResumes(sortResumes(backup.snapshot.resumes));
-    setSettings(backup.snapshot.settings);
-    setTablePreferences(backup.snapshot.tablePreferences);
+    setActivities(sortActivities(snapshot.activities));
+    setAnalyticsSettings(snapshot.analyticsSettings);
+    setApplications(snapshot.applications);
+    setContacts(snapshot.contacts);
+    setInterviews(snapshot.interviews);
+    setNotificationState(snapshot.notificationState);
+    setResumes(sortResumes(snapshot.resumes));
+    setSettings(snapshot.settings);
+    setTablePreferences(snapshot.tablePreferences);
   }
 
   function exportApplicationsCsv() {

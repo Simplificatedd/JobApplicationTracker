@@ -17,8 +17,9 @@ export interface ResumeUploadResult {
 const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const RESUME_MIME_TYPES = new Set(["application/pdf", DOCX_MIME_TYPE]);
+export const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 
-export function validateResumeFile(file: File) {
+export async function validateResumeFile(file: File) {
   const fileExtension = getResumeFileExtension(file.name);
 
   if (!fileExtension) {
@@ -33,11 +34,30 @@ export function validateResumeFile(file: File) {
     throw new Error("The selected resume file is empty.");
   }
 
+  if (file.size > MAX_RESUME_FILE_BYTES) {
+    throw new Error("Resume files must be 10 MB or smaller.");
+  }
+
+  const expectedMimeType =
+    fileExtension === "pdf" ? "application/pdf" : DOCX_MIME_TYPE;
+
+  if (file.type && file.type !== expectedMimeType) {
+    throw new Error("The resume file type does not match its extension.");
+  }
+
+  const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  const hasExpectedSignature =
+    fileExtension === "pdf"
+      ? startsWithBytes(signature, [0x25, 0x50, 0x44, 0x46, 0x2d])
+      : startsWithBytes(signature, [0x50, 0x4b, 0x03, 0x04]);
+
+  if (!hasExpectedSignature) {
+    throw new Error("The selected file is not a valid PDF or DOCX document.");
+  }
+
   return {
     fileExtension,
-    mimeType:
-      file.type ||
-      (fileExtension === "pdf" ? "application/pdf" : DOCX_MIME_TYPE),
+    mimeType: file.type || expectedMimeType,
   };
 }
 
@@ -50,7 +70,7 @@ export async function createResumeUploadResult({
   file: File;
   options: ResumeUploadOptions;
 }): Promise<ResumeUploadResult> {
-  const validatedFile = validateResumeFile(file);
+  const validatedFile = await validateResumeFile(file);
   const contentHash = await calculateContentHash(file);
   const duplicateOf = existingResumes.find(
     (resume) =>
@@ -158,12 +178,20 @@ function normalizeDownloadFileName(
   fileName: string,
   fileExtension: ResumeMetadata["fileExtension"],
 ) {
-  const trimmed = fileName.trim() || `resume.${fileExtension}`;
-  const lowerFileName = trimmed.toLowerCase();
+  const sanitized = [...fileName]
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= 32 && codePoint !== 127;
+    })
+    .join("")
+    .replace(/[\\/]/g, "_")
+    .trim();
+  const safeFileName = sanitized || `resume.${fileExtension}`;
+  const lowerFileName = safeFileName.toLowerCase();
 
   return lowerFileName.endsWith(`.${fileExtension}`)
-    ? trimmed
-    : `${trimmed}.${fileExtension}`;
+    ? safeFileName
+    : `${safeFileName}.${fileExtension}`;
 }
 
 function stripResumeFileExtension(fileName: string) {
@@ -174,4 +202,8 @@ function trimOptional(value?: string) {
   const trimmed = value?.trim() ?? "";
 
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function startsWithBytes(value: Uint8Array, expected: number[]) {
+  return expected.every((byte, index) => value[index] === byte);
 }

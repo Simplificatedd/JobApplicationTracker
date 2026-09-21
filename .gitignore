@@ -5,3 +5,10 @@ dist/
 *.local
 *.tsbuildinfo
 planning/
+coverage/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+.wrangler/

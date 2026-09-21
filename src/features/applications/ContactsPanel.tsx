@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { getSafeHttpUrl } from "../../lib/urls";
 import type { ContactInput } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
 
@@ -240,6 +241,7 @@ function ContactCard({
   onDeleteContact: (id: string) => void;
   onUpdateContact: (id: string, input: Partial<ContactInput>) => void;
 }) {
+  const safeLinkedInUrl = getSafeHttpUrl(contact.linkedInUrl);
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
@@ -356,10 +358,10 @@ function ContactCard({
             {[contact.role, contact.email, contact.phone].filter(Boolean).join(" / ") ||
               "Contact details blank"}
           </p>
-          {contact.linkedInUrl ? (
+          {safeLinkedInUrl ? (
             <a
               className="mt-2 block truncate text-sm font-medium text-primary hover:text-blue-700"
-              href={contact.linkedInUrl}
+              href={safeLinkedInUrl}
               rel="noreferrer"
               target="_blank"
             >

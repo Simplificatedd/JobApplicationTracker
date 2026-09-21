@@ -1,7 +1,15 @@
 import type { StorageSnapshot } from "../storage/StorageAdapter";
-import type { Application, ResumeMetadata } from "../types/application";
+import type {
+  Activity,
+  Application,
+  ApplicationContact,
+  Interview,
+  ResumeMetadata,
+} from "../types/application";
 
 export const BACKUP_SCHEMA_VERSION = 1;
+export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_BACKUP_RECORDS_PER_COLLECTION = 50_000;
 
 export interface ResumeFileBackup {
   dataBase64: string;
@@ -75,6 +83,10 @@ export function base64ToBlob(dataBase64: string, mimeType: string) {
 }
 
 export async function parseBackupFile(file: File) {
+  if (file.size > MAX_BACKUP_FILE_BYTES) {
+    throw new Error("Tracker backup files must be 100 MB or smaller.");
+  }
+
   let parsed: unknown;
 
   try {
@@ -161,7 +173,7 @@ function getBackupValidationError(value: unknown) {
     return "This backup file uses an unsupported schema version.";
   }
 
-  if (typeof value.exportedAt !== "string") {
+  if (!isTimestamp(value.exportedAt)) {
     return "This backup file is missing an export timestamp.";
   }
 
@@ -174,7 +186,34 @@ function getBackupValidationError(value: unknown) {
   }
 
   const resumeIds = new Set<string>();
+  const resumeStorageKeys = new Set<string>();
   const uploadedResumeStorageKeys = new Set<string>();
+
+  if (
+    !hasAllowedCollectionSizes(value.snapshot) ||
+    value.resumeFiles.length > MAX_BACKUP_RECORDS_PER_COLLECTION
+  ) {
+    return "This backup file contains too many records.";
+  }
+
+  if (
+    !hasUniqueIds(value.snapshot.activities) ||
+    !hasUniqueIds(value.snapshot.applications) ||
+    !hasUniqueIds(value.snapshot.contacts) ||
+    !hasUniqueIds(value.snapshot.interviews) ||
+    !hasUniqueIds(value.snapshot.resumes)
+  ) {
+    return "This backup file contains duplicate or blank record IDs.";
+  }
+
+  if (
+    !isAnalyticsSettings(value.snapshot.analyticsSettings) ||
+    !isNotificationState(value.snapshot.notificationState) ||
+    !isUserSettings(value.snapshot.settings) ||
+    !isTablePreferences(value.snapshot.tablePreferences)
+  ) {
+    return "This backup file contains invalid tracker settings.";
+  }
 
   for (const resume of value.snapshot.resumes) {
     if (!isResumeMetadata(resume)) {
@@ -183,10 +222,18 @@ function getBackupValidationError(value: unknown) {
 
     resumeIds.add(resume.id);
 
+    if (resumeStorageKeys.has(resume.storageKey)) {
+      return "This backup file contains duplicate resume storage keys.";
+    }
+
+    resumeStorageKeys.add(resume.storageKey);
+
     if (resume.fileSize > 0) {
       uploadedResumeStorageKeys.add(resume.storageKey);
     }
   }
+
+  const applicationIds = new Set<string>();
 
   for (const application of value.snapshot.applications) {
     if (!isApplication(application)) {
@@ -196,6 +243,38 @@ function getBackupValidationError(value: unknown) {
     if (application.resumeId && !resumeIds.has(application.resumeId)) {
       return "This backup file links an application to a missing resume.";
     }
+
+    applicationIds.add(application.id);
+  }
+
+  for (const activity of value.snapshot.activities) {
+    if (!isActivity(activity)) {
+      return "This backup file contains invalid activity data.";
+    }
+
+    if (!applicationIds.has(activity.applicationId)) {
+      return "This backup file links activity data to a missing application.";
+    }
+  }
+
+  for (const contact of value.snapshot.contacts) {
+    if (!isApplicationContact(contact)) {
+      return "This backup file contains invalid contact data.";
+    }
+
+    if (!applicationIds.has(contact.applicationId)) {
+      return "This backup file links contact data to a missing application.";
+    }
+  }
+
+  for (const interview of value.snapshot.interviews) {
+    if (!isInterview(interview)) {
+      return "This backup file contains invalid interview data.";
+    }
+
+    if (!applicationIds.has(interview.applicationId)) {
+      return "This backup file links interview data to a missing application.";
+    }
   }
 
   const resumeFileStorageKeys = new Set<string>();
@@ -203,6 +282,29 @@ function getBackupValidationError(value: unknown) {
   for (const resumeFile of value.resumeFiles) {
     if (!isResumeFileBackup(resumeFile)) {
       return "This backup file contains invalid resume file data.";
+    }
+
+    if (resumeFileStorageKeys.has(resumeFile.storageKey)) {
+      return "This backup file contains duplicate resume file payloads.";
+    }
+
+    const resume = value.snapshot.resumes.find(
+      (candidate) => candidate.storageKey === resumeFile.storageKey,
+    );
+
+    if (!resume) {
+      return "This backup file contains an unlinked resume file payload.";
+    }
+
+    const decodedFile = decodeBase64(resumeFile.dataBase64);
+
+    if (
+      decodedFile === undefined ||
+      decodedFile.length !== resume.fileSize ||
+      resumeFile.mimeType !== resume.mimeType ||
+      !hasExpectedResumeSignature(decodedFile, resume.fileExtension)
+    ) {
+      return "This backup file contains inconsistent resume file data.";
     }
 
     resumeFileStorageKeys.add(resumeFile.storageKey);
@@ -241,15 +343,138 @@ function isApplication(value: unknown): value is Application {
   }
 
   return (
-    typeof value.id === "string" &&
+    isNonBlankString(value.id) &&
     typeof value.company === "string" &&
     typeof value.jobTitle === "string" &&
     typeof value.jobDescription === "string" &&
-    typeof value.status === "string" &&
+    isOneOf(value.status, [
+      "Just Applied",
+      "Awaiting Response",
+      "Interviewing",
+      "Offered",
+      "Rejected",
+      "Withdrawn",
+    ]) &&
+    isOneOf(value.workMode, ["remote", "hybrid", "onsite", "unknown"]) &&
+    isOneOf(value.jobType, [
+      "internship",
+      "part-time",
+      "full-time",
+      "contract",
+      "other",
+    ]) &&
+    isOptionalString(value.source) &&
+    isOptionalString(value.location) &&
+    isOptionalString(value.applicationUrl) &&
+    isOptionalString(value.dateFound) &&
+    isOptionalString(value.dateApplied) &&
+    isOptionalString(value.deadline) &&
+    isOptionalString(value.roleStartDate) &&
+    isOptionalString(value.roleEndDate) &&
     typeof value.followUpNeeded === "boolean" &&
-    typeof value.createdAt === "string" &&
-    typeof value.updatedAt === "string" &&
+    isOptionalString(value.followUpDate) &&
+    isOptionalNonNegativeInteger(value.followUpPromptDays) &&
+    isOptionalNonNegativeInteger(value.interviewRound) &&
+    isOptionalOneOf(value.interviewType, [
+      "technical",
+      "face-to-face",
+      "HireVue",
+      "other",
+      "unknown",
+    ]) &&
+    isOptionalOneOf(value.interviewMode, [
+      "phone",
+      "video",
+      "onsite",
+      "take-home",
+      "other",
+    ]) &&
+    isOptionalString(value.interviewDateTime) &&
+    isOptionalString(value.interviewLocation) &&
+    isOptionalString(value.interviewMeetingUrl) &&
+    isOptionalString(value.interviewPlatform) &&
+    typeof value.interviewProctored === "boolean" &&
+    isOptionalString(value.interviewDeadline) &&
+    isOneOf(value.deadlineEntryMode, [
+      "exact",
+      "1_day",
+      "2_days",
+      "3_days",
+      "72_hours",
+    ]) &&
+    isOptionalString(value.nextAction) &&
+    isOneOf(value.priority, ["low", "medium", "high"]) &&
+    isOptionalString(value.coverLetterVersion) &&
+    isOptionalString(value.salary) &&
+    isOptionalString(value.notes) &&
+    isNonNegativeInteger(value.contactsCount) &&
+    isOptionalString(value.archivedAt) &&
+    isTimestamp(value.createdAt) &&
+    isTimestamp(value.updatedAt) &&
     (value.resumeId === undefined || typeof value.resumeId === "string")
+  );
+}
+
+function isActivity(value: unknown): value is Activity {
+  return (
+    isRecord(value) &&
+    isNonBlankString(value.id) &&
+    isNonBlankString(value.applicationId) &&
+    isOneOf(value.type, [
+      "created",
+      "updated",
+      "status_changed",
+      "archived",
+      "restored",
+      "deleted",
+      "contact_created",
+      "contact_updated",
+      "contact_deleted",
+    ]) &&
+    typeof value.message === "string" &&
+    isTimestamp(value.createdAt)
+  );
+}
+
+function isApplicationContact(value: unknown): value is ApplicationContact {
+  return (
+    isRecord(value) &&
+    isNonBlankString(value.id) &&
+    isNonBlankString(value.applicationId) &&
+    typeof value.name === "string" &&
+    isOptionalString(value.role) &&
+    isOptionalString(value.email) &&
+    isOptionalString(value.phone) &&
+    isOptionalString(value.linkedInUrl) &&
+    isOptionalString(value.notes) &&
+    isTimestamp(value.createdAt) &&
+    isTimestamp(value.updatedAt)
+  );
+}
+
+function isInterview(value: unknown): value is Interview {
+  return (
+    isRecord(value) &&
+    isNonBlankString(value.id) &&
+    isNonBlankString(value.applicationId) &&
+    isOneOf(value.type, [
+      "technical",
+      "face-to-face",
+      "HireVue",
+      "other",
+      "unknown",
+    ]) &&
+    isOneOf(value.mode, ["phone", "video", "onsite", "take-home", "other"]) &&
+    isOptionalString(value.dateTime) &&
+    isOptionalNonNegativeInteger(value.round) &&
+    isOptionalString(value.location) &&
+    isOptionalString(value.meetingUrl) &&
+    isOptionalString(value.platform) &&
+    typeof value.proctored === "boolean" &&
+    isOptionalString(value.deadline) &&
+    isOptionalString(value.notes) &&
+    isTimestamp(value.createdAt) &&
+    isTimestamp(value.updatedAt)
   );
 }
 
@@ -259,18 +484,26 @@ function isResumeMetadata(value: unknown): value is ResumeMetadata {
   }
 
   return (
-    typeof value.id === "string" &&
+    isNonBlankString(value.id) &&
     typeof value.displayName === "string" &&
     typeof value.originalFileName === "string" &&
     typeof value.downloadFileName === "string" &&
     (value.fileExtension === "pdf" || value.fileExtension === "docx") &&
-    typeof value.mimeType === "string" &&
+    value.mimeType ===
+      (value.fileExtension === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document") &&
     typeof value.fileSize === "number" &&
+    Number.isInteger(value.fileSize) &&
     value.fileSize >= 0 &&
-    typeof value.storageKey === "string" &&
-    typeof value.contentHash === "string" &&
-    typeof value.uploadedAt === "string" &&
-    typeof value.updatedAt === "string"
+    value.fileSize <= MAX_BACKUP_FILE_BYTES &&
+    isNonBlankString(value.storageKey) &&
+    isNonBlankString(value.contentHash) &&
+    isOptionalString(value.versionLabel) &&
+    isOptionalString(value.notes) &&
+    isTimestamp(value.uploadedAt) &&
+    isTimestamp(value.updatedAt) &&
+    (value.lastUsedAt === undefined || isTimestamp(value.lastUsedAt))
   );
 }
 
@@ -284,22 +517,157 @@ function isResumeFileBackup(value: unknown): value is ResumeFileBackup {
     value.storageKey.trim().length > 0 &&
     typeof value.mimeType === "string" &&
     value.mimeType.trim().length > 0 &&
-    typeof value.dataBase64 === "string" &&
-    isValidBase64(value.dataBase64)
+    typeof value.dataBase64 === "string"
   );
 }
 
-function isValidBase64(value: string) {
-  try {
-    atob(value);
+function isAnalyticsSettings(value: unknown) {
+  return (
+    isRecord(value) &&
+    typeof value.enabled === "boolean" &&
+    isOneOf(value.defaultTimeGrouping, ["daily", "weekly", "monthly"]) &&
+    isStringArray(value.visibleCharts) &&
+    typeof value.includeArchived === "boolean"
+  );
+}
+
+function isNotificationState(value: unknown) {
+  return (
+    isRecord(value) &&
+    isStringArray(value.dismissedNotificationIds) &&
+    (value.lastOpenedAt === undefined || isTimestamp(value.lastOpenedAt))
+  );
+}
+
+function isUserSettings(value: unknown) {
+  return (
+    isRecord(value) &&
+    isNonNegativeInteger(value.defaultFollowUpPromptDays) &&
+    isOneOf(value.contactsDisplayMode, ["side_panel", "modal"]) &&
+    isOneOf(value.navigationDisplayMode, ["side", "top"]) &&
+    isOneOf(value.addJobFormLayout, ["long_form", "stepped"]) &&
+    isOneOf(value.addJobPresentation, ["modal", "page"]) &&
+    isStringArray(value.visibleApplicationColumns) &&
+    typeof value.enableDraggableColumnWidths === "boolean" &&
+    typeof value.rememberTableState === "boolean" &&
+    typeof value.enableDeleteActiveApplications === "boolean" &&
+    typeof value.enableNotificationBell === "boolean" &&
+    typeof value.enableGroupedNotifications === "boolean" &&
+    typeof value.includeUpcomingInterviewsInAttention === "boolean" &&
+    isNonNegativeInteger(value.dueSoonDays) &&
+    typeof value.betaAnalyticsEnabled === "boolean"
+  );
+}
+
+function isTablePreferences(value: unknown) {
+  if (value === null) {
     return true;
-  } catch {
+  }
+
+  if (
+    !isRecord(value) ||
+    !isRecord(value.columnWidths) ||
+    !isRecord(value.filters) ||
+    !isRecord(value.sort)
+  ) {
     return false;
+  }
+
+  return (
+    Object.values(value.columnWidths).every(
+      (width) => typeof width === "number" && Number.isFinite(width) && width >= 0,
+    ) &&
+    Object.values(value.filters).every((filter) => typeof filter === "string") &&
+    typeof value.needsAttentionOnly === "boolean" &&
+    typeof value.searchQuery === "string" &&
+    typeof value.sort.column === "string" &&
+    isOneOf(value.sort.direction, ["ascending", "descending"]) &&
+    isStringArray(value.visibleApplicationColumns)
+  );
+}
+
+function hasAllowedCollectionSizes(snapshot: StorageSnapshot) {
+  return [
+    snapshot.activities,
+    snapshot.applications,
+    snapshot.contacts,
+    snapshot.interviews,
+    snapshot.resumes,
+  ].every((collection) => collection.length <= MAX_BACKUP_RECORDS_PER_COLLECTION);
+}
+
+function hasUniqueIds(values: unknown[]) {
+  const ids = new Set<string>();
+
+  for (const value of values) {
+    if (!isRecord(value) || !isNonBlankString(value.id) || ids.has(value.id)) {
+      return false;
+    }
+
+    ids.add(value.id);
+  }
+
+  return true;
+}
+
+function hasExpectedResumeSignature(
+  decodedFile: string,
+  extension: ResumeMetadata["fileExtension"],
+) {
+  const expected = extension === "pdf" ? "%PDF-" : "PK\u0003\u0004";
+  return decodedFile.startsWith(expected);
+}
+
+function decodeBase64(value: string) {
+  try {
+    return atob(value);
+  } catch {
+    return undefined;
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isNonBlankString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isOptionalNonNegativeInteger(
+  value: unknown,
+): value is number | undefined {
+  return value === undefined || isNonNegativeInteger(value);
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function isOneOf<const T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+): value is T {
+  return typeof value === "string" && allowedValues.includes(value as T);
+}
+
+function isOptionalOneOf<const T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+): value is T | undefined {
+  return value === undefined || isOneOf(value, allowedValues);
 }
 
 function toCsvRow(fields: Array<string | undefined>) {
