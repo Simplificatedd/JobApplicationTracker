@@ -1,13 +1,23 @@
 import { IDBFactory } from "fake-indexeddb";
-import { createIndexedDbStorageAdapter } from "../storage/indexedDbAdapter";
+import {
+  createIndexedDbStorageAdapter,
+  type IndexedDbStorageAdapterOptions,
+} from "../storage/indexedDbAdapter";
 
 let databaseSequence = 0;
 
-export function createTestStorageAdapter() {
+export function createTestStorageAdapter(
+  options: Omit<IndexedDbStorageAdapterOptions, "databaseName" | "indexedDb"> & {
+    databaseName?: string;
+    indexedDb?: IDBFactory;
+  } = {},
+) {
   databaseSequence += 1;
 
   return createIndexedDbStorageAdapter({
-    databaseName: `job-application-tracker-test-${databaseSequence}`,
-    indexedDb: new IDBFactory(),
+    ...options,
+    databaseName:
+      options.databaseName ?? `job-application-tracker-test-${databaseSequence}`,
+    indexedDb: options.indexedDb ?? new IDBFactory(),
   });
 }

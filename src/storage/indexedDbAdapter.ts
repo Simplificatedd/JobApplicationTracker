@@ -16,6 +16,7 @@ import type { TablePreferences } from "../types/tablePreferences";
 import type {
   ResumeBlobRecord,
   StorageAdapter,
+  StorageMutation,
   StorageSnapshot,
 } from "./StorageAdapter";
 
@@ -52,6 +53,14 @@ const NOTIFICATION_STATE_KEY = "notificationState";
 export interface IndexedDbStorageAdapterOptions {
   databaseName?: string;
   indexedDb?: IDBFactory;
+  beforeMutationWrite?: (operation: IndexedDbMutationWrite) => void;
+}
+
+export interface IndexedDbMutationWrite {
+  action: "delete" | "put";
+  key?: string;
+  record?: unknown;
+  storeName: StoreName;
 }
 
 export function createIndexedDbStorageAdapter(
@@ -82,6 +91,85 @@ export function createIndexedDbStorageAdapter(
     }
 
     return exportSnapshot();
+  }
+
+  async function commitMutation(mutation: StorageMutation) {
+    const storeNames = getMutationStoreNames(mutation);
+
+    if (storeNames.length === 0) {
+      return;
+    }
+
+    const database = await getDatabase();
+    const transaction = database.transaction(storeNames, "readwrite");
+
+    try {
+      putMutationRecords(transaction, "activities", mutation.activities);
+      putMutationRecords(transaction, "applications", mutation.applications);
+      putMutationRecords(transaction, "contacts", mutation.contacts);
+      putMutationRecords(transaction, "interviews", mutation.interviews);
+      putMutationRecords(transaction, "resumeMetadata", mutation.resumes);
+      putMutationRecords(transaction, "resumeFiles", mutation.resumeFiles);
+      deleteMutationRecords(
+        transaction,
+        "contacts",
+        mutation.deleteContactIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "interviews",
+        mutation.deleteInterviewIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "resumeMetadata",
+        mutation.deleteResumeIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "resumeFiles",
+        mutation.deleteResumeFileKeys,
+      );
+    } catch (error) {
+      transaction.abort();
+      throw error;
+    }
+
+    await transactionDone(transaction);
+  }
+
+  function putMutationRecords<T>(
+    transaction: IDBTransaction,
+    storeName: StoreName,
+    records?: readonly T[],
+  ) {
+    if (!records) {
+      return;
+    }
+
+    const store = transaction.objectStore(storeName);
+
+    for (const record of records) {
+      options.beforeMutationWrite?.({ action: "put", record, storeName });
+      store.put(record);
+    }
+  }
+
+  function deleteMutationRecords(
+    transaction: IDBTransaction,
+    storeName: StoreName,
+    keys?: readonly string[],
+  ) {
+    if (!keys) {
+      return;
+    }
+
+    const store = transaction.objectStore(storeName);
+
+    for (const key of keys) {
+      options.beforeMutationWrite?.({ action: "delete", key, storeName });
+      store.delete(key);
+    }
   }
 
   async function listApplications() {
@@ -443,6 +531,7 @@ export function createIndexedDbStorageAdapter(
 
   return {
     initialize,
+    commitMutation,
     listApplications,
     getApplication,
     createApplication,
@@ -874,4 +963,25 @@ function transactionDone(transaction: IDBTransaction) {
       reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
     };
   });
+}
+
+function getMutationStoreNames(mutation: StorageMutation): StoreName[] {
+  const storeNames = new Set<StoreName>();
+
+  if (mutation.activities?.length) storeNames.add("activities");
+  if (mutation.applications?.length) storeNames.add("applications");
+  if (mutation.contacts?.length || mutation.deleteContactIds?.length) {
+    storeNames.add("contacts");
+  }
+  if (mutation.interviews?.length || mutation.deleteInterviewIds?.length) {
+    storeNames.add("interviews");
+  }
+  if (mutation.resumes?.length || mutation.deleteResumeIds?.length) {
+    storeNames.add("resumeMetadata");
+  }
+  if (mutation.resumeFiles?.length || mutation.deleteResumeFileKeys?.length) {
+    storeNames.add("resumeFiles");
+  }
+
+  return [...storeNames];
 }
