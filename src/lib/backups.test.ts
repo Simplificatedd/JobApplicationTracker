@@ -10,6 +10,7 @@ import {
   MAX_BACKUP_FILE_BYTES,
   parseBackupFile,
 } from "./backups";
+import { MAX_RESUME_FILE_BYTES } from "./resumeFiles";
 
 const timestamp = "2026-09-21T00:00:00.000Z";
 
@@ -138,5 +139,38 @@ describe("parseBackupFile", () => {
     await expect(
       parseBackupFile(createBackupFile(snapshot, resumeFiles)),
     ).rejects.toThrow("inconsistent resume file data");
+  });
+
+  it("restores legacy resume files above the new-upload size limit", async () => {
+    const legacyPdf = `%PDF-${"a".repeat(MAX_RESUME_FILE_BYTES - 4)}`;
+    const snapshot = createSnapshot({
+      resumes: [
+        {
+          id: "resume-legacy",
+          displayName: "Legacy resume",
+          originalFileName: "legacy.pdf",
+          downloadFileName: "legacy.pdf",
+          fileExtension: "pdf",
+          mimeType: "application/pdf",
+          fileSize: legacyPdf.length,
+          storageKey: "resume-file-legacy",
+          contentHash: "legacy-hash",
+          uploadedAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(
+      parseBackupFile(
+        createBackupFile(snapshot, [
+          {
+            dataBase64: btoa(legacyPdf),
+            mimeType: "application/pdf",
+            storageKey: "resume-file-legacy",
+          },
+        ]),
+      ),
+    ).resolves.toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
   });
 });

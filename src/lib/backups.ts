@@ -6,7 +6,6 @@ import type {
   Interview,
   ResumeMetadata,
 } from "../types/application";
-import { MAX_RESUME_FILE_BYTES } from "./resumeFiles";
 
 export const BACKUP_SCHEMA_VERSION = 1;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
@@ -297,13 +296,13 @@ function getBackupValidationError(value: unknown) {
       return "This backup file contains an unlinked resume file payload.";
     }
 
-    const decodedSize = getBase64DecodedSize(resumeFile.dataBase64);
+    const decodedFile = decodeBase64(resumeFile.dataBase64);
 
     if (
-      decodedSize !== resume.fileSize ||
-      decodedSize > MAX_RESUME_FILE_BYTES ||
+      decodedFile === undefined ||
+      decodedFile.length !== resume.fileSize ||
       resumeFile.mimeType !== resume.mimeType ||
-      !hasExpectedResumeSignature(resumeFile.dataBase64, resume.fileExtension)
+      !hasExpectedResumeSignature(decodedFile, resume.fileExtension)
     ) {
       return "This backup file contains inconsistent resume file data.";
     }
@@ -497,7 +496,7 @@ function isResumeMetadata(value: unknown): value is ResumeMetadata {
     typeof value.fileSize === "number" &&
     Number.isInteger(value.fileSize) &&
     value.fileSize >= 0 &&
-    value.fileSize <= MAX_RESUME_FILE_BYTES &&
+    value.fileSize <= MAX_BACKUP_FILE_BYTES &&
     isNonBlankString(value.storageKey) &&
     isNonBlankString(value.contentHash) &&
     isOptionalString(value.versionLabel) &&
@@ -518,9 +517,7 @@ function isResumeFileBackup(value: unknown): value is ResumeFileBackup {
     value.storageKey.trim().length > 0 &&
     typeof value.mimeType === "string" &&
     value.mimeType.trim().length > 0 &&
-    typeof value.dataBase64 === "string" &&
-    value.dataBase64.length <= Math.ceil((MAX_RESUME_FILE_BYTES * 4) / 3) + 4 &&
-    isValidBase64(value.dataBase64)
+    typeof value.dataBase64 === "string"
   );
 }
 
@@ -613,25 +610,19 @@ function hasUniqueIds(values: unknown[]) {
   return true;
 }
 
-function getBase64DecodedSize(value: string) {
-  return atob(value).length;
-}
-
 function hasExpectedResumeSignature(
-  dataBase64: string,
+  decodedFile: string,
   extension: ResumeMetadata["fileExtension"],
 ) {
-  const binary = atob(dataBase64);
   const expected = extension === "pdf" ? "%PDF-" : "PK\u0003\u0004";
-  return binary.startsWith(expected);
+  return decodedFile.startsWith(expected);
 }
 
-function isValidBase64(value: string) {
+function decodeBase64(value: string) {
   try {
-    atob(value);
-    return true;
+    return atob(value);
   } catch {
-    return false;
+    return undefined;
   }
 }
 
