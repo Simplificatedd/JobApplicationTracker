@@ -195,6 +195,59 @@ describe("indexedDbStorageAdapter", () => {
     await expect(adapter.getResumeFile(resume.storageKey)).resolves.toBeUndefined();
   });
 
+  it.each([
+    "activities",
+    "applications",
+    "contacts",
+    "interviews",
+    "resumeMetadata",
+    "resumeFiles",
+  ] as const)(
+    "rolls back every store after an injected %s write failure",
+    async (failingStore) => {
+      const indexedDb = new IDBFactory();
+      const databaseName = `rollback-${failingStore}`;
+      const adapter = createTestStorageAdapter({
+        databaseName,
+        indexedDb,
+        beforeMutationWrite(operation) {
+          if (operation.storeName === failingStore) {
+            throw new Error(`Injected ${failingStore} write failure`);
+          }
+        },
+      });
+
+      await adapter.initialize();
+      await expect(
+        adapter.commitMutation({
+          activities: [activity],
+          applications: [{ ...application, resumeId: resume.id }],
+          contacts: [contact],
+          interviews: [interview],
+          resumes: [resume],
+          resumeFiles: [
+            { storageKey: resume.storageKey, file: new Blob(["%PDF"]) },
+          ],
+        }),
+      ).rejects.toThrow(`Injected ${failingStore} write failure`);
+
+      const refreshedAdapter = createTestStorageAdapter({
+        databaseName,
+        indexedDb,
+      });
+      await expect(refreshedAdapter.initialize()).resolves.toMatchObject({
+        activities: [],
+        applications: [],
+        contacts: [],
+        interviews: [],
+        resumes: [],
+      });
+      await expect(
+        refreshedAdapter.getResumeFile(resume.storageKey),
+      ).resolves.toBeUndefined();
+    },
+  );
+
   it("deletes resume records while unlinking applications in one transaction", async () => {
     const adapter = createTestStorageAdapter();
     const linkedApplication = { ...application, resumeId: resume.id };
