@@ -694,6 +694,36 @@ function EditForm({
               <option value="take-home">Take-home</option>
             </select>
           </Field>
+          <Field label="Interview Location">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewLocation", event.target.value)
+              }
+              type="text"
+              value={draft.interviewLocation}
+            />
+          </Field>
+          <Field label="Meeting URL">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewMeetingUrl", event.target.value)
+              }
+              type="url"
+              value={draft.interviewMeetingUrl}
+            />
+          </Field>
+          <Field label="Interview Platform">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewPlatform", event.target.value)
+              }
+              type="text"
+              value={draft.interviewPlatform}
+            />
+          </Field>
           <Field label="Deadline Timing">
             <select
               className="field-control"

@@ -51,6 +51,9 @@ interface AddApplicationFormState {
   interviewDateTime: string;
   interviewType: ApplicationInput["interviewType"];
   interviewMode: ApplicationInput["interviewMode"];
+  interviewLocation: string;
+  interviewMeetingUrl: string;
+  interviewPlatform: string;
   interviewProctored: boolean;
   interviewDeadline: string;
   priority: Priority;
@@ -84,6 +87,9 @@ const initialFormState: AddApplicationFormState = {
   interviewDateTime: "",
   interviewType: "unknown",
   interviewMode: "other",
+  interviewLocation: "",
+  interviewMeetingUrl: "",
+  interviewPlatform: "",
   interviewProctored: false,
   interviewDeadline: "",
   priority: "medium",
@@ -213,9 +219,15 @@ export function AddApplicationModal({
         : undefined,
       interviewType: isInterviewing ? form.interviewType : undefined,
       interviewMode: isInterviewing ? form.interviewMode : undefined,
-      interviewLocation: undefined,
-      interviewMeetingUrl: undefined,
-      interviewPlatform: undefined,
+      interviewLocation: isInterviewing
+        ? trimOptional(form.interviewLocation)
+        : undefined,
+      interviewMeetingUrl: isInterviewing
+        ? trimOptional(form.interviewMeetingUrl)
+        : undefined,
+      interviewPlatform: isInterviewing
+        ? trimOptional(form.interviewPlatform)
+        : undefined,
       interviewProctored: isInterviewing ? form.interviewProctored : false,
       interviewDeadline: isInterviewing
         ? trimOptional(form.interviewDeadline)
@@ -367,6 +379,39 @@ export function AddApplicationModal({
                     <option value="onsite">Onsite</option>
                     <option value="take-home">Take-home</option>
                   </select>
+                </Field>
+
+                <Field label="Interview Location">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewLocation", event.target.value)
+                    }
+                    type="text"
+                    value={form.interviewLocation}
+                  />
+                </Field>
+
+                <Field label="Meeting URL">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewMeetingUrl", event.target.value)
+                    }
+                    type="url"
+                    value={form.interviewMeetingUrl}
+                  />
+                </Field>
+
+                <Field label="Interview Platform">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewPlatform", event.target.value)
+                    }
+                    type="text"
+                    value={form.interviewPlatform}
+                  />
                 </Field>
               </>
             ) : null}
