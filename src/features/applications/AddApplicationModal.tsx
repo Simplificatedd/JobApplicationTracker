@@ -6,10 +6,14 @@ import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import type { ApplicationInput } from "../../store/useTrackerStore";
-import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
+import type {
+  ApplicationInput,
+  MutationResult,
+  PendingResumeUpload,
+} from "../../store/useTrackerStore";
 import type {
   ApplicationStatus,
+  Application,
   DeadlineEntryMode,
   JobType,
   Priority,
@@ -21,11 +25,10 @@ interface AddApplicationModalProps {
   defaultFollowUpPromptDays: number;
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (input: ApplicationInput) => void;
-  onUploadResume: (
-    file: File,
-    options?: ResumeUploadOptions,
-  ) => Promise<ResumeUploadResult>;
+  onCreate: (
+    input: ApplicationInput,
+    pendingResume?: PendingResumeUpload,
+  ) => Promise<MutationResult<Application>>;
   resumes: ResumeMetadata[];
 }
 
@@ -51,6 +54,9 @@ interface AddApplicationFormState {
   interviewDateTime: string;
   interviewType: ApplicationInput["interviewType"];
   interviewMode: ApplicationInput["interviewMode"];
+  interviewLocation: string;
+  interviewMeetingUrl: string;
+  interviewPlatform: string;
   interviewProctored: boolean;
   interviewDeadline: string;
   priority: Priority;
@@ -84,6 +90,9 @@ const initialFormState: AddApplicationFormState = {
   interviewDateTime: "",
   interviewType: "unknown",
   interviewMode: "other",
+  interviewLocation: "",
+  interviewMeetingUrl: "",
+  interviewPlatform: "",
   interviewProctored: false,
   interviewDeadline: "",
   priority: "medium",
@@ -100,13 +109,13 @@ export function AddApplicationModal({
   isOpen,
   onClose,
   onCreate,
-  onUploadResume,
   resumes,
 }: AddApplicationModalProps) {
   const [form, setForm] = useState<AddApplicationFormState>(initialFormState);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
   const [resumeUploadError, setResumeUploadError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
 
   useEscapeKey(isOpen && !isDiscardWarningOpen, requestClose);
@@ -128,6 +137,10 @@ export function AddApplicationModal({
   }
 
   function requestClose() {
+    if (isSaving) {
+      return;
+    }
+
     if (isFormDirty(form) || resumeUploadFile) {
       setIsDiscardWarningOpen(true);
       return;
@@ -168,26 +181,9 @@ export function AddApplicationModal({
     }
 
     const isInterviewing = form.status === "Interviewing";
-    let resumeId = trimOptional(form.resumeId);
-
     setResumeUploadError("");
-
-    if (resumeUploadFile) {
-      try {
-        const upload = await onUploadResume(resumeUploadFile, {
-          displayName: form.resumeUploadName,
-          markAsUsed: true,
-          versionLabel: form.resumeUploadVersion,
-        });
-
-        resumeId = upload.resume.id;
-      } catch (error) {
-        setResumeUploadError(getErrorMessage(error));
-        return;
-      }
-    }
-
-    onCreate({
+    setIsSaving(true);
+    const result = await onCreate({
       company: trimOptional(form.company) ?? "",
       jobTitle: trimmedTitle,
       jobDescription: trimOptional(form.jobDescription) ?? "",
@@ -213,19 +209,40 @@ export function AddApplicationModal({
         : undefined,
       interviewType: isInterviewing ? form.interviewType : undefined,
       interviewMode: isInterviewing ? form.interviewMode : undefined,
-      interviewLocation: undefined,
-      interviewMeetingUrl: undefined,
-      interviewPlatform: undefined,
+      interviewLocation: isInterviewing
+        ? trimOptional(form.interviewLocation)
+        : undefined,
+      interviewMeetingUrl: isInterviewing
+        ? trimOptional(form.interviewMeetingUrl)
+        : undefined,
+      interviewPlatform: isInterviewing
+        ? trimOptional(form.interviewPlatform)
+        : undefined,
       interviewProctored: isInterviewing ? form.interviewProctored : false,
       interviewDeadline: isInterviewing
         ? trimOptional(form.interviewDeadline)
         : undefined,
       priority: form.priority,
-      resumeId,
+      resumeId: trimOptional(form.resumeId),
       coverLetterVersion: trimOptional(form.coverLetterVersion),
       salary: trimOptional(form.salary),
       notes: trimOptional(form.notes),
-    });
+    }, resumeUploadFile
+      ? {
+          file: resumeUploadFile,
+          options: {
+            displayName: form.resumeUploadName,
+            markAsUsed: true,
+            versionLabel: form.resumeUploadVersion,
+          },
+        }
+      : undefined);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setResumeUploadError(result.error);
+      return;
+    }
 
     setForm(initialFormState);
     setResumeUploadFile(null);
@@ -250,7 +267,12 @@ export function AddApplicationModal({
           >
             Add job
           </h2>
-          <button className="icon-button" onClick={requestClose} type="button">
+          <button
+            className="icon-button"
+            disabled={isSaving}
+            onClick={requestClose}
+            type="button"
+          >
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Close</span>
           </button>
@@ -367,6 +389,39 @@ export function AddApplicationModal({
                     <option value="onsite">Onsite</option>
                     <option value="take-home">Take-home</option>
                   </select>
+                </Field>
+
+                <Field label="Interview Location">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewLocation", event.target.value)
+                    }
+                    type="text"
+                    value={form.interviewLocation}
+                  />
+                </Field>
+
+                <Field label="Meeting URL">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewMeetingUrl", event.target.value)
+                    }
+                    type="url"
+                    value={form.interviewMeetingUrl}
+                  />
+                </Field>
+
+                <Field label="Interview Platform">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewPlatform", event.target.value)
+                    }
+                    type="text"
+                    value={form.interviewPlatform}
+                  />
                 </Field>
               </>
             ) : null}
@@ -665,6 +720,7 @@ export function AddApplicationModal({
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
           <button
             className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+            disabled={isSaving}
             onClick={requestClose}
             type="button"
           >
@@ -676,11 +732,11 @@ export function AddApplicationModal({
                 ? "bg-primary text-primary-foreground hover:bg-blue-700"
                 : "bg-slate-200 text-slate-500"
             }`}
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             form="add-application-form"
             type="submit"
           >
-            Save
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
         {isDiscardWarningOpen ? (
@@ -706,10 +762,6 @@ function isFormDirty(form: AddApplicationFormState) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Resume upload failed.";
 }
 
 function Field({

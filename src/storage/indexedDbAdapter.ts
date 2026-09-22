@@ -16,6 +16,7 @@ import type { TablePreferences } from "../types/tablePreferences";
 import type {
   ResumeBlobRecord,
   StorageAdapter,
+  StorageMutation,
   StorageSnapshot,
 } from "./StorageAdapter";
 
@@ -49,12 +50,29 @@ const STORAGE_META_KEY = "storageMeta";
 const ANALYTICS_SETTINGS_KEY = "analyticsSettings";
 const NOTIFICATION_STATE_KEY = "notificationState";
 
-export function createIndexedDbStorageAdapter(): StorageAdapter {
+export interface IndexedDbStorageAdapterOptions {
+  databaseName?: string;
+  indexedDb?: IDBFactory;
+  beforeMutationWrite?: (operation: IndexedDbMutationWrite) => void;
+}
+
+export interface IndexedDbMutationWrite {
+  action: "delete" | "put";
+  key?: string;
+  record?: unknown;
+  storeName: StoreName;
+}
+
+export function createIndexedDbStorageAdapter(
+  options: IndexedDbStorageAdapterOptions = {},
+): StorageAdapter {
   let databasePromise: Promise<IDBDatabase> | null = null;
+  const databaseName = options.databaseName ?? TRACKER_DB_NAME;
+  const indexedDb = options.indexedDb ?? globalThis.indexedDB;
 
   function getDatabase() {
     if (!databasePromise) {
-      databasePromise = openDatabase();
+      databasePromise = openDatabase(databaseName, indexedDb);
     }
 
     return databasePromise;
@@ -73,6 +91,85 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
     }
 
     return exportSnapshot();
+  }
+
+  async function commitMutation(mutation: StorageMutation) {
+    const storeNames = getMutationStoreNames(mutation);
+
+    if (storeNames.length === 0) {
+      return;
+    }
+
+    const database = await getDatabase();
+    const transaction = database.transaction(storeNames, "readwrite");
+
+    try {
+      putMutationRecords(transaction, "activities", mutation.activities);
+      putMutationRecords(transaction, "applications", mutation.applications);
+      putMutationRecords(transaction, "contacts", mutation.contacts);
+      putMutationRecords(transaction, "interviews", mutation.interviews);
+      putMutationRecords(transaction, "resumeMetadata", mutation.resumes);
+      putMutationRecords(transaction, "resumeFiles", mutation.resumeFiles);
+      deleteMutationRecords(
+        transaction,
+        "contacts",
+        mutation.deleteContactIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "interviews",
+        mutation.deleteInterviewIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "resumeMetadata",
+        mutation.deleteResumeIds,
+      );
+      deleteMutationRecords(
+        transaction,
+        "resumeFiles",
+        mutation.deleteResumeFileKeys,
+      );
+    } catch (error) {
+      transaction.abort();
+      throw error;
+    }
+
+    await transactionDone(transaction);
+  }
+
+  function putMutationRecords<T>(
+    transaction: IDBTransaction,
+    storeName: StoreName,
+    records?: readonly T[],
+  ) {
+    if (!records?.length) {
+      return;
+    }
+
+    const store = transaction.objectStore(storeName);
+
+    for (const record of records) {
+      options.beforeMutationWrite?.({ action: "put", record, storeName });
+      store.put(record);
+    }
+  }
+
+  function deleteMutationRecords(
+    transaction: IDBTransaction,
+    storeName: StoreName,
+    keys?: readonly string[],
+  ) {
+    if (!keys?.length) {
+      return;
+    }
+
+    const store = transaction.objectStore(storeName);
+
+    for (const key of keys) {
+      options.beforeMutationWrite?.({ action: "delete", key, storeName });
+      store.delete(key);
+    }
   }
 
   async function listApplications() {
@@ -434,6 +531,7 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
 
   return {
     initialize,
+    commitMutation,
     listApplications,
     getApplication,
     createApplication,
@@ -480,14 +578,14 @@ export function createIndexedDbStorageAdapter(): StorageAdapter {
 
 export const indexedDbStorageAdapter = createIndexedDbStorageAdapter();
 
-function openDatabase() {
+function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    if (!("indexedDB" in window)) {
+    if (!indexedDb) {
       reject(new Error("IndexedDB is not available in this browser."));
       return;
     }
 
-    const request = indexedDB.open(TRACKER_DB_NAME, TRACKER_DB_VERSION);
+    const request = indexedDb.open(databaseName, TRACKER_DB_VERSION);
 
     request.onerror = () => {
       reject(
@@ -865,4 +963,25 @@ function transactionDone(transaction: IDBTransaction) {
       reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
     };
   });
+}
+
+function getMutationStoreNames(mutation: StorageMutation): StoreName[] {
+  const storeNames = new Set<StoreName>();
+
+  if (mutation.activities?.length) storeNames.add("activities");
+  if (mutation.applications?.length) storeNames.add("applications");
+  if (mutation.contacts?.length || mutation.deleteContactIds?.length) {
+    storeNames.add("contacts");
+  }
+  if (mutation.interviews?.length || mutation.deleteInterviewIds?.length) {
+    storeNames.add("interviews");
+  }
+  if (mutation.resumes?.length || mutation.deleteResumeIds?.length) {
+    storeNames.add("resumeMetadata");
+  }
+  if (mutation.resumeFiles?.length || mutation.deleteResumeFileKeys?.length) {
+    storeNames.add("resumeFiles");
+  }
+
+  return [...storeNames];
 }

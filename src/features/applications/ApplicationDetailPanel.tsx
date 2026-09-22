@@ -16,8 +16,11 @@ import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import type { ApplicationUpdate } from "../../store/useTrackerStore";
-import type { ResumeUploadOptions, ResumeUploadResult } from "../../lib/resumeFiles";
+import type {
+  ApplicationUpdate,
+  MutationResult,
+  PendingResumeUpload,
+} from "../../store/useTrackerStore";
 import type {
   Activity,
   Application,
@@ -38,11 +41,11 @@ interface ApplicationDetailPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   onClose: () => void;
-  onUpdate: (id: string, input: ApplicationUpdate) => void;
-  onUploadResume: (
-    file: File,
-    options?: ResumeUploadOptions,
-  ) => Promise<ResumeUploadResult>;
+  onUpdate: (
+    id: string,
+    input: ApplicationUpdate,
+    pendingResume?: PendingResumeUpload,
+  ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
 }
@@ -53,7 +56,6 @@ export function ApplicationDetailPanel({
   contacts,
   onClose,
   onUpdate,
-  onUploadResume,
   resume,
   resumes,
 }: ApplicationDetailPanelProps) {
@@ -62,6 +64,7 @@ export function ApplicationDetailPanel({
   const [draft, setDraft] = useState(() => toDraft(application));
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
@@ -74,26 +77,9 @@ export function ApplicationDetailPanel({
 
   async function saveChanges() {
     const isInterviewing = draft.status === "Interviewing";
-    let resumeId = trimOptional(draft.resumeId);
-
     setResumeUploadError("");
-
-    if (resumeUploadFile) {
-      try {
-        const upload = await onUploadResume(resumeUploadFile, {
-          displayName: draft.resumeUploadName,
-          markAsUsed: true,
-          versionLabel: draft.resumeUploadVersion,
-        });
-
-        resumeId = upload.resume.id;
-      } catch (error) {
-        setResumeUploadError(getErrorMessage(error));
-        return;
-      }
-    }
-
-    onUpdate(application.id, {
+    setIsSaving(true);
+    const result = await onUpdate(application.id, {
       company: draft.company.trim(),
       jobTitle: draft.jobTitle.trim() || application.jobTitle,
       jobDescription: draft.jobDescription.trim(),
@@ -110,38 +96,50 @@ export function ApplicationDetailPanel({
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
-      interviewRound: isInterviewing
-        ? Number(draft.interviewRound) || undefined
-        : undefined,
-      interviewDateTime: isInterviewing
-        ? trimOptional(draft.interviewDateTime)
-        : undefined,
-      interviewType: isInterviewing ? draft.interviewType : undefined,
-      interviewMode: isInterviewing ? draft.interviewMode : undefined,
-      interviewLocation: isInterviewing
-        ? trimOptional(draft.interviewLocation)
-        : undefined,
-      interviewMeetingUrl: isInterviewing
-        ? trimOptional(draft.interviewMeetingUrl)
-        : undefined,
-      interviewPlatform: isInterviewing
-        ? trimOptional(draft.interviewPlatform)
-        : undefined,
-      interviewProctored: isInterviewing ? draft.interviewProctored : false,
-      interviewDeadline: isInterviewing
-        ? trimOptional(draft.interviewDeadline)
-        : undefined,
+      ...(isInterviewing
+        ? {
+            interviewRound: Number(draft.interviewRound) || undefined,
+            interviewDateTime: trimOptional(draft.interviewDateTime),
+            interviewType: draft.interviewType,
+            interviewMode: draft.interviewMode,
+            interviewLocation: trimOptional(draft.interviewLocation),
+            interviewMeetingUrl: trimOptional(draft.interviewMeetingUrl),
+            interviewPlatform: trimOptional(draft.interviewPlatform),
+            interviewProctored: draft.interviewProctored,
+            interviewDeadline: trimOptional(draft.interviewDeadline),
+          }
+        : {}),
       priority: draft.priority,
-      resumeId,
+      resumeId: trimOptional(draft.resumeId),
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
       salary: trimOptional(draft.salary),
       notes: trimOptional(draft.notes),
-    });
+    }, resumeUploadFile
+      ? {
+          file: resumeUploadFile,
+          options: {
+            displayName: draft.resumeUploadName,
+            markAsUsed: true,
+            versionLabel: draft.resumeUploadVersion,
+          },
+        }
+      : undefined);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setResumeUploadError(result.error);
+      return;
+    }
+
     setResumeUploadFile(null);
     setIsEditing(false);
   }
 
   function cancelEditing() {
+    if (isSaving) {
+      return;
+    }
+
     setDraft(toDraft(application));
     setResumeUploadError("");
     setResumeUploadFile(null);
@@ -149,6 +147,10 @@ export function ApplicationDetailPanel({
   }
 
   function requestClose() {
+    if (isSaving) {
+      return;
+    }
+
     if (isEditing && (isDraftDirty(draft, application) || resumeUploadFile)) {
       setIsDiscardWarningOpen(true);
       return;
@@ -196,11 +198,23 @@ export function ApplicationDetailPanel({
           <div className="flex shrink-0 items-center gap-2">
             {isEditing ? (
               <>
-                <button className="icon-button" onClick={saveChanges} type="button">
+                <button
+                  className="icon-button"
+                  disabled={isSaving}
+                  onClick={saveChanges}
+                  type="button"
+                >
                   <Check aria-hidden="true" size={18} />
-                  <span className="sr-only">Save</span>
+                  <span className="sr-only">
+                    {isSaving ? "Saving" : "Save"}
+                  </span>
                 </button>
-                <button className="icon-button" onClick={cancelEditing} type="button">
+                <button
+                  className="icon-button"
+                  disabled={isSaving}
+                  onClick={cancelEditing}
+                  type="button"
+                >
                   <X aria-hidden="true" size={18} />
                   <span className="sr-only">Cancel</span>
                 </button>
@@ -211,7 +225,12 @@ export function ApplicationDetailPanel({
                 <span className="sr-only">Edit</span>
               </button>
             )}
-            <button className="icon-button" onClick={requestClose} type="button">
+            <button
+              className="icon-button"
+              disabled={isSaving}
+              onClick={requestClose}
+              type="button"
+            >
               <X aria-hidden="true" size={18} />
               <span className="sr-only">Close</span>
             </button>
@@ -260,7 +279,10 @@ function ReadOnlyDetails({
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
-  onUpdate: (id: string, input: ApplicationUpdate) => void;
+  onUpdate: (
+    id: string,
+    input: ApplicationUpdate,
+  ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
@@ -702,6 +724,36 @@ function EditForm({
               <option value="take-home">Take-home</option>
             </select>
           </Field>
+          <Field label="Interview Location">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewLocation", event.target.value)
+              }
+              type="text"
+              value={draft.interviewLocation}
+            />
+          </Field>
+          <Field label="Meeting URL">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewMeetingUrl", event.target.value)
+              }
+              type="url"
+              value={draft.interviewMeetingUrl}
+            />
+          </Field>
+          <Field label="Interview Platform">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("interviewPlatform", event.target.value)
+              }
+              type="text"
+              value={draft.interviewPlatform}
+            />
+          </Field>
           <Field label="Deadline Timing">
             <select
               className="field-control"
@@ -912,8 +964,4 @@ function toDateTimeLocal(value?: string) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Resume upload failed.";
 }

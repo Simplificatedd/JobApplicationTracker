@@ -4,17 +4,22 @@ import { useEffect, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { getSafeHttpUrl } from "../../lib/urls";
-import type { ContactInput } from "../../store/useTrackerStore";
+import type { ContactInput, MutationResult } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
 
 interface ContactsPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   displayMode: "side_panel" | "modal";
-  onAddContact: (input: ContactInput) => ApplicationContact;
+  onAddContact: (
+    input: ContactInput,
+  ) => Promise<MutationResult<ApplicationContact>>;
   onClose: () => void;
-  onDeleteContact: (id: string) => void;
-  onUpdateContact: (id: string, input: Partial<ContactInput>) => void;
+  onDeleteContact: (id: string) => Promise<MutationResult>;
+  onUpdateContact: (
+    id: string,
+    input: Partial<ContactInput>,
+  ) => Promise<MutationResult>;
 }
 
 interface ContactDraft {
@@ -46,7 +51,9 @@ export function ContactsPanel({
 }: ContactsPanelProps) {
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [newContact, setNewContact] = useState(emptyDraft);
+  const [operationError, setOperationError] = useState("");
 
   useEscapeKey(!editingContactId && !isDiscardWarningOpen, requestClose);
 
@@ -55,14 +62,16 @@ export function ContactsPanel({
       ? "mx-auto my-auto h-auto max-h-[88vh] w-full max-w-2xl rounded-lg"
       : "ml-auto h-full w-full max-w-xl sm:rounded-l-lg";
 
-  function addContact() {
+  async function addContact() {
     const name = newContact.name.trim();
 
     if (!name) {
       return;
     }
 
-    onAddContact({
+    setIsAdding(true);
+    setOperationError("");
+    const result = await onAddContact({
       applicationId: application.id,
       name,
       email: trimOptional(newContact.email),
@@ -71,10 +80,21 @@ export function ContactsPanel({
       phone: trimOptional(newContact.phone),
       role: trimOptional(newContact.role),
     });
+    setIsAdding(false);
+
+    if (!result.ok) {
+      setOperationError(result.error);
+      return;
+    }
+
     setNewContact(emptyDraft);
   }
 
   function requestClose() {
+    if (isAdding) {
+      return;
+    }
+
     if (editingContactId) {
       setIsDiscardWarningOpen(true);
       return;
@@ -121,7 +141,12 @@ export function ContactsPanel({
               Contacts for {application.jobTitle}
             </h2>
           </div>
-          <button className="icon-button" onClick={requestClose} type="button">
+          <button
+            className="icon-button"
+            disabled={isAdding}
+            onClick={requestClose}
+            type="button"
+          >
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Close contacts</span>
           </button>
@@ -170,12 +195,12 @@ export function ContactsPanel({
               />
               <button
                 className="inline-flex h-10 items-center justify-center gap-2 self-end rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500"
-                disabled={!newContact.name.trim()}
+                disabled={!newContact.name.trim() || isAdding}
                 onClick={addContact}
                 type="button"
               >
                 <Plus aria-hidden="true" size={16} />
-                Add
+                {isAdding ? "Adding..." : "Add"}
               </button>
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-sm font-medium text-foreground">
@@ -193,6 +218,11 @@ export function ContactsPanel({
                 />
               </label>
             </div>
+            {operationError ? (
+              <p className="mt-3 text-sm font-medium text-destructive" role="alert">
+                {operationError}
+              </p>
+            ) : null}
           </section>
 
           <section className="space-y-3">
@@ -238,12 +268,17 @@ function ContactCard({
 }: {
   contact: ApplicationContact;
   onEditingChange: (contactId: string | null) => void;
-  onDeleteContact: (id: string) => void;
-  onUpdateContact: (id: string, input: Partial<ContactInput>) => void;
+  onDeleteContact: (id: string) => Promise<MutationResult>;
+  onUpdateContact: (
+    id: string,
+    input: Partial<ContactInput>,
+  ) => Promise<MutationResult>;
 }) {
   const safeLinkedInUrl = getSafeHttpUrl(contact.linkedInUrl);
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [operationError, setOperationError] = useState("");
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
 
   useEscapeKey(isEditing && !isDiscardWarningOpen, requestCancel);
@@ -258,8 +293,10 @@ function ContactCard({
     };
   }, [contact.id, isEditing, onEditingChange]);
 
-  function confirm() {
-    onUpdateContact(contact.id, {
+  async function confirm() {
+    setIsSaving(true);
+    setOperationError("");
+    const result = await onUpdateContact(contact.id, {
       applicationId: contact.applicationId,
       email: trimOptional(draft.email),
       linkedInUrl: trimOptional(draft.linkedInUrl),
@@ -268,6 +305,13 @@ function ContactCard({
       phone: trimOptional(draft.phone),
       role: trimOptional(draft.role),
     });
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setOperationError(result.error);
+      return;
+    }
+
     setIsEditing(false);
   }
 
@@ -277,6 +321,10 @@ function ContactCard({
   }
 
   function requestCancel() {
+    if (isSaving) {
+      return;
+    }
+
     if (isContactDraftDirty(draft, toDraft(contact))) {
       setIsDiscardWarningOpen(true);
       return;
@@ -324,15 +372,30 @@ function ContactCard({
           </label>
         </div>
         <div className="mt-3 flex justify-end gap-2">
-          <button className="icon-button" onClick={confirm} type="button">
+          <button
+            className="icon-button"
+            disabled={isSaving}
+            onClick={confirm}
+            type="button"
+          >
             <Check aria-hidden="true" size={18} />
             <span className="sr-only">Confirm contact edit</span>
           </button>
-          <button className="icon-button" onClick={requestCancel} type="button">
+          <button
+            className="icon-button"
+            disabled={isSaving}
+            onClick={requestCancel}
+            type="button"
+          >
             <X aria-hidden="true" size={18} />
             <span className="sr-only">Cancel contact edit</span>
           </button>
         </div>
+        {operationError ? (
+          <p className="mt-3 text-sm font-medium text-destructive" role="alert">
+            {operationError}
+          </p>
+        ) : null}
         {isDiscardWarningOpen ? (
           <UnsavedChangesDialog
             body="Discard unsaved contact edits?"

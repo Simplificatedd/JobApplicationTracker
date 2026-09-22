@@ -26,8 +26,22 @@ export interface ResumeBlobRecord {
   file: Blob;
 }
 
+export interface StorageMutation {
+  activities?: readonly Activity[];
+  applications?: readonly Application[];
+  contacts?: readonly ApplicationContact[];
+  interviews?: readonly Interview[];
+  resumes?: readonly ResumeMetadata[];
+  resumeFiles?: readonly ResumeBlobRecord[];
+  deleteContactIds?: readonly string[];
+  deleteInterviewIds?: readonly string[];
+  deleteResumeIds?: readonly string[];
+  deleteResumeFileKeys?: readonly string[];
+}
+
 export interface StorageAdapter {
   initialize(): Promise<StorageSnapshot>;
+  commitMutation(mutation: StorageMutation): Promise<void>;
 
   listApplications(): Promise<Application[]>;
   getApplication(id: string): Promise<Application | undefined>;
