@@ -1,8 +1,10 @@
 import {
+  Cloud,
   Download,
   FileDown,
   FileUp,
   Info,
+  LogOut,
   RotateCcw,
   Settings,
 } from "lucide-react";
@@ -12,6 +14,7 @@ import type { BackupImportPreview } from "../../lib/backups";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
+  cloudAccountEmail: string | null;
   onExportApplicationsCsv: () => Blob;
   onExportFullBackup: () => Promise<Blob>;
   onImportFullBackup: (file: File) => Promise<void>;
@@ -22,6 +25,7 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({
+  cloudAccountEmail,
   onExportApplicationsCsv,
   onExportFullBackup,
   onImportFullBackup,
@@ -85,7 +89,7 @@ export function SettingsPage({
     }
 
     const confirmed = window.confirm(
-      "Replace all local tracker data with this backup?",
+      "Replace all cloud tracker data with this backup? This will sync to every signed-in device.",
     );
 
     if (!confirmed) {
@@ -161,14 +165,31 @@ export function SettingsPage({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <SettingsGroup title="Browser Storage">
+        <SettingsGroup title="Cloud Storage">
           <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm leading-6 text-foreground">
-            <p>
-              Application data is stored in this browser profile. Clearing this
-              site&apos;s browser data can remove saved entries, so keep regular
-              backups.
-            </p>
+            <div className="flex items-start gap-3">
+              <Cloud aria-hidden="true" className="mt-1 shrink-0 text-info" size={18} />
+              <div>
+                <p className="font-semibold">Cloud sync is active</p>
+                <p className="text-muted">
+                  D1 stores your tracker data and R2 stores resume files. This
+                  browser keeps a local cache for faster loading.
+                </p>
+                {cloudAccountEmail ? (
+                  <p className="mt-1 break-all text-muted">
+                    Signed in as {cloudAccountEmail}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
+          <a
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            href="/cdn-cgi/access/logout"
+          >
+            <LogOut aria-hidden="true" size={16} />
+            Sign out
+          </a>
           <div className="grid gap-2 sm:grid-cols-2">
             <ActionButton onClick={exportFullBackup}>
               <FileDown aria-hidden="true" size={16} />
@@ -181,7 +202,7 @@ export function SettingsPage({
           </div>
           <label className="block rounded-lg border border-border bg-surface px-3 py-3">
             <SettingLabel
-              description="Preview a tracker backup before replacing local data."
+              description="Preview a tracker backup before replacing your cloud data."
               label="Import backup"
             />
             <input
@@ -208,7 +229,7 @@ export function SettingsPage({
                 type="button"
               >
                 <FileUp aria-hidden="true" size={16} />
-                Replace local data
+                Replace cloud data
               </button>
             </div>
           ) : null}

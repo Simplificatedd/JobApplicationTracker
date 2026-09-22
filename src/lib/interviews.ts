@@ -77,29 +77,6 @@ export function reconcileCanonicalInterviews(
       nextInterviews.push(migratedInterview);
       interviewWrites.push(migratedInterview);
       applicationInterviews = [...applicationInterviews, migratedInterview];
-    } else if (
-      projectedInterview &&
-      application.updatedAt > projectedInterview.updatedAt &&
-      hasDifferentInterviewProjection(
-        application,
-        applyInterviewProjection(application, projectedInterview),
-      )
-    ) {
-      const reconciledInterview = interviewFromApplicationProjection(
-        application,
-        projectedInterview,
-      );
-      const interviewIndex = nextInterviews.findIndex(
-        (interview) => interview.id === reconciledInterview.id,
-      );
-
-      nextInterviews[interviewIndex] = reconciledInterview;
-      interviewWrites.push(reconciledInterview);
-      applicationInterviews = applicationInterviews.map((interview) =>
-        interview.id === reconciledInterview.id
-          ? reconciledInterview
-          : interview,
-      );
     }
 
     const currentInterview = selectCurrentInterview(applicationInterviews, {

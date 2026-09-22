@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "job-application-tracker",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-22",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "job-application-tracker",
+      "database_id": "replace-with-your-d1-database-id",
+      "preview_database_id": "DB",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RESUME_FILES",
+      "bucket_name": "job-application-tracker-resumes",
+      "preview_bucket_name": "job-application-tracker-resumes-preview"
+    }
+  ]
+}

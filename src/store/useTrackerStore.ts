@@ -4,7 +4,6 @@ import type {
   Activity,
   Application,
   ApplicationContact,
-  ApplicationStatus,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -41,7 +40,7 @@ import {
   upsertInterviewHistory,
 } from "../lib/interviews";
 import { createMutationQueue } from "../lib/mutationQueue";
-import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
+import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -78,6 +77,7 @@ export interface TrackerStore {
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
+  cloudAccountEmail: string | null;
   contacts: ApplicationContact[];
   interviews: Interview[];
   isStorageLoading: boolean;
@@ -137,6 +137,7 @@ export function useTrackerStore(): TrackerStore {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<ApplicationContact[]>([]);
+  const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
@@ -153,7 +154,7 @@ export function useTrackerStore(): TrackerStore {
   const [tablePreferences, setTablePreferences] =
     useState<TablePreferences | null>(null);
   const analyticsMutationQueue = useRef(createMutationQueue()).current;
-  const applicationMutationQueue = useRef(createMutationQueue()).current;
+  const [applicationMutationQueue] = useState(createMutationQueue);
   const notificationMutationQueue = useRef(createMutationQueue()).current;
   const settingsMutationQueue = useRef(createMutationQueue()).current;
   const tablePreferencesMutationQueue = useRef(createMutationQueue()).current;
@@ -164,7 +165,7 @@ export function useTrackerStore(): TrackerStore {
     setIsStorageLoading(true);
     setStorageError(null);
 
-    indexedDbStorageAdapter
+    cloudStorageAdapter
       .initialize()
       .then(async (snapshot) => {
         if (!isActive) {
@@ -180,7 +181,7 @@ export function useTrackerStore(): TrackerStore {
           interviewReconciliation.applicationWrites.length > 0 ||
           interviewReconciliation.interviewWrites.length > 0
         ) {
-          await indexedDbStorageAdapter.commitMutation({
+          await cloudStorageAdapter.commitMutation({
             applications: interviewReconciliation.applicationWrites,
             interviews: interviewReconciliation.interviewWrites,
           });
@@ -204,6 +205,7 @@ export function useTrackerStore(): TrackerStore {
         setResumes(snapshot.resumes);
         setSettings(snapshot.settings);
         setTablePreferences(snapshot.tablePreferences);
+        setCloudAccountEmail(cloudStorageAdapter.getAccount()?.email ?? null);
         setIsStorageLoading(false);
       })
       .catch((error: unknown) => {
@@ -220,70 +222,23 @@ export function useTrackerStore(): TrackerStore {
     };
   }, [storageRetryKey]);
 
-  useEffect(() => {
-    if (isStorageLoading || storageError) {
-      return;
-    }
-
-    const now = new Date();
-    const transitionedApplications = applications.filter(
-      (application) =>
-        application.status === "Just Applied" &&
-        application.dateApplied &&
-        daysSince(application.dateApplied, now) >=
-          (application.followUpPromptDays ?? settings.defaultFollowUpPromptDays),
-    );
-
-    if (transitionedApplications.length === 0) {
-      return;
-    }
-
-    const updatedAt = createTimestamp(now);
-    const transitionedIds = new Set(
-      transitionedApplications.map((application) => application.id),
-    );
-    const updatedApplications = applications.map((application) =>
-      transitionedIds.has(application.id)
-        ? {
-            ...application,
-            status: "Awaiting Response" as ApplicationStatus,
-            updatedAt,
-          }
-        : application,
-    );
-    const newActivities = transitionedApplications.map((application) =>
-      createActivity(
-        application.id,
-        "status_changed",
-        "Status changed to Awaiting Response after the follow-up window elapsed.",
-        updatedAt,
-      ),
-    );
-
-    void indexedDbStorageAdapter
-      .commitMutation({
-        activities: newActivities,
-        applications: updatedApplications.filter((application) =>
-          transitionedIds.has(application.id),
-        ),
-      })
-      .then(() => {
-        setApplications(updatedApplications);
-        setActivities((current) => sortActivities([...newActivities, ...current]));
-        setStorageError(null);
-      })
-      .catch((error: unknown) => {
-        setStorageError(getStorageErrorMessage(error));
-      });
-  }, [
-    applications,
-    isStorageLoading,
-    settings.defaultFollowUpPromptDays,
-    storageError,
-  ]);
-
   function retryStorage() {
     setStorageRetryKey((current) => current + 1);
+  }
+
+  function runApplicationMutation<Value>(
+    operation: () => Promise<MutationResult<Value>>,
+  ) {
+    return applicationMutationQueue.run(async () => {
+      try {
+        return await operation();
+      } catch (error) {
+        const message = getStorageErrorMessage(error);
+
+        setStorageError(message);
+        return failure(message);
+      }
+    });
   }
 
   async function appendActivity(
@@ -306,13 +261,23 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationInput,
     pendingResume?: PendingResumeUpload,
   ): Promise<MutationResult<Application>> {
+    return runApplicationMutation(() =>
+      createApplicationNow(input, pendingResume),
+    );
+  }
+
+  async function createApplicationNow(
+    input: ApplicationInput,
+    pendingResume?: PendingResumeUpload,
+  ): Promise<MutationResult<Application>> {
     const createdAt = createTimestamp();
+    const currentResumes = await cloudStorageAdapter.listResumeMetadata();
     let resumeUpload: ResumeUploadResult | undefined;
 
     if (pendingResume) {
       try {
         resumeUpload = await createResumeUploadResult({
-          existingResumes: resumes,
+          existingResumes: currentResumes,
           file: pendingResume.file,
           options: pendingResume.options ?? {},
         });
@@ -340,7 +305,7 @@ export function useTrackerStore(): TrackerStore {
     const interview = buildInterviewRecord(application, [], createdAt);
     const markedResume = resumeUpload
       ? resumeUpload.resume
-      : getMarkedResume(application.resumeId, createdAt);
+      : getMarkedResume(application.resumeId, createdAt, currentResumes);
     const result = await commitMutation({
       activities: [createdActivity],
       applications: [application],
@@ -399,16 +364,9 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
   ): Promise<MutationResult> {
-    return applicationMutationQueue.run(async () => {
-      try {
-        return await updateApplicationNow(id, input, pendingResume);
-      } catch (error) {
-        const message = getStorageErrorMessage(error);
-
-        setStorageError(message);
-        return failure(message);
-      }
-    });
+    return runApplicationMutation(() =>
+      updateApplicationNow(id, input, pendingResume),
+    );
   }
 
   async function updateApplicationNow(
@@ -418,9 +376,9 @@ export function useTrackerStore(): TrackerStore {
   ): Promise<MutationResult> {
     const [currentApplication, currentInterviews, currentResumes] =
       await Promise.all([
-        indexedDbStorageAdapter.getApplication(id),
-        indexedDbStorageAdapter.listInterviews(id),
-        indexedDbStorageAdapter.listResumeMetadata(),
+        cloudStorageAdapter.getApplication(id),
+        cloudStorageAdapter.listInterviews(id),
+        cloudStorageAdapter.listResumeMetadata(),
       ]);
 
     if (!currentApplication) {
@@ -514,217 +472,264 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function archiveApplication(id: string): Promise<MutationResult> {
-    const application = applications.find((candidate) => candidate.id === id);
+    return runApplicationMutation(async () => {
+      const application = await cloudStorageAdapter.getApplication(id);
 
-    if (!application) {
-      return failure("Application could not be found.");
-    }
+      if (!application) {
+        return failure("Application could not be found.");
+      }
 
-    const updatedAt = createTimestamp();
-    const archivedApplication = {
-      ...application,
-      archivedAt: updatedAt,
-      updatedAt,
-    };
-    const activity = createActivity(id, "archived", "Archived application.", updatedAt);
-    const result = await commitMutation({
-      activities: [activity],
-      applications: [archivedApplication],
+      const updatedAt = createTimestamp();
+      const archivedApplication = {
+        ...application,
+        archivedAt: updatedAt,
+        updatedAt,
+      };
+      const activity = createActivity(
+        id,
+        "archived",
+        "Archived application.",
+        updatedAt,
+      );
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [archivedApplication],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? archivedApplication : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success();
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setApplications((current) =>
-      current.map((candidate) =>
-        candidate.id === id ? archivedApplication : candidate,
-      ),
-    );
-    setActivities((current) => sortActivities([activity, ...current]));
-    return success();
   }
 
   async function restoreApplication(id: string): Promise<MutationResult> {
-    const application = applications.find((candidate) => candidate.id === id);
+    return runApplicationMutation(async () => {
+      const application = await cloudStorageAdapter.getApplication(id);
 
-    if (!application) {
-      return failure("Application could not be found.");
-    }
+      if (!application) {
+        return failure("Application could not be found.");
+      }
 
-    const updatedAt = createTimestamp();
-    const restoredApplication = {
-      ...application,
-      archivedAt: undefined,
-      updatedAt,
-    };
-    const activity = createActivity(id, "restored", "Restored application.", updatedAt);
-    const result = await commitMutation({
-      activities: [activity],
-      applications: [restoredApplication],
+      const updatedAt = createTimestamp();
+      const restoredApplication = {
+        ...application,
+        archivedAt: undefined,
+        updatedAt,
+      };
+      const activity = createActivity(
+        id,
+        "restored",
+        "Restored application.",
+        updatedAt,
+      );
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [restoredApplication],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? restoredApplication : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success();
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setApplications((current) =>
-      current.map((candidate) =>
-        candidate.id === id ? restoredApplication : candidate,
-      ),
-    );
-    setActivities((current) => sortActivities([activity, ...current]));
-    return success();
   }
 
   async function deleteApplication(id: string): Promise<MutationResult> {
-    try {
-      await indexedDbStorageAdapter.deleteApplication(id);
+    return runApplicationMutation(async () => {
+      await cloudStorageAdapter.deleteApplication(id);
       setStorageError(null);
-    } catch (error) {
-      const message = getStorageErrorMessage(error);
-      setStorageError(message);
-      return failure(message);
-    }
 
-    setApplications((current) =>
-      current.filter((application) => application.id !== id),
-    );
-    setContacts((current) =>
-      current.filter((contact) => contact.applicationId !== id),
-    );
-    setActivities((current) =>
-      current.filter((activity) => activity.applicationId !== id),
-    );
-    setInterviews((current) =>
-      current.filter((interview) => interview.applicationId !== id),
-    );
-    return success();
+      setApplications((current) =>
+        current.filter((application) => application.id !== id),
+      );
+      setContacts((current) =>
+        current.filter((contact) => contact.applicationId !== id),
+      );
+      setActivities((current) =>
+        current.filter((activity) => activity.applicationId !== id),
+      );
+      setInterviews((current) =>
+        current.filter((interview) => interview.applicationId !== id),
+      );
+      return success();
+    });
   }
 
   async function addContact(
     input: ContactInput,
   ): Promise<MutationResult<ApplicationContact>> {
-    const createdAt = createTimestamp();
-    const contact: ApplicationContact = {
-      ...input,
-      id: createId("contact"),
-      createdAt,
-      updatedAt: createdAt,
-    };
-    const activity = createActivity(
-      input.applicationId,
-      "contact_created",
-      `Added contact ${contact.name}.`,
-      createdAt,
-    );
-    const updatedApplications = applications.map((application) =>
-      application.id === input.applicationId
-        ? {
-            ...application,
-            contactsCount: application.contactsCount + 1,
-            updatedAt: createdAt,
-          }
-        : application,
-    );
-    const updatedApplication = updatedApplications.find(
-      (application) => application.id === input.applicationId,
-    );
-    const result = await commitMutation({
-      activities: [activity],
-      applications: updatedApplication ? [updatedApplication] : undefined,
-      contacts: [contact],
+    return runApplicationMutation(async () => {
+      const [application, currentContacts] = await Promise.all([
+        cloudStorageAdapter.getApplication(input.applicationId),
+        cloudStorageAdapter.listContacts(input.applicationId),
+      ]);
+
+      if (!application) {
+        return failure("Application could not be found.");
+      }
+
+      const createdAt = createTimestamp();
+      const contact: ApplicationContact = {
+        ...input,
+        id: createId("contact"),
+        createdAt,
+        updatedAt: createdAt,
+      };
+      const activity = createActivity(
+        input.applicationId,
+        "contact_created",
+        `Added contact ${contact.name}.`,
+        createdAt,
+      );
+      const updatedApplication = {
+        ...application,
+        contactsCount: currentContacts.length + 1,
+        updatedAt: createdAt,
+      };
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [updatedApplication],
+        contacts: [contact],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setContacts((current) => [contact, ...current]);
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+
+      return success(contact);
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setContacts((current) => [contact, ...current]);
-    setApplications(updatedApplications);
-    setActivities((current) => sortActivities([activity, ...current]));
-
-    return success(contact);
   }
 
   async function updateContact(
     id: string,
     input: Partial<ContactInput>,
   ): Promise<MutationResult> {
-    const contact = contacts.find((candidate) => candidate.id === id);
+    return runApplicationMutation(async () => {
+      const contact = (await cloudStorageAdapter.listContacts()).find(
+        (candidate) => candidate.id === id,
+      );
 
-    if (!contact) {
-      return failure("Contact could not be found.");
-    }
+      if (!contact) {
+        return failure("Contact could not be found.");
+      }
 
-    const updatedAt = createTimestamp();
-    const updatedContact = {
-      ...contact,
-      ...input,
-      updatedAt,
-    };
-    const activity = createActivity(
-      contact.applicationId,
-      "contact_updated",
-      `Updated contact ${updatedContact.name}.`,
-      updatedAt,
-    );
-    const result = await commitMutation({
-      activities: [activity],
-      contacts: [updatedContact],
+      if (!(await cloudStorageAdapter.getApplication(contact.applicationId))) {
+        return failure("Application could not be found.");
+      }
+
+      const updatedAt = createTimestamp();
+      const updatedContact = {
+        ...contact,
+        ...input,
+        applicationId: contact.applicationId,
+        updatedAt,
+      };
+      const activity = createActivity(
+        contact.applicationId,
+        "contact_updated",
+        `Updated contact ${updatedContact.name}.`,
+        updatedAt,
+      );
+      const result = await commitMutation({
+        activities: [activity],
+        contacts: [updatedContact],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setContacts((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? updatedContact : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success();
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setContacts((current) =>
-      current.map((candidate) => (candidate.id === id ? updatedContact : candidate)),
-    );
-    setActivities((current) => sortActivities([activity, ...current]));
-    return success();
   }
 
   async function deleteContact(id: string): Promise<MutationResult> {
-    const contact = contacts.find((candidate) => candidate.id === id);
+    return runApplicationMutation(async () => {
+      const currentContacts = await cloudStorageAdapter.listContacts();
+      const contact = currentContacts.find((candidate) => candidate.id === id);
 
-    if (!contact) {
-      return failure("Contact could not be found.");
-    }
+      if (!contact) {
+        return failure("Contact could not be found.");
+      }
 
-    const updatedAt = createTimestamp();
-    const activity = createActivity(
-      contact.applicationId,
-      "contact_deleted",
-      `Deleted contact ${contact.name}.`,
-      updatedAt,
-    );
-    const updatedApplications = applications.map((application) =>
-      application.id === contact.applicationId
-        ? {
-            ...application,
-            contactsCount: Math.max(0, application.contactsCount - 1),
-            updatedAt,
-          }
-        : application,
-    );
-    const updatedApplication = updatedApplications.find(
-      (application) => application.id === contact.applicationId,
-    );
-    const result = await commitMutation({
-      activities: [activity],
-      applications: updatedApplication ? [updatedApplication] : undefined,
-      deleteContactIds: [id],
+      const application = await cloudStorageAdapter.getApplication(
+        contact.applicationId,
+      );
+
+      if (!application) {
+        return failure("Application could not be found.");
+      }
+
+      const updatedAt = createTimestamp();
+      const activity = createActivity(
+        contact.applicationId,
+        "contact_deleted",
+        `Deleted contact ${contact.name}.`,
+        updatedAt,
+      );
+      const updatedApplication = {
+        ...application,
+        contactsCount: currentContacts.filter(
+          (candidate) =>
+            candidate.applicationId === contact.applicationId &&
+            candidate.id !== id,
+        ).length,
+        updatedAt,
+      };
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [updatedApplication],
+        deleteContactIds: [id],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setContacts((current) =>
+        current.filter((candidate) => candidate.id !== id),
+      );
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success();
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setContacts((current) => current.filter((candidate) => candidate.id !== id));
-    setApplications(updatedApplications);
-    setActivities((current) => sortActivities([activity, ...current]));
-    return success();
   }
 
   async function uploadResume(
@@ -738,7 +743,7 @@ export function useTrackerStore(): TrackerStore {
     });
 
     try {
-      await indexedDbStorageAdapter.saveResume(result.resume, file);
+      await cloudStorageAdapter.saveResume(result.resume, file);
       setStorageError(null);
       setResumes((current) => sortResumes([result.resume, ...current]));
     } catch (error) {
@@ -775,40 +780,46 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function deleteResume(id: string): Promise<MutationResult> {
-    const currentResume = resumes.find((resume) => resume.id === id);
+    return runApplicationMutation(async () => {
+      const [currentResumes, currentApplications] = await Promise.all([
+        cloudStorageAdapter.listResumeMetadata(),
+        cloudStorageAdapter.listApplications(),
+      ]);
+      const currentResume = currentResumes.find((resume) => resume.id === id);
 
-    if (!currentResume) {
-      return failure("Resume metadata could not be found.");
-    }
+      if (!currentResume) {
+        return failure("Resume metadata could not be found.");
+      }
 
-    const updatedAt = createTimestamp();
-    const linkedApplications = applications.filter(
-      (application) => application.resumeId === id,
-    );
-    const updatedApplications = linkedApplications.map((application) => ({
-      ...application,
-      resumeId: undefined,
-      updatedAt,
-    }));
-    const result = await commitMutation({
-      applications: updatedApplications,
-      deleteResumeIds: [id],
-      deleteResumeFileKeys: [currentResume.storageKey],
+      const updatedAt = createTimestamp();
+      const linkedApplications = currentApplications.filter(
+        (application) => application.resumeId === id,
+      );
+      const updatedApplications = linkedApplications.map((application) => ({
+        ...application,
+        resumeId: undefined,
+        updatedAt,
+      }));
+      const result = await commitMutation({
+        applications: updatedApplications,
+        deleteResumeIds: [id],
+        deleteResumeFileKeys: [currentResume.storageKey],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setResumes((current) => current.filter((resume) => resume.id !== id));
+      setApplications((current) =>
+        current.map((application) =>
+          application.resumeId === id
+            ? { ...application, resumeId: undefined, updatedAt }
+            : application,
+        ),
+      );
+      return success();
     });
-
-    if (!result.ok) {
-      return result;
-    }
-
-    setResumes((current) => current.filter((resume) => resume.id !== id));
-    setApplications((current) =>
-      current.map((application) =>
-        application.resumeId === id
-          ? { ...application, resumeId: undefined, updatedAt }
-          : application,
-      ),
-    );
-    return success();
   }
 
   async function getResumeFile(id: string) {
@@ -818,7 +829,7 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("Resume metadata could not be found.");
     }
 
-    const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+    const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
     if (!file) {
       throw new Error("The resume file is missing from local storage.");
@@ -828,10 +839,10 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function exportFullBackup() {
-    const snapshot = await indexedDbStorageAdapter.exportSnapshot();
+    const snapshot = await cloudStorageAdapter.exportSnapshot();
     const resumeFileBackups = await Promise.all(
       snapshot.resumes.map(async (resume) => {
-        const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+        const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
         if (!file) {
           if (resume.fileSize <= 0) {
@@ -862,6 +873,10 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function importFullBackup(file: File) {
+    await applicationMutationQueue.run(() => importFullBackupNow(file));
+  }
+
+  async function importFullBackupNow(file: File) {
     const backup = await parseBackupFile(file);
     const applications = withContactCounts(
       backup.snapshot.applications,
@@ -883,7 +898,7 @@ export function useTrackerStore(): TrackerStore {
       }),
     );
 
-    await indexedDbStorageAdapter.importSnapshot(snapshot, resumeFiles);
+    await cloudStorageAdapter.importSnapshot(snapshot, resumeFiles);
 
     setActivities(sortActivities(snapshot.activities));
     setAnalyticsSettings(snapshot.analyticsSettings);
@@ -903,7 +918,7 @@ export function useTrackerStore(): TrackerStore {
   async function dismissNotification(id: string) {
     return notificationMutationQueue.run(async () => {
       try {
-        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const currentState = await cloudStorageAdapter.getNotificationState();
         const dismissedNotificationIds = Array.from(
           new Set([...currentState.dismissedNotificationIds, id]),
         );
@@ -913,7 +928,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState),
           () => setNotificationState(updatedState),
         );
       } catch (error) {
@@ -926,14 +941,14 @@ export function useTrackerStore(): TrackerStore {
   async function markNotificationsOpened() {
     return notificationMutationQueue.run(async () => {
       try {
-        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const currentState = await cloudStorageAdapter.getNotificationState();
         const updatedState = {
           ...currentState,
           lastOpenedAt: createTimestamp(),
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState),
           () => setNotificationState(updatedState),
         );
       } catch (error) {
@@ -946,14 +961,14 @@ export function useTrackerStore(): TrackerStore {
   async function updateSettings(input: Partial<UserSettings>) {
     return settingsMutationQueue.run(async () => {
       try {
-        const currentSettings = await indexedDbStorageAdapter.getSettings();
+        const currentSettings = await cloudStorageAdapter.getSettings();
         const updatedSettings = {
           ...currentSettings,
           ...input,
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveSettings(updatedSettings),
+          cloudStorageAdapter.saveSettings(updatedSettings),
           () => setSettings(updatedSettings),
         );
       } catch (error) {
@@ -967,14 +982,14 @@ export function useTrackerStore(): TrackerStore {
     return analyticsMutationQueue.run(async () => {
       try {
         const currentSettings =
-          await indexedDbStorageAdapter.getAnalyticsSettings();
+          await cloudStorageAdapter.getAnalyticsSettings();
         const updatedSettings = {
           ...currentSettings,
           ...input,
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
           () => setAnalyticsSettings(updatedSettings),
         );
       } catch (error) {
@@ -986,7 +1001,7 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetSettings() {
     return settingsMutationQueue.run(() =>
-      persistThenUpdate(indexedDbStorageAdapter.resetSettings(), () =>
+      persistThenUpdate(cloudStorageAdapter.resetSettings(), () =>
         setSettings(DEFAULT_USER_SETTINGS),
       ),
     );
@@ -996,14 +1011,14 @@ export function useTrackerStore(): TrackerStore {
     return tablePreferencesMutationQueue.run(async () => {
       try {
         const currentPreferences =
-          await indexedDbStorageAdapter.getTablePreferences();
+          await cloudStorageAdapter.getTablePreferences();
         const updatedTablePreferences = {
           ...currentPreferences,
           ...input,
         } as TablePreferences;
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
           () => setTablePreferences(updatedTablePreferences),
         );
       } catch (error) {
@@ -1016,7 +1031,7 @@ export function useTrackerStore(): TrackerStore {
   async function resetTablePreferences() {
     return tablePreferencesMutationQueue.run(() =>
       persistThenUpdate(
-        indexedDbStorageAdapter.resetTablePreferences(),
+        cloudStorageAdapter.resetTablePreferences(),
         () => setTablePreferences(null),
       ),
     );
@@ -1026,7 +1041,7 @@ export function useTrackerStore(): TrackerStore {
     mutation: StorageMutation,
   ): Promise<MutationResult> {
     try {
-      await indexedDbStorageAdapter.commitMutation(mutation);
+      await cloudStorageAdapter.commitMutation(mutation);
       setStorageError(null);
       return success();
     } catch (error) {
@@ -1055,6 +1070,7 @@ export function useTrackerStore(): TrackerStore {
     activities,
     analyticsSettings,
     applications,
+    cloudAccountEmail,
     contacts,
     interviews,
     isStorageLoading,
@@ -1212,11 +1228,4 @@ function failure(error: unknown): { error: string; ok: false } {
       typeof error === "string" ? error : getStorageErrorMessage(error),
     ok: false,
   };
-}
-
-function daysSince(dateStamp: string, now: Date) {
-  const date = new Date(dateStamp);
-  const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-  return Math.floor((now.getTime() - date.getTime()) / millisecondsPerDay);
 }

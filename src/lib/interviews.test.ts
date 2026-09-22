@@ -189,7 +189,7 @@ describe("reconcileCanonicalInterviews", () => {
     });
   });
 
-  it("merges a newer application projection without losing interview notes", () => {
+  it("keeps a canonical interview authoritative after an unrelated application update", () => {
     const newerApplication = {
       ...application,
       interviewDateTime: "2026-09-24T14:00",
@@ -201,16 +201,15 @@ describe("reconcileCanonicalInterviews", () => {
       [firstRound],
     );
 
-    expect(result.interviewWrites).toEqual([
-      expect.objectContaining({
-        id: firstRound.id,
-        dateTime: "2026-09-24T14:00",
-        notes: firstRound.notes,
-        platform: "Teams",
-        updatedAt: newerApplication.updatedAt,
-      }),
-    ]);
-    expect(result.applicationWrites).toEqual([]);
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews).toEqual([firstRound]);
+    expect(result.applications[0]).toMatchObject({
+      interviewDateTime: firstRound.dateTime,
+      interviewPlatform: firstRound.platform,
+      interviewRound: firstRound.round,
+      updatedAt: newerApplication.updatedAt,
+    });
+    expect(result.applicationWrites).toEqual([result.applications[0]]);
   });
 });
 

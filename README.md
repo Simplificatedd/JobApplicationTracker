@@ -1,9 +1,10 @@
 # Job Application Tracker
 
-A local-first web app for tracking internship and early-career job applications,
-follow-ups, interviews, contacts, resumes, backups, and beta analytics.
+An authenticated cloud-backed web app for tracking internship and early-career
+job applications, follow-ups, interviews, contacts, resumes, backups, and beta
+analytics.
 
-## V1 Features
+## Features
 
 - Applications table with search, filters, sorting, adjustable desktop columns,
   mobile cards, archive, restore, and optional active-delete protection.
@@ -18,41 +19,50 @@ follow-ups, interviews, contacts, resumes, backups, and beta analytics.
   destructive confirmations.
 - Optional beta Analytics tab with local charts and an activity calendar.
 
-## Local-First Storage
+## Authenticated Cloud Storage
 
-V1 stores tracker data in the browser profile using IndexedDB. Application
-records, contacts, activities, settings, table preferences, notification
-dismissals, analytics settings, resume metadata, and uploaded resume files all
-stay on the device/browser profile where the app is used.
+V2 uses Cloudflare Access for authentication, D1 for each user's tracker
+snapshot, and R2 for resume files. Every API request validates the Access JWT
+issuer, audience, signature, and required identity claims before deriving the
+owner ID. Browser-supplied owner IDs are never accepted.
 
-This keeps V1 simple and private by default, but it also means the app is not a
-cloud sync product. Clearing site data, switching browsers, using another
-device, or losing the browser profile can remove the local tracker data.
+IndexedDB remains a local cache. On the first authenticated visit, if that user
+does not yet have cloud data, the app migrates the existing browser snapshot and
+resume files to D1 and R2. After that, cloud state is authoritative. Writes use
+optimistic revisions, retry transient failures, and rebase a mutation when
+another session has written a newer revision.
 
-Use **Settings -> Full backup** regularly. The full backup includes the tracker
-snapshot and any stored resume files as base64 data. Keep backups somewhere you
-trust, because they can contain personal job-search information and resume
-files. CSV export is useful for spreadsheet review, but it is not a full restore
-backup.
+Use **Settings -> Full backup** regularly. A full backup includes the tracker
+snapshot and resume files as base64 data. Restoring a backup replaces the
+signed-in user's cloud data and refreshes the browser cache.
 
 ## Privacy Notes
 
-- No backend is implemented in V1.
+- Each D1 row and R2 object is scoped to the verified Cloudflare Access subject.
 - No analytics service or third-party telemetry is used.
 - Resume usage is not tracked in analytics.
-- Uploaded resumes remain in local IndexedDB unless included in a backup file
-  that you export.
+- Uploaded resumes are stored in the private R2 binding and cached in IndexedDB.
+- Resume uploads are limited to 10 MB per file and 100 MB per signed-in user.
 - Demo seed data uses fictional companies, people, and URLs.
 
 ## Run Locally
 
-Use the Node.js version recorded in `.nvmrc` (Node 22). With `nvm` installed:
+Use the Node.js version recorded in `.nvmrc` (Node 22). Copy the local Cloudflare
+configuration and fill in the D1 database ID:
 
 ```bash
 nvm use
 npm ci
+cp wrangler.example.jsonc wrangler.jsonc
+cp .dev.vars.example .dev.vars
+npx wrangler d1 migrations apply job-application-tracker --local
 npm run dev
 ```
+
+`LOCAL_DEV_AUTH_EMAIL` is accepted only when the request hostname is
+`localhost` or `127.0.0.1`. It cannot bypass Access on a deployed hostname.
+`npm run dev:ui` starts Vite without the cloud API and is intended only for
+isolated UI work.
 
 Run the same verification gate used by CI before committing or deploying:
 
@@ -76,38 +86,70 @@ configuration.
 
 ## Deploy To Cloudflare Pages
 
-Cloudflare Pages can host the static V1 app.
+Each student can deploy an independent copy from a fork, or a class can share
+one Access-protected deployment: verified Access subjects keep each user's data
+separate in the same D1 database and R2 bucket.
 
-1. In Cloudflare, create a Pages project connected to your fork.
-2. Set the build command to `npm run build`.
-3. Set the build output directory to `dist`.
-4. Deploy from your default branch.
+### 1. Create the storage resources
 
-No V1 runtime environment variables are required.
+In **Cloudflare -> Storage & Databases**:
 
-## Optional Cloudflare Access
+1. Create a D1 database named `job-application-tracker`.
+2. Create an R2 bucket named `job-application-tracker-resumes`.
+3. Copy `wrangler.example.jsonc` to the ignored `wrangler.jsonc` file and replace
+   `replace-with-your-d1-database-id` with the D1 database ID.
+4. Apply the schema:
 
-If you want the hosted tracker to be private, put Cloudflare Access in front of
-the Pages project.
+```bash
+npx wrangler login
+npx wrangler d1 migrations apply job-application-tracker --remote
+```
 
-1. Open Cloudflare Zero Trust.
-2. Create an Access application for the Pages domain.
-3. Add an allow policy for your email, team domain, or identity provider group.
-4. Test in a private window before adding real tracker data.
+### 2. Create the Pages project
 
-Cloudflare Access protects access to the static app. It does not change the V1
-local-first storage model. Each browser profile still has its own independent
-data, so using the same deployment from another device will not show the first
-device's records.
+1. Open **Workers & Pages -> Create application -> Pages -> Connect to Git**.
+2. Select the student's fork.
+3. Use production branch `main`, build command `npm run build`, output directory
+   `dist`, and leave the root directory blank.
+4. Complete the initial deployment to obtain the `*.pages.dev` hostname.
 
-For a single-user deployment, allow only the owner's identity. Each student who
-wants an independent deployment should create their own fork, Pages project,
-and Access policy rather than sharing one deployment.
+Pages Functions are deployed from `functions/`; do not use dashboard Direct
+Upload for this project.
 
-## V2 Roadmap
+### 3. Protect the site with Cloudflare Access
 
-V2 is intentionally not implemented here. The expected direction is optional
-Cloudflare-backed sync using D1 for structured records and R2 for resume files,
-with server-side authorization that scopes every record and file to the signed-in
-owner, plus explicit migration/import flows from V1 backups. Until that exists,
-V1 remains browser-local and backup-driven.
+1. In the Pages project, open **Settings -> General** and enable the Access
+   policy.
+2. Manage the generated Access application and remove the wildcard from its
+   public hostname so it protects the production `<project>.pages.dev` address.
+3. Add an **Allow** policy for the intended student emails, email domain, or
+   identity-provider group.
+4. Copy the application's **Application Audience (AUD) Tag**.
+5. Return to Pages and enable the Access policy again if preview deployments
+   should also be protected. Configure preview environment variables with that
+   preview application's AUD tag.
+
+### 4. Add production bindings and variables
+
+In **Pages project -> Settings** add these production bindings:
+
+- D1 binding `DB` -> `job-application-tracker`
+- R2 binding `RESUME_FILES` -> `job-application-tracker-resumes`
+
+Add these production variables:
+
+- `TEAM_DOMAIN` -> `https://<your-team-name>.cloudflareaccess.com`
+- `POLICY_AUD` -> the production Access application AUD tag
+
+Do not set `LOCAL_DEV_AUTH_EMAIL` in Cloudflare. Add equivalent preview bindings
+and variables only if branch previews need a working backend.
+
+### 5. Redeploy and verify
+
+Redeploy the latest `main` commit, then open the production URL in a private
+window. Verify that Access requires sign-in, create a test application, refresh
+the page, and download an uploaded test resume. Delete the test data before
+inviting students.
+
+Every later push to `main` deploys automatically. Keep `wrangler.jsonc`,
+`.dev.vars`, real resumes, and exported backups out of Git.
