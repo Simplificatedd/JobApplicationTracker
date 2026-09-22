@@ -5,11 +5,25 @@ const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", DOCX_MIME_TYPE]);
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_USER_RESUME_BYTES = 100 * 1024 * 1024;
 const STORAGE_KEY_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 
 interface ResumeObjectRow {
   file_size: number;
   mime_type: string;
+}
+
+interface ResumeUsageRow {
+  used_bytes: number | string | null;
+}
+
+export function requireAvailableResumeQuota(
+  usedBytes: number,
+  incomingBytes: number,
+) {
+  if (usedBytes + incomingBytes > MAX_USER_RESUME_BYTES) {
+    throw new HttpError(413, "Cloud resume storage is limited to 100 MB per user.");
+  }
 }
 
 function validateStorageKey(storageKey: string) {
@@ -76,6 +90,15 @@ export async function putResumeFile(
   if (!isPdf && !isDocx) {
     throw new HttpError(400, "The uploaded resume contents do not match its type.");
   }
+
+  const usage = await env.DB.prepare(
+    `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
+     FROM resume_objects
+     WHERE owner_id = ? AND storage_key <> ?`,
+  )
+    .bind(user.id, storageKey)
+    .first<ResumeUsageRow>();
+  requireAvailableResumeQuota(Number(usage?.used_bytes ?? 0), bytes.byteLength);
 
   const timestamp = new Date().toISOString();
   await env.RESUME_FILES.put(objectKey(user, storageKey), bytes, {

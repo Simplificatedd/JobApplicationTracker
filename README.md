@@ -42,6 +42,7 @@ signed-in user's cloud data and refreshes the browser cache.
 - No analytics service or third-party telemetry is used.
 - Resume usage is not tracked in analytics.
 - Uploaded resumes are stored in the private R2 binding and cached in IndexedDB.
+- Resume uploads are limited to 10 MB per file and 100 MB per signed-in user.
 - Demo seed data uses fictional companies, people, and URLs.
 
 ## Run Locally
