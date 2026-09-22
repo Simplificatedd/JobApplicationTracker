@@ -26,3 +26,16 @@ export function errorResponse(error: unknown) {
     { status: 500 },
   );
 }
+
+export function requireSameOriginMutation(request: Request) {
+  if (request.method === "GET" || request.method === "HEAD") {
+    return;
+  }
+
+  const requestOrigin = new URL(request.url).origin;
+  const origin = request.headers.get("origin");
+
+  if (origin !== requestOrigin) {
+    throw new HttpError(403, "Cross-origin cloud storage writes are not allowed.");
+  }
+}

@@ -1,5 +1,10 @@
 import { authenticateAccessRequest } from "../lib/auth";
-import { errorResponse, HttpError, jsonResponse } from "../lib/http";
+import {
+  errorResponse,
+  HttpError,
+  jsonResponse,
+  requireSameOriginMutation,
+} from "../lib/http";
 import {
   deleteResumeFile,
   getResumeFile,
@@ -16,6 +21,7 @@ import type { CloudflareEnv } from "../lib/types";
 export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
   try {
     const user = await authenticateAccessRequest(context.request, context.env);
+    requireSameOriginMutation(context.request);
     const url = new URL(context.request.url);
     const route = url.pathname.replace(/^\/api\/?/, "");
 
