@@ -43,6 +43,9 @@ signed-in user's cloud data and refreshes the browser cache.
 - Resume usage is not tracked in analytics.
 - Uploaded resumes are stored in the private R2 binding and cached in IndexedDB.
 - Resume uploads are limited to 10 MB per file and 100 MB per signed-in user.
+- Server-side safety budgets stop resume storage above 5 GiB, tracker snapshots
+  above 512 MiB, or more than 100,000 R2 writes and 1,000,000 R2 reads in one
+  UTC calendar month. Requests fail closed when a budget is exhausted.
 - Demo seed data uses fictional companies, people, and URLs.
 
 ## Run Locally
@@ -96,6 +99,7 @@ In **Cloudflare -> Storage & Databases**:
 
 1. Create a D1 database named `job-application-tracker`.
 2. Create an R2 bucket named `job-application-tracker-resumes`.
+   Keep its default **Standard** storage class and do not enable public access.
 3. Copy `wrangler.example.jsonc` to the ignored `wrangler.jsonc` file and replace
    `replace-with-your-d1-database-id` with the D1 database ID.
 4. Apply the schema:

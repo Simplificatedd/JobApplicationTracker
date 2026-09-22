@@ -7,7 +7,9 @@ import {
 import type { StorageSnapshot } from "../../src/storage/StorageAdapter";
 import {
   getCloudState,
+  MAX_TOTAL_SNAPSHOT_BYTES,
   parseSaveStateRequest,
+  requireAvailableSnapshotQuota,
   saveCloudState,
 } from "./state";
 
@@ -117,6 +119,12 @@ class FakeD1Database {
 }
 
 describe("cloud state", () => {
+  it("rejects writes beyond the account snapshot budget", () => {
+    expect(() =>
+      requireAvailableSnapshotQuota(MAX_TOTAL_SNAPSHOT_BYTES, 1),
+    ).toThrow("account safety limit");
+  });
+
   it("validates incoming state envelopes", () => {
     const input = { baseRevision: null, snapshot: snapshot() };
     expect(parseSaveStateRequest(JSON.stringify(input))).toEqual(input);

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { HttpError } from "./http";
 import {
+  MAX_TOTAL_RESUME_BYTES,
   MAX_USER_RESUME_BYTES,
   requireAvailableResumeQuota,
+  requireAvailableTotalResumeQuota,
 } from "./resumeFiles";
 
 describe("resume storage quota", () => {
@@ -20,6 +22,14 @@ describe("resume storage quota", () => {
       requireAvailableResumeQuota(MAX_USER_RESUME_BYTES, 1),
     ).toThrowError(
       expect.objectContaining({ status: 413 }) as unknown as HttpError,
+    );
+  });
+
+  it("rejects a write that exceeds the account storage budget", () => {
+    expect(() =>
+      requireAvailableTotalResumeQuota(MAX_TOTAL_RESUME_BYTES, 1),
+    ).toThrowError(
+      expect.objectContaining({ status: 507 }) as unknown as HttpError,
     );
   });
 });
