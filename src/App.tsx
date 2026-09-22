@@ -86,7 +86,7 @@ function StorageErrorBanner({
       <div className="flex min-w-0 items-start gap-3">
         <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} />
         <p className="min-w-0">
-          Local storage could not be reached. {message}
+          Cloud storage could not be reached. {message}
         </p>
       </div>
       <button
@@ -106,10 +106,10 @@ function StorageLoading() {
     <section className="surface-panel flex min-h-[280px] items-center justify-center rounded-lg px-6 py-12 text-center">
       <div>
         <p className="text-base font-semibold text-foreground">
-          Loading local tracker data
+          Loading your cloud tracker
         </p>
         <p className="mt-2 text-sm text-muted">
-          Your applications are opening from this browser profile.
+          Your signed-in workspace is syncing securely.
         </p>
       </div>
     </section>
@@ -178,6 +178,7 @@ function renderView(
 
   return (
     <SettingsPage
+      cloudAccountEmail={tracker.cloudAccountEmail}
       onExportApplicationsCsv={tracker.exportApplicationsCsv}
       onExportFullBackup={tracker.exportFullBackup}
       onImportFullBackup={tracker.importFullBackup}
