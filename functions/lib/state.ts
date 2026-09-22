@@ -7,11 +7,28 @@ import type {
 } from "./types";
 
 const MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024;
+export const MAX_TOTAL_SNAPSHOT_BYTES = 512 * 1024 * 1024;
 
 interface StateRow {
   revision: number;
   snapshot_json: string;
   updated_at: string;
+}
+
+interface StateUsageRow {
+  used_bytes: number | string | null;
+}
+
+export function requireAvailableSnapshotQuota(
+  usedBytes: number,
+  incomingBytes: number,
+) {
+  if (usedBytes + incomingBytes > MAX_TOTAL_SNAPSHOT_BYTES) {
+    throw new HttpError(
+      507,
+      "Cloud tracker data has reached its account safety limit.",
+    );
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,6 +112,18 @@ export async function saveCloudState(
 ): Promise<CloudStateEnvelope> {
   const timestamp = new Date().toISOString();
   const snapshotJson = JSON.stringify(input.snapshot);
+  const usage = await database
+    .prepare(
+      `SELECT COALESCE(SUM(LENGTH(CAST(snapshot_json AS BLOB))), 0) AS used_bytes
+       FROM tracker_state
+       WHERE owner_id <> ?`,
+    )
+    .bind(user.id)
+    .first<StateUsageRow>();
+  requireAvailableSnapshotQuota(
+    Number(usage?.used_bytes ?? 0),
+    new TextEncoder().encode(snapshotJson).byteLength,
+  );
 
   if (input.baseRevision === null) {
     const result = await database

@@ -1,11 +1,13 @@
 import { HttpError } from "./http";
 import type { AuthenticatedUser, CloudflareEnv } from "./types";
+import { reserveR2Operation } from "./usageBudgets";
 
 const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const ALLOWED_MIME_TYPES = new Set(["application/pdf", DOCX_MIME_TYPE]);
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_USER_RESUME_BYTES = 100 * 1024 * 1024;
+export const MAX_TOTAL_RESUME_BYTES = 5 * 1024 * 1024 * 1024;
 const STORAGE_KEY_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 
 interface ResumeObjectRow {
@@ -23,6 +25,18 @@ export function requireAvailableResumeQuota(
 ) {
   if (usedBytes + incomingBytes > MAX_USER_RESUME_BYTES) {
     throw new HttpError(413, "Cloud resume storage is limited to 100 MB per user.");
+  }
+}
+
+export function requireAvailableTotalResumeQuota(
+  usedBytes: number,
+  incomingBytes: number,
+) {
+  if (usedBytes + incomingBytes > MAX_TOTAL_RESUME_BYTES) {
+    throw new HttpError(
+      507,
+      "Cloud resume storage has reached its account safety limit.",
+    );
   }
 }
 
@@ -91,14 +105,31 @@ export async function putResumeFile(
     throw new HttpError(400, "The uploaded resume contents do not match its type.");
   }
 
-  const usage = await env.DB.prepare(
-    `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
-     FROM resume_objects
-     WHERE owner_id = ? AND storage_key <> ?`,
-  )
-    .bind(user.id, storageKey)
-    .first<ResumeUsageRow>();
-  requireAvailableResumeQuota(Number(usage?.used_bytes ?? 0), bytes.byteLength);
+  const [userUsage, totalUsage] = await Promise.all([
+    env.DB.prepare(
+      `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
+       FROM resume_objects
+       WHERE owner_id = ? AND storage_key <> ?`,
+    )
+      .bind(user.id, storageKey)
+      .first<ResumeUsageRow>(),
+    env.DB.prepare(
+      `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
+       FROM resume_objects
+       WHERE NOT (owner_id = ? AND storage_key = ?)`,
+    )
+      .bind(user.id, storageKey)
+      .first<ResumeUsageRow>(),
+  ]);
+  requireAvailableResumeQuota(
+    Number(userUsage?.used_bytes ?? 0),
+    bytes.byteLength,
+  );
+  requireAvailableTotalResumeQuota(
+    Number(totalUsage?.used_bytes ?? 0),
+    bytes.byteLength,
+  );
+  await reserveR2Operation(env.DB, "write");
 
   const timestamp = new Date().toISOString();
   await env.RESUME_FILES.put(objectKey(user, storageKey), bytes, {
@@ -131,6 +162,7 @@ export async function getResumeFile(
     throw new HttpError(404, "The resume file could not be found.");
   }
 
+  await reserveR2Operation(env.DB, "read");
   const object = await env.RESUME_FILES.get(objectKey(user, storageKey));
 
   if (!object?.body) {
