@@ -13,3 +13,6 @@ coverage/
 .env.*
 !.env.example
 .wrangler/
+wrangler.json
+wrangler.jsonc
+wrangler.toml
