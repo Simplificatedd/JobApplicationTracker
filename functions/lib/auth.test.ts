@@ -65,4 +65,26 @@ describe("authenticateAccessRequest", () => {
       ),
     ).rejects.toMatchObject({ status: 500 } satisfies Partial<HttpError>);
   });
+
+  it("allows an explicit local identity only on loopback hosts", async () => {
+    const localEnv = { ...env, LOCAL_DEV_AUTH_EMAIL: "local@example.edu" };
+
+    await expect(
+      authenticateAccessRequest(
+        new Request("http://127.0.0.1:8788/api/session"),
+        localEnv,
+        vi.fn(),
+      ),
+    ).resolves.toEqual({
+      email: "local@example.edu",
+      id: "local:local@example.edu",
+    });
+    await expect(
+      authenticateAccessRequest(
+        new Request("https://tracker.example/api/session"),
+        localEnv,
+        vi.fn(),
+      ),
+    ).rejects.toMatchObject({ status: 401 } satisfies Partial<HttpError>);
+  });
 });

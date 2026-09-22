@@ -37,9 +37,22 @@ async function verifyAccessToken(
 
 export async function authenticateAccessRequest(
   request: Request,
-  env: Pick<CloudflareEnv, "POLICY_AUD" | "TEAM_DOMAIN">,
+  env: Pick<
+    CloudflareEnv,
+    "LOCAL_DEV_AUTH_EMAIL" | "POLICY_AUD" | "TEAM_DOMAIN"
+  >,
   verify: AccessTokenVerifier = verifyAccessToken,
 ): Promise<AuthenticatedUser> {
+  const requestHost = new URL(request.url).hostname;
+  const localEmail = env.LOCAL_DEV_AUTH_EMAIL?.trim();
+
+  if (
+    localEmail &&
+    (requestHost === "127.0.0.1" || requestHost === "localhost")
+  ) {
+    return { email: localEmail, id: `local:${localEmail.toLowerCase()}` };
+  }
+
   const audience = env.POLICY_AUD?.trim();
   const issuer = normalizeTeamDomain(env.TEAM_DOMAIN ?? "");
 

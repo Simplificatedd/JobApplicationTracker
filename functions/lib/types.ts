@@ -3,6 +3,7 @@ import type { StorageSnapshot } from "../../src/storage/StorageAdapter";
 
 export interface CloudflareEnv {
   DB: D1Database;
+  LOCAL_DEV_AUTH_EMAIL?: string;
   POLICY_AUD: string;
   RESUME_FILES: R2Bucket;
   TEAM_DOMAIN: string;
