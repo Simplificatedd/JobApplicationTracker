@@ -41,7 +41,7 @@ import {
   upsertInterviewHistory,
 } from "../lib/interviews";
 import { createMutationQueue } from "../lib/mutationQueue";
-import { indexedDbStorageAdapter } from "../storage/indexedDbAdapter";
+import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -78,6 +78,7 @@ export interface TrackerStore {
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
+  cloudAccountEmail: string | null;
   contacts: ApplicationContact[];
   interviews: Interview[];
   isStorageLoading: boolean;
@@ -137,6 +138,7 @@ export function useTrackerStore(): TrackerStore {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<ApplicationContact[]>([]);
+  const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
@@ -164,7 +166,7 @@ export function useTrackerStore(): TrackerStore {
     setIsStorageLoading(true);
     setStorageError(null);
 
-    indexedDbStorageAdapter
+    cloudStorageAdapter
       .initialize()
       .then(async (snapshot) => {
         if (!isActive) {
@@ -180,7 +182,7 @@ export function useTrackerStore(): TrackerStore {
           interviewReconciliation.applicationWrites.length > 0 ||
           interviewReconciliation.interviewWrites.length > 0
         ) {
-          await indexedDbStorageAdapter.commitMutation({
+          await cloudStorageAdapter.commitMutation({
             applications: interviewReconciliation.applicationWrites,
             interviews: interviewReconciliation.interviewWrites,
           });
@@ -204,6 +206,7 @@ export function useTrackerStore(): TrackerStore {
         setResumes(snapshot.resumes);
         setSettings(snapshot.settings);
         setTablePreferences(snapshot.tablePreferences);
+        setCloudAccountEmail(cloudStorageAdapter.getAccount()?.email ?? null);
         setIsStorageLoading(false);
       })
       .catch((error: unknown) => {
@@ -260,7 +263,7 @@ export function useTrackerStore(): TrackerStore {
       ),
     );
 
-    void indexedDbStorageAdapter
+    void cloudStorageAdapter
       .commitMutation({
         activities: newActivities,
         applications: updatedApplications.filter((application) =>
@@ -418,9 +421,9 @@ export function useTrackerStore(): TrackerStore {
   ): Promise<MutationResult> {
     const [currentApplication, currentInterviews, currentResumes] =
       await Promise.all([
-        indexedDbStorageAdapter.getApplication(id),
-        indexedDbStorageAdapter.listInterviews(id),
-        indexedDbStorageAdapter.listResumeMetadata(),
+        cloudStorageAdapter.getApplication(id),
+        cloudStorageAdapter.listInterviews(id),
+        cloudStorageAdapter.listResumeMetadata(),
       ]);
 
     if (!currentApplication) {
@@ -579,7 +582,7 @@ export function useTrackerStore(): TrackerStore {
 
   async function deleteApplication(id: string): Promise<MutationResult> {
     try {
-      await indexedDbStorageAdapter.deleteApplication(id);
+      await cloudStorageAdapter.deleteApplication(id);
       setStorageError(null);
     } catch (error) {
       const message = getStorageErrorMessage(error);
@@ -738,7 +741,7 @@ export function useTrackerStore(): TrackerStore {
     });
 
     try {
-      await indexedDbStorageAdapter.saveResume(result.resume, file);
+      await cloudStorageAdapter.saveResume(result.resume, file);
       setStorageError(null);
       setResumes((current) => sortResumes([result.resume, ...current]));
     } catch (error) {
@@ -818,7 +821,7 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("Resume metadata could not be found.");
     }
 
-    const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+    const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
     if (!file) {
       throw new Error("The resume file is missing from local storage.");
@@ -828,10 +831,10 @@ export function useTrackerStore(): TrackerStore {
   }
 
   async function exportFullBackup() {
-    const snapshot = await indexedDbStorageAdapter.exportSnapshot();
+    const snapshot = await cloudStorageAdapter.exportSnapshot();
     const resumeFileBackups = await Promise.all(
       snapshot.resumes.map(async (resume) => {
-        const file = await indexedDbStorageAdapter.getResumeFile(resume.storageKey);
+        const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
         if (!file) {
           if (resume.fileSize <= 0) {
@@ -883,7 +886,7 @@ export function useTrackerStore(): TrackerStore {
       }),
     );
 
-    await indexedDbStorageAdapter.importSnapshot(snapshot, resumeFiles);
+    await cloudStorageAdapter.importSnapshot(snapshot, resumeFiles);
 
     setActivities(sortActivities(snapshot.activities));
     setAnalyticsSettings(snapshot.analyticsSettings);
@@ -903,7 +906,7 @@ export function useTrackerStore(): TrackerStore {
   async function dismissNotification(id: string) {
     return notificationMutationQueue.run(async () => {
       try {
-        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const currentState = await cloudStorageAdapter.getNotificationState();
         const dismissedNotificationIds = Array.from(
           new Set([...currentState.dismissedNotificationIds, id]),
         );
@@ -913,7 +916,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState),
           () => setNotificationState(updatedState),
         );
       } catch (error) {
@@ -926,14 +929,14 @@ export function useTrackerStore(): TrackerStore {
   async function markNotificationsOpened() {
     return notificationMutationQueue.run(async () => {
       try {
-        const currentState = await indexedDbStorageAdapter.getNotificationState();
+        const currentState = await cloudStorageAdapter.getNotificationState();
         const updatedState = {
           ...currentState,
           lastOpenedAt: createTimestamp(),
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState),
           () => setNotificationState(updatedState),
         );
       } catch (error) {
@@ -946,14 +949,14 @@ export function useTrackerStore(): TrackerStore {
   async function updateSettings(input: Partial<UserSettings>) {
     return settingsMutationQueue.run(async () => {
       try {
-        const currentSettings = await indexedDbStorageAdapter.getSettings();
+        const currentSettings = await cloudStorageAdapter.getSettings();
         const updatedSettings = {
           ...currentSettings,
           ...input,
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveSettings(updatedSettings),
+          cloudStorageAdapter.saveSettings(updatedSettings),
           () => setSettings(updatedSettings),
         );
       } catch (error) {
@@ -967,14 +970,14 @@ export function useTrackerStore(): TrackerStore {
     return analyticsMutationQueue.run(async () => {
       try {
         const currentSettings =
-          await indexedDbStorageAdapter.getAnalyticsSettings();
+          await cloudStorageAdapter.getAnalyticsSettings();
         const updatedSettings = {
           ...currentSettings,
           ...input,
         };
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
           () => setAnalyticsSettings(updatedSettings),
         );
       } catch (error) {
@@ -986,7 +989,7 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetSettings() {
     return settingsMutationQueue.run(() =>
-      persistThenUpdate(indexedDbStorageAdapter.resetSettings(), () =>
+      persistThenUpdate(cloudStorageAdapter.resetSettings(), () =>
         setSettings(DEFAULT_USER_SETTINGS),
       ),
     );
@@ -996,14 +999,14 @@ export function useTrackerStore(): TrackerStore {
     return tablePreferencesMutationQueue.run(async () => {
       try {
         const currentPreferences =
-          await indexedDbStorageAdapter.getTablePreferences();
+          await cloudStorageAdapter.getTablePreferences();
         const updatedTablePreferences = {
           ...currentPreferences,
           ...input,
         } as TablePreferences;
 
         return persistThenUpdate(
-          indexedDbStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
           () => setTablePreferences(updatedTablePreferences),
         );
       } catch (error) {
@@ -1016,7 +1019,7 @@ export function useTrackerStore(): TrackerStore {
   async function resetTablePreferences() {
     return tablePreferencesMutationQueue.run(() =>
       persistThenUpdate(
-        indexedDbStorageAdapter.resetTablePreferences(),
+        cloudStorageAdapter.resetTablePreferences(),
         () => setTablePreferences(null),
       ),
     );
@@ -1026,7 +1029,7 @@ export function useTrackerStore(): TrackerStore {
     mutation: StorageMutation,
   ): Promise<MutationResult> {
     try {
-      await indexedDbStorageAdapter.commitMutation(mutation);
+      await cloudStorageAdapter.commitMutation(mutation);
       setStorageError(null);
       return success();
     } catch (error) {
@@ -1055,6 +1058,7 @@ export function useTrackerStore(): TrackerStore {
     activities,
     analyticsSettings,
     applications,
+    cloudAccountEmail,
     contacts,
     interviews,
     isStorageLoading,
