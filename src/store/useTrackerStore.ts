@@ -4,7 +4,6 @@ import type {
   Activity,
   Application,
   ApplicationContact,
-  ApplicationStatus,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -222,71 +221,6 @@ export function useTrackerStore(): TrackerStore {
       isActive = false;
     };
   }, [storageRetryKey]);
-
-  useEffect(() => {
-    if (isStorageLoading || storageError) {
-      return;
-    }
-
-    void applicationMutationQueue.run(async () => {
-      try {
-        const currentApplications = await cloudStorageAdapter.listApplications();
-        const now = new Date();
-        const transitionedApplications = currentApplications.filter(
-          (application) =>
-            application.status === "Just Applied" &&
-            application.dateApplied &&
-            daysSince(application.dateApplied, now) >=
-              (application.followUpPromptDays ??
-                settings.defaultFollowUpPromptDays),
-        );
-
-        if (transitionedApplications.length === 0) {
-          return;
-        }
-
-        const updatedAt = createTimestamp(now);
-        const updatedApplications = transitionedApplications.map(
-          (application) => ({
-            ...application,
-            status: "Awaiting Response" as ApplicationStatus,
-            updatedAt,
-          }),
-        );
-        const updatesById = new Map(
-          updatedApplications.map((application) => [application.id, application]),
-        );
-        const newActivities = transitionedApplications.map((application) =>
-          createActivity(
-            application.id,
-            "status_changed",
-            "Status changed to Awaiting Response after the follow-up window elapsed.",
-            updatedAt,
-          ),
-        );
-
-        await cloudStorageAdapter.commitMutation({
-          activities: newActivities,
-          applications: updatedApplications,
-        });
-        setApplications((current) =>
-          current.map((application) =>
-            updatesById.get(application.id) ?? application,
-          ),
-        );
-        setActivities((current) => sortActivities([...newActivities, ...current]));
-        setStorageError(null);
-      } catch (error) {
-        setStorageError(getStorageErrorMessage(error));
-      }
-    });
-  }, [
-    applicationMutationQueue,
-    applications,
-    isStorageLoading,
-    settings.defaultFollowUpPromptDays,
-    storageError,
-  ]);
 
   function retryStorage() {
     setStorageRetryKey((current) => current + 1);
@@ -1294,11 +1228,4 @@ function failure(error: unknown): { error: string; ok: false } {
       typeof error === "string" ? error : getStorageErrorMessage(error),
     ok: false,
   };
-}
-
-function daysSince(dateStamp: string, now: Date) {
-  const date = new Date(dateStamp);
-  const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-  return Math.floor((now.getTime() - date.getTime()) / millisecondsPerDay);
 }
