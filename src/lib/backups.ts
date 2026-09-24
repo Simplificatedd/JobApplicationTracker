@@ -267,6 +267,24 @@ function getBackupValidationError(value: unknown) {
     }
   }
 
+  const contactCounts = new Map<string, number>();
+
+  for (const contact of value.snapshot.contacts) {
+    contactCounts.set(
+      contact.applicationId,
+      (contactCounts.get(contact.applicationId) ?? 0) + 1,
+    );
+  }
+
+  if (
+    value.snapshot.applications.some(
+      (application) =>
+        application.contactsCount !== (contactCounts.get(application.id) ?? 0),
+    )
+  ) {
+    return "This backup file contains inconsistent application contact counts.";
+  }
+
   for (const interview of value.snapshot.interviews) {
     if (!isInterview(interview)) {
       return "This backup file contains invalid interview data.";
@@ -366,13 +384,13 @@ function isApplication(value: unknown): value is Application {
     isOptionalString(value.source) &&
     isOptionalString(value.location) &&
     isOptionalString(value.applicationUrl) &&
-    isOptionalString(value.dateFound) &&
-    isOptionalString(value.dateApplied) &&
-    isOptionalString(value.deadline) &&
-    isOptionalString(value.roleStartDate) &&
-    isOptionalString(value.roleEndDate) &&
+    isOptionalDate(value.dateFound) &&
+    isOptionalDate(value.dateApplied) &&
+    isOptionalDateOrDateTime(value.deadline) &&
+    isOptionalDate(value.roleStartDate) &&
+    isOptionalDate(value.roleEndDate) &&
     typeof value.followUpNeeded === "boolean" &&
-    isOptionalString(value.followUpDate) &&
+    isOptionalDate(value.followUpDate) &&
     isOptionalNonNegativeInteger(value.followUpPromptDays) &&
     isOptionalNonNegativeInteger(value.interviewRound) &&
     isOptionalOneOf(value.interviewType, [
@@ -389,12 +407,12 @@ function isApplication(value: unknown): value is Application {
       "take-home",
       "other",
     ]) &&
-    isOptionalString(value.interviewDateTime) &&
+    isOptionalDateTime(value.interviewDateTime) &&
     isOptionalString(value.interviewLocation) &&
     isOptionalString(value.interviewMeetingUrl) &&
     isOptionalString(value.interviewPlatform) &&
     typeof value.interviewProctored === "boolean" &&
-    isOptionalString(value.interviewDeadline) &&
+    isOptionalDateTime(value.interviewDeadline) &&
     isOneOf(value.deadlineEntryMode, [
       "exact",
       "1_day",
@@ -411,7 +429,7 @@ function isApplication(value: unknown): value is Application {
     isOptionalString(value.archivedAt) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt) &&
-    (value.resumeId === undefined || typeof value.resumeId === "string")
+    (value.resumeId === undefined || isNonBlankString(value.resumeId))
   );
 }
 
@@ -441,7 +459,7 @@ function isApplicationContact(value: unknown): value is ApplicationContact {
     isRecord(value) &&
     isNonBlankString(value.id) &&
     isNonBlankString(value.applicationId) &&
-    typeof value.name === "string" &&
+    isNonBlankString(value.name) &&
     isOptionalString(value.role) &&
     isOptionalString(value.email) &&
     isOptionalString(value.phone) &&
@@ -465,13 +483,13 @@ function isInterview(value: unknown): value is Interview {
       "unknown",
     ]) &&
     isOneOf(value.mode, ["phone", "video", "onsite", "take-home", "other"]) &&
-    isOptionalString(value.dateTime) &&
+    isOptionalDateTime(value.dateTime) &&
     isOptionalNonNegativeInteger(value.round) &&
     isOptionalString(value.location) &&
     isOptionalString(value.meetingUrl) &&
     isOptionalString(value.platform) &&
     typeof value.proctored === "boolean" &&
-    isOptionalString(value.deadline) &&
+    isOptionalDateTime(value.deadline) &&
     isOptionalString(value.notes) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
@@ -653,7 +671,72 @@ function isOptionalNonNegativeInteger(
 }
 
 function isTimestamp(value: unknown): value is string {
-  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+  return isDateTime(value);
+}
+
+function isOptionalDate(value: unknown): value is string | undefined {
+  return value === undefined || isDate(value);
+}
+
+function isOptionalDateTime(value: unknown): value is string | undefined {
+  return value === undefined || isDateTime(value);
+}
+
+function isOptionalDateOrDateTime(
+  value: unknown,
+): value is string | undefined {
+  return value === undefined || isDate(value) || isDateTime(value);
+}
+
+function isDate(value: unknown): value is string {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  return Boolean(match && hasValidDateParts(match));
+}
+
+function isDateTime(value: unknown): value is string {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.exec(
+    value,
+  );
+
+  if (!match || !hasValidDateParts(match)) {
+    return false;
+  }
+
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6] ?? 0);
+
+  return (
+    hour >= 0 &&
+    hour <= 23 &&
+    minute >= 0 &&
+    minute <= 59 &&
+    second >= 0 &&
+    second <= 59 &&
+    !Number.isNaN(Date.parse(value))
+  );
+}
+
+function hasValidDateParts(match: RegExpExecArray) {
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
 }
 
 function isOneOf<const T extends string>(
