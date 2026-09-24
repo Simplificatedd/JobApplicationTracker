@@ -48,6 +48,13 @@ signed-in user's cloud data and refreshes the browser cache.
   UTC calendar month. Requests fail closed when a budget is exhausted.
 - Demo seed data uses fictional companies, people, and URLs.
 
+### Data model decisions
+
+- Application deletion is a confirmed permanent removal intended for accidental
+  or test entries. It removes the application and its activity timeline, so the
+  app does not create an unreachable deletion activity first.
+- Archive an application instead when its history should remain available.
+
 ## Run Locally
 
 Use the Node.js version recorded in `.nvmrc` (Node 22). Copy the local Cloudflare

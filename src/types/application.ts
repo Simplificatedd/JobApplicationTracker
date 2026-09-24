@@ -96,7 +96,6 @@ export interface Activity {
     | "status_changed"
     | "archived"
     | "restored"
-    | "deleted"
     | "contact_created"
     | "contact_updated"
     | "contact_deleted";

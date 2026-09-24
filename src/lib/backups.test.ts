@@ -105,6 +105,26 @@ describe("parseBackupFile", () => {
     );
   });
 
+  it("rejects the removed application deletion activity type", async () => {
+    const snapshot = {
+      ...createSnapshot(),
+      activities: [
+        {
+          id: "activity-1",
+          applicationId: "app-1",
+          type: "deleted",
+          message: "Deleted application.",
+          createdAt: timestamp,
+        },
+      ],
+      applications: [createApplication()],
+    };
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid activity data",
+    );
+  });
+
   it("rejects records linked to missing applications", async () => {
     const snapshot = createSnapshot({
       contacts: [
