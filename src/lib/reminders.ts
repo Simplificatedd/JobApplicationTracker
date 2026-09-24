@@ -43,9 +43,9 @@ export function classifyReminderSeverity(
   dueSoonDays: number,
   now = new Date(),
 ): ReminderSeverity {
-  const dueDate = dueAt instanceof Date ? dueAt : new Date(dueAt);
+  const dueDate = dueAt instanceof Date ? dueAt : parseDate(dueAt);
 
-  if (Number.isNaN(dueDate.getTime())) {
+  if (!dueDate || Number.isNaN(dueDate.getTime())) {
     return "upcoming";
   }
 
@@ -336,6 +336,25 @@ function addDays(date: Date, days: number) {
 function parseDate(value: string | undefined) {
   if (!value) {
     return undefined;
+  }
+
+  const dateStampMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+  if (dateStampMatch) {
+    const year = Number(dateStampMatch[1]);
+    const monthIndex = Number(dateStampMatch[2]) - 1;
+    const day = Number(dateStampMatch[3]);
+    const localDate = new Date(year, monthIndex, day);
+
+    if (
+      localDate.getFullYear() !== year ||
+      localDate.getMonth() !== monthIndex ||
+      localDate.getDate() !== day
+    ) {
+      return undefined;
+    }
+
+    return localDate;
   }
 
   const date = new Date(value);
