@@ -328,22 +328,46 @@ change production.
 #### Existing Direct Upload projects
 
 A Pages project created with Wrangler shows **Git Provider: No** and does not
-deploy when GitHub changes. This repository's CI workflow handles that case for
-the reference deployment: after every successful `main` verification, it
-builds and deploys the same commit to the existing Pages project.
+deploy when GitHub changes. The included CI workflow can safely add automatic
+deployment to an existing Direct Upload project.
 
-The repository owner must add these GitHub Actions secrets under **Settings ->
-Secrets and variables -> Actions**:
+Do not configure this workflow when the Pages project already shows a Git
+provider. Cloudflare's Git integration already deploys `main`, and enabling
+both methods would create duplicate deployments.
 
-- `CLOUDFLARE_ACCOUNT_ID`: the account ID shown in the Cloudflare dashboard.
-- `CLOUDFLARE_API_TOKEN`: a dedicated token restricted to the intended account
-  with only **Account -> Cloudflare Pages -> Edit** permission.
+For a Direct Upload project:
 
-Never commit either value. The deployment job is restricted to the original
-repository's `main` branch, waits for all checks to pass, and runs production
-deployments one at a time. A newer release cancels a superseded deployment to
-avoid unnecessary builds. Forks should use the Git-integrated setup above; it
-does not require copying the reference deployment's credentials.
+1. In Cloudflare, open **My Profile -> API Tokens -> Create Token -> Create
+   Custom Token**.
+2. Add only the **Account -> Cloudflare Pages -> Edit** permission.
+3. Under **Account Resources**, include only the account that owns the Pages
+   project. Create the token and copy it when Cloudflare displays it.
+4. Find the account ID in the Cloudflare dashboard. You can also run
+   `npx wrangler whoami` from the project folder.
+5. In the GitHub repository, open **Settings -> Secrets and variables ->
+   Actions -> Secrets** and add:
+   - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID.
+   - `CLOUDFLARE_API_TOKEN`: the token created above.
+6. Open the **Variables** tab on the same GitHub page and add:
+   - `CLOUDFLARE_PAGES_PROJECT`: the exact Pages **Project Name**.
+
+The project name is not necessarily the same as the public hostname. For
+example, a project named `job-application-tracker` may use a hostname such as
+`job-application-tracker-cne.pages.dev`. Copy the value from the **Project
+Name** column in `npx wrangler pages project list`, without `.pages.dev`.
+
+Forked repositories may initially have GitHub Actions disabled. If necessary,
+open the repository's **Actions** tab and enable workflows. After adding all
+three settings, open **Actions -> CI -> Run workflow**, select `main`, and run
+it once. The `verify` job must pass before `Deploy production` starts. Confirm
+the same commit appears under **Cloudflare -> Workers & Pages -> your project
+-> Deployments**.
+
+After activation, every push or merge to `main` is verified and deployed.
+Pull requests never deploy, missing configuration skips the deployment job,
+and a newer release cancels a superseded deployment to avoid unnecessary
+builds. Never commit or share the API token. Rotate it immediately if it is
+exposed.
 
 ### Cost and usage guardrails
 
@@ -377,3 +401,7 @@ the deployment widely, review Cloudflare's official [R2 pricing](https://develop
 | API returns a configuration error | Confirm the AUD came from the exact production application and that `TEAM_DOMAIN` includes `https://` with no callback path. |
 | D1 reports a missing table | Re-run `npx wrangler d1 migrations apply job-application-tracker --remote` against the correct account and database. |
 | The wildcard cannot be removed | Edit the public hostname destination, leave **Subdomain** completely blank, keep the exact `pages.dev` domain selected, and save. Rename the application if Cloudflare reports a conflict. |
+| `Deploy production` is skipped | For Direct Upload projects, add the `CLOUDFLARE_PAGES_PROJECT` repository variable and run CI from `main`. For Git-integrated projects, a skipped job is expected. |
+| Cloudflare reports `Project not found` | Set `CLOUDFLARE_PAGES_PROJECT` to the Pages project name, not its `pages.dev` hostname, and confirm the project belongs to `CLOUDFLARE_ACCOUNT_ID`. |
+| Cloudflare rejects the deployment token | Recreate `CLOUDFLARE_API_TOKEN` with **Account -> Cloudflare Pages -> Edit**, restrict it to the correct account, and replace the GitHub secret. |
+| GitHub shows a successful merge but the live site is old | Check the latest CI run for a successful `Deploy production` job, confirm its commit appears in Cloudflare Deployments, then hard-refresh the production page. |
