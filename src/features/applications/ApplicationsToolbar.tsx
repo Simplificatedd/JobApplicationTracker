@@ -217,6 +217,7 @@ function ColumnsModal({
   onClose: () => void;
   visibleApplicationColumns: string[];
 }) {
+  const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
   useEscapeKey(true, onClose);
 
   function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -227,13 +228,18 @@ function ColumnsModal({
 
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
     if (checked) {
-      onChange?.([...new Set([...visibleApplicationColumns, columnId])]);
+      setDraftColumns((current) => [...new Set([...current, columnId])]);
       return;
     }
 
-    onChange?.(
-      visibleApplicationColumns.filter((currentColumn) => currentColumn !== columnId),
+    setDraftColumns((current) =>
+      current.filter((currentColumn) => currentColumn !== columnId),
     );
+  }
+
+  function applyChanges() {
+    onChange?.(draftColumns);
+    onClose();
   }
 
   return (
@@ -261,7 +267,7 @@ function ColumnsModal({
         <div className="grid gap-2 overflow-y-auto px-4 py-5 sm:px-6">
           {APPLICATION_TABLE_COLUMNS.map((column) => {
             const checked =
-              !column.canHide || visibleApplicationColumns.includes(column.id);
+              !column.canHide || draftColumns.includes(column.id);
 
             return (
               <label
@@ -292,7 +298,7 @@ function ColumnsModal({
           <button
             className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={() =>
-              onChange?.(
+              setDraftColumns(
                 APPLICATION_TABLE_COLUMNS.filter((column) => !column.canHide).map(
                   (column) => column.id,
                 ),
@@ -305,7 +311,7 @@ function ColumnsModal({
           <button
             className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={() =>
-              onChange?.(
+              setDraftColumns(
                 APPLICATION_TABLE_COLUMNS.map((column) => column.id),
               )
             }
@@ -314,11 +320,18 @@ function ColumnsModal({
             Show all
           </button>
           <button
-            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onClose}
             type="button"
           >
-            Done
+            Cancel
+          </button>
+          <button
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            onClick={applyChanges}
+            type="button"
+          >
+            Apply
           </button>
         </footer>
       </div>
