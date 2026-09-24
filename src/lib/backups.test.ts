@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StorageSnapshot } from "../storage/StorageAdapter";
+import type { Application } from "../types/application";
 import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
@@ -13,6 +14,26 @@ import {
 import { MAX_RESUME_FILE_BYTES } from "./resumeFiles";
 
 const timestamp = "2026-09-21T00:00:00.000Z";
+
+function createApplication(overrides: Partial<Application> = {}): Application {
+  return {
+    id: "app-1",
+    company: "Example Company",
+    jobTitle: "Product Intern",
+    jobDescription: "",
+    status: "Just Applied",
+    workMode: "unknown",
+    jobType: "internship",
+    followUpNeeded: false,
+    interviewProctored: false,
+    deadlineEntryMode: "exact",
+    priority: "medium",
+    contactsCount: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  };
+}
 
 function createSnapshot(
   overrides: Partial<StorageSnapshot> = {},
@@ -99,6 +120,63 @@ describe("parseBackupFile", () => {
 
     await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
       "contact data to a missing application",
+    );
+  });
+
+  it("rejects impossible calendar dates in application data", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication({ dateApplied: "2026-02-31" })],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid application data",
+    );
+  });
+
+  it("accepts date-only and exact date/time deadlines", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({ deadline: "2026-09-30T23:59" }),
+        createApplication({
+          id: "app-2",
+          deadline: "2026-10-01",
+        }),
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("rejects malformed interview date-times", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication()],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: "app-1",
+          type: "technical",
+          mode: "video",
+          dateTime: "not-a-date",
+          proctored: false,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid interview data",
+    );
+  });
+
+  it("rejects application contact counts that disagree with contact records", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication({ contactsCount: 1 })],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "inconsistent application contact counts",
     );
   });
 
