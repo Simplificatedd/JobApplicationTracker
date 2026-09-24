@@ -23,7 +23,10 @@ import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
 } from "./ApplicationsTable";
-import type { ApplicationFilters } from "./applicationFilters";
+import {
+  DEFAULT_APPLICATION_FILTERS,
+  type ApplicationFilters,
+} from "./applicationFilters";
 import type {
   DeadlineEntryMode,
   InterviewType,
@@ -33,7 +36,9 @@ import type {
 } from "../../types/application";
 
 interface ApplicationsToolbarProps {
+  companyOptions?: string[];
   filters?: ApplicationFilters;
+  locationOptions?: string[];
   needsAttentionOnly?: boolean;
   onColumnVisibilityChange?: (columns: string[]) => void;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
@@ -45,7 +50,9 @@ interface ApplicationsToolbarProps {
 }
 
 export function ApplicationsToolbar({
+  companyOptions = [],
   filters,
+  locationOptions = [],
   needsAttentionOnly = false,
   onColumnVisibilityChange,
   onFilterChange,
@@ -57,32 +64,7 @@ export function ApplicationsToolbar({
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
-  const currentFilters = filters ?? {
-    applicationUrl: "",
-    contacts: "",
-    coverLetterVersion: "",
-    dateApplied: "",
-    deadline: "",
-    deadlineEntryMode: "",
-    followUp: "",
-    followUpPromptDays: "",
-    interview: "",
-    interviewRound: "",
-    interviewType: "",
-    jobDescription: "",
-    jobType: "",
-    location: "",
-    notes: "",
-    priority: "",
-    resume: "",
-    roleEndDate: "",
-    roleStartDate: "",
-    salary: "",
-    source: "",
-    status: "",
-    updatedAt: "",
-    workMode: "",
-  };
+  const currentFilters = filters ?? DEFAULT_APPLICATION_FILTERS;
   const activeFilterCount = countActiveFilters(
     currentFilters,
     needsAttentionOnly,
@@ -188,7 +170,9 @@ export function ApplicationsToolbar({
 
       {isMoreFiltersOpen ? (
         <MoreFiltersModal
+          companyOptions={companyOptions}
           currentFilters={currentFilters}
+          locationOptions={locationOptions}
           needsAttentionOnly={needsAttentionOnly}
           onClose={() => setIsMoreFiltersOpen(false)}
           onFilterChange={onFilterChange}
@@ -466,14 +450,18 @@ function InterviewDateFilter({
 }
 
 function MoreFiltersModal({
+  companyOptions,
   currentFilters,
+  locationOptions,
   needsAttentionOnly,
   onClose,
   onFilterChange,
   onNeedsAttentionOnlyChange,
   onResetFilters,
 }: {
+  companyOptions: string[];
   currentFilters: ApplicationFilters;
+  locationOptions: string[];
   needsAttentionOnly: boolean;
   onClose: () => void;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
@@ -513,6 +501,20 @@ function MoreFiltersModal({
         </header>
 
         <div className="grid gap-3 overflow-y-auto px-4 py-5 sm:grid-cols-2 sm:px-6">
+          <FilterSelect
+            icon={SlidersHorizontal}
+            label="Company"
+            onChange={(value) => onFilterChange?.({ company: value })}
+            value={currentFilters.company}
+          >
+            <option value="">Company</option>
+            {companyOptions.map((company) => (
+              <option key={company} value={company}>
+                {company}
+              </option>
+            ))}
+          </FilterSelect>
+
           <StatusFilter
             currentFilters={currentFilters}
             onFilterChange={onFilterChange}
@@ -778,8 +780,11 @@ function MoreFiltersModal({
             value={currentFilters.location}
           >
             <option value="">Location</option>
-            <option value="Singapore">Singapore</option>
-            <option value="Remote">Remote</option>
+            {locationOptions.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
           </FilterSelect>
 
           <FilterSelect

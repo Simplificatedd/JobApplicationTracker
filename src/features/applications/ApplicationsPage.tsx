@@ -11,7 +11,9 @@ import {
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
+  getApplicationFilterOptions,
   isNeedsAttention,
+  normalizeApplicationFilters,
   sortApplications,
   type ApplicationFilters,
   type SortColumn,
@@ -107,7 +109,7 @@ export function ApplicationsPage({
     mergeColumnWidths(rememberedTablePreferences?.columnWidths),
   );
   const [filters, setFilters] = useState<ApplicationFilters>(
-    rememberedTablePreferences?.filters ?? DEFAULT_APPLICATION_FILTERS,
+    normalizeApplicationFilters(rememberedTablePreferences?.filters),
   );
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
     rememberedTablePreferences?.needsAttentionOnly ?? false,
@@ -126,6 +128,11 @@ export function ApplicationsPage({
   );
   const baseApplications =
     viewMode === "archive" ? archivedApplications : activeApplications;
+  const companyOptions = getApplicationFilterOptions(baseApplications, "company");
+  const locationOptions = getApplicationFilterOptions(
+    baseApplications,
+    "location",
+  );
   const searchedApplications = searchApplications(baseApplications, searchQuery);
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
@@ -222,7 +229,9 @@ export function ApplicationsPage({
       </section>
 
       <ApplicationsToolbar
+        companyOptions={companyOptions}
         filters={filters}
+        locationOptions={locationOptions}
         needsAttentionOnly={needsAttentionOnly}
         onColumnVisibilityChange={(visibleApplicationColumns) =>
           updateSettings({ visibleApplicationColumns })
