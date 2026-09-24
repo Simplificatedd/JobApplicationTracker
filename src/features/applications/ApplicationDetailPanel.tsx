@@ -12,7 +12,12 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
-import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import {
+  formatDate,
+  formatDateRange,
+  formatDateTime,
+  formatUpdatedAt,
+} from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -185,9 +190,11 @@ export function ApplicationDetailPanel({
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted">
-              {application.company || "Company blank"}
-            </p>
+            {application.company ? (
+              <p className="text-sm font-medium text-muted">
+                {application.company}
+              </p>
+            ) : null}
             <h2
               className="mt-1 truncate text-xl font-semibold text-foreground"
               id="application-detail-title"
@@ -345,23 +352,24 @@ function ReadOnlyDetails({
         <DetailRow label="Deadline" value={formatDate(application.deadline)} />
         <DetailRow
           label="Role dates"
-          value={`${formatDate(application.roleStartDate)} - ${formatDate(
+          value={formatDateRange(
+            application.roleStartDate,
             application.roleEndDate,
-          )}`}
+          )}
         />
         <DetailRow
           label="Follow-up"
           value={
             application.followUpNeeded
-              ? `Needed ${formatDate(application.followUpDate)}`
-              : `Optional ${formatDate(application.followUpDate)}`
+              ? ["Needed", formatDate(application.followUpDate)]
+                  .filter(Boolean)
+                  .join(" ")
+              : formatDate(application.followUpDate)
           }
         />
         <DetailRow
           label="Interview"
-          value={`${application.interviewRound ? `Round ${application.interviewRound} / ` : ""}${formatDateTime(application.interviewDateTime)} / ${
-            application.interviewType ?? "Type blank"
-          }`}
+          value={formatInterviewSummary(application)}
         />
         <DetailRow
           label="Resume"
@@ -424,11 +432,13 @@ function ReadOnlyDetails({
                 <p className="text-sm font-semibold text-foreground">
                   {contact.name}
                 </p>
-                <p className="mt-1 text-sm text-muted">
-                  {[contact.role, contact.email, contact.phone]
-                    .filter(Boolean)
-                    .join(" / ") || "Contact details blank"}
-                </p>
+                {[contact.role, contact.email, contact.phone].some(Boolean) ? (
+                  <p className="mt-1 text-sm text-muted">
+                    {[contact.role, contact.email, contact.phone]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </p>
+                ) : null}
                 {contact.notes ? (
                   <p className="mt-2 text-sm text-foreground">{contact.notes}</p>
                 ) : null}
@@ -873,7 +883,12 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value || "Blank"}</p>
+      <p
+        aria-label={value ? undefined : "No value"}
+        className="mt-1 min-h-5 text-sm text-foreground"
+      >
+        {value ?? ""}
+      </p>
     </div>
   );
 }
@@ -883,10 +898,24 @@ function TextBlock({ label, value }: { label: string; value?: string }) {
     <section>
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
       <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm leading-6 text-foreground">
-        {value || "Blank"}
+        {value ?? ""}
       </p>
     </section>
   );
+}
+
+function formatInterviewSummary(application: Application) {
+  const details = [
+    application.interviewRound
+      ? `Round ${application.interviewRound}`
+      : undefined,
+    application.interviewDateTime
+      ? formatDateTime(application.interviewDateTime)
+      : undefined,
+    application.interviewType,
+  ].filter(Boolean);
+
+  return details.length > 0 ? details.join(" / ") : "Not scheduled";
 }
 
 function Field({

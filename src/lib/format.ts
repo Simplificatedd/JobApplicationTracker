@@ -14,10 +14,14 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-SG", {
 
 export function formatDate(value?: string) {
   if (!value) {
-    return "Blank";
+    return "";
   }
 
   return dateFormatter.format(new Date(value));
+}
+
+export function formatDateRange(start?: string, end?: string) {
+  return [formatDate(start), formatDate(end)].filter(Boolean).join(" - ");
 }
 
 export function formatDateTime(value?: string) {

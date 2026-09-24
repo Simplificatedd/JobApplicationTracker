@@ -69,9 +69,11 @@ export function InterviewCell({
         <p className="truncate text-sm font-medium text-foreground">
           {formatDateTime(application.interviewDateTime)}
         </p>
-        <p className="mt-1 truncate text-xs text-muted">
-          {application.interviewType ?? "Type blank"}
-        </p>
+        {application.interviewType ? (
+          <p className="mt-1 truncate text-xs text-muted">
+            {application.interviewType}
+          </p>
+        ) : null}
       </div>
     </div>
   );

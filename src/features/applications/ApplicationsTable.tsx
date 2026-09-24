@@ -1134,9 +1134,9 @@ function ApplicationCard({
           <p className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground">
             {application.jobTitle}
           </p>
-          {isColumnVisible("company") ? (
+          {isColumnVisible("company") && application.company ? (
             <p className="mt-1 truncate text-xs font-medium text-muted">
-              {application.company || "Company blank"}
+              {application.company}
             </p>
           ) : null}
         </div>
@@ -1218,9 +1218,14 @@ function CardField({
 }
 
 function TextCell({ value }: { value?: string | number }) {
+  const isEmpty = value === undefined || value === "";
+
   return (
-    <p className="truncate text-sm text-foreground">
-      {value === undefined || value === "" ? "Blank" : value}
+    <p
+      aria-label={isEmpty ? "No value" : undefined}
+      className="min-h-5 truncate text-sm text-foreground"
+    >
+      {isEmpty ? "" : value}
     </p>
   );
 }
@@ -1228,7 +1233,7 @@ function TextCell({ value }: { value?: string | number }) {
 function LongTextCell({ value }: { value?: string }) {
   return (
     <p className="line-clamp-2 text-sm leading-5 text-foreground">
-      {value || "Blank"}
+      {value ?? ""}
     </p>
   );
 }
