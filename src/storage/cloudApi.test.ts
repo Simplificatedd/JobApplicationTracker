@@ -15,6 +15,7 @@ const snapshot = {
   analyticsSettings: DEFAULT_ANALYTICS_SETTINGS,
   applications: [],
   contacts: [],
+  coverLetters: [],
   interviews: [],
   notificationState: DEFAULT_NOTIFICATION_STATE,
   resumes: [],

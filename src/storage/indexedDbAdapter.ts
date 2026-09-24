@@ -9,6 +9,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -22,13 +23,14 @@ import type {
 } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 3;
+export const TRACKER_DB_VERSION = 4;
 
 type StoreName =
   | "activities"
   | "analyticsSettings"
   | "applications"
   | "contacts"
+  | "coverLetterMetadata"
   | "interviews"
   | "notificationState"
   | "resumeMetadata"
@@ -108,9 +110,19 @@ export function createIndexedDbStorageAdapter(
       putMutationRecords(transaction, "activities", mutation.activities);
       putMutationRecords(transaction, "applications", mutation.applications);
       putMutationRecords(transaction, "contacts", mutation.contacts);
+      putMutationRecords(
+        transaction,
+        "coverLetterMetadata",
+        mutation.coverLetters,
+      );
       putMutationRecords(transaction, "interviews", mutation.interviews);
       putMutationRecords(transaction, "resumeMetadata", mutation.resumes);
       putMutationRecords(transaction, "resumeFiles", mutation.resumeFiles);
+      deleteMutationRecords(
+        transaction,
+        "coverLetterMetadata",
+        mutation.deleteCoverLetterIds,
+      );
       deleteMutationRecords(
         transaction,
         "contacts",
@@ -306,6 +318,37 @@ export function createIndexedDbStorageAdapter(
     );
   }
 
+  async function listCoverLetterMetadata() {
+    return getAll<CoverLetterMetadata>(
+      await getDatabase(),
+      "coverLetterMetadata",
+    );
+  }
+
+  async function saveCoverLetter(coverLetter: CoverLetterMetadata, file: Blob) {
+    const database = await getDatabase();
+    const transaction = database.transaction(
+      ["resumeFiles", "coverLetterMetadata"],
+      "readwrite",
+    );
+
+    transaction.objectStore("resumeFiles").put({
+      storageKey: coverLetter.storageKey,
+      file,
+    });
+    transaction.objectStore("coverLetterMetadata").put(coverLetter);
+
+    await transactionDone(transaction);
+  }
+
+  async function updateCoverLetterMetadata(coverLetter: CoverLetterMetadata) {
+    await putRecord(await getDatabase(), "coverLetterMetadata", coverLetter);
+  }
+
+  async function deleteCoverLetterMetadata(id: string) {
+    await deleteRecord(await getDatabase(), "coverLetterMetadata", id);
+  }
+
   async function listResumeMetadata() {
     const resumes = await getAll<Partial<ResumeMetadata>>(
       await getDatabase(),
@@ -460,6 +503,7 @@ export function createIndexedDbStorageAdapter(
       analyticsSettings: await getAnalyticsSettings(),
       applications: await listApplications(),
       contacts: await listContacts(),
+      coverLetters: await listCoverLetterMetadata(),
       interviews: await listInterviews(),
       notificationState: await getNotificationState(),
       resumes: await listResumeMetadata(),
@@ -479,6 +523,7 @@ export function createIndexedDbStorageAdapter(
         "analyticsSettings",
         "applications",
         "contacts",
+        "coverLetterMetadata",
         "interviews",
         "notificationState",
         "resumeMetadata",
@@ -495,6 +540,10 @@ export function createIndexedDbStorageAdapter(
     putMany(transaction.objectStore("activities"), snapshot.activities);
     putMany(transaction.objectStore("applications"), snapshot.applications);
     putMany(transaction.objectStore("contacts"), snapshot.contacts);
+    putMany(
+      transaction.objectStore("coverLetterMetadata"),
+      snapshot.coverLetters ?? [],
+    );
     putMany(transaction.objectStore("interviews"), snapshot.interviews);
     putMany(transaction.objectStore("resumeMetadata"), snapshot.resumes);
     putMany(transaction.objectStore("resumeFiles"), resumeFiles);
@@ -552,6 +601,10 @@ export function createIndexedDbStorageAdapter(
     saveInterview,
     deleteInterview,
     deleteInterviewsForApplication,
+    listCoverLetterMetadata,
+    saveCoverLetter,
+    updateCoverLetterMetadata,
+    deleteCoverLetterMetadata,
     listResumeMetadata,
     saveResume,
     createResumeMetadata,
@@ -650,6 +703,10 @@ function upgradeDatabase(
 
   if (!database.objectStoreNames.contains("resumeMetadata")) {
     database.createObjectStore("resumeMetadata", { keyPath: "id" });
+  }
+
+  if (!database.objectStoreNames.contains("coverLetterMetadata")) {
+    database.createObjectStore("coverLetterMetadata", { keyPath: "id" });
   }
 
   if (!database.objectStoreNames.contains("resumeFiles")) {

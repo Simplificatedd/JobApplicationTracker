@@ -1,5 +1,9 @@
 import { createId, createTimestamp } from "./domain";
-import type { ResumeMetadata } from "../types/application";
+import type {
+  CoverLetterMetadata,
+  ResumeMetadata,
+  StoredDocumentMetadata,
+} from "../types/application";
 
 export interface ResumeUploadOptions {
   displayName?: string;
@@ -12,6 +16,11 @@ export interface ResumeUploadOptions {
 export interface ResumeUploadResult {
   duplicateOf?: ResumeMetadata;
   resume: ResumeMetadata;
+}
+
+export interface CoverLetterUploadResult {
+  coverLetter: CoverLetterMetadata;
+  duplicateOf?: CoverLetterMetadata;
 }
 
 export function requiresDuplicateConfirmation(
@@ -27,29 +36,33 @@ const RESUME_MIME_TYPES = new Set(["application/pdf", DOCX_MIME_TYPE]);
 export const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 
 export async function validateResumeFile(file: File) {
+  return validateDocumentFile(file, "resume");
+}
+
+async function validateDocumentFile(file: File, documentLabel: string) {
   const fileExtension = getResumeFileExtension(file.name);
 
   if (!fileExtension) {
-    throw new Error("Upload a PDF or DOCX resume file.");
+    throw new Error(`Upload a PDF or DOCX ${documentLabel} file.`);
   }
 
   if (file.type && !RESUME_MIME_TYPES.has(file.type)) {
-    throw new Error("Upload a PDF or DOCX resume file.");
+    throw new Error(`Upload a PDF or DOCX ${documentLabel} file.`);
   }
 
   if (file.size <= 0) {
-    throw new Error("The selected resume file is empty.");
+    throw new Error(`The selected ${documentLabel} file is empty.`);
   }
 
   if (file.size > MAX_RESUME_FILE_BYTES) {
-    throw new Error("Resume files must be 10 MB or smaller.");
+    throw new Error(`${capitalize(documentLabel)} files must be 10 MB or smaller.`);
   }
 
   const expectedMimeType =
     fileExtension === "pdf" ? "application/pdf" : DOCX_MIME_TYPE;
 
   if (file.type && file.type !== expectedMimeType) {
-    throw new Error("The resume file type does not match its extension.");
+    throw new Error(`The ${documentLabel} file type does not match its extension.`);
   }
 
   const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
@@ -77,11 +90,55 @@ export async function createResumeUploadResult({
   file: File;
   options: ResumeUploadOptions;
 }): Promise<ResumeUploadResult> {
-  const validatedFile = await validateResumeFile(file);
+  const result = await createDocumentUploadResult({
+    documentLabel: "resume",
+    existingDocuments: existingResumes,
+    file,
+    idPrefix: "resume",
+    options,
+  });
+
+  return { duplicateOf: result.duplicateOf, resume: result.document };
+}
+
+export async function createCoverLetterUploadResult({
+  existingCoverLetters,
+  file,
+  options,
+}: {
+  existingCoverLetters: CoverLetterMetadata[];
+  file: File;
+  options: ResumeUploadOptions;
+}): Promise<CoverLetterUploadResult> {
+  const result = await createDocumentUploadResult({
+    documentLabel: "cover letter",
+    existingDocuments: existingCoverLetters,
+    file,
+    idPrefix: "cover-letter",
+    options,
+  });
+
+  return { coverLetter: result.document, duplicateOf: result.duplicateOf };
+}
+
+async function createDocumentUploadResult({
+  documentLabel,
+  existingDocuments,
+  file,
+  idPrefix,
+  options,
+}: {
+  documentLabel: string;
+  existingDocuments: StoredDocumentMetadata[];
+  file: File;
+  idPrefix: string;
+  options: ResumeUploadOptions;
+}) {
+  const validatedFile = await validateDocumentFile(file, documentLabel);
   const contentHash = await calculateContentHash(file);
-  const duplicateOf = existingResumes.find(
-    (resume) =>
-      resume.contentHash === contentHash && resume.fileSize === file.size,
+  const duplicateOf = existingDocuments.find(
+    (document) =>
+      document.contentHash === contentHash && document.fileSize === file.size,
   );
   const timestamp = createTimestamp();
   const originalFileName = file.name;
@@ -92,8 +149,8 @@ export async function createResumeUploadResult({
 
   return {
     duplicateOf,
-    resume: {
-      id: createId("resume"),
+    document: {
+      id: createId(idPrefix),
       displayName:
         options.displayName?.trim() ||
         stripResumeFileExtension(originalFileName) ||
@@ -103,15 +160,24 @@ export async function createResumeUploadResult({
       fileExtension: validatedFile.fileExtension,
       mimeType: validatedFile.mimeType,
       fileSize: file.size,
-      storageKey: createId("resume-file"),
+      storageKey: createId(`${idPrefix}-file`),
       contentHash,
       versionLabel: trimOptional(options.versionLabel),
       notes: trimOptional(options.notes),
       uploadedAt: timestamp,
       updatedAt: timestamp,
       lastUsedAt: options.markAsUsed ? timestamp : undefined,
-    },
+    } satisfies StoredDocumentMetadata,
   };
+}
+
+export function updateCoverLetterMetadata(
+  coverLetter: CoverLetterMetadata,
+  input: Partial<
+    Pick<CoverLetterMetadata, "displayName" | "downloadFileName" | "versionLabel" | "notes">
+  >,
+) {
+  return updateDocumentMetadata(coverLetter, input);
 }
 
 export function updateResumeMetadata(
@@ -120,28 +186,51 @@ export function updateResumeMetadata(
     Pick<ResumeMetadata, "displayName" | "downloadFileName" | "versionLabel" | "notes">
   >,
 ) {
+  return updateDocumentMetadata(resume, input);
+}
+
+function updateDocumentMetadata(
+  document: StoredDocumentMetadata,
+  input: Partial<
+    Pick<StoredDocumentMetadata, "displayName" | "downloadFileName" | "versionLabel" | "notes">
+  >,
+) {
   return {
-    ...resume,
-    displayName: input.displayName?.trim() || resume.displayName,
+    ...document,
+    displayName: input.displayName?.trim() || document.displayName,
     downloadFileName: input.downloadFileName
-      ? normalizeDownloadFileName(input.downloadFileName, resume.fileExtension)
-      : resume.downloadFileName,
+      ? normalizeDownloadFileName(input.downloadFileName, document.fileExtension)
+      : document.downloadFileName,
     versionLabel: "versionLabel" in input
       ? trimOptional(input.versionLabel)
-      : resume.versionLabel,
+      : document.versionLabel,
     notes: "notes" in input
       ? trimOptional(input.notes)
-      : resume.notes,
+      : document.notes,
     updatedAt: createTimestamp(),
-  } satisfies ResumeMetadata;
+  } satisfies StoredDocumentMetadata;
 }
 
 export function markResumeUsed(resume: ResumeMetadata, timestamp = createTimestamp()) {
+  return markDocumentUsed(resume, timestamp);
+}
+
+export function markCoverLetterUsed(
+  coverLetter: CoverLetterMetadata,
+  timestamp = createTimestamp(),
+) {
+  return markDocumentUsed(coverLetter, timestamp);
+}
+
+function markDocumentUsed(
+  document: StoredDocumentMetadata,
+  timestamp: string,
+) {
   return {
-    ...resume,
+    ...document,
     lastUsedAt: timestamp,
     updatedAt: timestamp,
-  } satisfies ResumeMetadata;
+  } satisfies StoredDocumentMetadata;
 }
 
 export function shouldMarkResumeUsed(
@@ -224,4 +313,8 @@ function trimOptional(value?: string) {
 
 function startsWithBytes(value: Uint8Array, expected: number[]) {
   return expected.every((byte, index) => value[index] === byte);
+}
+
+function capitalize(value: string) {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }

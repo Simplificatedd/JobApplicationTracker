@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ResumeMetadata } from "../types/application";
 import {
   createResumeUploadResult,
+  createCoverLetterUploadResult,
   MAX_RESUME_FILE_BYTES,
   requiresDuplicateConfirmation,
   shouldMarkResumeUsed,
@@ -63,6 +64,27 @@ describe("createResumeUploadResult", () => {
     });
 
     expect(result.resume.downloadFileName).toBe(".._private_resume.pdf");
+  });
+});
+
+describe("createCoverLetterUploadResult", () => {
+  it("creates reusable cover letter metadata with a distinct storage key", async () => {
+    const result = await createCoverLetterUploadResult({
+      existingCoverLetters: [],
+      file: new File([PDF_HEADER], "acme-cover-letter.pdf", {
+        type: "application/pdf",
+      }),
+      options: { displayName: "Acme cover letter", markAsUsed: true },
+    });
+
+    expect(result.coverLetter).toMatchObject({
+      displayName: "Acme cover letter",
+      fileExtension: "pdf",
+      originalFileName: "acme-cover-letter.pdf",
+    });
+    expect(result.coverLetter.id).toMatch(/^cover-letter-/);
+    expect(result.coverLetter.storageKey).toMatch(/^cover-letter-file-/);
+    expect(result.coverLetter.lastUsedAt).toBeDefined();
   });
 });
 

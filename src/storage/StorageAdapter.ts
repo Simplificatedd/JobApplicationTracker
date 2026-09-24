@@ -3,6 +3,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -14,6 +15,7 @@ export interface StorageSnapshot {
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
   contacts: ApplicationContact[];
+  coverLetters: CoverLetterMetadata[];
   interviews: Interview[];
   notificationState: NotificationState;
   resumes: ResumeMetadata[];
@@ -30,10 +32,12 @@ export interface StorageMutation {
   activities?: readonly Activity[];
   applications?: readonly Application[];
   contacts?: readonly ApplicationContact[];
+  coverLetters?: readonly CoverLetterMetadata[];
   interviews?: readonly Interview[];
   resumes?: readonly ResumeMetadata[];
   resumeFiles?: readonly ResumeBlobRecord[];
   deleteContactIds?: readonly string[];
+  deleteCoverLetterIds?: readonly string[];
   deleteInterviewIds?: readonly string[];
   deleteResumeIds?: readonly string[];
   deleteResumeFileKeys?: readonly string[];
@@ -65,6 +69,11 @@ export interface StorageAdapter {
   saveInterview(interview: Interview): Promise<void>;
   deleteInterview(id: string): Promise<void>;
   deleteInterviewsForApplication(applicationId: string): Promise<void>;
+
+  listCoverLetterMetadata(): Promise<CoverLetterMetadata[]>;
+  saveCoverLetter(coverLetter: CoverLetterMetadata, file: Blob): Promise<void>;
+  updateCoverLetterMetadata(coverLetter: CoverLetterMetadata): Promise<void>;
+  deleteCoverLetterMetadata(id: string): Promise<void>;
 
   listResumeMetadata(): Promise<ResumeMetadata[]>;
   saveResume(resume: ResumeMetadata, file: Blob): Promise<void>;
