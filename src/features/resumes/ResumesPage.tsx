@@ -12,10 +12,12 @@ import {
 import { useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
-import { formatFileSize, type ResumeUploadResult } from "../../lib/resumeFiles";
+import { formatFileSize } from "../../lib/resumeFiles";
 import type {
   MutationResult,
+  ResumeUploadAttempt,
   ResumeMetadataUpdate,
 } from "../../store/useTrackerStore";
 import type { Application, ResumeMetadata } from "../../types/application";
@@ -31,7 +33,8 @@ interface ResumesPageProps {
   onUploadResume: (
     file: File,
     options?: ResumeMetadataUpdate,
-  ) => Promise<ResumeUploadResult>;
+    allowDuplicate?: boolean,
+  ) => Promise<ResumeUploadAttempt>;
   resumes: ResumeMetadata[];
 }
 
@@ -48,6 +51,11 @@ export function ResumesPage({
   const [versionLabel, setVersionLabel] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    duplicateOf: ResumeMetadata;
+    file: File;
+  } | null>(null);
   const {
     actionError,
     clearActionError,
@@ -57,7 +65,7 @@ export function ResumesPage({
   } = useResumeFileActions(getResumeFile);
   const linkedCounts = getLinkedCounts(applications);
 
-  async function handleUpload(file: File | undefined) {
+  async function handleUpload(file: File | undefined, allowDuplicate = false) {
     if (!file) {
       return;
     }
@@ -65,26 +73,42 @@ export function ResumesPage({
     setUploadError("");
     setUploadMessage("");
     clearActionError();
+    setIsUploading(true);
 
     try {
-      const result = await onUploadResume(file, {
+      const options = {
         displayName,
         versionLabel,
-      });
+      };
+      const result = await onUploadResume(file, options, allowDuplicate);
 
+      if (!result.saved && result.duplicateOf) {
+        setPendingDuplicate({
+          duplicateOf: result.duplicateOf,
+          file,
+        });
+        return;
+      }
+
+      setPendingDuplicate(null);
       setDisplayName("");
       setVersionLabel("");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
 
-      setUploadMessage(
-        result.duplicateOf
-          ? `Uploaded. Exact duplicate of ${result.duplicateOf.displayName}.`
-          : "Resume uploaded.",
-      );
+      setUploadMessage("Resume uploaded.");
     } catch (error) {
       setUploadError(getErrorMessage(error));
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  function cancelDuplicateUpload() {
+    setPendingDuplicate(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   }
 
@@ -108,6 +132,7 @@ export function ResumesPage({
             <input
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="field-control"
+              id="resume-upload-file-input"
               onChange={(event) => handleUpload(event.target.files?.[0])}
               ref={fileInputRef}
               type="file"
@@ -133,11 +158,12 @@ export function ResumesPage({
           </Field>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 md:self-end"
+            disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             type="button"
           >
             <Upload aria-hidden="true" size={16} />
-            Upload
+            {isUploading ? "Checking..." : "Upload"}
           </button>
         </div>
         {uploadError || actionError ? (
@@ -191,6 +217,73 @@ export function ResumesPage({
           </div>
         </section>
       )}
+      {pendingDuplicate ? (
+        <DuplicateResumeDialog
+          duplicateOf={pendingDuplicate.duplicateOf}
+          isUploading={isUploading}
+          onCancel={cancelDuplicateUpload}
+          onConfirm={() =>
+            void handleUpload(pendingDuplicate.file, true)
+          }
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function DuplicateResumeDialog({
+  duplicateOf,
+  isUploading,
+  onCancel,
+  onConfirm,
+}: {
+  duplicateOf: ResumeMetadata;
+  isUploading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEscapeKey(true, onCancel);
+
+  return (
+    <div
+      aria-labelledby="duplicate-resume-title"
+      aria-modal="true"
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="alertdialog"
+    >
+      <div className="w-full max-w-md rounded-lg bg-surface p-5 shadow-popover">
+        <h2
+          className="text-lg font-semibold text-foreground"
+          id="duplicate-resume-title"
+        >
+          Exact duplicate resume
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          This file has the same contents as “{duplicateOf.displayName}”. No file
+          has been saved yet.
+        </p>
+        <p className="mt-2 text-sm text-foreground">
+          Upload it as a separate resume anyway?
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+            disabled={isUploading}
+            onClick={onCancel}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            disabled={isUploading}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isUploading ? "Uploading..." : "Upload anyway"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

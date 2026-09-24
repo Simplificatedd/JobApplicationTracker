@@ -3,6 +3,7 @@ import type { ResumeMetadata } from "../types/application";
 import {
   createResumeUploadResult,
   MAX_RESUME_FILE_BYTES,
+  requiresDuplicateConfirmation,
   shouldMarkResumeUsed,
   updateResumeMetadata,
   validateResumeFile,
@@ -62,6 +63,27 @@ describe("createResumeUploadResult", () => {
     });
 
     expect(result.resume.downloadFileName).toBe(".._private_resume.pdf");
+  });
+});
+
+describe("requiresDuplicateConfirmation", () => {
+  const resume = {
+    id: "resume-duplicate",
+  } as ResumeMetadata;
+  const result = {
+    duplicateOf: resume,
+    resume,
+  };
+
+  it("requires confirmation before an exact duplicate is saved", () => {
+    expect(requiresDuplicateConfirmation(result)).toBe(true);
+    expect(requiresDuplicateConfirmation(result, true)).toBe(false);
+  });
+
+  it("allows a unique upload without confirmation", () => {
+    expect(
+      requiresDuplicateConfirmation({ resume }),
+    ).toBe(false);
   });
 });
 

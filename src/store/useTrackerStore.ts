@@ -30,6 +30,7 @@ import {
 import {
   createResumeUploadResult,
   markResumeUsed,
+  requiresDuplicateConfirmation,
   shouldMarkResumeUsed,
   type ResumeUploadOptions,
   type ResumeUploadResult,
@@ -55,6 +56,10 @@ export type ApplicationInput = Omit<
 export type ApplicationUpdate = Partial<
   Omit<Application, "id" | "contactsCount" | "createdAt" | "updatedAt">
 >;
+
+export interface ResumeUploadAttempt extends ResumeUploadResult {
+  saved: boolean;
+}
 
 export type ContactInput = Omit<
   ApplicationContact,
@@ -119,7 +124,8 @@ export interface TrackerStore {
   uploadResume: (
     file: File,
     options?: ResumeUploadOptions,
-  ) => Promise<ResumeUploadResult>;
+    allowDuplicate?: boolean,
+  ) => Promise<ResumeUploadAttempt>;
   updateApplication: (
     id: string,
     input: ApplicationUpdate,
@@ -736,12 +742,17 @@ export function useTrackerStore(): TrackerStore {
   async function uploadResume(
     file: File,
     options: ResumeUploadOptions = {},
-  ): Promise<ResumeUploadResult> {
+    allowDuplicate = false,
+  ): Promise<ResumeUploadAttempt> {
     const result = await createResumeUploadResult({
       existingResumes: resumes,
       file,
       options,
     });
+
+    if (requiresDuplicateConfirmation(result, allowDuplicate)) {
+      return { ...result, saved: false };
+    }
 
     try {
       await cloudStorageAdapter.saveResume(result.resume, file);
@@ -752,7 +763,7 @@ export function useTrackerStore(): TrackerStore {
       throw error;
     }
 
-    return result;
+    return { ...result, saved: true };
   }
 
   async function updateResume(

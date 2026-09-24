@@ -37,7 +37,14 @@ export function App() {
       groupedNotifications={tracker.settings.enableGroupedNotifications}
       navigationDisplayMode={tracker.settings.navigationDisplayMode}
       notifications={notifications}
-      onAddOpen={() => setIsAddOpen(true)}
+      onPrimaryAction={() => {
+        if (visibleView === "resumes") {
+          document.getElementById("resume-upload-file-input")?.click();
+          return;
+        }
+
+        setIsAddOpen(true);
+      }}
       onDismissNotification={tracker.dismissNotification}
       onMarkNotificationsOpened={tracker.markNotificationsOpened}
       onOpenApplicationFromNotification={(id) => {
@@ -56,8 +63,11 @@ export function App() {
       {tracker.isStorageLoading ? (
         <StorageLoading />
       ) : (
-        renderView(visibleView, tracker, openApplicationId, () =>
-          setOpenApplicationId(null),
+        renderView(
+          visibleView,
+          tracker,
+          openApplicationId,
+          () => setOpenApplicationId(null),
         )
       )}
       {isAddOpen ? (
