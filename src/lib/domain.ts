@@ -43,7 +43,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   addJobFormLayout: "long_form",
   addJobPresentation: "modal",
   visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
-  enableDraggableColumnWidths: true,
+  enableDraggableColumnWidths: false,
   rememberTableState: true,
   enableDeleteActiveApplications: false,
   enableNotificationBell: true,
