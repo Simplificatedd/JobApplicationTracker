@@ -23,6 +23,13 @@ export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [
   "actions",
 ];
 
+export const REQUIRED_APPLICATION_COLUMNS = [
+  "jobTitle",
+  "status",
+  "contacts",
+  "actions",
+];
+
 export const APPLICATION_SOURCES = [
   "LinkedIn",
   "Referral",
@@ -52,6 +59,22 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   dueSoonDays: 3,
   betaAnalyticsEnabled: false,
 };
+
+export function normalizeUserSettings(
+  settings?: Partial<UserSettings>,
+): UserSettings {
+  const visibleApplicationColumns = [
+    ...(settings?.visibleApplicationColumns ??
+      DEFAULT_USER_SETTINGS.visibleApplicationColumns),
+    ...REQUIRED_APPLICATION_COLUMNS,
+  ];
+
+  return {
+    ...DEFAULT_USER_SETTINGS,
+    ...settings,
+    visibleApplicationColumns: [...new Set(visibleApplicationColumns)],
+  };
+}
 
 export const DEFAULT_ANALYTICS_SETTINGS: AnalyticsSettings = {
   enabled: false,

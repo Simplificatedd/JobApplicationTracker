@@ -25,6 +25,7 @@ import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
+  normalizeUserSettings,
 } from "../lib/domain";
 import {
   createResumeUploadResult,
@@ -203,7 +204,7 @@ export function useTrackerStore(): TrackerStore {
         setInterviews(interviewReconciliation.interviews);
         setNotificationState(snapshot.notificationState);
         setResumes(snapshot.resumes);
-        setSettings(snapshot.settings);
+        setSettings(normalizeUserSettings(snapshot.settings));
         setTablePreferences(snapshot.tablePreferences);
         setCloudAccountEmail(cloudStorageAdapter.getAccount()?.email ?? null);
         setIsStorageLoading(false);
