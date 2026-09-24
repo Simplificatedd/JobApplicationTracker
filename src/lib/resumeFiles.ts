@@ -14,6 +14,13 @@ export interface ResumeUploadResult {
   resume: ResumeMetadata;
 }
 
+export function requiresDuplicateConfirmation(
+  result: ResumeUploadResult,
+  allowDuplicate = false,
+) {
+  return Boolean(result.duplicateOf && !allowDuplicate);
+}
+
 const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const RESUME_MIME_TYPES = new Set(["application/pdf", DOCX_MIME_TYPE]);
