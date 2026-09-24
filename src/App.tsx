@@ -60,14 +60,16 @@ export function App() {
           setOpenApplicationId(null),
         )
       )}
-      <AddApplicationModal
-        applications={tracker.applications}
-        defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        onCreate={tracker.createApplication}
-        resumes={tracker.resumes}
-      />
+      {isAddOpen ? (
+        <AddApplicationModal
+          applications={tracker.applications}
+          defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
+          isOpen
+          onClose={() => setIsAddOpen(false)}
+          onCreate={tracker.createApplication}
+          resumes={tracker.resumes}
+        />
+      ) : null}
     </AppShell>
   );
 }
