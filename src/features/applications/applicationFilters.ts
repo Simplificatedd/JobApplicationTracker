@@ -52,6 +52,7 @@ export type SortDirection = "ascending" | "descending";
 
 export interface ApplicationFilters {
   applicationUrl: PresenceFilter;
+  company: string;
   contacts: ContactFilter;
   coverLetterVersion: PresenceFilter;
   dateApplied: PresenceFilter;
@@ -84,6 +85,7 @@ export interface SortState {
 
 export const DEFAULT_APPLICATION_FILTERS: ApplicationFilters = {
   applicationUrl: "",
+  company: "",
   contacts: "",
   coverLetterVersion: "",
   dateApplied: "",
@@ -119,6 +121,14 @@ export function applyApplicationFilters(
   filters: ApplicationFilters,
 ) {
   return applications.filter((application) => {
+    if (
+      filters.company &&
+      normalizeFilterValue(application.company) !==
+        normalizeFilterValue(filters.company)
+    ) {
+      return false;
+    }
+
     if (filters.status && application.status !== filters.status) {
       return false;
     }
@@ -234,7 +244,11 @@ export function applyApplicationFilters(
       return false;
     }
 
-    if (filters.location && application.location !== filters.location) {
+    if (
+      filters.location &&
+      normalizeFilterValue(application.location) !==
+        normalizeFilterValue(filters.location)
+    ) {
       return false;
     }
 
@@ -281,6 +295,35 @@ export function applyApplicationFilters(
 
     return true;
   });
+}
+
+export function normalizeApplicationFilters(
+  filters: Partial<ApplicationFilters> | null | undefined,
+): ApplicationFilters {
+  return {
+    ...DEFAULT_APPLICATION_FILTERS,
+    ...filters,
+  };
+}
+
+export function getApplicationFilterOptions(
+  applications: Application[],
+  field: "company" | "location",
+) {
+  const optionsByNormalizedValue = new Map<string, string>();
+
+  for (const application of applications) {
+    const displayValue = application[field]?.trim().replace(/\s+/g, " ");
+    const normalizedValue = normalizeFilterValue(displayValue);
+
+    if (displayValue && !optionsByNormalizedValue.has(normalizedValue)) {
+      optionsByNormalizedValue.set(normalizedValue, displayValue);
+    }
+  }
+
+  return [...optionsByNormalizedValue.values()].sort((left, right) =>
+    left.localeCompare(right, undefined, { sensitivity: "base" }),
+  );
 }
 
 export function isNeedsAttention(
@@ -380,6 +423,10 @@ function matchesPresence(value: string | undefined, filter: PresenceFilter) {
   }
 
   return true;
+}
+
+function normalizeFilterValue(value: string | undefined) {
+  return value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
 }
 
 function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
