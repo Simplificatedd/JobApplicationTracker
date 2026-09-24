@@ -2,6 +2,7 @@ import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
+  normalizeUserSettings,
 } from "../lib/domain";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
@@ -884,13 +885,7 @@ function normalizeResumeMetadata(resume: Partial<ResumeMetadata>): ResumeMetadat
 }
 
 function normalizeSettings(settings?: Partial<UserSettings>): UserSettings {
-  return {
-    ...DEFAULT_USER_SETTINGS,
-    ...settings,
-    visibleApplicationColumns:
-      settings?.visibleApplicationColumns ??
-      DEFAULT_USER_SETTINGS.visibleApplicationColumns,
-  };
+  return normalizeUserSettings(settings);
 }
 
 function normalizeNotificationState(

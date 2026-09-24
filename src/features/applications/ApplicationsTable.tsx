@@ -153,7 +153,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     width: 220,
   },
   {
-    canHide: true,
+    canHide: false,
     id: "status",
     key: "status",
     label: "Status",
@@ -265,7 +265,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     width: 150,
   },
   {
-    canHide: true,
+    canHide: false,
     id: "contacts",
     key: "contacts",
     label: "Contacts",
