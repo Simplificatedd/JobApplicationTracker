@@ -3,6 +3,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -18,6 +19,7 @@ export interface ResumeFileBackup {
 }
 
 export interface TrackerBackup {
+  coverLetterFiles: ResumeFileBackup[];
   exportedAt: string;
   resumeFiles: ResumeFileBackup[];
   schemaVersion: typeof BACKUP_SCHEMA_VERSION;
@@ -28,19 +30,24 @@ export interface BackupImportPreview {
   activities: number;
   applications: number;
   contacts: number;
+  coverLetterFiles: number;
+  coverLetters: number;
   interviews: number;
   resumeFiles: number;
   resumes: number;
 }
 
 export async function createBackupFile({
+  coverLetterFiles = [],
   resumeFiles,
   snapshot,
 }: {
+  coverLetterFiles?: ResumeFileBackup[];
   resumeFiles: ResumeFileBackup[];
   snapshot: StorageSnapshot;
 }) {
   const backup: TrackerBackup = {
+    coverLetterFiles,
     exportedAt: new Date().toISOString(),
     resumeFiles,
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -111,6 +118,8 @@ export function getBackupImportPreview(
     activities: backup.snapshot.activities.length,
     applications: backup.snapshot.applications.length,
     contacts: backup.snapshot.contacts.length,
+    coverLetterFiles: backup.coverLetterFiles.length,
+    coverLetters: backup.snapshot.coverLetters.length,
     interviews: backup.snapshot.interviews.length,
     resumeFiles: backup.resumeFiles.length,
     resumes: backup.snapshot.resumes.length,
@@ -119,12 +128,17 @@ export function getBackupImportPreview(
 
 export function createApplicationsCsv({
   applications,
+  coverLetters = [],
   resumes,
 }: {
   applications: Application[];
+  coverLetters?: CoverLetterMetadata[];
   resumes: ResumeMetadata[];
 }) {
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
+  const coverLetterById = new Map(
+    coverLetters.map((coverLetter) => [coverLetter.id, coverLetter]),
+  );
   const rows = applications.map((application) => [
     application.company,
     application.jobTitle,
@@ -141,6 +155,10 @@ export function createApplicationsCsv({
     application.resumeId
       ? resumeById.get(application.resumeId)?.displayName ?? "Missing resume"
       : "",
+    application.coverLetterId
+      ? coverLetterById.get(application.coverLetterId)?.displayName ??
+        "Missing cover letter"
+      : application.coverLetterVersion,
     application.notes,
   ]);
   const header = [
@@ -157,6 +175,7 @@ export function createApplicationsCsv({
     "job_type",
     "application_url",
     "resume",
+    "cover_letter",
     "notes",
   ];
   const csv = [header, ...rows].map(toCsvRow).join("\n");
@@ -181,6 +200,22 @@ function getBackupValidationError(value: unknown) {
     return "This backup file is missing resume file payloads.";
   }
 
+  if (value.coverLetterFiles === undefined) {
+    value.coverLetterFiles = [];
+  }
+
+  if (!Array.isArray(value.coverLetterFiles)) {
+    return "This backup file contains invalid cover letter file payloads.";
+  }
+
+  const coverLetterFiles = value.coverLetterFiles;
+
+  if (!isRecord(value.snapshot)) {
+    return "This backup file is missing required tracker data.";
+  }
+
+  value.snapshot.coverLetters ??= [];
+
   if (!isStorageSnapshot(value.snapshot)) {
     return "This backup file is missing required tracker data.";
   }
@@ -188,10 +223,14 @@ function getBackupValidationError(value: unknown) {
   const resumeIds = new Set<string>();
   const resumeStorageKeys = new Set<string>();
   const uploadedResumeStorageKeys = new Set<string>();
+  const coverLetterIds = new Set<string>();
+  const coverLetterStorageKeys = new Set<string>();
+  const uploadedCoverLetterStorageKeys = new Set<string>();
 
   if (
     !hasAllowedCollectionSizes(value.snapshot) ||
-    value.resumeFiles.length > MAX_BACKUP_RECORDS_PER_COLLECTION
+    value.resumeFiles.length > MAX_BACKUP_RECORDS_PER_COLLECTION ||
+    coverLetterFiles.length > MAX_BACKUP_RECORDS_PER_COLLECTION
   ) {
     return "This backup file contains too many records.";
   }
@@ -201,7 +240,8 @@ function getBackupValidationError(value: unknown) {
     !hasUniqueIds(value.snapshot.applications) ||
     !hasUniqueIds(value.snapshot.contacts) ||
     !hasUniqueIds(value.snapshot.interviews) ||
-    !hasUniqueIds(value.snapshot.resumes)
+    !hasUniqueIds(value.snapshot.resumes) ||
+    !hasUniqueIds(value.snapshot.coverLetters)
   ) {
     return "This backup file contains duplicate or blank record IDs.";
   }
@@ -233,6 +273,24 @@ function getBackupValidationError(value: unknown) {
     }
   }
 
+  for (const coverLetter of value.snapshot.coverLetters) {
+    if (!isResumeMetadata(coverLetter)) {
+      return "This backup file contains invalid cover letter metadata.";
+    }
+
+    coverLetterIds.add(coverLetter.id);
+
+    if (coverLetterStorageKeys.has(coverLetter.storageKey)) {
+      return "This backup file contains duplicate cover letter storage keys.";
+    }
+
+    coverLetterStorageKeys.add(coverLetter.storageKey);
+
+    if (coverLetter.fileSize > 0) {
+      uploadedCoverLetterStorageKeys.add(coverLetter.storageKey);
+    }
+  }
+
   const applicationIds = new Set<string>();
 
   for (const application of value.snapshot.applications) {
@@ -242,6 +300,13 @@ function getBackupValidationError(value: unknown) {
 
     if (application.resumeId && !resumeIds.has(application.resumeId)) {
       return "This backup file links an application to a missing resume.";
+    }
+
+    if (
+      application.coverLetterId &&
+      !coverLetterIds.has(application.coverLetterId)
+    ) {
+      return "This backup file links an application to a missing cover letter.";
     }
 
     applicationIds.add(application.id);
@@ -334,6 +399,45 @@ function getBackupValidationError(value: unknown) {
     }
   }
 
+  const coverLetterFileStorageKeys = new Set<string>();
+
+  for (const coverLetterFile of coverLetterFiles) {
+    if (!isResumeFileBackup(coverLetterFile)) {
+      return "This backup file contains invalid cover letter file data.";
+    }
+
+    if (coverLetterFileStorageKeys.has(coverLetterFile.storageKey)) {
+      return "This backup file contains duplicate cover letter file payloads.";
+    }
+
+    const coverLetter = value.snapshot.coverLetters.find(
+      (candidate) => candidate.storageKey === coverLetterFile.storageKey,
+    );
+
+    if (!coverLetter) {
+      return "This backup file contains an unlinked cover letter file payload.";
+    }
+
+    const decodedFile = decodeBase64(coverLetterFile.dataBase64);
+
+    if (
+      decodedFile === undefined ||
+      decodedFile.length !== coverLetter.fileSize ||
+      coverLetterFile.mimeType !== coverLetter.mimeType ||
+      !hasExpectedResumeSignature(decodedFile, coverLetter.fileExtension)
+    ) {
+      return "This backup file contains inconsistent cover letter file data.";
+    }
+
+    coverLetterFileStorageKeys.add(coverLetterFile.storageKey);
+  }
+
+  for (const storageKey of uploadedCoverLetterStorageKeys) {
+    if (!coverLetterFileStorageKeys.has(storageKey)) {
+      return "This backup file is missing a stored cover letter file.";
+    }
+  }
+
   return null;
 }
 
@@ -347,6 +451,7 @@ function isStorageSnapshot(value: unknown): value is StorageSnapshot {
     isRecord(value.analyticsSettings) &&
     Array.isArray(value.applications) &&
     Array.isArray(value.contacts) &&
+    Array.isArray(value.coverLetters) &&
     Array.isArray(value.interviews) &&
     isRecord(value.notificationState) &&
     Array.isArray(value.resumes) &&
@@ -422,6 +527,7 @@ function isApplication(value: unknown): value is Application {
     ]) &&
     isOptionalString(value.nextAction) &&
     isOneOf(value.priority, ["low", "medium", "high"]) &&
+    (value.coverLetterId === undefined || isNonBlankString(value.coverLetterId)) &&
     isOptionalString(value.coverLetterVersion) &&
     isOptionalString(value.salary) &&
     isOptionalString(value.notes) &&
@@ -608,6 +714,7 @@ function hasAllowedCollectionSizes(snapshot: StorageSnapshot) {
     snapshot.activities,
     snapshot.applications,
     snapshot.contacts,
+    snapshot.coverLetters,
     snapshot.interviews,
     snapshot.resumes,
   ].every((collection) => collection.length <= MAX_BACKUP_RECORDS_PER_COLLECTION);

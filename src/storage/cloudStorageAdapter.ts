@@ -435,9 +435,12 @@ export function createCloudStorageAdapter({
   }
 
   async function clearResumeFiles() {
-    const resumes = await listResumeMetadata();
+    const documents = [
+      ...(await listResumeMetadata()),
+      ...(await listCoverLetterMetadata()),
+    ];
     await Promise.allSettled(
-      resumes.map((resume) => api.deleteResumeFile(resume.storageKey)),
+      documents.map((document) => api.deleteResumeFile(document.storageKey)),
     );
     await cache.clearResumeFiles();
   }

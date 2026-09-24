@@ -4,6 +4,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -29,12 +30,15 @@ import {
 } from "../lib/domain";
 import {
   createResumeUploadResult,
+  createCoverLetterUploadResult,
+  markCoverLetterUsed,
   markResumeUsed,
   requiresDuplicateConfirmation,
   shouldMarkResumeUsed,
   type ResumeUploadOptions,
   type ResumeUploadResult,
   updateResumeMetadata,
+  updateCoverLetterMetadata,
 } from "../lib/resumeFiles";
 import {
   buildInterviewRecord,
@@ -61,6 +65,12 @@ export interface ResumeUploadAttempt extends ResumeUploadResult {
   saved: boolean;
 }
 
+export interface CoverLetterUploadAttempt {
+  coverLetter: CoverLetterMetadata;
+  duplicateOf?: CoverLetterMetadata;
+  saved: boolean;
+}
+
 export type ContactInput = Omit<
   ApplicationContact,
   "id" | "createdAt" | "updatedAt"
@@ -75,6 +85,8 @@ export interface PendingResumeUpload {
   options?: ResumeUploadOptions;
 }
 
+export type PendingCoverLetterUpload = PendingResumeUpload;
+
 export type MutationResult<Value = void> =
   | { ok: true; value: Value }
   | { error: string; ok: false };
@@ -85,6 +97,7 @@ export interface TrackerStore {
   applications: Application[];
   cloudAccountEmail: string | null;
   contacts: ApplicationContact[];
+  coverLetters: CoverLetterMetadata[];
   interviews: Interview[];
   isStorageLoading: boolean;
   notificationState: NotificationState;
@@ -103,14 +116,17 @@ export interface TrackerStore {
   createApplication: (
     input: ApplicationInput,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ) => Promise<MutationResult<Application>>;
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
+  deleteCoverLetter: (id: string) => Promise<MutationResult>;
   deleteResume: (id: string) => Promise<MutationResult>;
   dismissNotification: (id: string) => Promise<boolean>;
   exportApplicationsCsv: () => Blob;
   exportFullBackup: () => Promise<Blob>;
   getResumeFile: (id: string) => Promise<Blob>;
+  getCoverLetterFile: (id: string) => Promise<Blob>;
   importFullBackup: (file: File) => Promise<void>;
   previewBackupImport: (file: File) => Promise<BackupImportPreview>;
   resetSettings: () => Promise<boolean>;
@@ -121,15 +137,25 @@ export interface TrackerStore {
     id: string,
     input: ResumeMetadataUpdate,
   ) => Promise<MutationResult>;
+  updateCoverLetter: (
+    id: string,
+    input: ResumeMetadataUpdate,
+  ) => Promise<MutationResult>;
   uploadResume: (
     file: File,
     options?: ResumeUploadOptions,
     allowDuplicate?: boolean,
   ) => Promise<ResumeUploadAttempt>;
+  uploadCoverLetter: (
+    file: File,
+    options?: ResumeUploadOptions,
+    allowDuplicate?: boolean,
+  ) => Promise<CoverLetterUploadAttempt>;
   updateApplication: (
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ) => Promise<MutationResult>;
   updateAnalyticsSettings: (input: Partial<AnalyticsSettings>) => Promise<boolean>;
   updateContact: (
@@ -144,6 +170,7 @@ export function useTrackerStore(): TrackerStore {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<ApplicationContact[]>([]);
+  const [coverLetters, setCoverLetters] = useState<CoverLetterMetadata[]>([]);
   const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isStorageLoading, setIsStorageLoading] = useState(true);
@@ -207,6 +234,7 @@ export function useTrackerStore(): TrackerStore {
           ),
         );
         setContacts(snapshot.contacts);
+        setCoverLetters(sortResumes(snapshot.coverLetters));
         setInterviews(interviewReconciliation.interviews);
         setNotificationState(snapshot.notificationState);
         setResumes(snapshot.resumes);
@@ -267,19 +295,27 @@ export function useTrackerStore(): TrackerStore {
   async function createApplication(
     input: ApplicationInput,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ): Promise<MutationResult<Application>> {
     return runApplicationMutation(() =>
-      createApplicationNow(input, pendingResume),
+      createApplicationNow(input, pendingResume, pendingCoverLetter),
     );
   }
 
   async function createApplicationNow(
     input: ApplicationInput,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ): Promise<MutationResult<Application>> {
     const createdAt = createTimestamp();
-    const currentResumes = await cloudStorageAdapter.listResumeMetadata();
+    const [currentResumes, currentCoverLetters] = await Promise.all([
+      cloudStorageAdapter.listResumeMetadata(),
+      cloudStorageAdapter.listCoverLetterMetadata(),
+    ]);
     let resumeUpload: ResumeUploadResult | undefined;
+    let coverLetterUpload: Awaited<
+      ReturnType<typeof createCoverLetterUploadResult>
+    > | undefined;
 
     if (pendingResume) {
       try {
@@ -293,11 +329,25 @@ export function useTrackerStore(): TrackerStore {
       }
     }
 
+    if (pendingCoverLetter) {
+      try {
+        coverLetterUpload = await createCoverLetterUploadResult({
+          existingCoverLetters: currentCoverLetters,
+          file: pendingCoverLetter.file,
+          options: pendingCoverLetter.options ?? {},
+        });
+      } catch (error) {
+        return failure(error);
+      }
+    }
+
     const application: Application = {
       ...input,
       id: createId("app"),
       dateApplied: input.dateApplied || createDateStamp(),
       resumeId: resumeUpload?.resume.id ?? input.resumeId,
+      coverLetterId:
+        coverLetterUpload?.coverLetter.id ?? input.coverLetterId,
       status: input.status || "Just Applied",
       contactsCount: 0,
       createdAt,
@@ -313,14 +363,30 @@ export function useTrackerStore(): TrackerStore {
     const markedResume = resumeUpload
       ? resumeUpload.resume
       : getMarkedResume(application.resumeId, createdAt, currentResumes);
+    const markedCoverLetter = coverLetterUpload
+      ? coverLetterUpload.coverLetter
+      : getMarkedCoverLetter(
+          application.coverLetterId,
+          createdAt,
+          currentCoverLetters,
+        );
     const result = await commitMutation({
       activities: [createdActivity],
       applications: [application],
       interviews: interview ? [interview] : undefined,
       resumes: markedResume ? [markedResume] : undefined,
-      resumeFiles: resumeUpload
-        ? [{ storageKey: resumeUpload.resume.storageKey, file: pendingResume!.file }]
-        : undefined,
+      coverLetters: markedCoverLetter ? [markedCoverLetter] : undefined,
+      resumeFiles: [
+        ...(resumeUpload
+          ? [{ storageKey: resumeUpload.resume.storageKey, file: pendingResume!.file }]
+          : []),
+        ...(coverLetterUpload
+          ? [{
+              storageKey: coverLetterUpload.coverLetter.storageKey,
+              file: pendingCoverLetter!.file,
+            }]
+          : []),
+      ],
     });
 
     if (!result.ok) {
@@ -339,6 +405,17 @@ export function useTrackerStore(): TrackerStore {
         sortResumes([
           markedResume,
           ...current.filter((resume) => resume.id !== markedResume.id),
+        ]),
+      );
+    }
+
+    if (markedCoverLetter) {
+      setCoverLetters((current) =>
+        sortResumes([
+          markedCoverLetter,
+          ...current.filter(
+            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
+          ),
         ]),
       );
     }
@@ -366,13 +443,30 @@ export function useTrackerStore(): TrackerStore {
     return markResumeUsed(currentResume, timestamp);
   }
 
+  function getMarkedCoverLetter(
+    coverLetterId: string | undefined,
+    timestamp: string,
+    availableCoverLetters = coverLetters,
+  ) {
+    if (!coverLetterId) {
+      return undefined;
+    }
+
+    const coverLetter = availableCoverLetters.find(
+      (candidate) => candidate.id === coverLetterId,
+    );
+
+    return coverLetter ? markCoverLetterUsed(coverLetter, timestamp) : undefined;
+  }
+
   async function updateApplication(
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ): Promise<MutationResult> {
     return runApplicationMutation(() =>
-      updateApplicationNow(id, input, pendingResume),
+      updateApplicationNow(id, input, pendingResume, pendingCoverLetter),
     );
   }
 
@@ -380,12 +474,19 @@ export function useTrackerStore(): TrackerStore {
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingCoverLetterUpload,
   ): Promise<MutationResult> {
-    const [currentApplication, currentInterviews, currentResumes] =
+    const [
+      currentApplication,
+      currentInterviews,
+      currentResumes,
+      currentCoverLetters,
+    ] =
       await Promise.all([
         cloudStorageAdapter.getApplication(id),
         cloudStorageAdapter.listInterviews(id),
         cloudStorageAdapter.listResumeMetadata(),
+        cloudStorageAdapter.listCoverLetterMetadata(),
       ]);
 
     if (!currentApplication) {
@@ -393,6 +494,9 @@ export function useTrackerStore(): TrackerStore {
     }
 
     let resumeUpload: ResumeUploadResult | undefined;
+    let coverLetterUpload: Awaited<
+      ReturnType<typeof createCoverLetterUploadResult>
+    > | undefined;
 
     if (pendingResume) {
       try {
@@ -406,6 +510,18 @@ export function useTrackerStore(): TrackerStore {
       }
     }
 
+    if (pendingCoverLetter) {
+      try {
+        coverLetterUpload = await createCoverLetterUploadResult({
+          existingCoverLetters: currentCoverLetters,
+          file: pendingCoverLetter.file,
+          options: pendingCoverLetter.options ?? {},
+        });
+      } catch (error) {
+        return failure(error);
+      }
+    }
+
     const updatedAt = createTimestamp();
     const updatedApplication: Application = {
       ...currentApplication,
@@ -413,6 +529,11 @@ export function useTrackerStore(): TrackerStore {
       resumeId:
         resumeUpload?.resume.id ??
         ("resumeId" in input ? input.resumeId : currentApplication.resumeId),
+      coverLetterId:
+        coverLetterUpload?.coverLetter.id ??
+        ("coverLetterId" in input
+          ? input.coverLetterId
+          : currentApplication.coverLetterId),
       updatedAt,
     };
     const newActivities = buildApplicationUpdateActivities(
@@ -436,14 +557,35 @@ export function useTrackerStore(): TrackerStore {
             currentResumes,
           )
         : undefined;
+    const markedCoverLetter = coverLetterUpload
+      ? coverLetterUpload.coverLetter
+      : shouldMarkResumeUsed(
+            currentApplication.coverLetterId,
+            updatedApplication.coverLetterId,
+          )
+        ? getMarkedCoverLetter(
+            updatedApplication.coverLetterId,
+            updatedAt,
+            currentCoverLetters,
+          )
+        : undefined;
     const result = await commitMutation({
       activities: newActivities,
       applications: [updatedApplication],
       interviews: updatedInterview ? [updatedInterview] : undefined,
       resumes: markedResume ? [markedResume] : undefined,
-      resumeFiles: resumeUpload
-        ? [{ storageKey: resumeUpload.resume.storageKey, file: pendingResume!.file }]
-        : undefined,
+      coverLetters: markedCoverLetter ? [markedCoverLetter] : undefined,
+      resumeFiles: [
+        ...(resumeUpload
+          ? [{ storageKey: resumeUpload.resume.storageKey, file: pendingResume!.file }]
+          : []),
+        ...(coverLetterUpload
+          ? [{
+              storageKey: coverLetterUpload.coverLetter.storageKey,
+              file: pendingCoverLetter!.file,
+            }]
+          : []),
+      ],
     });
 
     if (!result.ok) {
@@ -471,6 +613,18 @@ export function useTrackerStore(): TrackerStore {
         sortResumes([
           markedResume,
           ...current.filter((resume) => resume.id !== markedResume.id),
+        ]),
+      );
+    }
+
+
+    if (markedCoverLetter) {
+      setCoverLetters((current) =>
+        sortResumes([
+          markedCoverLetter,
+          ...current.filter(
+            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
+          ),
         ]),
       );
     }
@@ -766,6 +920,35 @@ export function useTrackerStore(): TrackerStore {
     return { ...result, saved: true };
   }
 
+  async function uploadCoverLetter(
+    file: File,
+    options: ResumeUploadOptions = {},
+    allowDuplicate = false,
+  ): Promise<CoverLetterUploadAttempt> {
+    const result = await createCoverLetterUploadResult({
+      existingCoverLetters: coverLetters,
+      file,
+      options,
+    });
+
+    if (result.duplicateOf && !allowDuplicate) {
+      return { ...result, saved: false };
+    }
+
+    try {
+      await cloudStorageAdapter.saveCoverLetter(result.coverLetter, file);
+      setStorageError(null);
+      setCoverLetters((current) =>
+        sortResumes([result.coverLetter, ...current]),
+      );
+    } catch (error) {
+      setStorageError(getStorageErrorMessage(error));
+      throw error;
+    }
+
+    return { ...result, saved: true };
+  }
+
   async function updateResume(
     id: string,
     input: ResumeMetadataUpdate,
@@ -786,6 +969,38 @@ export function useTrackerStore(): TrackerStore {
     setResumes((current) =>
       sortResumes(
         current.map((resume) => (resume.id === id ? updatedResume : resume)),
+      ),
+    );
+    return success();
+  }
+
+  async function updateCoverLetter(
+    id: string,
+    input: ResumeMetadataUpdate,
+  ): Promise<MutationResult> {
+    const currentCoverLetter = coverLetters.find(
+      (coverLetter) => coverLetter.id === id,
+    );
+
+    if (!currentCoverLetter) {
+      return failure("Cover letter metadata could not be found.");
+    }
+
+    const updatedCoverLetter = updateCoverLetterMetadata(
+      currentCoverLetter,
+      input,
+    );
+    const result = await commitMutation({ coverLetters: [updatedCoverLetter] });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    setCoverLetters((current) =>
+      sortResumes(
+        current.map((coverLetter) =>
+          coverLetter.id === id ? updatedCoverLetter : coverLetter,
+        ),
       ),
     );
     return success();
@@ -834,6 +1049,52 @@ export function useTrackerStore(): TrackerStore {
     });
   }
 
+  async function deleteCoverLetter(id: string): Promise<MutationResult> {
+    return runApplicationMutation(async () => {
+      const [currentCoverLetters, currentApplications] = await Promise.all([
+        cloudStorageAdapter.listCoverLetterMetadata(),
+        cloudStorageAdapter.listApplications(),
+      ]);
+      const currentCoverLetter = currentCoverLetters.find(
+        (coverLetter) => coverLetter.id === id,
+      );
+
+      if (!currentCoverLetter) {
+        return failure("Cover letter metadata could not be found.");
+      }
+
+      const updatedAt = createTimestamp();
+      const updatedApplications = currentApplications
+        .filter((application) => application.coverLetterId === id)
+        .map((application) => ({
+          ...application,
+          coverLetterId: undefined,
+          updatedAt,
+        }));
+      const result = await commitMutation({
+        applications: updatedApplications,
+        deleteCoverLetterIds: [id],
+        deleteResumeFileKeys: [currentCoverLetter.storageKey],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setCoverLetters((current) =>
+        current.filter((coverLetter) => coverLetter.id !== id),
+      );
+      setApplications((current) =>
+        current.map((application) =>
+          application.coverLetterId === id
+            ? { ...application, coverLetterId: undefined, updatedAt }
+            : application,
+        ),
+      );
+      return success();
+    });
+  }
+
   async function getResumeFile(id: string) {
     const resume = resumes.find((candidate) => candidate.id === id);
 
@@ -845,6 +1106,22 @@ export function useTrackerStore(): TrackerStore {
 
     if (!file) {
       throw new Error("The resume file is missing from local storage.");
+    }
+
+    return file;
+  }
+
+  async function getCoverLetterFile(id: string) {
+    const coverLetter = coverLetters.find((candidate) => candidate.id === id);
+
+    if (!coverLetter) {
+      throw new Error("Cover letter metadata could not be found.");
+    }
+
+    const file = await cloudStorageAdapter.getResumeFile(coverLetter.storageKey);
+
+    if (!file) {
+      throw new Error("The cover letter file is missing from storage.");
     }
 
     return file;
@@ -877,7 +1154,34 @@ export function useTrackerStore(): TrackerStore {
       (resumeFile) => resumeFile !== null,
     );
 
-    return createBackupFile({ resumeFiles, snapshot });
+    const coverLetterFileBackups = await Promise.all(
+      snapshot.coverLetters.map(async (coverLetter) => {
+        const file = await cloudStorageAdapter.getResumeFile(
+          coverLetter.storageKey,
+        );
+
+        if (!file) {
+          if (coverLetter.fileSize <= 0) {
+            return null;
+          }
+
+          throw new Error(
+            `The stored file for "${coverLetter.displayName}" is missing.`,
+          );
+        }
+
+        return {
+          dataBase64: await blobToBase64(file),
+          mimeType: file.type || coverLetter.mimeType,
+          storageKey: coverLetter.storageKey,
+        };
+      }),
+    );
+    const coverLetterFiles = coverLetterFileBackups.filter(
+      (coverLetterFile) => coverLetterFile !== null,
+    );
+
+    return createBackupFile({ coverLetterFiles, resumeFiles, snapshot });
   }
 
   async function previewBackupImport(file: File) {
@@ -904,7 +1208,10 @@ export function useTrackerStore(): TrackerStore {
       interviews: interviewReconciliation.interviews,
       settings: normalizeUserSettings(backup.snapshot.settings),
     };
-    const resumeFiles: ResumeBlobRecord[] = backup.resumeFiles.map(
+    const resumeFiles: ResumeBlobRecord[] = [
+      ...backup.resumeFiles,
+      ...backup.coverLetterFiles,
+    ].map(
       (resumeFile) => ({
         file: base64ToBlob(resumeFile.dataBase64, resumeFile.mimeType),
         storageKey: resumeFile.storageKey,
@@ -917,6 +1224,7 @@ export function useTrackerStore(): TrackerStore {
     setAnalyticsSettings(snapshot.analyticsSettings);
     setApplications(snapshot.applications);
     setContacts(snapshot.contacts);
+    setCoverLetters(sortResumes(snapshot.coverLetters));
     setInterviews(snapshot.interviews);
     setNotificationState(snapshot.notificationState);
     setResumes(sortResumes(snapshot.resumes));
@@ -925,7 +1233,7 @@ export function useTrackerStore(): TrackerStore {
   }
 
   function exportApplicationsCsv() {
-    return createApplicationsCsv({ applications, resumes });
+    return createApplicationsCsv({ applications, coverLetters, resumes });
   }
 
   async function dismissNotification(id: string) {
@@ -1085,6 +1393,7 @@ export function useTrackerStore(): TrackerStore {
     applications,
     cloudAccountEmail,
     contacts,
+    coverLetters,
     interviews,
     isStorageLoading,
     notificationState,
@@ -1099,10 +1408,12 @@ export function useTrackerStore(): TrackerStore {
     createApplication,
     deleteApplication,
     deleteContact,
+    deleteCoverLetter,
     deleteResume,
     dismissNotification,
     exportApplicationsCsv,
     exportFullBackup,
+    getCoverLetterFile,
     getResumeFile,
     importFullBackup,
     previewBackupImport,
@@ -1110,7 +1421,9 @@ export function useTrackerStore(): TrackerStore {
     resetTablePreferences,
     restoreApplication,
     markNotificationsOpened,
+    updateCoverLetter,
     updateResume,
+    uploadCoverLetter,
     uploadResume,
     updateApplication,
     updateAnalyticsSettings,
