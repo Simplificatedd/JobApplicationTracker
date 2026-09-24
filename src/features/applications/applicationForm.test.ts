@@ -1,9 +1,34 @@
 import { describe, expect, it } from "vitest";
 import type { Application } from "../../types/application";
 import {
+  deadlineValueForEntryMode,
   findDuplicateApplication,
   suggestFollowUpDate,
 } from "./applicationForm";
+
+describe("deadlineValueForEntryMode", () => {
+  it("preserves exact date/time values", () => {
+    expect(
+      deadlineValueForEntryMode("2026-10-01T17:30:45", "exact"),
+    ).toBe("2026-10-01T17:30");
+  });
+
+  it("makes existing date-only deadlines editable in exact mode", () => {
+    expect(deadlineValueForEntryMode("2026-10-01", "exact")).toBe(
+      "2026-10-01T23:59",
+    );
+  });
+
+  it("keeps only the calendar date in relative modes", () => {
+    expect(
+      deadlineValueForEntryMode("2026-10-01T17:30", "72_hours"),
+    ).toBe("2026-10-01");
+  });
+
+  it("keeps blank deadlines blank", () => {
+    expect(deadlineValueForEntryMode("", "exact")).toBe("");
+  });
+});
 
 const existingApplication: Application = {
   id: "existing",

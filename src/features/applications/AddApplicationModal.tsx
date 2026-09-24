@@ -7,6 +7,7 @@ import { APPLICATION_SOURCES } from "../../lib/domain";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
+  deadlineValueForEntryMode,
   type DuplicateApplicationMatch,
   findDuplicateApplication,
   suggestFollowUpDate,
@@ -218,6 +219,14 @@ export function AddApplicationModal({
             current.dateApplied,
             Number(value) || defaultFollowUpPromptDays,
           ),
+    }));
+  }
+
+  function updateDeadlineEntryMode(value: DeadlineEntryMode) {
+    setForm((current) => ({
+      ...current,
+      deadline: deadlineValueForEntryMode(current.deadline, value),
+      deadlineEntryMode: value,
     }));
   }
 
@@ -513,7 +522,9 @@ export function AddApplicationModal({
               <input
                 className="field-control"
                 onChange={(event) => updateForm("deadline", event.target.value)}
-                type="date"
+                type={
+                  form.deadlineEntryMode === "exact" ? "datetime-local" : "date"
+                }
                 value={form.deadline}
               />
             </Field>
@@ -683,8 +694,7 @@ export function AddApplicationModal({
               <select
                 className="field-control"
                 onChange={(event) =>
-                  updateForm(
-                    "deadlineEntryMode",
+                  updateDeadlineEntryMode(
                     event.target.value as DeadlineEntryMode,
                   )
                 }
