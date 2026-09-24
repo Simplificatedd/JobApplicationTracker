@@ -1025,6 +1025,12 @@ function getMutationStoreNames(mutation: StorageMutation): StoreName[] {
   if (mutation.contacts?.length || mutation.deleteContactIds?.length) {
     storeNames.add("contacts");
   }
+  if (
+    mutation.coverLetters?.length ||
+    mutation.deleteCoverLetterIds?.length
+  ) {
+    storeNames.add("coverLetterMetadata");
+  }
   if (mutation.interviews?.length || mutation.deleteInterviewIds?.length) {
     storeNames.add("interviews");
   }
