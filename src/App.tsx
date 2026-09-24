@@ -12,7 +12,6 @@ import { useTrackerStore } from "./store/useTrackerStore";
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [resumeUploadRequestId, setResumeUploadRequestId] = useState(0);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
   const notifications = useMemo(
@@ -40,7 +39,7 @@ export function App() {
       notifications={notifications}
       onPrimaryAction={() => {
         if (visibleView === "resumes") {
-          setResumeUploadRequestId((current) => current + 1);
+          document.getElementById("resume-upload-file-input")?.click();
           return;
         }
 
@@ -69,7 +68,6 @@ export function App() {
           tracker,
           openApplicationId,
           () => setOpenApplicationId(null),
-          resumeUploadRequestId,
         )
       )}
       {isAddOpen ? (
@@ -136,7 +134,6 @@ function renderView(
   tracker: ReturnType<typeof useTrackerStore>,
   openApplicationId: string | null,
   onOpenApplicationHandled: () => void,
-  resumeUploadRequestId: number,
 ) {
   if (view === "applications" || view === "archive") {
     return (
@@ -188,7 +185,6 @@ function renderView(
         onDeleteResume={tracker.deleteResume}
         onUpdateResume={tracker.updateResume}
         onUploadResume={tracker.uploadResume}
-        uploadRequestId={resumeUploadRequestId}
         resumes={tracker.resumes}
       />
     );

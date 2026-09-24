@@ -9,7 +9,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -36,7 +36,6 @@ interface ResumesPageProps {
     allowDuplicate?: boolean,
   ) => Promise<ResumeUploadAttempt>;
   resumes: ResumeMetadata[];
-  uploadRequestId?: number;
 }
 
 export function ResumesPage({
@@ -46,7 +45,6 @@ export function ResumesPage({
   onUpdateResume,
   onUploadResume,
   resumes,
-  uploadRequestId = 0,
 }: ResumesPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState("");
@@ -66,12 +64,6 @@ export function ResumesPage({
     workingResumeId,
   } = useResumeFileActions(getResumeFile);
   const linkedCounts = getLinkedCounts(applications);
-
-  useEffect(() => {
-    if (uploadRequestId > 0) {
-      fileInputRef.current?.click();
-    }
-  }, [uploadRequestId]);
 
   async function handleUpload(file: File | undefined, allowDuplicate = false) {
     if (!file) {
@@ -140,6 +132,7 @@ export function ResumesPage({
             <input
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="field-control"
+              id="resume-upload-file-input"
               onChange={(event) => handleUpload(event.target.files?.[0])}
               ref={fileInputRef}
               type="file"
