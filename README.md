@@ -341,7 +341,8 @@ Secrets and variables -> Actions**:
 
 Never commit either value. The deployment job is restricted to the original
 repository's `main` branch, waits for all checks to pass, and runs production
-deployments one at a time. Forks should use the Git-integrated setup above; it
+deployments one at a time. A newer release cancels a superseded deployment to
+avoid unnecessary builds. Forks should use the Git-integrated setup above; it
 does not require copying the reference deployment's credentials.
 
 ### Cost and usage guardrails
