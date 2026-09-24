@@ -325,6 +325,25 @@ deployment.
 Every later push to `main` deploys automatically. Pull-request previews do not
 change production.
 
+#### Existing Direct Upload projects
+
+A Pages project created with Wrangler shows **Git Provider: No** and does not
+deploy when GitHub changes. This repository's CI workflow handles that case for
+the reference deployment: after every successful `main` verification, it
+builds and deploys the same commit to the existing Pages project.
+
+The repository owner must add these GitHub Actions secrets under **Settings ->
+Secrets and variables -> Actions**:
+
+- `CLOUDFLARE_ACCOUNT_ID`: the account ID shown in the Cloudflare dashboard.
+- `CLOUDFLARE_API_TOKEN`: a dedicated token restricted to the intended account
+  with only **Account -> Cloudflare Pages -> Edit** permission.
+
+Never commit either value. The deployment job is restricted to the original
+repository's `main` branch, waits for all checks to pass, and runs production
+deployments one at a time. Forks should use the Git-integrated setup above; it
+does not require copying the reference deployment's credentials.
+
 ### Cost and usage guardrails
 
 The server enforces conservative application-level limits:
