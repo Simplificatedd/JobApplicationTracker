@@ -18,11 +18,12 @@ import {
   ContactsButton,
   DescriptionPreview,
   FollowUpCell,
+  FollowUpNeededQuickEditCell,
   InterviewCell,
   ResumeCell,
   RowActionsMenu,
+  StatusQuickEditCell,
 } from "./TableCells";
-import { StatusBadge } from "./StatusBadge";
 import { formatDate, formatDeadline, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -991,7 +992,12 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "status") {
-    return <StatusBadge status={application.status} />;
+    return (
+      <StatusQuickEditCell
+        application={application}
+        onUpdate={(input) => onUpdateApplication(application.id, input)}
+      />
+    );
   }
 
   if (columnId === "dateApplied") {
@@ -1015,11 +1021,21 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "followUp") {
-    return <FollowUpCell application={application} />;
+    return (
+      <FollowUpCell
+        application={application}
+        onUpdate={(input) => onUpdateApplication(application.id, input)}
+      />
+    );
   }
 
   if (columnId === "followUpNeeded") {
-    return <TextCell value={application.followUpNeeded ? "Yes" : "No"} />;
+    return (
+      <FollowUpNeededQuickEditCell
+        application={application}
+        onUpdate={(input) => onUpdateApplication(application.id, input)}
+      />
+    );
   }
 
   if (columnId === "followUpPromptDays") {
@@ -1039,7 +1055,12 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "interviewDateTime") {
-    return <InterviewCell application={application} />;
+    return (
+      <InterviewCell
+        application={application}
+        onUpdate={(input) => onUpdateApplication(application.id, input)}
+      />
+    );
   }
 
   if (columnId === "interviewType") {
