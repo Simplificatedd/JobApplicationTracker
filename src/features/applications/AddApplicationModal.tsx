@@ -562,18 +562,6 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Follow-up Date">
-              <input
-                className="field-control"
-                onChange={(event) => {
-                  setIsFollowUpDateCustomized(true);
-                  updateForm("followUpDate", event.target.value);
-                }}
-                type="date"
-                value={form.followUpDate}
-              />
-            </Field>
-
             {form.status === "Interviewing" ? (
               <Field label="Interview Date/Time">
                 <input
@@ -839,6 +827,18 @@ export function AddApplicationModal({
               />
               <span>Follow-up Needed</span>
             </label>
+
+            <Field label="Follow-up Date">
+              <input
+                className="field-control"
+                onChange={(event) => {
+                  setIsFollowUpDateCustomized(true);
+                  updateForm("followUpDate", event.target.value);
+                }}
+                type="date"
+                value={form.followUpDate}
+              />
+            </Field>
 
             <Field label="Follow-up Prompt Days">
               <input
