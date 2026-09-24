@@ -9,7 +9,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
@@ -33,6 +33,7 @@ interface ResumesPageProps {
     options?: ResumeMetadataUpdate,
   ) => Promise<ResumeUploadResult>;
   resumes: ResumeMetadata[];
+  uploadRequestId?: number;
 }
 
 export function ResumesPage({
@@ -42,6 +43,7 @@ export function ResumesPage({
   onUpdateResume,
   onUploadResume,
   resumes,
+  uploadRequestId = 0,
 }: ResumesPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState("");
@@ -56,6 +58,12 @@ export function ResumesPage({
     workingResumeId,
   } = useResumeFileActions(getResumeFile);
   const linkedCounts = getLinkedCounts(applications);
+
+  useEffect(() => {
+    if (uploadRequestId > 0) {
+      fileInputRef.current?.click();
+    }
+  }, [uploadRequestId]);
 
   async function handleUpload(file: File | undefined) {
     if (!file) {

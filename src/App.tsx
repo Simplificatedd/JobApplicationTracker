@@ -12,6 +12,7 @@ import { useTrackerStore } from "./store/useTrackerStore";
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [resumeUploadRequestId, setResumeUploadRequestId] = useState(0);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
   const notifications = useMemo(
@@ -37,7 +38,14 @@ export function App() {
       groupedNotifications={tracker.settings.enableGroupedNotifications}
       navigationDisplayMode={tracker.settings.navigationDisplayMode}
       notifications={notifications}
-      onAddOpen={() => setIsAddOpen(true)}
+      onPrimaryAction={() => {
+        if (visibleView === "resumes") {
+          setResumeUploadRequestId((current) => current + 1);
+          return;
+        }
+
+        setIsAddOpen(true);
+      }}
       onDismissNotification={tracker.dismissNotification}
       onMarkNotificationsOpened={tracker.markNotificationsOpened}
       onOpenApplicationFromNotification={(id) => {
@@ -56,8 +64,12 @@ export function App() {
       {tracker.isStorageLoading ? (
         <StorageLoading />
       ) : (
-        renderView(visibleView, tracker, openApplicationId, () =>
-          setOpenApplicationId(null),
+        renderView(
+          visibleView,
+          tracker,
+          openApplicationId,
+          () => setOpenApplicationId(null),
+          resumeUploadRequestId,
         )
       )}
       {isAddOpen ? (
@@ -124,6 +136,7 @@ function renderView(
   tracker: ReturnType<typeof useTrackerStore>,
   openApplicationId: string | null,
   onOpenApplicationHandled: () => void,
+  resumeUploadRequestId: number,
 ) {
   if (view === "applications" || view === "archive") {
     return (
@@ -175,6 +188,7 @@ function renderView(
         onDeleteResume={tracker.deleteResume}
         onUpdateResume={tracker.updateResume}
         onUploadResume={tracker.uploadResume}
+        uploadRequestId={resumeUploadRequestId}
         resumes={tracker.resumes}
       />
     );

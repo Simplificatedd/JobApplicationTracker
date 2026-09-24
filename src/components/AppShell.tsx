@@ -9,6 +9,7 @@ import {
   PanelTopOpen,
   Plus,
   Settings,
+  Upload,
 } from "lucide-react";
 import {
   type CSSProperties,
@@ -36,7 +37,7 @@ interface AppShellProps {
   groupedNotifications: boolean;
   notifications: ReminderNotification[];
   navigationDisplayMode: "side" | "top";
-  onAddOpen: () => void;
+  onPrimaryAction: () => void;
   onDismissNotification: (id: string) => void;
   onMarkNotificationsOpened: () => void;
   onOpenApplicationFromNotification: (id: string) => void;
@@ -77,7 +78,7 @@ export function AppShell({
   groupedNotifications,
   notifications,
   navigationDisplayMode,
-  onAddOpen,
+  onPrimaryAction,
   onDismissNotification,
   onMarkNotificationsOpened,
   onOpenApplicationFromNotification,
@@ -92,8 +93,9 @@ export function AppShell({
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
-  const showAddButton = currentView !== "settings" && currentView !== "archive";
+  const showAddButton = currentView !== "settings";
   const addLabel = currentView === "resumes" ? "Upload resume" : "Add job";
+  const PrimaryActionIcon = currentView === "resumes" ? Upload : Plus;
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
   const ToggleIcon = isTopNavigation
@@ -267,10 +269,10 @@ export function AppShell({
                 {showAddButton ? (
                   <button
                     className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700"
-                    onClick={onAddOpen}
+                    onClick={onPrimaryAction}
                     type="button"
                   >
-                    <Plus aria-hidden="true" size={18} />
+                    <PrimaryActionIcon aria-hidden="true" size={18} />
                     <span>{addLabel}</span>
                   </button>
                 ) : null}
