@@ -267,29 +267,15 @@ export function SettingsPage({
             suffix="days"
             value={settings.defaultFollowUpPromptDays}
           />
-          <ToggleButtonField
-            checked={settings.addJobFormLayout === "stepped"}
-            description="Choose between one long form or a guided step-by-step flow for adding applications."
-            label="Add job form as:"
-            offLabel="Single form"
-            onChange={(checked) =>
-              onUpdateSettings({
-                addJobFormLayout: checked ? "stepped" : "long_form",
-              })
-            }
-            onLabel="Step-by-step"
+          <UnavailableSettingField
+            description="Add Job currently uses one complete form. A guided step-by-step mode is not available yet."
+            label="Add job form"
+            value="Single form"
           />
-          <ToggleButtonField
-            checked={settings.addJobPresentation === "page"}
-            description="Choose whether the add job experience opens over the current page or as its own page."
-            label="Open add job as:"
-            offLabel="Dialog"
-            onChange={(checked) =>
-              onUpdateSettings({
-                addJobPresentation: checked ? "page" : "modal",
-              })
-            }
-            onLabel="Full page"
+          <UnavailableSettingField
+            description="Add Job currently opens as a dialog over the workspace. A full-page mode is not available yet."
+            label="Add job opens as"
+            value="Dialog"
           />
         </SettingsGroup>
 
@@ -520,6 +506,28 @@ function ToggleButtonField({
       >
         {checked ? onLabel : offLabel}
       </button>
+    </div>
+  );
+}
+
+function UnavailableSettingField({
+  description,
+  label,
+  value,
+}: {
+  description: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
+      <SettingLabel description={description} label={label} />
+      <div className="flex items-center gap-2 sm:justify-end">
+        <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-foreground">
+          {value}
+        </span>
+        <span className="text-xs font-medium text-muted">Only mode available</span>
+      </div>
     </div>
   );
 }

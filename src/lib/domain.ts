@@ -72,6 +72,8 @@ export function normalizeUserSettings(
   return {
     ...DEFAULT_USER_SETTINGS,
     ...settings,
+    addJobFormLayout: "long_form",
+    addJobPresentation: "modal",
     visibleApplicationColumns: [...new Set(visibleApplicationColumns)],
   };
 }

@@ -29,4 +29,16 @@ describe("normalizeUserSettings", () => {
         .enableDraggableColumnWidths,
     ).toBe(true);
   });
+
+  it("normalizes unavailable Add Job modes to the implemented workflow", () => {
+    expect(
+      normalizeUserSettings({
+        addJobFormLayout: "stepped",
+        addJobPresentation: "page",
+      }),
+    ).toMatchObject({
+      addJobFormLayout: "long_form",
+      addJobPresentation: "modal",
+    });
+  });
 });
