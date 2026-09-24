@@ -17,6 +17,7 @@ import { APPLICATION_SOURCES } from "../../lib/domain";
 import {
   formatDate,
   formatDateRange,
+  formatDeadline,
   formatDateTime,
   formatUpdatedAt,
 } from "../../lib/format";
@@ -42,6 +43,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
+import { deadlineValueForEntryMode } from "./applicationForm";
 
 interface ApplicationDetailPanelProps {
   activities: Activity[];
@@ -371,7 +373,7 @@ function ReadOnlyDetails({
         <DetailRow label="Job type" value={application.jobType} />
         <DetailRow label="Source" value={application.source} />
         <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
-        <DetailRow label="Deadline" value={formatDate(application.deadline)} />
+        <DetailRow label="Deadline" value={formatDeadline(application.deadline)} />
         <DetailRow
           label="Role dates"
           value={formatDateRange(
@@ -688,7 +690,37 @@ function EditForm({
         draft={draft}
         setDraft={setDraft}
       />
-      <DateField label="Deadline" name="deadline" draft={draft} setDraft={setDraft} />
+      <Field label="Deadline">
+        <input
+          className="field-control"
+          onChange={(event) => updateDraft("deadline", event.target.value)}
+          type={
+            draft.deadlineEntryMode === "exact" ? "datetime-local" : "date"
+          }
+          value={draft.deadline}
+        />
+      </Field>
+      <Field label="Deadline Timing">
+        <select
+          className="field-control"
+          onChange={(event) => {
+            const entryMode = event.target.value as DeadlineEntryMode;
+
+            setDraft((current) => ({
+              ...current,
+              deadline: deadlineValueForEntryMode(current.deadline, entryMode),
+              deadlineEntryMode: entryMode,
+            }));
+          }}
+          value={draft.deadlineEntryMode}
+        >
+          <option value="exact">Exact date/time</option>
+          <option value="1_day">1 day</option>
+          <option value="2_days">2 days</option>
+          <option value="3_days">3 days</option>
+          <option value="72_hours">72 hours</option>
+        </select>
+      </Field>
       <DateField
         label="Role Start"
         name="roleStartDate"
@@ -787,24 +819,6 @@ function EditForm({
               type="text"
               value={draft.interviewPlatform}
             />
-          </Field>
-          <Field label="Deadline Timing">
-            <select
-              className="field-control"
-              onChange={(event) =>
-                updateDraft(
-                  "deadlineEntryMode",
-                  event.target.value as DeadlineEntryMode,
-                )
-              }
-              value={draft.deadlineEntryMode}
-            >
-              <option value="exact">Exact date/time</option>
-              <option value="1_day">1 day</option>
-              <option value="2_days">2 days</option>
-              <option value="3_days">3 days</option>
-              <option value="72_hours">72 hours</option>
-            </select>
           </Field>
           <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
             <input
@@ -1025,7 +1039,10 @@ function toDraft(application: Application) {
     source: application.source ?? "",
     applicationUrl: application.applicationUrl ?? "",
     dateApplied: application.dateApplied ?? "",
-    deadline: application.deadline ?? "",
+    deadline: deadlineValueForEntryMode(
+      application.deadline ?? "",
+      application.deadlineEntryMode,
+    ),
     deadlineEntryMode: application.deadlineEntryMode,
     roleStartDate: application.roleStartDate ?? "",
     roleEndDate: application.roleEndDate ?? "",

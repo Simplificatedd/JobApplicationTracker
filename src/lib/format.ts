@@ -24,6 +24,16 @@ export function formatDateRange(start?: string, end?: string) {
   return [formatDate(start), formatDate(end)].filter(Boolean).join(" - ");
 }
 
+export function formatDeadline(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  return value.includes("T")
+    ? dateTimeFormatter.format(new Date(value))
+    : formatDate(value);
+}
+
 export function formatDateTime(value?: string) {
   if (!value) {
     return "Not scheduled";

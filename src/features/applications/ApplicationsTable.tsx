@@ -23,7 +23,7 @@ import {
   RowActionsMenu,
 } from "./TableCells";
 import { StatusBadge } from "./StatusBadge";
-import { formatDate, formatUpdatedAt } from "../../lib/format";
+import { formatDate, formatDeadline, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
@@ -999,7 +999,7 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "deadline") {
-    return <TextCell value={formatDate(application.deadline)} />;
+    return <TextCell value={formatDeadline(application.deadline)} />;
   }
 
   if (columnId === "deadlineEntryMode") {

@@ -6,6 +6,12 @@ import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import {
+  deadlineValueForEntryMode,
+  type DuplicateApplicationMatch,
+  findDuplicateApplication,
+  suggestFollowUpDate,
+} from "./applicationForm";
 import type {
   ApplicationInput,
   MutationResult,
@@ -22,6 +28,7 @@ import type {
 } from "../../types/application";
 
 interface AddApplicationModalProps {
+  applications: Application[];
   defaultFollowUpPromptDays: number;
   isOpen: boolean;
   onClose: () => void;
@@ -68,57 +75,72 @@ interface AddApplicationFormState {
   notes: string;
 }
 
-const initialFormState: AddApplicationFormState = {
-  company: "",
-  jobTitle: "",
-  jobDescription: "",
-  status: "",
-  location: "",
-  workMode: "unknown",
-  jobType: "internship",
-  source: "",
-  applicationUrl: "",
-  dateApplied: "",
-  deadline: "",
-  deadlineEntryMode: "exact",
-  roleStartDate: "",
-  roleEndDate: "",
-  followUpNeeded: false,
-  followUpDate: "",
-  followUpPromptDays: "",
-  interviewRound: "",
-  interviewDateTime: "",
-  interviewType: "unknown",
-  interviewMode: "other",
-  interviewLocation: "",
-  interviewMeetingUrl: "",
-  interviewPlatform: "",
-  interviewProctored: false,
-  interviewDeadline: "",
-  priority: "medium",
-  resumeId: "",
-  resumeUploadName: "",
-  resumeUploadVersion: "",
-  coverLetterVersion: "",
-  salary: "",
-  notes: "",
-};
+function createInitialFormState(
+  defaultFollowUpPromptDays: number,
+): AddApplicationFormState {
+  return {
+    company: "",
+    jobTitle: "",
+    jobDescription: "",
+    status: "",
+    location: "",
+    workMode: "unknown",
+    jobType: "internship",
+    source: "",
+    applicationUrl: "",
+    dateApplied: "",
+    deadline: "",
+    deadlineEntryMode: "exact",
+    roleStartDate: "",
+    roleEndDate: "",
+    followUpNeeded: false,
+    followUpDate: suggestFollowUpDate("", defaultFollowUpPromptDays),
+    followUpPromptDays: "",
+    interviewRound: "",
+    interviewDateTime: "",
+    interviewType: "unknown",
+    interviewMode: "other",
+    interviewLocation: "",
+    interviewMeetingUrl: "",
+    interviewPlatform: "",
+    interviewProctored: false,
+    interviewDeadline: "",
+    priority: "medium",
+    resumeId: "",
+    resumeUploadName: "",
+    resumeUploadVersion: "",
+    coverLetterVersion: "",
+    salary: "",
+    notes: "",
+  };
+}
 
 export function AddApplicationModal({
+  applications,
   defaultFollowUpPromptDays,
   isOpen,
   onClose,
   onCreate,
   resumes,
 }: AddApplicationModalProps) {
-  const [form, setForm] = useState<AddApplicationFormState>(initialFormState);
+  const [cleanForm, setCleanForm] = useState<AddApplicationFormState>(() =>
+    createInitialFormState(defaultFollowUpPromptDays),
+  );
+  const [form, setForm] = useState<AddApplicationFormState>(cleanForm);
+  const [isFollowUpDateCustomized, setIsFollowUpDateCustomized] =
+    useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [duplicateMatch, setDuplicateMatch] =
+    useState<DuplicateApplicationMatch | null>(null);
 
-  useEscapeKey(isOpen && !isDiscardWarningOpen, requestClose);
+  useEscapeKey(
+    isOpen && !isDiscardWarningOpen && !duplicateMatch,
+    requestClose,
+  );
 
   if (!isOpen) {
     return null;
@@ -141,7 +163,7 @@ export function AddApplicationModal({
       return;
     }
 
-    if (isFormDirty(form) || resumeUploadFile) {
+    if (isFormDirty(form, cleanForm) || resumeUploadFile) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -150,18 +172,62 @@ export function AddApplicationModal({
   }
 
   function closeModal() {
+    setDuplicateMatch(null);
     setTitleError("");
     setResumeUploadError("");
     onClose();
   }
 
   function discardAndClose() {
-    setForm(initialFormState);
+    resetForm();
     setResumeUploadFile(null);
     setIsDiscardWarningOpen(false);
+    setDuplicateMatch(null);
     setResumeUploadError("");
     setTitleError("");
     onClose();
+  }
+
+  function resetForm() {
+    const nextForm = createInitialFormState(defaultFollowUpPromptDays);
+
+    setCleanForm(nextForm);
+    setForm(nextForm);
+    setIsFollowUpDateCustomized(false);
+  }
+
+  function updateAppliedDate(value: string) {
+    setForm((current) => ({
+      ...current,
+      dateApplied: value,
+      followUpDate: isFollowUpDateCustomized
+        ? current.followUpDate
+        : suggestFollowUpDate(
+            value,
+            Number(current.followUpPromptDays) || defaultFollowUpPromptDays,
+          ),
+    }));
+  }
+
+  function updateFollowUpPromptDays(value: string) {
+    setForm((current) => ({
+      ...current,
+      followUpPromptDays: value,
+      followUpDate: isFollowUpDateCustomized
+        ? current.followUpDate
+        : suggestFollowUpDate(
+            current.dateApplied,
+            Number(value) || defaultFollowUpPromptDays,
+          ),
+    }));
+  }
+
+  function updateDeadlineEntryMode(value: DeadlineEntryMode) {
+    setForm((current) => ({
+      ...current,
+      deadline: deadlineValueForEntryMode(current.deadline, value),
+      deadlineEntryMode: value,
+    }));
   }
 
   function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -173,6 +239,10 @@ export function AddApplicationModal({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    await saveApplication(false);
+  }
+
+  async function saveApplication(skipDuplicateCheck: boolean) {
     const trimmedTitle = form.jobTitle.trim();
 
     if (!trimmedTitle) {
@@ -181,9 +251,7 @@ export function AddApplicationModal({
     }
 
     const isInterviewing = form.status === "Interviewing";
-    setResumeUploadError("");
-    setIsSaving(true);
-    const result = await onCreate({
+    const input: ApplicationInput = {
       company: trimOptional(form.company) ?? "",
       jobTitle: trimmedTitle,
       jobDescription: trimOptional(form.jobDescription) ?? "",
@@ -227,7 +295,21 @@ export function AddApplicationModal({
       coverLetterVersion: trimOptional(form.coverLetterVersion),
       salary: trimOptional(form.salary),
       notes: trimOptional(form.notes),
-    }, resumeUploadFile
+    };
+
+    if (!skipDuplicateCheck) {
+      const duplicate = findDuplicateApplication(applications, input);
+
+      if (duplicate) {
+        setDuplicateMatch(duplicate);
+        return;
+      }
+    }
+
+    setDuplicateMatch(null);
+    setResumeUploadError("");
+    setIsSaving(true);
+    const result = await onCreate(input, resumeUploadFile
       ? {
           file: resumeUploadFile,
           options: {
@@ -244,7 +326,7 @@ export function AddApplicationModal({
       return;
     }
 
-    setForm(initialFormState);
+    resetForm();
     setResumeUploadFile(null);
     setResumeUploadError("");
     setTitleError("");
@@ -429,7 +511,7 @@ export function AddApplicationModal({
             <Field label="Applied Date">
               <input
                 className="field-control"
-                onChange={(event) => updateForm("dateApplied", event.target.value)}
+                onChange={(event) => updateAppliedDate(event.target.value)}
                 type="date"
                 value={form.dateApplied}
               />
@@ -439,7 +521,9 @@ export function AddApplicationModal({
               <input
                 className="field-control"
                 onChange={(event) => updateForm("deadline", event.target.value)}
-                type="date"
+                type={
+                  form.deadlineEntryMode === "exact" ? "datetime-local" : "date"
+                }
                 value={form.deadline}
               />
             </Field>
@@ -447,7 +531,10 @@ export function AddApplicationModal({
             <Field label="Follow-up Date">
               <input
                 className="field-control"
-                onChange={(event) => updateForm("followUpDate", event.target.value)}
+                onChange={(event) => {
+                  setIsFollowUpDateCustomized(true);
+                  updateForm("followUpDate", event.target.value);
+                }}
                 type="date"
                 value={form.followUpDate}
               />
@@ -606,8 +693,7 @@ export function AddApplicationModal({
               <select
                 className="field-control"
                 onChange={(event) =>
-                  updateForm(
-                    "deadlineEntryMode",
+                  updateDeadlineEntryMode(
                     event.target.value as DeadlineEntryMode,
                   )
                 }
@@ -665,7 +751,7 @@ export function AddApplicationModal({
                 className="field-control"
                 min="1"
                 onChange={(event) =>
-                  updateForm("followUpPromptDays", event.target.value)
+                  updateFollowUpPromptDays(event.target.value)
                 }
                 placeholder={String(defaultFollowUpPromptDays)}
                 type="number"
@@ -745,15 +831,83 @@ export function AddApplicationModal({
             onConfirm={discardAndClose}
           />
         ) : null}
+        {duplicateMatch ? (
+          <DuplicateApplicationDialog
+            isSaving={isSaving}
+            match={duplicateMatch}
+            onCancel={() => setDuplicateMatch(null)}
+            onConfirm={() => void saveApplication(true)}
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function isFormDirty(form: AddApplicationFormState) {
+function DuplicateApplicationDialog({
+  isSaving,
+  match,
+  onCancel,
+  onConfirm,
+}: {
+  isSaving: boolean;
+  match: DuplicateApplicationMatch;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEscapeKey(true, onCancel);
+
+  return (
+    <div
+      aria-labelledby="duplicate-application-title"
+      aria-modal="true"
+      className="modal-overlay fixed inset-0 z-[60] flex items-center justify-center p-4"
+      role="alertdialog"
+    >
+      <div className="w-full max-w-md rounded-lg bg-surface p-5 shadow-popover">
+        <h3
+          className="text-lg font-semibold text-foreground"
+          id="duplicate-application-title"
+        >
+          Possible duplicate application
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          This matches {match.application.jobTitle} at {match.application.company || "an unnamed company"} by {match.matchedBy}.
+          {match.application.archivedAt ? " The existing entry is archived." : ""}
+        </p>
+        <p className="mt-2 text-sm text-foreground">
+          Do you want to save another entry anyway?
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+            disabled={isSaving}
+            onClick={onCancel}
+            type="button"
+          >
+            Go back
+          </button>
+          <button
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            disabled={isSaving}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isSaving ? "Saving..." : "Save anyway"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isFormDirty(
+  form: AddApplicationFormState,
+  cleanForm: AddApplicationFormState,
+) {
   return Object.entries(form).some(([key, value]) => {
     const initialValue =
-      initialFormState[key as keyof AddApplicationFormState];
+      cleanForm[key as keyof AddApplicationFormState];
 
     return value !== initialValue;
   });
