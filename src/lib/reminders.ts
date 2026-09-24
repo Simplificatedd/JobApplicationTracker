@@ -136,7 +136,9 @@ export function deriveApplicationNotifications(
       notifications.push({
         application,
         applicationId: application.id,
-        body: `${application.company || "Company blank"} / ${severityLabel(severity)}`,
+        body: [application.company, severityLabel(severity)]
+          .filter(Boolean)
+          .join(" / "),
         dueAt: followUpDueDate,
         group: "followups",
         id: buildNotificationId(application.id, "follow_up", followUpDueDate),
@@ -150,7 +152,7 @@ export function deriveApplicationNotifications(
     notifications.push({
       application,
       applicationId: application.id,
-      body: application.company || "Company blank",
+      body: application.company,
       group: "other",
       id: buildNotificationId(application.id, "flagged", application.updatedAt),
       severity: "due_soon",
@@ -177,7 +179,9 @@ export function deriveApplicationNotifications(
     notifications.push({
       application,
       applicationId: application.id,
-      body: `${application.company || "Company blank"} / ${severityLabel(severity)}`,
+      body: [application.company, severityLabel(severity)]
+        .filter(Boolean)
+        .join(" / "),
       dueAt: application.interviewDateTime,
       group: "interviews",
       id: buildNotificationId(
@@ -210,7 +214,9 @@ export function deriveApplicationNotifications(
     notifications.push({
       application,
       applicationId: application.id,
-      body: `${application.company || "Company blank"} / ${severityLabel(severity)}`,
+      body: [application.company, severityLabel(severity)]
+        .filter(Boolean)
+        .join(" / "),
       dueAt: interviewDeadline,
       group: "interviews",
       id: buildNotificationId(application.id, "deadline", interviewDeadline),

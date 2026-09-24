@@ -417,10 +417,13 @@ function ContactCard({
           <p className="truncate text-sm font-semibold text-foreground">
             {contact.name}
           </p>
-          <p className="mt-1 text-sm text-muted">
-            {[contact.role, contact.email, contact.phone].filter(Boolean).join(" / ") ||
-              "Contact details blank"}
-          </p>
+          {[contact.role, contact.email, contact.phone].some(Boolean) ? (
+            <p className="mt-1 text-sm text-muted">
+              {[contact.role, contact.email, contact.phone]
+                .filter(Boolean)
+                .join(" / ")}
+            </p>
+          ) : null}
           {safeLinkedInUrl ? (
             <a
               className="mt-2 block truncate text-sm font-medium text-primary hover:text-blue-700"

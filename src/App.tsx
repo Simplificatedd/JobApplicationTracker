@@ -135,6 +135,7 @@ function renderView(
         enableDeleteActiveApplications={
           tracker.settings.enableDeleteActiveApplications
         }
+        getResumeFile={tracker.getResumeFile}
         openApplicationId={openApplicationId}
         onOpenApplicationHandled={onOpenApplicationHandled}
         restoreApplication={tracker.restoreApplication}

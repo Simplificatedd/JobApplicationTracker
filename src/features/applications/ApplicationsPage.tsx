@@ -19,6 +19,7 @@ import {
 import { searchApplications } from "./applicationSearch";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { deriveApplicationNotifications } from "../../lib/reminders";
+import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import type {
   ApplicationUpdate,
   ContactInput,
@@ -43,6 +44,7 @@ interface ApplicationsPageProps {
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
   enableDeleteActiveApplications: boolean;
+  getResumeFile: (id: string) => Promise<Blob>;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
@@ -73,6 +75,7 @@ export function ApplicationsPage({
   deleteApplication,
   deleteContact,
   enableDeleteActiveApplications,
+  getResumeFile,
   openApplicationId,
   onOpenApplicationHandled,
   restoreApplication,
@@ -92,6 +95,12 @@ export function ApplicationsPage({
   const [contactsApplicationId, setContactsApplicationId] = useState<
     string | null
   >(null);
+  const {
+    actionError: resumeActionError,
+    downloadResume,
+    previewResume,
+    workingResumeId,
+  } = useResumeFileActions(getResumeFile);
   const rememberedTablePreferences =
     settings.rememberTableState ? tablePreferences : null;
   const [columnWidths, setColumnWidths] = useState<ApplicationColumnWidths>(
@@ -233,6 +242,12 @@ export function ApplicationsPage({
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
+      {resumeActionError ? (
+        <p className="text-sm font-medium text-destructive" role="alert">
+          {resumeActionError}
+        </p>
+      ) : null}
+
       <ApplicationsTable
         applications={visibleApplications}
         columnWidths={columnWidths}
@@ -252,6 +267,7 @@ export function ApplicationsPage({
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
+        onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={async (id) => {
           const result = await deleteApplication(id);
@@ -266,6 +282,7 @@ export function ApplicationsPage({
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
         onUpdateApplication={updateApplication}
         resumes={resumes}
+        workingResumeId={workingResumeId}
         sort={sort}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
@@ -280,6 +297,8 @@ export function ApplicationsPage({
             (contact) => contact.applicationId === selectedApplication.id,
           )}
           onClose={() => setSelectedApplicationId(null)}
+          onDownloadResume={downloadResume}
+          onPreviewResume={previewResume}
           onUpdate={updateApplication}
           resume={
             selectedApplication.resumeId
@@ -287,6 +306,8 @@ export function ApplicationsPage({
               : undefined
           }
           resumes={resumes}
+          resumeActionError={resumeActionError}
+          workingResumeId={workingResumeId}
         />
       ) : null}
 

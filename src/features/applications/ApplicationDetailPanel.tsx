@@ -3,6 +3,8 @@ import {
   CalendarPlus,
   CalendarX,
   Check,
+  Download,
+  Eye,
   ExternalLink,
   Pencil,
   Upload,
@@ -12,7 +14,12 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
-import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import {
+  formatDate,
+  formatDateRange,
+  formatDateTime,
+  formatUpdatedAt,
+} from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -41,6 +48,8 @@ interface ApplicationDetailPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   onClose: () => void;
+  onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
@@ -48,6 +57,8 @@ interface ApplicationDetailPanelProps {
   ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
+  resumeActionError: string;
+  workingResumeId: string | null;
 }
 
 export function ApplicationDetailPanel({
@@ -55,9 +66,13 @@ export function ApplicationDetailPanel({
   application,
   contacts,
   onClose,
+  onDownloadResume,
+  onPreviewResume,
   onUpdate,
   resume,
   resumes,
+  resumeActionError,
+  workingResumeId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
@@ -185,9 +200,11 @@ export function ApplicationDetailPanel({
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted">
-              {application.company || "Company blank"}
-            </p>
+            {application.company ? (
+              <p className="text-sm font-medium text-muted">
+                {application.company}
+              </p>
+            ) : null}
             <h2
               className="mt-1 truncate text-xl font-semibold text-foreground"
               id="application-detail-title"
@@ -251,8 +268,12 @@ export function ApplicationDetailPanel({
               activities={activities}
               application={application}
               contacts={contacts}
+              onDownloadResume={onDownloadResume}
+              onPreviewResume={onPreviewResume}
               onUpdate={onUpdate}
               resume={resume}
+              resumeActionError={resumeActionError}
+              workingResumeId={workingResumeId}
             />
           )}
         </div>
@@ -273,17 +294,25 @@ function ReadOnlyDetails({
   activities,
   application,
   contacts,
+  onDownloadResume,
+  onPreviewResume,
   onUpdate,
   resume,
+  resumeActionError,
+  workingResumeId,
 }: {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
   ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
+  resumeActionError: string;
+  workingResumeId: string | null;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
 
@@ -345,31 +374,31 @@ function ReadOnlyDetails({
         <DetailRow label="Deadline" value={formatDate(application.deadline)} />
         <DetailRow
           label="Role dates"
-          value={`${formatDate(application.roleStartDate)} - ${formatDate(
+          value={formatDateRange(
+            application.roleStartDate,
             application.roleEndDate,
-          )}`}
+          )}
         />
         <DetailRow
           label="Follow-up"
           value={
             application.followUpNeeded
-              ? `Needed ${formatDate(application.followUpDate)}`
-              : `Optional ${formatDate(application.followUpDate)}`
+              ? ["Needed", formatDate(application.followUpDate)]
+                  .filter(Boolean)
+                  .join(" ")
+              : formatDate(application.followUpDate)
           }
         />
         <DetailRow
           label="Interview"
-          value={`${application.interviewRound ? `Round ${application.interviewRound} / ` : ""}${formatDateTime(application.interviewDateTime)} / ${
-            application.interviewType ?? "Type blank"
-          }`}
+          value={formatInterviewSummary(application)}
         />
-        <DetailRow
-          label="Resume"
-          value={
-            resume
-              ? `${resume.displayName} / ${resume.originalFileName}`
-              : "Unassigned"
-          }
+        <ResumeDetail
+          error={resumeActionError}
+          isWorking={resume?.id === workingResumeId}
+          onDownload={onDownloadResume}
+          onPreview={onPreviewResume}
+          resume={resume}
         />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
@@ -424,11 +453,13 @@ function ReadOnlyDetails({
                 <p className="text-sm font-semibold text-foreground">
                   {contact.name}
                 </p>
-                <p className="mt-1 text-sm text-muted">
-                  {[contact.role, contact.email, contact.phone]
-                    .filter(Boolean)
-                    .join(" / ") || "Contact details blank"}
-                </p>
+                {[contact.role, contact.email, contact.phone].some(Boolean) ? (
+                  <p className="mt-1 text-sm text-muted">
+                    {[contact.role, contact.email, contact.phone]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </p>
+                ) : null}
                 {contact.notes ? (
                   <p className="mt-2 text-sm text-foreground">{contact.notes}</p>
                 ) : null}
@@ -461,14 +492,17 @@ function ReadOnlyDetails({
 
 function DetailActionButton({
   children,
+  disabled = false,
   onClick,
 }: {
   children: React.ReactNode;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
@@ -873,7 +907,62 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-1 text-sm text-foreground">{value || "Blank"}</p>
+      <p
+        aria-label={value ? undefined : "No value"}
+        className="mt-1 min-h-5 text-sm text-foreground"
+      >
+        {value ?? ""}
+      </p>
+    </div>
+  );
+}
+
+function ResumeDetail({
+  error,
+  isWorking,
+  onDownload,
+  onPreview,
+  resume,
+}: {
+  error: string;
+  isWorking: boolean;
+  onDownload: (resume: ResumeMetadata) => Promise<void>;
+  onPreview: (resume: ResumeMetadata) => Promise<void>;
+  resume?: ResumeMetadata;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-muted">Resume</p>
+      {resume ? (
+        <>
+          <p className="mt-1 truncate text-sm text-foreground">
+            {resume.displayName} / {resume.originalFileName}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <DetailActionButton
+              disabled={isWorking}
+              onClick={() => void onPreview(resume)}
+            >
+              <Eye aria-hidden="true" size={16} />
+              {isWorking ? "Opening…" : "Preview"}
+            </DetailActionButton>
+            <DetailActionButton
+              disabled={isWorking}
+              onClick={() => void onDownload(resume)}
+            >
+              <Download aria-hidden="true" size={16} />
+              Download
+            </DetailActionButton>
+          </div>
+          {error ? (
+            <p className="mt-2 text-sm font-medium text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-muted">Unassigned</p>
+      )}
     </div>
   );
 }
@@ -883,10 +972,24 @@ function TextBlock({ label, value }: { label: string; value?: string }) {
     <section>
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
       <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm leading-6 text-foreground">
-        {value || "Blank"}
+        {value ?? ""}
       </p>
     </section>
   );
+}
+
+function formatInterviewSummary(application: Application) {
+  const details = [
+    application.interviewRound
+      ? `Round ${application.interviewRound}`
+      : undefined,
+    application.interviewDateTime
+      ? formatDateTime(application.interviewDateTime)
+      : undefined,
+    application.interviewType,
+  ].filter(Boolean);
+
+  return details.length > 0 ? details.join(" / ") : "Not scheduled";
 }
 
 function Field({

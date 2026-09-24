@@ -39,6 +39,7 @@ interface ApplicationsTableProps {
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onPreviewResume: (resume: ResumeFile) => Promise<void>;
   onColumnWidthsChange: (widths: ApplicationColumnWidths) => void;
   onRestoreApplication: (applicationId: string) => void;
   onSortChange: (column: SortColumn) => void;
@@ -46,6 +47,7 @@ interface ApplicationsTableProps {
   resumes: ResumeFile[];
   sort: SortState;
   visibleApplicationColumns: string[];
+  workingResumeId: string | null;
 }
 
 export type ApplicationColumnId =
@@ -333,6 +335,7 @@ export function ApplicationsTable({
   onDeleteApplication,
   onOpenApplication,
   onOpenContacts,
+  onPreviewResume,
   onColumnWidthsChange,
   onRestoreApplication,
   onSortChange,
@@ -340,6 +343,7 @@ export function ApplicationsTable({
   resumes,
   sort,
   visibleApplicationColumns,
+  workingResumeId,
 }: ApplicationsTableProps) {
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
   const tableViewportRef = useRef<HTMLDivElement>(null);
@@ -549,6 +553,7 @@ export function ApplicationsTable({
                 onDeleteApplication={onDeleteApplication}
                 onOpenApplication={onOpenApplication}
                 onOpenContacts={onOpenContacts}
+                onPreviewResume={onPreviewResume}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
                 visibleColumnIds={visibleColumnIds}
@@ -557,6 +562,7 @@ export function ApplicationsTable({
                     ? resumeById.get(application.resumeId)
                     : undefined
                 }
+                workingResumeId={workingResumeId}
               />
             ))}
           </div>
@@ -692,6 +698,7 @@ export function ApplicationsTable({
                     onDeleteApplication={onDeleteApplication}
                     onOpenApplication={onOpenApplication}
                     onOpenContacts={onOpenContacts}
+                    onPreviewResume={onPreviewResume}
                     onRestoreApplication={onRestoreApplication}
                     onUpdateApplication={onUpdateApplication}
                     visibleColumnIds={visibleColumnIds}
@@ -700,6 +707,7 @@ export function ApplicationsTable({
                         ? resumeById.get(application.resumeId)
                         : undefined
                     }
+                    workingResumeId={workingResumeId}
                   />
                 ))}
               </tbody>
@@ -808,10 +816,12 @@ function ApplicationRow({
   onDeleteApplication,
   onOpenApplication,
   onOpenContacts,
+  onPreviewResume,
   onRestoreApplication,
   onUpdateApplication,
   resume,
   visibleColumnIds,
+  workingResumeId,
 }: {
   application: JobApplication;
   enableDeleteActiveApplications: boolean;
@@ -819,10 +829,12 @@ function ApplicationRow({
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onPreviewResume: (resume: ResumeFile) => Promise<void>;
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
+  workingResumeId: string | null;
 }) {
   function openFromRowClick(event: ReactMouseEvent<HTMLTableRowElement>) {
     if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
@@ -861,9 +873,11 @@ function ApplicationRow({
                 onArchiveApplication={onArchiveApplication}
                 onDeleteApplication={onDeleteApplication}
                 onOpenContacts={onOpenContacts}
+                onPreviewResume={onPreviewResume}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
                 resume={resume}
+                workingResumeId={workingResumeId}
               />
             </div>
           </td>
@@ -922,9 +936,11 @@ function ApplicationColumnCell({
   onArchiveApplication,
   onDeleteApplication,
   onOpenContacts,
+  onPreviewResume,
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  workingResumeId,
 }: {
   application: JobApplication;
   columnId: ApplicationColumnId;
@@ -932,9 +948,11 @@ function ApplicationColumnCell({
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onPreviewResume: (resume: ResumeFile) => Promise<void>;
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  workingResumeId: string | null;
 }) {
   if (columnId === "jobTitle") {
     return (
@@ -1033,7 +1051,13 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "resume") {
-    return <ResumeCell resume={resume} />;
+    return (
+      <ResumeCell
+        isWorking={resume?.id === workingResumeId}
+        onPreview={onPreviewResume}
+        resume={resume}
+      />
+    );
   }
 
   if (columnId === "contacts") {
@@ -1080,10 +1104,12 @@ function ApplicationCard({
   onDeleteApplication,
   onOpenApplication,
   onOpenContacts,
+  onPreviewResume,
   onRestoreApplication,
   onUpdateApplication,
   resume,
   visibleColumnIds,
+  workingResumeId,
 }: {
   application: JobApplication;
   enableDeleteActiveApplications: boolean;
@@ -1091,10 +1117,12 @@ function ApplicationCard({
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
   onOpenContacts: (applicationId: string) => void;
+  onPreviewResume: (resume: ResumeFile) => Promise<void>;
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
   visibleColumnIds: ApplicationColumnId[];
+  workingResumeId: string | null;
 }) {
   function openFromCardClick(event: ReactMouseEvent<HTMLElement>) {
     if (!shouldIgnoreEntryOpen(event.target, event.currentTarget)) {
@@ -1134,9 +1162,9 @@ function ApplicationCard({
           <p className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground">
             {application.jobTitle}
           </p>
-          {isColumnVisible("company") ? (
+          {isColumnVisible("company") && application.company ? (
             <p className="mt-1 truncate text-xs font-medium text-muted">
-              {application.company || "Company blank"}
+              {application.company}
             </p>
           ) : null}
         </div>
@@ -1173,9 +1201,11 @@ function ApplicationCard({
                 onArchiveApplication={onArchiveApplication}
                 onDeleteApplication={onDeleteApplication}
                 onOpenContacts={onOpenContacts}
+                onPreviewResume={onPreviewResume}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
                 resume={resume}
+                workingResumeId={workingResumeId}
               />
             </CardField>
           );
@@ -1218,9 +1248,14 @@ function CardField({
 }
 
 function TextCell({ value }: { value?: string | number }) {
+  const isEmpty = value === undefined || value === "";
+
   return (
-    <p className="truncate text-sm text-foreground">
-      {value === undefined || value === "" ? "Blank" : value}
+    <p
+      aria-label={isEmpty ? "No value" : undefined}
+      className="min-h-5 truncate text-sm text-foreground"
+    >
+      {isEmpty ? "" : value}
     </p>
   );
 }
@@ -1228,7 +1263,7 @@ function TextCell({ value }: { value?: string | number }) {
 function LongTextCell({ value }: { value?: string }) {
   return (
     <p className="line-clamp-2 text-sm leading-5 text-foreground">
-      {value || "Blank"}
+      {value ?? ""}
     </p>
   );
 }

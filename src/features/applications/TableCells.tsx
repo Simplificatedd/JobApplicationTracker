@@ -10,8 +10,10 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { calculateFollowUpDueDate } from "../../lib/reminders";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -69,26 +71,42 @@ export function InterviewCell({
         <p className="truncate text-sm font-medium text-foreground">
           {formatDateTime(application.interviewDateTime)}
         </p>
-        <p className="mt-1 truncate text-xs text-muted">
-          {application.interviewType ?? "Type blank"}
-        </p>
+        {application.interviewType ? (
+          <p className="mt-1 truncate text-xs text-muted">
+            {application.interviewType}
+          </p>
+        ) : null}
       </div>
     </div>
   );
 }
 
-export function ResumeCell({ resume }: { resume?: ResumeFile }) {
+export function ResumeCell({
+  isWorking,
+  onPreview,
+  resume,
+}: {
+  isWorking: boolean;
+  onPreview: (resume: ResumeFile) => Promise<void>;
+  resume?: ResumeFile;
+}) {
   if (!resume) {
     return <p className="truncate text-sm text-muted">Unassigned</p>;
   }
 
   return (
-    <div
+    <button
+      aria-label={`Preview ${resume.displayName}`}
       className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md text-left text-sm font-medium text-foreground hover:text-primary"
+      disabled={isWorking}
+      onClick={() => void onPreview(resume)}
+      type="button"
     >
       <FileText aria-hidden="true" className="shrink-0 text-muted" size={16} />
-      <span className="truncate">{resume.displayName}</span>
-    </div>
+      <span className="truncate">
+        {isWorking ? "Opening…" : resume.displayName}
+      </span>
+    </button>
   );
 }
 
@@ -128,9 +146,15 @@ export function RowActionsMenu({
 }) {
   const canDelete = Boolean(application.archivedAt) || enableDeleteActiveApplications;
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
+  const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  useEscapeKey(isOpen, () => setIsOpen(false));
+  useEscapeKey(isOpen, () => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -138,7 +162,12 @@ export function RowActionsMenu({
     }
 
     function closeOnOutsidePointer(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        !menuRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -147,6 +176,43 @@ export function RowActionsMenu({
 
     return () => {
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function updatePosition() {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+
+      if (!trigger || !menu) {
+        return;
+      }
+
+      setMenuPosition(
+        getAnchoredMenuPosition({
+          anchor: trigger.getBoundingClientRect(),
+          menuHeight: menu.offsetHeight,
+          menuWidth: menu.offsetWidth,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        }),
+      );
+    }
+
+    updatePosition();
+    menuRef.current
+      ?.querySelector<HTMLElement>("[role='menuitem']")
+      ?.focus();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [isOpen]);
 
@@ -202,26 +268,30 @@ export function RowActionsMenu({
   }
 
   return (
-    <div
-      className="relative"
-      onClick={(event) => event.stopPropagation()}
-      ref={menuRef}
-    >
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
       <button
+        aria-controls={isOpen ? menuId : undefined}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         className="icon-button h-9 w-9 max-w-full"
         onClick={() => setIsOpen((current) => !current)}
+        ref={triggerRef}
         type="button"
       >
         <MoreHorizontal aria-hidden="true" size={18} />
         <span className="sr-only">Open row actions</span>
       </button>
-      {isOpen ? (
-      <div
-        className="absolute right-0 top-11 z-10 w-44 rounded-lg border border-border bg-surface p-1 shadow-popover"
-        role="menu"
-      >
+      {isOpen
+        ? createPortal(
+            <div
+              className="fixed z-[60] w-44 rounded-lg border border-border bg-surface p-1 shadow-popover"
+              id={menuId}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={moveMenuFocus}
+              ref={menuRef}
+              role="menu"
+              style={{ left: menuPosition.left, top: menuPosition.top }}
+            >
         {application.archivedAt ? (
           <button
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
@@ -276,10 +346,39 @@ export function RowActionsMenu({
             Delete
           </button>
         ) : null}
-      </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
+}
+
+function moveMenuFocus(event: React.KeyboardEvent<HTMLDivElement>) {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+    return;
+  }
+
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>("[role='menuitem']"),
+  );
+
+  if (items.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+  const nextIndex =
+    event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? items.length - 1
+        : event.key === "ArrowUp"
+          ? (currentIndex - 1 + items.length) % items.length
+          : (currentIndex + 1) % items.length;
+
+  items[nextIndex]?.focus();
 }
 
 function MenuButton({
