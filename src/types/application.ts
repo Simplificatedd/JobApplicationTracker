@@ -28,7 +28,7 @@ export type Priority = "low" | "medium" | "high";
 
 export type DeadlineEntryMode = "exact" | "1_day" | "2_days" | "3_days" | "72_hours";
 
-export interface ResumeMetadata {
+export interface StoredDocumentMetadata {
   id: string;
   displayName: string;
   originalFileName: string;
@@ -44,6 +44,9 @@ export interface ResumeMetadata {
   updatedAt: string;
   lastUsedAt?: string;
 }
+
+export type ResumeMetadata = StoredDocumentMetadata;
+export type CoverLetterMetadata = StoredDocumentMetadata;
 
 export interface Application {
   id: string;
@@ -78,6 +81,7 @@ export interface Application {
   nextAction?: string;
   priority: Priority;
   resumeId?: string;
+  coverLetterId?: string;
   coverLetterVersion?: string;
   salary?: string;
   notes?: string;

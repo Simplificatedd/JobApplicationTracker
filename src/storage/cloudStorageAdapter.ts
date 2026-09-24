@@ -4,6 +4,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -37,6 +38,10 @@ export function applyStorageMutation(
     contacts: removeRecords(
       upsertRecords(snapshot.contacts, mutation.contacts),
       mutation.deleteContactIds,
+    ),
+    coverLetters: removeRecords(
+      upsertRecords(snapshot.coverLetters ?? [], mutation.coverLetters),
+      mutation.deleteCoverLetterIds,
     ),
     interviews: removeRecords(
       upsertRecords(snapshot.interviews, mutation.interviews),
@@ -118,7 +123,7 @@ export function createCloudStorageAdapter({
     if (remoteState) {
       cloudState = remoteState;
       await refreshCache(remoteState.snapshot);
-      return remoteState.snapshot;
+      return normalizeSnapshot(remoteState.snapshot);
     }
 
     const localFiles = await cache.listResumeFiles();
@@ -139,7 +144,7 @@ export function createCloudStorageAdapter({
     }
 
     await refreshCache(cloudState.snapshot, localFiles);
-    return cloudState.snapshot;
+    return normalizeSnapshot(cloudState.snapshot);
   }
 
   async function ensureInitialized() {
@@ -203,7 +208,10 @@ export function createCloudStorageAdapter({
       [...currentFiles, ...addedFiles].map((record) => [record.storageKey, record]),
     );
     const referencedKeys = new Set(
-      snapshot.resumes.map((resume) => resume.storageKey),
+      [
+        ...snapshot.resumes,
+        ...(snapshot.coverLetters ?? []),
+      ].map((document) => document.storageKey),
     );
     const retainedFiles = [...filesByKey.values()].filter((record) =>
       referencedKeys.has(record.storageKey),
@@ -349,6 +357,25 @@ export function createCloudStorageAdapter({
     return (await snapshot()).resumes;
   }
 
+  async function listCoverLetterMetadata() {
+    return (await snapshot()).coverLetters ?? [];
+  }
+
+  async function saveCoverLetter(coverLetter: CoverLetterMetadata, file: Blob) {
+    await commitMutation({
+      coverLetters: [coverLetter],
+      resumeFiles: [{ file, storageKey: coverLetter.storageKey }],
+    });
+  }
+
+  async function updateCoverLetterMetadata(coverLetter: CoverLetterMetadata) {
+    await commitMutation({ coverLetters: [coverLetter] });
+  }
+
+  async function deleteCoverLetterMetadata(id: string) {
+    await commitMutation({ deleteCoverLetterIds: [id] });
+  }
+
   async function saveResume(resume: ResumeMetadata, file: Blob) {
     await commitMutation({
       resumes: [resume],
@@ -408,9 +435,12 @@ export function createCloudStorageAdapter({
   }
 
   async function clearResumeFiles() {
-    const resumes = await listResumeMetadata();
+    const documents = [
+      ...(await listResumeMetadata()),
+      ...(await listCoverLetterMetadata()),
+    ];
     await Promise.allSettled(
-      resumes.map((resume) => api.deleteResumeFile(resume.storageKey)),
+      documents.map((document) => api.deleteResumeFile(document.storageKey)),
     );
     await cache.clearResumeFiles();
   }
@@ -495,6 +525,10 @@ export function createCloudStorageAdapter({
     deleteInterview,
     deleteInterviewsForApplication,
     listResumeMetadata,
+    listCoverLetterMetadata,
+    saveCoverLetter,
+    updateCoverLetterMetadata,
+    deleteCoverLetterMetadata,
     saveResume,
     createResumeMetadata,
     updateResumeMetadata,
@@ -521,3 +555,10 @@ export function createCloudStorageAdapter({
 }
 
 export const cloudStorageAdapter = createCloudStorageAdapter();
+
+function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
+  return {
+    ...snapshot,
+    coverLetters: snapshot.coverLetters ?? [],
+  };
+}

@@ -165,7 +165,7 @@ export function applyApplicationFilters(
     if (
       filters.coverLetterVersion &&
       !matchesPresence(
-        application.coverLetterVersion,
+        application.coverLetterId ?? application.coverLetterVersion,
         filters.coverLetterVersion,
       )
     ) {

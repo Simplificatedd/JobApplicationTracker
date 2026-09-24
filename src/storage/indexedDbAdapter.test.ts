@@ -5,6 +5,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   Interview,
   ResumeMetadata,
 } from "../types/application";
@@ -74,6 +75,15 @@ const resume: ResumeMetadata = {
   lastUsedAt: timestamp,
 };
 
+const coverLetter: CoverLetterMetadata = {
+  ...resume,
+  id: "cover-letter-1",
+  displayName: "Engineering cover letter",
+  originalFileName: "cover-letter.pdf",
+  downloadFileName: "cover-letter.pdf",
+  storageKey: "cover-letter-file-1",
+};
+
 describe("indexedDbStorageAdapter", () => {
   it("creates an isolated empty database with default settings", async () => {
     const adapter = createTestStorageAdapter();
@@ -82,6 +92,7 @@ describe("indexedDbStorageAdapter", () => {
       activities: [],
       applications: [],
       contacts: [],
+      coverLetters: [],
       interviews: [],
       resumes: [],
       settings: DEFAULT_USER_SETTINGS,
@@ -115,24 +126,40 @@ describe("indexedDbStorageAdapter", () => {
     await adapter.initialize();
     await adapter.commitMutation({
       activities: [activity],
-      applications: [{ ...application, resumeId: resume.id }],
+      applications: [{
+        ...application,
+        coverLetterId: coverLetter.id,
+        resumeId: resume.id,
+      }],
       contacts: [contact],
+      coverLetters: [coverLetter],
       interviews: [interview],
       resumes: [resume],
-      resumeFiles: [{ storageKey: resume.storageKey, file: new Blob(["%PDF"]) }],
+      resumeFiles: [
+        { storageKey: resume.storageKey, file: new Blob(["%PDF"]) },
+        { storageKey: coverLetter.storageKey, file: new Blob(["%PDF"]) },
+      ],
     });
 
     const refreshedAdapter = createTestStorageAdapter({ databaseName, indexedDb });
     await expect(refreshedAdapter.initialize()).resolves.toMatchObject({
       activities: [activity],
-      applications: [{ id: application.id, resumeId: resume.id }],
+      applications: [{
+        coverLetterId: coverLetter.id,
+        id: application.id,
+        resumeId: resume.id,
+      }],
       contacts: [contact],
+      coverLetters: [coverLetter],
       interviews: [interview],
       resumes: [resume],
     });
     await expect(refreshedAdapter.getResumeFile(resume.storageKey)).resolves.toMatchObject(
       { size: 4 },
     );
+    await expect(
+      refreshedAdapter.getResumeFile(coverLetter.storageKey),
+    ).resolves.toMatchObject({ size: 4 });
   });
 
   it("ignores empty write lists when their stores are outside the transaction", async () => {
@@ -230,6 +257,7 @@ describe("indexedDbStorageAdapter", () => {
     "activities",
     "applications",
     "contacts",
+    "coverLetterMetadata",
     "interviews",
     "resumeMetadata",
     "resumeFiles",
@@ -254,6 +282,7 @@ describe("indexedDbStorageAdapter", () => {
           activities: [activity],
           applications: [{ ...application, resumeId: resume.id }],
           contacts: [contact],
+          coverLetters: [coverLetter],
           interviews: [interview],
           resumes: [resume],
           resumeFiles: [
@@ -270,6 +299,7 @@ describe("indexedDbStorageAdapter", () => {
         activities: [],
         applications: [],
         contacts: [],
+        coverLetters: [],
         interviews: [],
         resumes: [],
       });
@@ -305,5 +335,40 @@ describe("indexedDbStorageAdapter", () => {
     ]);
     await expect(adapter.listResumeMetadata()).resolves.toEqual([]);
     await expect(adapter.getResumeFile(resume.storageKey)).resolves.toBeUndefined();
+  });
+
+  it("deletes cover letters and their shared file records atomically", async () => {
+    const adapter = createTestStorageAdapter();
+    const linkedApplication = {
+      ...application,
+      coverLetterId: coverLetter.id,
+    };
+    const unlinkedApplication = {
+      ...linkedApplication,
+      coverLetterId: undefined,
+      updatedAt: "2026-09-21T01:00:00.000Z",
+    };
+
+    await adapter.initialize();
+    await adapter.commitMutation({
+      applications: [linkedApplication],
+      coverLetters: [coverLetter],
+      resumeFiles: [
+        { storageKey: coverLetter.storageKey, file: new Blob(["%PDF"]) },
+      ],
+    });
+    await adapter.commitMutation({
+      applications: [unlinkedApplication],
+      deleteCoverLetterIds: [coverLetter.id],
+      deleteResumeFileKeys: [coverLetter.storageKey],
+    });
+
+    await expect(adapter.listApplications()).resolves.toEqual([
+      unlinkedApplication,
+    ]);
+    await expect(adapter.listCoverLetterMetadata()).resolves.toEqual([]);
+    await expect(
+      adapter.getResumeFile(coverLetter.storageKey),
+    ).resolves.toBeUndefined();
   });
 });

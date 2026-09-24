@@ -88,3 +88,26 @@ describe("application company and location filters", () => {
     ).toBe("");
   });
 });
+
+describe("cover letter filter", () => {
+  it("treats stored cover letters and legacy version labels as assigned", () => {
+    const stored = {
+      ...baseApplication,
+      id: "stored-cover-letter",
+      coverLetterId: "cover-letter-1",
+    };
+    const legacy = {
+      ...baseApplication,
+      id: "legacy-cover-letter",
+      coverLetterVersion: "Acme draft",
+    };
+    const unassigned = { ...baseApplication, id: "no-cover-letter" };
+
+    expect(
+      applyApplicationFilters([stored, legacy, unassigned], {
+        ...DEFAULT_APPLICATION_FILTERS,
+        coverLetterVersion: "filled",
+      }),
+    ).toEqual([stored, legacy]);
+  });
+});

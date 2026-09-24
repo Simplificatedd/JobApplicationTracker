@@ -43,6 +43,7 @@ function createSnapshot(
     analyticsSettings: DEFAULT_ANALYTICS_SETTINGS,
     applications: [],
     contacts: [],
+    coverLetters: [],
     interviews: [],
     notificationState: DEFAULT_NOTIFICATION_STATE,
     resumes: [],
@@ -52,11 +53,16 @@ function createSnapshot(
   };
 }
 
-function createBackupFile(snapshot: unknown, resumeFiles: unknown[] = []) {
+function createBackupFile(
+  snapshot: unknown,
+  resumeFiles: unknown[] = [],
+  coverLetterFiles?: unknown[],
+) {
   return new File(
     [
       JSON.stringify({
         exportedAt: timestamp,
+        ...(coverLetterFiles === undefined ? {} : { coverLetterFiles }),
         resumeFiles,
         schemaVersion: BACKUP_SCHEMA_VERSION,
         snapshot,
@@ -270,5 +276,42 @@ describe("parseBackupFile", () => {
         ]),
       ),
     ).resolves.toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("validates and restores cover letter metadata and files", async () => {
+    const coverLetterPdf = "%PDF-cover-letter";
+    const snapshot = createSnapshot({
+      applications: [createApplication({ coverLetterId: "cover-letter-1" })],
+      coverLetters: [
+        {
+          id: "cover-letter-1",
+          displayName: "Acme cover letter",
+          originalFileName: "cover-letter.pdf",
+          downloadFileName: "cover-letter.pdf",
+          fileExtension: "pdf",
+          mimeType: "application/pdf",
+          fileSize: coverLetterPdf.length,
+          storageKey: "cover-letter-file-1",
+          contentHash: "cover-letter-hash",
+          uploadedAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(
+      parseBackupFile(
+        createBackupFile(snapshot, [], [
+          {
+            dataBase64: btoa(coverLetterPdf),
+            mimeType: "application/pdf",
+            storageKey: "cover-letter-file-1",
+          },
+        ]),
+      ),
+    ).resolves.toMatchObject({
+      coverLetterFiles: [{ storageKey: "cover-letter-file-1" }],
+      snapshot: { coverLetters: [{ id: "cover-letter-1" }] },
+    });
   });
 });

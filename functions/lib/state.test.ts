@@ -36,6 +36,7 @@ function snapshot(company = "Example Co"): StorageSnapshot {
       },
     ],
     contacts: [],
+    coverLetters: [],
     interviews: [],
     notificationState: DEFAULT_NOTIFICATION_STATE,
     resumes: [],

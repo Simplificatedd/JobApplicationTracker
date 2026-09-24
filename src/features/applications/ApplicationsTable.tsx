@@ -31,6 +31,7 @@ import type { SortColumn, SortState } from "./applicationFilters";
 
 interface ApplicationsTableProps {
   applications: JobApplication[];
+  coverLetters: ResumeFile[];
   columnWidths: ApplicationColumnWidths;
   emptyBody?: string;
   emptyTitle?: string;
@@ -277,7 +278,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "coverLetterVersion",
     key: "coverLetterVersion",
-    label: "Cover Letter Version",
+    label: "Cover Letter",
     minWidth: 96,
     width: 190,
   },
@@ -327,6 +328,7 @@ export const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
 
 export function ApplicationsTable({
   applications,
+  coverLetters,
   columnWidths,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
@@ -349,6 +351,9 @@ export function ApplicationsTable({
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
+  const coverLetterById = new Map(
+    coverLetters.map((coverLetter) => [coverLetter.id, coverLetter]),
+  );
   const visibleColumns = APPLICATION_TABLE_COLUMNS.filter(
     (column) =>
       !column.canHide || visibleApplicationColumns.includes(column.id),
@@ -548,6 +553,11 @@ export function ApplicationsTable({
             {applications.map((application) => (
               <ApplicationCard
                 application={application}
+                coverLetter={
+                  application.coverLetterId
+                    ? coverLetterById.get(application.coverLetterId)
+                    : undefined
+                }
                 enableDeleteActiveApplications={enableDeleteActiveApplications}
                 key={application.id}
                 onArchiveApplication={onArchiveApplication}
@@ -691,6 +701,11 @@ export function ApplicationsTable({
                 {applications.map((application) => (
                   <ApplicationRow
                     application={application}
+                    coverLetter={
+                      application.coverLetterId
+                        ? coverLetterById.get(application.coverLetterId)
+                        : undefined
+                    }
                     enableDeleteActiveApplications={
                       enableDeleteActiveApplications
                     }
@@ -812,6 +827,7 @@ function getHeaderClassName() {
 
 function ApplicationRow({
   application,
+  coverLetter,
   enableDeleteActiveApplications,
   onArchiveApplication,
   onDeleteApplication,
@@ -825,6 +841,7 @@ function ApplicationRow({
   workingResumeId,
 }: {
   application: JobApplication;
+  coverLetter?: ResumeFile;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
@@ -869,6 +886,7 @@ function ApplicationRow({
             <div className={getCellContentClassName(columnId)}>
               <ApplicationColumnCell
                 application={application}
+                coverLetter={coverLetter}
                 columnId={columnId}
                 enableDeleteActiveApplications={enableDeleteActiveApplications}
                 onArchiveApplication={onArchiveApplication}
@@ -932,6 +950,7 @@ function getCellContentClassName(columnId: ApplicationColumnId) {
 
 function ApplicationColumnCell({
   application,
+  coverLetter,
   columnId,
   enableDeleteActiveApplications,
   onArchiveApplication,
@@ -944,6 +963,7 @@ function ApplicationColumnCell({
   workingResumeId,
 }: {
   application: JobApplication;
+  coverLetter?: ResumeFile;
   columnId: ApplicationColumnId;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
@@ -1091,7 +1111,11 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "coverLetterVersion") {
-    return <TextCell value={application.coverLetterVersion} />;
+    return (
+      <TextCell
+        value={coverLetter?.displayName ?? application.coverLetterVersion}
+      />
+    );
   }
 
   if (columnId === "salary") {
@@ -1120,6 +1144,7 @@ function ApplicationColumnCell({
 
 function ApplicationCard({
   application,
+  coverLetter,
   enableDeleteActiveApplications,
   onArchiveApplication,
   onDeleteApplication,
@@ -1133,6 +1158,7 @@ function ApplicationCard({
   workingResumeId,
 }: {
   application: JobApplication;
+  coverLetter?: ResumeFile;
   enableDeleteActiveApplications: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
@@ -1217,6 +1243,7 @@ function ApplicationCard({
             <CardField key={column.id} label={column.label}>
               <ApplicationColumnCell
                 application={application}
+                coverLetter={coverLetter}
                 columnId={column.id}
                 enableDeleteActiveApplications={enableDeleteActiveApplications}
                 onArchiveApplication={onArchiveApplication}

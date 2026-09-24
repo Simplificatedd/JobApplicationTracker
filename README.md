@@ -22,18 +22,18 @@ analytics.
 ## Authenticated Cloud Storage
 
 V2 uses Cloudflare Access for authentication, D1 for each user's tracker
-snapshot, and R2 for resume files. Every API request validates the Access JWT
+snapshot, and R2 for resume and cover-letter files. Every API request validates the Access JWT
 issuer, audience, signature, and required identity claims before deriving the
 owner ID. Browser-supplied owner IDs are never accepted.
 
 IndexedDB remains a local cache. On the first authenticated visit, if that user
 does not yet have cloud data, the app migrates the existing browser snapshot and
-resume files to D1 and R2. After that, cloud state is authoritative. Writes use
+resume and cover-letter files to D1 and R2. After that, cloud state is authoritative. Writes use
 optimistic revisions, retry transient failures, and rebase a mutation when
 another session has written a newer revision.
 
 Use **Settings -> Full backup** regularly. A full backup includes the tracker
-snapshot and resume files as base64 data. Restoring a backup replaces the
+snapshot and stored document files as base64 data. Restoring a backup replaces the
 signed-in user's cloud data and refreshes the browser cache.
 
 ## Privacy Notes
@@ -100,14 +100,14 @@ build output is written to `dist/`.
 4. Run `npm run dev` for local development.
 5. Run `npm run check` before publishing changes.
 
-Do not commit real resume files, personal backups, or private deployment
+Do not commit real resume or cover-letter files, personal backups, or private deployment
 configuration.
 
 ## Cloudflare Deployment Guide
 
 Anyone can deploy an independent copy from a fork. A team or other group can
 also share one deployment. The app uses each person's verified sign-in to keep
-their tracker data and resume files separate from everyone else's.
+their tracker data and uploaded document files separate from everyone else's.
 
 This guide connects Cloudflare Pages to GitHub. After the initial setup, updating
 the `main` branch automatically updates the live site. Work on another branch or

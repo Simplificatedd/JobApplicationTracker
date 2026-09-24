@@ -44,6 +44,7 @@ function isStorageSnapshot(value: unknown): value is StorageSnapshot {
     Array.isArray(value.activities) &&
     Array.isArray(value.applications) &&
     Array.isArray(value.contacts) &&
+    Array.isArray(value.coverLetters) &&
     Array.isArray(value.interviews) &&
     Array.isArray(value.resumes) &&
     isRecord(value.analyticsSettings) &&
@@ -66,7 +67,13 @@ export function parseSaveStateRequest(text: string): SaveStateRequest {
     throw new HttpError(400, "The cloud snapshot is not valid JSON.");
   }
 
-  if (!isRecord(value) || !isStorageSnapshot(value.snapshot)) {
+  if (!isRecord(value) || !isRecord(value.snapshot)) {
+    throw new HttpError(400, "The cloud snapshot has an invalid shape.");
+  }
+
+  value.snapshot.coverLetters ??= [];
+
+  if (!isStorageSnapshot(value.snapshot)) {
     throw new HttpError(400, "The cloud snapshot has an invalid shape.");
   }
 
@@ -98,9 +105,11 @@ export async function getCloudState(
     return null;
   }
 
+  const snapshot = JSON.parse(row.snapshot_json) as StorageSnapshot;
+
   return {
     revision: row.revision,
-    snapshot: JSON.parse(row.snapshot_json) as StorageSnapshot,
+    snapshot: { ...snapshot, coverLetters: snapshot.coverLetters ?? [] },
     updatedAt: row.updated_at,
   };
 }

@@ -32,6 +32,7 @@ import type {
   Activity,
   Application,
   ApplicationContact,
+  CoverLetterMetadata,
   ResumeMetadata,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
@@ -43,10 +44,12 @@ interface ApplicationsPageProps {
   applications: Application[];
   archiveApplication: (id: string) => void;
   contacts: ApplicationContact[];
+  coverLetters: CoverLetterMetadata[];
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
   enableDeleteActiveApplications: boolean;
   getResumeFile: (id: string) => Promise<Blob>;
+  getCoverLetterFile: (id: string) => Promise<Blob>;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
@@ -63,6 +66,7 @@ interface ApplicationsPageProps {
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingResumeUpload,
   ) => Promise<MutationResult>;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updateTablePreferences: (preferences: Partial<TablePreferences>) => void;
@@ -74,10 +78,12 @@ export function ApplicationsPage({
   applications,
   archiveApplication,
   contacts,
+  coverLetters,
   deleteApplication,
   deleteContact,
   enableDeleteActiveApplications,
   getResumeFile,
+  getCoverLetterFile,
   openApplicationId,
   onOpenApplicationHandled,
   restoreApplication,
@@ -103,6 +109,12 @@ export function ApplicationsPage({
     previewResume,
     workingResumeId,
   } = useResumeFileActions(getResumeFile);
+  const {
+    actionError: coverLetterActionError,
+    downloadResume: downloadCoverLetter,
+    previewResume: previewCoverLetter,
+    workingResumeId: workingCoverLetterId,
+  } = useResumeFileActions(getCoverLetterFile, "Cover letter");
   const rememberedTablePreferences =
     settings.rememberTableState ? tablePreferences : null;
   const [columnWidths, setColumnWidths] = useState<ApplicationColumnWidths>(
@@ -256,9 +268,15 @@ export function ApplicationsPage({
           {resumeActionError}
         </p>
       ) : null}
+      {coverLetterActionError ? (
+        <p className="text-sm font-medium text-destructive" role="alert">
+          {coverLetterActionError}
+        </p>
+      ) : null}
 
       <ApplicationsTable
         applications={visibleApplications}
+        coverLetters={coverLetters}
         columnWidths={columnWidths}
         emptyBody={
           searchQuery
@@ -302,12 +320,24 @@ export function ApplicationsPage({
             (activity) => activity.applicationId === selectedApplication.id,
           )}
           application={selectedApplication}
+          coverLetter={
+            selectedApplication.coverLetterId
+              ? coverLetters.find(
+                  (coverLetter) =>
+                    coverLetter.id === selectedApplication.coverLetterId,
+                )
+              : undefined
+          }
+          coverLetterActionError={coverLetterActionError}
+          coverLetters={coverLetters}
           contacts={contacts.filter(
             (contact) => contact.applicationId === selectedApplication.id,
           )}
           onClose={() => setSelectedApplicationId(null)}
+          onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}
           onPreviewResume={previewResume}
+          onPreviewCoverLetter={previewCoverLetter}
           onUpdate={updateApplication}
           resume={
             selectedApplication.resumeId
@@ -317,6 +347,7 @@ export function ApplicationsPage({
           resumes={resumes}
           resumeActionError={resumeActionError}
           workingResumeId={workingResumeId}
+          workingCoverLetterId={workingCoverLetterId}
         />
       ) : null}
 

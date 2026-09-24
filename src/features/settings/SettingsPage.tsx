@@ -172,7 +172,7 @@ export function SettingsPage({
               <div>
                 <p className="font-semibold">Cloud sync is active</p>
                 <p className="text-muted">
-                  D1 stores your tracker data and R2 stores resume files. This
+                  D1 stores your tracker data and R2 stores resume and cover letter files. This
                   browser keeps a local cache for faster loading.
                 </p>
                 {cloudAccountEmail ? (
@@ -221,6 +221,14 @@ export function SettingsPage({
                 <PreviewCount label="Interviews" value={backupPreview.interviews} />
                 <PreviewCount label="Resumes" value={backupPreview.resumes} />
                 <PreviewCount label="Files" value={backupPreview.resumeFiles} />
+                <PreviewCount
+                  label="Cover letters"
+                  value={backupPreview.coverLetters}
+                />
+                <PreviewCount
+                  label="Cover letter files"
+                  value={backupPreview.coverLetterFiles}
+                />
               </div>
               <button
                 className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"

@@ -345,7 +345,7 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   applicationUrl: "Link to the job post or application portal.",
   company: "Employer, recruiter, or organization name.",
   contacts: "Number of people linked to this application.",
-  coverLetterVersion: "Cover letter draft or version used for this application.",
+  coverLetterVersion: "Stored cover letter used for this application.",
   dateApplied: "Date you submitted the application.",
   deadline: "Application or assessment deadline.",
   deadlineEntryMode: "How the deadline timing was entered.",

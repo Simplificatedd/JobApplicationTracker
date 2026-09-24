@@ -7,6 +7,7 @@ import type { ResumeMetadata } from "../types/application";
 
 export function useResumeFileActions(
   getResumeFile: (id: string) => Promise<Blob>,
+  documentLabel = "Resume",
 ) {
   const [actionError, setActionError] = useState("");
   const [workingResumeId, setWorkingResumeId] = useState<string | null>(null);
@@ -18,7 +19,7 @@ export function useResumeFileActions(
     try {
       await downloadResumeFile(resume, getResumeFile);
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      setActionError(getErrorMessage(error, documentLabel));
     } finally {
       setWorkingResumeId(null);
     }
@@ -31,7 +32,7 @@ export function useResumeFileActions(
     try {
       await previewResumeFile(resume, getResumeFile);
     } catch (error) {
-      setActionError(getErrorMessage(error));
+      setActionError(getErrorMessage(error, documentLabel));
     } finally {
       setWorkingResumeId(null);
     }
@@ -46,6 +47,6 @@ export function useResumeFileActions(
   };
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Resume action failed.";
+function getErrorMessage(error: unknown, documentLabel: string) {
+  return error instanceof Error ? error.message : `${documentLabel} action failed.`;
 }

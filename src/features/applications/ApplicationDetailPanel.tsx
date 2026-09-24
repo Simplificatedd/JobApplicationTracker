@@ -34,6 +34,7 @@ import type {
   Application,
   ApplicationContact,
   ApplicationStatus,
+  CoverLetterMetadata,
   DeadlineEntryMode,
   InterviewMode,
   InterviewType,
@@ -49,38 +50,54 @@ interface ApplicationDetailPanelProps {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  coverLetter?: CoverLetterMetadata;
+  coverLetterActionError: string;
+  coverLetters: CoverLetterMetadata[];
   onClose: () => void;
+  onDownloadCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
   onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingResumeUpload,
   ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
   resumeActionError: string;
   workingResumeId: string | null;
+  workingCoverLetterId: string | null;
 }
 
 export function ApplicationDetailPanel({
   activities,
   application,
   contacts,
+  coverLetter,
+  coverLetterActionError,
+  coverLetters,
   onClose,
+  onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
+  onPreviewCoverLetter,
   onUpdate,
   resume,
   resumes,
   resumeActionError,
   workingResumeId,
+  workingCoverLetterId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
   const [resumeUploadError, setResumeUploadError] = useState("");
+  const [coverLetterUploadError, setCoverLetterUploadError] = useState("");
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [coverLetterUploadFile, setCoverLetterUploadFile] =
+    useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
@@ -88,13 +105,16 @@ export function ApplicationDetailPanel({
   function startEditing() {
     setDraft(toDraft(application));
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setIsEditing(true);
   }
 
   async function saveChanges() {
     const isInterviewing = draft.status === "Interviewing";
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setIsSaving(true);
     const result = await onUpdate(application.id, {
       company: draft.company.trim(),
@@ -128,27 +148,42 @@ export function ApplicationDetailPanel({
         : {}),
       priority: draft.priority,
       resumeId: trimOptional(draft.resumeId),
+      coverLetterId: trimOptional(draft.coverLetterId),
       coverLetterVersion: trimOptional(draft.coverLetterVersion),
       salary: trimOptional(draft.salary),
       notes: trimOptional(draft.notes),
-    }, resumeUploadFile
-      ? {
-          file: resumeUploadFile,
-          options: {
-            displayName: draft.resumeUploadName,
-            markAsUsed: true,
-            versionLabel: draft.resumeUploadVersion,
-          },
-        }
-      : undefined);
+    },
+      resumeUploadFile
+        ? {
+            file: resumeUploadFile,
+            options: {
+              displayName: draft.resumeUploadName,
+              markAsUsed: true,
+              versionLabel: draft.resumeUploadVersion,
+            },
+          }
+        : undefined,
+      coverLetterUploadFile
+        ? {
+            file: coverLetterUploadFile,
+            options: {
+              displayName: draft.coverLetterUploadName,
+              markAsUsed: true,
+              versionLabel: draft.coverLetterUploadVersion,
+            },
+          }
+        : undefined,
+    );
     setIsSaving(false);
 
     if (!result.ok) {
       setResumeUploadError(result.error);
+      setCoverLetterUploadError(result.error);
       return;
     }
 
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setIsEditing(false);
   }
 
@@ -159,7 +194,9 @@ export function ApplicationDetailPanel({
 
     setDraft(toDraft(application));
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setIsEditing(false);
   }
 
@@ -168,7 +205,12 @@ export function ApplicationDetailPanel({
       return;
     }
 
-    if (isEditing && (isDraftDirty(draft, application) || resumeUploadFile)) {
+    if (
+      isEditing &&
+      (isDraftDirty(draft, application) ||
+        resumeUploadFile ||
+        coverLetterUploadFile)
+    ) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -180,7 +222,9 @@ export function ApplicationDetailPanel({
     setIsDiscardWarningOpen(false);
     setDraft(toDraft(application));
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setIsEditing(false);
     onClose();
   }
@@ -259,10 +303,13 @@ export function ApplicationDetailPanel({
         <div className="overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
             <EditForm
+              coverLetterUploadError={coverLetterUploadError}
+              coverLetters={coverLetters}
               draft={draft}
               resumeUploadError={resumeUploadError}
               resumes={resumes}
               setDraft={setDraft}
+              setCoverLetterUploadFile={setCoverLetterUploadFile}
               setResumeUploadFile={setResumeUploadFile}
             />
           ) : (
@@ -270,12 +317,17 @@ export function ApplicationDetailPanel({
               activities={activities}
               application={application}
               contacts={contacts}
+              coverLetter={coverLetter}
+              coverLetterActionError={coverLetterActionError}
+              onDownloadCoverLetter={onDownloadCoverLetter}
               onDownloadResume={onDownloadResume}
               onPreviewResume={onPreviewResume}
+              onPreviewCoverLetter={onPreviewCoverLetter}
               onUpdate={onUpdate}
               resume={resume}
               resumeActionError={resumeActionError}
               workingResumeId={workingResumeId}
+              workingCoverLetterId={workingCoverLetterId}
             />
           )}
         </div>
@@ -296,18 +348,27 @@ function ReadOnlyDetails({
   activities,
   application,
   contacts,
+  coverLetter,
+  coverLetterActionError,
+  onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
+  onPreviewCoverLetter,
   onUpdate,
   resume,
   resumeActionError,
   workingResumeId,
+  workingCoverLetterId,
 }: {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  coverLetter?: CoverLetterMetadata;
+  coverLetterActionError: string;
+  onDownloadCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
   onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
@@ -315,6 +376,7 @@ function ReadOnlyDetails({
   resume?: ResumeMetadata;
   resumeActionError: string;
   workingResumeId: string | null;
+  workingCoverLetterId: string | null;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
 
@@ -401,6 +463,14 @@ function ReadOnlyDetails({
           onDownload={onDownloadResume}
           onPreview={onPreviewResume}
           resume={resume}
+        />
+        <DocumentDetail
+          document={coverLetter}
+          error={coverLetterActionError}
+          isWorking={coverLetter?.id === workingCoverLetterId}
+          label="Cover letter"
+          onDownload={onDownloadCoverLetter}
+          onPreview={onPreviewCoverLetter}
         />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
@@ -514,16 +584,22 @@ function DetailActionButton({
 }
 
 function EditForm({
+  coverLetterUploadError,
+  coverLetters,
   draft,
   resumeUploadError,
   resumes,
   setDraft,
+  setCoverLetterUploadFile,
   setResumeUploadFile,
 }: {
+  coverLetterUploadError: string;
+  coverLetters: CoverLetterMetadata[];
   draft: ApplicationDraft;
   resumeUploadError: string;
   resumes: ResumeMetadata[];
   setDraft: React.Dispatch<React.SetStateAction<ApplicationDraft>>;
+  setCoverLetterUploadFile: (file: File | null) => void;
   setResumeUploadFile: (file: File | null) => void;
 }) {
   function updateDraft<Key extends keyof ApplicationDraft>(
@@ -658,6 +734,59 @@ function EditForm({
           {resumeUploadError ? (
             <p className="mt-2 text-xs font-medium text-destructive">
               {resumeUploadError}
+            </p>
+          ) : null}
+        </div>
+      </Field>
+      <Field label="Cover Letter">
+        <select
+          className="field-control"
+          onChange={(event) => updateDraft("coverLetterId", event.target.value)}
+          value={draft.coverLetterId}
+        >
+          <option value="">Unassigned</option>
+          {coverLetters.map((coverLetter) => (
+            <option key={coverLetter.id} value={coverLetter.id}>
+              {coverLetter.displayName}
+            </option>
+          ))}
+        </select>
+        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Upload aria-hidden="true" size={16} />
+            Upload new cover letter
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="field-control sm:col-span-2"
+              onChange={(event) =>
+                setCoverLetterUploadFile(event.target.files?.[0] ?? null)
+              }
+              type="file"
+            />
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("coverLetterUploadName", event.target.value)
+              }
+              placeholder="Display name"
+              type="text"
+              value={draft.coverLetterUploadName}
+            />
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("coverLetterUploadVersion", event.target.value)
+              }
+              placeholder="Version label"
+              type="text"
+              value={draft.coverLetterUploadVersion}
+            />
+          </div>
+          {coverLetterUploadError ? (
+            <p className="mt-2 text-xs font-medium text-destructive">
+              {coverLetterUploadError}
             </p>
           ) : null}
         </div>
@@ -945,24 +1074,51 @@ function ResumeDetail({
   resume?: ResumeMetadata;
 }) {
   return (
+    <DocumentDetail
+      document={resume}
+      error={error}
+      isWorking={isWorking}
+      label="Resume"
+      onDownload={onDownload}
+      onPreview={onPreview}
+    />
+  );
+}
+
+function DocumentDetail({
+  document,
+  error,
+  isWorking,
+  label,
+  onDownload,
+  onPreview,
+}: {
+  document?: ResumeMetadata;
+  error: string;
+  isWorking: boolean;
+  label: string;
+  onDownload: (document: ResumeMetadata) => Promise<void>;
+  onPreview: (document: ResumeMetadata) => Promise<void>;
+}) {
+  return (
     <div>
-      <p className="text-xs font-semibold uppercase text-muted">Resume</p>
-      {resume ? (
+      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
+      {document ? (
         <>
           <p className="mt-1 truncate text-sm text-foreground">
-            {resume.displayName} / {resume.originalFileName}
+            {document.displayName} / {document.originalFileName}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <DetailActionButton
               disabled={isWorking}
-              onClick={() => void onPreview(resume)}
+              onClick={() => void onPreview(document)}
             >
               <Eye aria-hidden="true" size={16} />
               {isWorking ? "Opening…" : "Preview"}
             </DetailActionButton>
             <DetailActionButton
               disabled={isWorking}
-              onClick={() => void onDownload(resume)}
+              onClick={() => void onDownload(document)}
             >
               <Download aria-hidden="true" size={16} />
               Download
@@ -1063,6 +1219,9 @@ function toDraft(application: Application) {
     resumeId: application.resumeId ?? "",
     resumeUploadName: "",
     resumeUploadVersion: "",
+    coverLetterId: application.coverLetterId ?? "",
+    coverLetterUploadName: "",
+    coverLetterUploadVersion: "",
     coverLetterVersion: application.coverLetterVersion ?? "",
     salary: application.salary ?? "",
     notes: application.notes ?? "",
