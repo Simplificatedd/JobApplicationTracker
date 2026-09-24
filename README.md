@@ -40,7 +40,7 @@ signed-in user's cloud data and refreshes the browser cache.
 
 - Each D1 row and R2 object is scoped to the verified Cloudflare Access subject.
 - No analytics service or third-party telemetry is used.
-- Resume usage is not tracked in analytics.
+- Resume attachment history is not tracked or included in analytics.
 - Uploaded resumes are stored in the private R2 binding and cached in IndexedDB.
 - Resume uploads are limited to 10 MB per file and 100 MB per signed-in user.
 - Server-side safety budgets stop resume storage above 5 GiB, tracker snapshots
@@ -54,6 +54,15 @@ signed-in user's cloud data and refreshes the browser cache.
   or test entries. It removes the application and its activity timeline, so the
   app does not create an unreachable deletion activity first.
 - Archive an application instead when its history should remain available.
+- Each application stores only its current resume attachment through
+  `resumeId`. Replacing a resume replaces that current link; the app does not
+  create separate historical usage records or retain an `attachedAt` history.
+- Full backups preserve the current `resumeId` link. Deleting an application
+  removes that link with the application but keeps the reusable resume file in
+  the private resume library.
+- A separate `ResumeUsage` history collection is deferred. Adding one later
+  requires an explicit storage and backup schema migration; it is not a hidden
+  requirement of the current release.
 
 ## Run Locally
 

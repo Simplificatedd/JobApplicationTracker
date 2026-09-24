@@ -15,7 +15,7 @@ interface ResumeObjectRow {
   mime_type: string;
 }
 
-interface ResumeUsageRow {
+interface ResumeStorageBytesRow {
   used_bytes: number | string | null;
 }
 
@@ -112,14 +112,14 @@ export async function putResumeFile(
        WHERE owner_id = ? AND storage_key <> ?`,
     )
       .bind(user.id, storageKey)
-      .first<ResumeUsageRow>(),
+      .first<ResumeStorageBytesRow>(),
     env.DB.prepare(
       `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
        FROM resume_objects
        WHERE NOT (owner_id = ? AND storage_key = ?)`,
     )
       .bind(user.id, storageKey)
-      .first<ResumeUsageRow>(),
+      .first<ResumeStorageBytesRow>(),
   ]);
   requireAvailableResumeQuota(
     Number(userUsage?.used_bytes ?? 0),
