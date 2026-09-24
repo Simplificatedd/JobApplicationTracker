@@ -18,9 +18,14 @@ import { formatFileSize } from "../../lib/resumeFiles";
 import type {
   MutationResult,
   ResumeUploadAttempt,
+  CoverLetterUploadAttempt,
   ResumeMetadataUpdate,
 } from "../../store/useTrackerStore";
-import type { Application, ResumeMetadata } from "../../types/application";
+import type {
+  Application,
+  CoverLetterMetadata,
+  ResumeMetadata,
+} from "../../types/application";
 
 interface ResumesPageProps {
   applications: Application[];
@@ -36,16 +41,64 @@ interface ResumesPageProps {
     allowDuplicate?: boolean,
   ) => Promise<ResumeUploadAttempt>;
   resumes: ResumeMetadata[];
+  documentKind?: "cover letter" | "resume";
+}
+
+interface CoverLettersPageProps {
+  applications: Application[];
+  coverLetters: CoverLetterMetadata[];
+  getCoverLetterFile: (id: string) => Promise<Blob>;
+  onDeleteCoverLetter: (id: string) => Promise<MutationResult>;
+  onUpdateCoverLetter: (
+    id: string,
+    input: ResumeMetadataUpdate,
+  ) => Promise<MutationResult>;
+  onUploadCoverLetter: (
+    file: File,
+    options?: ResumeMetadataUpdate,
+    allowDuplicate?: boolean,
+  ) => Promise<CoverLetterUploadAttempt>;
+}
+
+export function CoverLettersPage({
+  applications,
+  coverLetters,
+  getCoverLetterFile,
+  onDeleteCoverLetter,
+  onUpdateCoverLetter,
+  onUploadCoverLetter,
+}: CoverLettersPageProps) {
+  return (
+    <ResumesPage
+      applications={applications}
+      documentKind="cover letter"
+      getResumeFile={getCoverLetterFile}
+      onDeleteResume={onDeleteCoverLetter}
+      onUpdateResume={onUpdateCoverLetter}
+      onUploadResume={async (...args) => {
+        const result = await onUploadCoverLetter(...args);
+        return {
+          duplicateOf: result.duplicateOf,
+          resume: result.coverLetter,
+          saved: result.saved,
+        };
+      }}
+      resumes={coverLetters}
+    />
+  );
 }
 
 export function ResumesPage({
   applications,
+  documentKind = "resume",
   getResumeFile,
   onDeleteResume,
   onUpdateResume,
   onUploadResume,
   resumes,
 }: ResumesPageProps) {
+  const isCoverLetter = documentKind === "cover letter";
+  const documentLabel = isCoverLetter ? "Cover letter" : "Resume";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState("");
   const [versionLabel, setVersionLabel] = useState("");
@@ -62,8 +115,8 @@ export function ResumesPage({
     downloadResume,
     previewResume,
     workingResumeId,
-  } = useResumeFileActions(getResumeFile);
-  const linkedCounts = getLinkedCounts(applications);
+  } = useResumeFileActions(getResumeFile, documentLabel);
+  const linkedCounts = getLinkedCounts(applications, isCoverLetter);
 
   async function handleUpload(file: File | undefined, allowDuplicate = false) {
     if (!file) {
@@ -97,7 +150,7 @@ export function ResumesPage({
         fileInputRef.current.value = "";
       }
 
-      setUploadMessage("Resume uploaded.");
+      setUploadMessage(`${documentLabel} uploaded.`);
     } catch (error) {
       setUploadError(getErrorMessage(error));
     } finally {
@@ -132,7 +185,7 @@ export function ResumesPage({
             <input
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="field-control"
-              id="resume-upload-file-input"
+              id={`${isCoverLetter ? "cover-letter" : "resume"}-upload-file-input`}
               onChange={(event) => handleUpload(event.target.files?.[0])}
               ref={fileInputRef}
               type="file"
@@ -177,8 +230,8 @@ export function ResumesPage({
         <EmptyState
           body="Upload PDF or DOCX versions to attach them to applications."
           icon={FileText}
-          kicker="Resumes"
-          title="Resume library"
+          kicker={isCoverLetter ? "Cover letters" : "Resumes"}
+          title={`${documentLabel} library`}
         />
       ) : (
         <section className="surface-panel overflow-hidden rounded-lg">
@@ -202,6 +255,7 @@ export function ResumesPage({
               <tbody className="divide-y divide-border">
                 {resumes.map((resume) => (
                   <ResumeRow
+                    documentLabel={documentKind}
                     isWorking={workingResumeId === resume.id}
                     key={resume.id}
                     linkedCount={linkedCounts.get(resume.id) ?? 0}
@@ -219,6 +273,7 @@ export function ResumesPage({
       )}
       {pendingDuplicate ? (
         <DuplicateResumeDialog
+          documentLabel={documentKind}
           duplicateOf={pendingDuplicate.duplicateOf}
           isUploading={isUploading}
           onCancel={cancelDuplicateUpload}
@@ -232,11 +287,13 @@ export function ResumesPage({
 }
 
 function DuplicateResumeDialog({
+  documentLabel,
   duplicateOf,
   isUploading,
   onCancel,
   onConfirm,
 }: {
+  documentLabel: "cover letter" | "resume";
   duplicateOf: ResumeMetadata;
   isUploading: boolean;
   onCancel: () => void;
@@ -256,14 +313,14 @@ function DuplicateResumeDialog({
           className="text-lg font-semibold text-foreground"
           id="duplicate-resume-title"
         >
-          Exact duplicate resume
+          Exact duplicate {documentLabel}
         </h2>
         <p className="mt-2 text-sm leading-6 text-muted">
           This file has the same contents as “{duplicateOf.displayName}”. No file
           has been saved yet.
         </p>
         <p className="mt-2 text-sm text-foreground">
-          Upload it as a separate resume anyway?
+          Upload it as a separate {documentLabel} anyway?
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -289,6 +346,7 @@ function DuplicateResumeDialog({
 }
 
 function ResumeRow({
+  documentLabel,
   isWorking,
   linkedCount,
   onDelete,
@@ -297,6 +355,7 @@ function ResumeRow({
   onUpdate,
   resume,
 }: {
+  documentLabel: "cover letter" | "resume";
   isWorking: boolean;
   linkedCount: number;
   onDelete: () => void;
@@ -382,7 +441,7 @@ function ResumeRow({
           <div className="space-y-2">
             <p className="truncate">{resume.originalFileName}</p>
             <textarea
-              aria-label="Resume notes"
+              aria-label={`${documentLabel} notes`}
               className="field-control min-h-20 resize-y"
               onChange={(event) =>
                 setDraft((current) => ({
@@ -453,8 +512,8 @@ function ResumeRow({
                 disabled={isWorking}
                 label={
                   resume.fileExtension === "pdf"
-                    ? "Preview resume"
-                    : "Download resume"
+                    ? `Preview ${documentLabel}`
+                    : `Download ${documentLabel}`
                 }
                 onClick={onPreview}
               >
@@ -462,7 +521,7 @@ function ResumeRow({
               </IconAction>
               <IconAction
                 disabled={isWorking}
-                label="Download resume"
+                label={`Download ${documentLabel}`}
                 onClick={onDownload}
               >
                 <Download aria-hidden="true" size={16} />
@@ -470,7 +529,11 @@ function ResumeRow({
               <IconAction label="Edit metadata" onClick={() => setIsEditing(true)}>
                 <Pencil aria-hidden="true" size={16} />
               </IconAction>
-              <IconAction label="Delete resume" onClick={onDelete} tone="danger">
+              <IconAction
+                label={`Delete ${documentLabel}`}
+                onClick={onDelete}
+                tone="danger"
+              >
                 <Trash2 aria-hidden="true" size={16} />
               </IconAction>
             </>
@@ -583,20 +646,27 @@ function Td({
   );
 }
 
-function getLinkedCounts(applications: Application[]) {
+function getLinkedCounts(
+  applications: Application[],
+  useCoverLetterId = false,
+) {
   const counts = new Map<string, number>();
 
   for (const application of applications) {
-    if (!application.resumeId) {
+    const documentId = useCoverLetterId
+      ? application.coverLetterId
+      : application.resumeId;
+
+    if (!documentId) {
       continue;
     }
 
-    counts.set(application.resumeId, (counts.get(application.resumeId) ?? 0) + 1);
+    counts.set(documentId, (counts.get(documentId) ?? 0) + 1);
   }
 
   return counts;
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Resume action failed.";
+  return error instanceof Error ? error.message : "Document action failed.";
 }

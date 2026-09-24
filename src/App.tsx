@@ -4,7 +4,10 @@ import { AppShell, type ViewKey } from "./components/AppShell";
 import { AddApplicationModal } from "./features/applications/AddApplicationModal";
 import { ApplicationsPage } from "./features/applications/ApplicationsPage";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
-import { ResumesPage } from "./features/resumes/ResumesPage";
+import {
+  CoverLettersPage,
+  ResumesPage,
+} from "./features/resumes/ResumesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { deriveReminderNotifications } from "./lib/reminders";
 import { useTrackerStore } from "./store/useTrackerStore";
@@ -38,8 +41,12 @@ export function App() {
       navigationDisplayMode={tracker.settings.navigationDisplayMode}
       notifications={notifications}
       onPrimaryAction={() => {
-        if (visibleView === "resumes") {
-          document.getElementById("resume-upload-file-input")?.click();
+        if (visibleView === "resumes" || visibleView === "coverLetters") {
+          document
+            .getElementById(
+              `${visibleView === "coverLetters" ? "cover-letter" : "resume"}-upload-file-input`,
+            )
+            ?.click();
           return;
         }
 
@@ -73,6 +80,7 @@ export function App() {
       {isAddOpen ? (
         <AddApplicationModal
           applications={tracker.applications}
+          coverLetters={tracker.coverLetters}
           defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
           isOpen
           onClose={() => setIsAddOpen(false)}
@@ -143,12 +151,14 @@ function renderView(
         applications={tracker.applications}
         archiveApplication={tracker.archiveApplication}
         contacts={tracker.contacts}
+        coverLetters={tracker.coverLetters}
         deleteApplication={tracker.deleteApplication}
         deleteContact={tracker.deleteContact}
         enableDeleteActiveApplications={
           tracker.settings.enableDeleteActiveApplications
         }
         getResumeFile={tracker.getResumeFile}
+        getCoverLetterFile={tracker.getCoverLetterFile}
         openApplicationId={openApplicationId}
         onOpenApplicationHandled={onOpenApplicationHandled}
         restoreApplication={tracker.restoreApplication}
@@ -186,6 +196,19 @@ function renderView(
         onUpdateResume={tracker.updateResume}
         onUploadResume={tracker.uploadResume}
         resumes={tracker.resumes}
+      />
+    );
+  }
+
+  if (view === "coverLetters") {
+    return (
+      <CoverLettersPage
+        applications={tracker.applications}
+        coverLetters={tracker.coverLetters}
+        getCoverLetterFile={tracker.getCoverLetterFile}
+        onDeleteCoverLetter={tracker.deleteCoverLetter}
+        onUpdateCoverLetter={tracker.updateCoverLetter}
+        onUploadCoverLetter={tracker.uploadCoverLetter}
       />
     );
   }

@@ -20,6 +20,7 @@ import type {
 import type {
   ApplicationStatus,
   Application,
+  CoverLetterMetadata,
   DeadlineEntryMode,
   JobType,
   Priority,
@@ -35,7 +36,9 @@ interface AddApplicationModalProps {
   onCreate: (
     input: ApplicationInput,
     pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingResumeUpload,
   ) => Promise<MutationResult<Application>>;
+  coverLetters: CoverLetterMetadata[];
   resumes: ResumeMetadata[];
 }
 
@@ -70,6 +73,9 @@ interface AddApplicationFormState {
   resumeId: string;
   resumeUploadName: string;
   resumeUploadVersion: string;
+  coverLetterId: string;
+  coverLetterUploadName: string;
+  coverLetterUploadVersion: string;
   coverLetterVersion: string;
   salary: string;
   notes: string;
@@ -109,6 +115,9 @@ function createInitialFormState(
     resumeId: "",
     resumeUploadName: "",
     resumeUploadVersion: "",
+    coverLetterId: "",
+    coverLetterUploadName: "",
+    coverLetterUploadVersion: "",
     coverLetterVersion: "",
     salary: "",
     notes: "",
@@ -117,6 +126,7 @@ function createInitialFormState(
 
 export function AddApplicationModal({
   applications,
+  coverLetters,
   defaultFollowUpPromptDays,
   isOpen,
   onClose,
@@ -131,6 +141,9 @@ export function AddApplicationModal({
     useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
+  const [coverLetterUploadFile, setCoverLetterUploadFile] =
+    useState<File | null>(null);
+  const [coverLetterUploadError, setCoverLetterUploadError] = useState("");
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
@@ -163,7 +176,7 @@ export function AddApplicationModal({
       return;
     }
 
-    if (isFormDirty(form, cleanForm) || resumeUploadFile) {
+    if (isFormDirty(form, cleanForm) || resumeUploadFile || coverLetterUploadFile) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -175,15 +188,18 @@ export function AddApplicationModal({
     setDuplicateMatch(null);
     setTitleError("");
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     onClose();
   }
 
   function discardAndClose() {
     resetForm();
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setIsDiscardWarningOpen(false);
     setDuplicateMatch(null);
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setTitleError("");
     onClose();
   }
@@ -292,6 +308,7 @@ export function AddApplicationModal({
         : undefined,
       priority: form.priority,
       resumeId: trimOptional(form.resumeId),
+      coverLetterId: trimOptional(form.coverLetterId),
       coverLetterVersion: trimOptional(form.coverLetterVersion),
       salary: trimOptional(form.salary),
       notes: trimOptional(form.notes),
@@ -308,27 +325,44 @@ export function AddApplicationModal({
 
     setDuplicateMatch(null);
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setIsSaving(true);
-    const result = await onCreate(input, resumeUploadFile
-      ? {
-          file: resumeUploadFile,
-          options: {
-            displayName: form.resumeUploadName,
-            markAsUsed: true,
-            versionLabel: form.resumeUploadVersion,
-          },
-        }
-      : undefined);
+    const result = await onCreate(
+      input,
+      resumeUploadFile
+        ? {
+            file: resumeUploadFile,
+            options: {
+              displayName: form.resumeUploadName,
+              markAsUsed: true,
+              versionLabel: form.resumeUploadVersion,
+            },
+          }
+        : undefined,
+      coverLetterUploadFile
+        ? {
+            file: coverLetterUploadFile,
+            options: {
+              displayName: form.coverLetterUploadName,
+              markAsUsed: true,
+              versionLabel: form.coverLetterUploadVersion,
+            },
+          }
+        : undefined,
+    );
     setIsSaving(false);
 
     if (!result.ok) {
       setResumeUploadError(result.error);
+      setCoverLetterUploadError(result.error);
       return;
     }
 
     resetForm();
     setResumeUploadFile(null);
+    setCoverLetterUploadFile(null);
     setResumeUploadError("");
+    setCoverLetterUploadError("");
     setTitleError("");
     onClose();
   }
@@ -773,15 +807,60 @@ export function AddApplicationModal({
               </select>
             </Field>
 
-            <Field label="Cover Letter Version">
-              <input
+            <Field label="Cover Letter">
+              <select
                 className="field-control"
                 onChange={(event) =>
-                  updateForm("coverLetterVersion", event.target.value)
+                  updateForm("coverLetterId", event.target.value)
                 }
-                type="text"
-                value={form.coverLetterVersion}
-              />
+                value={form.coverLetterId}
+              >
+                <option value="">No cover letter selected</option>
+                {coverLetters.map((coverLetter) => (
+                  <option key={coverLetter.id} value={coverLetter.id}>
+                    {coverLetter.displayName}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Upload aria-hidden="true" size={16} />
+                  Upload new cover letter
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="field-control sm:col-span-2"
+                    onChange={(event) =>
+                      setCoverLetterUploadFile(event.target.files?.[0] ?? null)
+                    }
+                    type="file"
+                  />
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("coverLetterUploadName", event.target.value)
+                    }
+                    placeholder="Display name"
+                    type="text"
+                    value={form.coverLetterUploadName}
+                  />
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("coverLetterUploadVersion", event.target.value)
+                    }
+                    placeholder="Version label"
+                    type="text"
+                    value={form.coverLetterUploadVersion}
+                  />
+                </div>
+                {coverLetterUploadError ? (
+                  <p className="mt-2 text-xs font-medium text-destructive">
+                    {coverLetterUploadError}
+                  </p>
+                ) : null}
+              </div>
             </Field>
 
             <Field label="Salary / Pay">
