@@ -132,7 +132,7 @@ export function deriveApplicationNotifications(
       now,
     );
 
-    if (severity !== "upcoming" || application.followUpNeeded) {
+    if (severity !== "upcoming") {
       notifications.push({
         application,
         applicationId: application.id,
@@ -148,18 +148,6 @@ export function deriveApplicationNotifications(
         type: "follow_up",
       });
     }
-  } else if (application.followUpNeeded) {
-    notifications.push({
-      application,
-      applicationId: application.id,
-      body: application.company,
-      group: "other",
-      id: buildNotificationId(application.id, "flagged", application.updatedAt),
-      severity: "due_soon",
-      sortAt: new Date(application.updatedAt).getTime(),
-      title: `Follow-up flagged for ${application.jobTitle}`,
-      type: "flagged",
-    });
   }
 
   const interviewDate = parseDate(application.interviewDateTime);

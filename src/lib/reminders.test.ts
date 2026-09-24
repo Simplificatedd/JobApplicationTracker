@@ -84,4 +84,35 @@ describe("deriveApplicationNotifications", () => {
 
     expect(notifications).toEqual([]);
   });
+
+  it("does not flag a follow-up before the due-soon window", () => {
+    const notifications = deriveApplicationNotifications(
+      { ...baseApplication, followUpDate: "2026-09-30" },
+      { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+      new Date("2026-09-20T12:00:00.000Z"),
+    );
+
+    expect(notifications).toEqual([]);
+  });
+
+  it.each([
+    ["2026-09-23", "due_soon"],
+    ["2026-09-20", "due_today"],
+    ["2026-09-19", "overdue"],
+  ] as const)(
+    "flags a follow-up dated %s as %s",
+    (followUpDate, expectedSeverity) => {
+      const notifications = deriveApplicationNotifications(
+        { ...baseApplication, followUpDate },
+        { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+        new Date("2026-09-20T12:00:00.000Z"),
+      );
+
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0]).toMatchObject({
+        severity: expectedSeverity,
+        type: "follow_up",
+      });
+    },
+  );
 });
