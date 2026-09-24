@@ -902,6 +902,7 @@ export function useTrackerStore(): TrackerStore {
       ...backup.snapshot,
       applications: interviewReconciliation.applications,
       interviews: interviewReconciliation.interviews,
+      settings: normalizeUserSettings(backup.snapshot.settings),
     };
     const resumeFiles: ResumeBlobRecord[] = backup.resumeFiles.map(
       (resumeFile) => ({
@@ -974,10 +975,10 @@ export function useTrackerStore(): TrackerStore {
     return settingsMutationQueue.run(async () => {
       try {
         const currentSettings = await cloudStorageAdapter.getSettings();
-        const updatedSettings = {
+        const updatedSettings = normalizeUserSettings({
           ...currentSettings,
           ...input,
-        };
+        });
 
         return persistThenUpdate(
           cloudStorageAdapter.saveSettings(updatedSettings),
