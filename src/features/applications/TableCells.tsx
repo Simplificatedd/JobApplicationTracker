@@ -4,20 +4,41 @@ import {
   CalendarClock,
   CalendarPlus,
   CalendarX,
+  Check,
   FileText,
   MoreHorizontal,
+  Pencil,
   MessageSquareText,
   RotateCcw,
   Trash2,
+  X,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { APPLICATION_STATUSES } from "../../lib/constants";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { calculateFollowUpDueDate } from "../../lib/reminders";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
-import type { JobApplication, ResumeFile } from "../../types/application";
+import type {
+  ApplicationStatus,
+  JobApplication,
+  ResumeFile,
+} from "../../types/application";
+import {
+  createFollowUpQuickEdit,
+  createInterviewQuickEdit,
+  createStatusQuickEdit,
+} from "./applicationQuickEdits";
+import { StatusBadge } from "./StatusBadge";
 
 export function DescriptionPreview({ description }: { description: string }) {
   return (
@@ -31,37 +52,130 @@ export function DescriptionPreview({ description }: { description: string }) {
 
 export function FollowUpCell({
   application,
+  onUpdate,
 }: {
   application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftDate, setDraftDate] = useState(application.followUpDate ?? "");
+  const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
   const dueDate = calculateFollowUpDueDate(
     application,
     application.followUpPromptDays ?? 7,
   );
 
+  function startEditing() {
+    setDraftDate(application.followUpDate ?? "");
+    setDraftNeeded(application.followUpNeeded);
+    setIsEditing(true);
+  }
+
+  if (isEditing) {
+    return (
+      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+        <input
+          aria-label="Follow-up date"
+          className="field-control h-9 w-full min-w-0 text-xs"
+          onChange={(event) => setDraftDate(event.target.value)}
+          type="date"
+          value={draftDate}
+        />
+        <label className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <input
+            checked={draftNeeded}
+            className="h-4 w-4 rounded border-border text-primary"
+            onChange={(event) => setDraftNeeded(event.target.checked)}
+            type="checkbox"
+          />
+          Needed
+        </label>
+        <QuickEditActions
+          label="follow-up"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={() => {
+            onUpdate(createFollowUpQuickEdit(draftNeeded, draftDate));
+            setIsEditing(false);
+          }}
+        />
+      </QuickEditContainer>
+    );
+  }
+
   return (
-    <div className="min-w-0 max-w-full overflow-hidden">
-      <p
-        className={`truncate text-sm font-medium ${
-          application.followUpNeeded ? "text-warning" : "text-foreground"
-        }`}
-      >
-        {formatDate(dueDate)}
-      </p>
-      <p className="mt-1 truncate text-xs text-muted">
-        {application.followUpNeeded ? "Needed" : "Optional"}
-      </p>
-    </div>
+    <button
+      aria-label="Quick edit follow-up"
+      className="group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
+      onClick={startEditing}
+      type="button"
+    >
+      <span className="min-w-0 max-w-full overflow-hidden">
+        <span
+          className={`block truncate text-sm font-medium ${
+            application.followUpNeeded ? "text-warning" : "text-foreground"
+          }`}
+        >
+          {formatDate(dueDate)}
+        </span>
+        <span className="mt-1 block truncate text-xs text-muted">
+          {application.followUpNeeded ? "Needed" : "Optional"}
+        </span>
+      </span>
+      <Pencil
+        aria-hidden="true"
+        className="mt-0.5 shrink-0 text-muted"
+        size={14}
+      />
+    </button>
   );
 }
 
 export function InterviewCell({
   application,
+  onUpdate,
 }: {
   application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftDateTime, setDraftDateTime] = useState(
+    application.interviewDateTime?.slice(0, 16) ?? "",
+  );
+
+  function startEditing() {
+    setDraftDateTime(application.interviewDateTime?.slice(0, 16) ?? "");
+    setIsEditing(true);
+  }
+
+  if (isEditing) {
+    return (
+      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+        <input
+          aria-label="Interview date and time"
+          className="field-control h-9 w-full min-w-0 text-xs"
+          onChange={(event) => setDraftDateTime(event.target.value)}
+          type="datetime-local"
+          value={draftDateTime}
+        />
+        <QuickEditActions
+          label="interview date and time"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={() => {
+            onUpdate(createInterviewQuickEdit(application, draftDateTime));
+            setIsEditing(false);
+          }}
+        />
+      </QuickEditContainer>
+    );
+  }
+
   return (
-    <div className="flex min-w-0 max-w-full gap-2 overflow-hidden">
+    <button
+      aria-label="Quick edit interview date and time"
+      className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
+      onClick={startEditing}
+      type="button"
+    >
       <CalendarClock
         aria-hidden="true"
         className="mt-0.5 shrink-0 text-muted"
@@ -77,6 +191,185 @@ export function InterviewCell({
           </p>
         ) : null}
       </div>
+      <Pencil
+        aria-hidden="true"
+        className="ml-auto mt-0.5 shrink-0 text-muted"
+        size={14}
+      />
+    </button>
+  );
+}
+
+export function StatusQuickEditCell({
+  application,
+  onUpdate,
+}: {
+  application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftStatus, setDraftStatus] = useState(application.status);
+
+  function startEditing() {
+    setDraftStatus(application.status);
+    setIsEditing(true);
+  }
+
+  if (isEditing) {
+    return (
+      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+        <select
+          aria-label="Application status"
+          className="field-control h-9 w-full min-w-0 text-xs"
+          onChange={(event) =>
+            setDraftStatus(event.target.value as ApplicationStatus)
+          }
+          value={draftStatus}
+        >
+          {APPLICATION_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {status}
+            </option>
+          ))}
+        </select>
+        <QuickEditActions
+          label="status"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={() => {
+            onUpdate(createStatusQuickEdit(draftStatus));
+            setIsEditing(false);
+          }}
+        />
+      </QuickEditContainer>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Quick edit status"
+      className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+      onClick={startEditing}
+      type="button"
+    >
+      <StatusBadge status={application.status} />
+      <Pencil
+        aria-hidden="true"
+        className="shrink-0 text-muted"
+        size={14}
+      />
+    </button>
+  );
+}
+
+export function FollowUpNeededQuickEditCell({
+  application,
+  onUpdate,
+}: {
+  application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
+
+  if (isEditing) {
+    return (
+      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          <input
+            checked={draftNeeded}
+            className="h-4 w-4 rounded border-border text-primary"
+            onChange={(event) => setDraftNeeded(event.target.checked)}
+            type="checkbox"
+          />
+          {draftNeeded ? "Yes" : "No"}
+        </label>
+        <QuickEditActions
+          label="follow-up needed"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={() => {
+            onUpdate(
+              createFollowUpQuickEdit(
+                draftNeeded,
+                application.followUpDate ?? "",
+              ),
+            );
+            setIsEditing(false);
+          }}
+        />
+      </QuickEditContainer>
+    );
+  }
+
+  return (
+    <button
+      aria-label="Quick edit follow-up needed"
+      className="group flex w-full items-center justify-between gap-2 rounded-md text-sm text-foreground"
+      onClick={() => {
+        setDraftNeeded(application.followUpNeeded);
+        setIsEditing(true);
+      }}
+      type="button"
+    >
+      <span>{application.followUpNeeded ? "Yes" : "No"}</span>
+      <Pencil
+        aria-hidden="true"
+        className="shrink-0 text-muted"
+        size={14}
+      />
+    </button>
+  );
+}
+
+function QuickEditContainer({
+  children,
+  onCancel,
+}: {
+  children: ReactNode;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="space-y-2"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onCancel();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function QuickEditActions({
+  label,
+  onCancel,
+  onConfirm,
+}: {
+  label: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        aria-label={`Save ${label}`}
+        className="icon-button h-8 w-8 text-success"
+        onClick={onConfirm}
+        type="button"
+      >
+        <Check aria-hidden="true" size={15} />
+      </button>
+      <button
+        aria-label={`Cancel ${label} edit`}
+        className="icon-button h-8 w-8"
+        onClick={onCancel}
+        type="button"
+      >
+        <X aria-hidden="true" size={15} />
+      </button>
     </div>
   );
 }
