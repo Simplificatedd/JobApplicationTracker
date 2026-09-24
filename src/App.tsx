@@ -61,6 +61,7 @@ export function App() {
         )
       )}
       <AddApplicationModal
+        applications={tracker.applications}
         defaultFollowUpPromptDays={tracker.settings.defaultFollowUpPromptDays}
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
