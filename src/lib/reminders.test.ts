@@ -58,6 +58,20 @@ describe("classifyReminderSeverity", () => {
     expect(classifyReminderSeverity("2026-09-22", 3, now)).toBe("due_soon");
     expect(classifyReminderSeverity("2026-09-30", 3, now)).toBe("upcoming");
   });
+
+  it("keeps timestamp reminders tied to their exact instant", () => {
+    expect(
+      classifyReminderSeverity(
+        "2026-09-21T00:30:00.000Z",
+        3,
+        new Date("2026-09-21T00:00:00.000Z"),
+      ),
+    ).toBe("due_today");
+  });
+
+  it("treats invalid date stamps as upcoming instead of rolling them over", () => {
+    expect(classifyReminderSeverity("2026-02-31", 3, now)).toBe("upcoming");
+  });
 });
 
 describe("deriveApplicationNotifications", () => {
