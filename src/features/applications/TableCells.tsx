@@ -81,18 +81,32 @@ export function InterviewCell({
   );
 }
 
-export function ResumeCell({ resume }: { resume?: ResumeFile }) {
+export function ResumeCell({
+  isWorking,
+  onPreview,
+  resume,
+}: {
+  isWorking: boolean;
+  onPreview: (resume: ResumeFile) => Promise<void>;
+  resume?: ResumeFile;
+}) {
   if (!resume) {
     return <p className="truncate text-sm text-muted">Unassigned</p>;
   }
 
   return (
-    <div
+    <button
+      aria-label={`Preview ${resume.displayName}`}
       className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md text-left text-sm font-medium text-foreground hover:text-primary"
+      disabled={isWorking}
+      onClick={() => void onPreview(resume)}
+      type="button"
     >
       <FileText aria-hidden="true" className="shrink-0 text-muted" size={16} />
-      <span className="truncate">{resume.displayName}</span>
-    </div>
+      <span className="truncate">
+        {isWorking ? "Opening…" : resume.displayName}
+      </span>
+    </button>
   );
 }
 

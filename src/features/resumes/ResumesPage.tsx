@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
+import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
 import { formatFileSize, type ResumeUploadResult } from "../../lib/resumeFiles";
 import type {
@@ -47,7 +48,13 @@ export function ResumesPage({
   const [versionLabel, setVersionLabel] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
-  const [workingResumeId, setWorkingResumeId] = useState<string | null>(null);
+  const {
+    actionError,
+    clearActionError,
+    downloadResume,
+    previewResume,
+    workingResumeId,
+  } = useResumeFileActions(getResumeFile);
   const linkedCounts = getLinkedCounts(applications);
 
   async function handleUpload(file: File | undefined) {
@@ -57,6 +64,7 @@ export function ResumesPage({
 
     setUploadError("");
     setUploadMessage("");
+    clearActionError();
 
     try {
       const result = await onUploadResume(file, {
@@ -77,55 +85,6 @@ export function ResumesPage({
       );
     } catch (error) {
       setUploadError(getErrorMessage(error));
-    }
-  }
-
-  async function previewResume(resume: ResumeMetadata) {
-    if (resume.fileExtension !== "pdf") {
-      await downloadResume(resume);
-      return;
-    }
-
-    const previewWindow = window.open("about:blank", "_blank");
-
-    if (!previewWindow) {
-      setUploadError("PDF preview was blocked. Use download instead.");
-      return;
-    }
-
-    previewWindow.opener = null;
-    setWorkingResumeId(resume.id);
-
-    try {
-      const file = await getResumeFile(resume.id);
-      const url = URL.createObjectURL(file);
-
-      previewWindow.location.href = url;
-      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    } catch (error) {
-      previewWindow.close();
-      setUploadError(getErrorMessage(error));
-    } finally {
-      setWorkingResumeId(null);
-    }
-  }
-
-  async function downloadResume(resume: ResumeMetadata) {
-    setWorkingResumeId(resume.id);
-
-    try {
-      const file = await getResumeFile(resume.id);
-      const url = URL.createObjectURL(file);
-      const anchor = document.createElement("a");
-
-      anchor.href = url;
-      anchor.download = resume.downloadFileName;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      setUploadError(getErrorMessage(error));
-    } finally {
-      setWorkingResumeId(null);
     }
   }
 
@@ -181,8 +140,8 @@ export function ResumesPage({
             Upload
           </button>
         </div>
-        {uploadError ? (
-          <InlineAlert message={uploadError} tone="danger" />
+        {uploadError || actionError ? (
+          <InlineAlert message={uploadError || actionError} tone="danger" />
         ) : uploadMessage ? (
           <InlineAlert message={uploadMessage} tone="info" />
         ) : null}

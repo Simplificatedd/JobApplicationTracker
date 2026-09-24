@@ -3,6 +3,8 @@ import {
   CalendarPlus,
   CalendarX,
   Check,
+  Download,
+  Eye,
   ExternalLink,
   Pencil,
   Upload,
@@ -46,6 +48,8 @@ interface ApplicationDetailPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   onClose: () => void;
+  onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
@@ -53,6 +57,8 @@ interface ApplicationDetailPanelProps {
   ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
+  resumeActionError: string;
+  workingResumeId: string | null;
 }
 
 export function ApplicationDetailPanel({
@@ -60,9 +66,13 @@ export function ApplicationDetailPanel({
   application,
   contacts,
   onClose,
+  onDownloadResume,
+  onPreviewResume,
   onUpdate,
   resume,
   resumes,
+  resumeActionError,
+  workingResumeId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
@@ -258,8 +268,12 @@ export function ApplicationDetailPanel({
               activities={activities}
               application={application}
               contacts={contacts}
+              onDownloadResume={onDownloadResume}
+              onPreviewResume={onPreviewResume}
               onUpdate={onUpdate}
               resume={resume}
+              resumeActionError={resumeActionError}
+              workingResumeId={workingResumeId}
             />
           )}
         </div>
@@ -280,17 +294,25 @@ function ReadOnlyDetails({
   activities,
   application,
   contacts,
+  onDownloadResume,
+  onPreviewResume,
   onUpdate,
   resume,
+  resumeActionError,
+  workingResumeId,
 }: {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
+  onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
+  onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
   ) => Promise<MutationResult>;
   resume?: ResumeMetadata;
+  resumeActionError: string;
+  workingResumeId: string | null;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
 
@@ -371,13 +393,12 @@ function ReadOnlyDetails({
           label="Interview"
           value={formatInterviewSummary(application)}
         />
-        <DetailRow
-          label="Resume"
-          value={
-            resume
-              ? `${resume.displayName} / ${resume.originalFileName}`
-              : "Unassigned"
-          }
+        <ResumeDetail
+          error={resumeActionError}
+          isWorking={resume?.id === workingResumeId}
+          onDownload={onDownloadResume}
+          onPreview={onPreviewResume}
+          resume={resume}
         />
         <DetailRow label="Salary / pay" value={application.salary} />
       </section>
@@ -471,14 +492,17 @@ function ReadOnlyDetails({
 
 function DetailActionButton({
   children,
+  disabled = false,
   onClick,
 }: {
   children: React.ReactNode;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
@@ -889,6 +913,56 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
       >
         {value ?? ""}
       </p>
+    </div>
+  );
+}
+
+function ResumeDetail({
+  error,
+  isWorking,
+  onDownload,
+  onPreview,
+  resume,
+}: {
+  error: string;
+  isWorking: boolean;
+  onDownload: (resume: ResumeMetadata) => Promise<void>;
+  onPreview: (resume: ResumeMetadata) => Promise<void>;
+  resume?: ResumeMetadata;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-muted">Resume</p>
+      {resume ? (
+        <>
+          <p className="mt-1 truncate text-sm text-foreground">
+            {resume.displayName} / {resume.originalFileName}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <DetailActionButton
+              disabled={isWorking}
+              onClick={() => void onPreview(resume)}
+            >
+              <Eye aria-hidden="true" size={16} />
+              {isWorking ? "Opening…" : "Preview"}
+            </DetailActionButton>
+            <DetailActionButton
+              disabled={isWorking}
+              onClick={() => void onDownload(resume)}
+            >
+              <Download aria-hidden="true" size={16} />
+              Download
+            </DetailActionButton>
+          </div>
+          {error ? (
+            <p className="mt-2 text-sm font-medium text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-muted">Unassigned</p>
+      )}
     </div>
   );
 }
