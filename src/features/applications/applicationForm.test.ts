@@ -35,7 +35,7 @@ const existingApplication: Application = {
   company: "Acme Labs",
   jobTitle: "Product Intern",
   jobDescription: "",
-  status: "Just Applied",
+  status: "Awaiting Response",
   workMode: "unknown",
   jobType: "internship",
   applicationUrl: "https://example.com/jobs/123/",

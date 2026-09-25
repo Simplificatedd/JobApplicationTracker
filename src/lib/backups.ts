@@ -7,6 +7,7 @@ import type {
   Interview,
   ResumeMetadata,
 } from "../types/application";
+import { normalizeApplicationStatus } from "./domain";
 
 export const BACKUP_SCHEMA_VERSION = 1;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
@@ -108,7 +109,18 @@ export async function parseBackupFile(file: File) {
     throw new Error(validationError);
   }
 
-  return parsed as TrackerBackup;
+  const backup = parsed as TrackerBackup;
+
+  return {
+    ...backup,
+    snapshot: {
+      ...backup.snapshot,
+      applications: backup.snapshot.applications.map((application) => ({
+        ...application,
+        status: normalizeApplicationStatus(application.status),
+      })),
+    },
+  };
 }
 
 export function getBackupImportPreview(

@@ -14,7 +14,7 @@ const baseApplication: Application = {
   company: "Example Company",
   jobTitle: "Software Engineer",
   jobDescription: "Build reliable software.",
-  status: "Just Applied",
+  status: "Awaiting Response",
   workMode: "unknown",
   jobType: "internship",
   followUpNeeded: false,
@@ -58,7 +58,7 @@ describe("application company and location filters", () => {
         ...DEFAULT_APPLICATION_FILTERS,
         company: "Example Company",
         location: "Tokyo",
-        status: "Just Applied",
+        status: "Awaiting Response",
       }),
     ).toEqual([applications[1]]);
   });

@@ -3,13 +3,21 @@ import type { ApplicationStatus } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [
-  "Just Applied",
   "Awaiting Response",
   "Interviewing",
   "Offered",
   "Rejected",
   "Withdrawn",
 ];
+
+export const DEFAULT_APPLICATION_STATUS: ApplicationStatus =
+  "Awaiting Response";
+
+export function normalizeApplicationStatus(status: unknown): ApplicationStatus {
+  return APPLICATION_STATUSES.includes(status as ApplicationStatus)
+    ? (status as ApplicationStatus)
+    : DEFAULT_APPLICATION_STATUS;
+}
 
 export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [
   "jobTitle",

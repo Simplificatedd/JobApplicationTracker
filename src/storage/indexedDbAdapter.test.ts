@@ -118,6 +118,21 @@ describe("indexedDbStorageAdapter", () => {
     });
   });
 
+  it("normalizes legacy application statuses when reading saved records", async () => {
+    const adapter = createTestStorageAdapter();
+    const legacyApplication = {
+      ...application,
+      status: "Just Applied",
+    } as unknown as Application;
+
+    await adapter.initialize();
+    await adapter.commitMutation({ applications: [legacyApplication] });
+
+    await expect(adapter.listApplications()).resolves.toMatchObject([
+      { status: "Awaiting Response" },
+    ]);
+  });
+
   it("commits a complete domain mutation atomically", async () => {
     const indexedDb = new IDBFactory();
     const databaseName = "atomic-domain-mutation";

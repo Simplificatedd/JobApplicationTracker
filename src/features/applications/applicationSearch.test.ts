@@ -7,7 +7,7 @@ const baseApplication: Application = {
   company: "Example Company",
   jobTitle: "Software Engineer",
   jobDescription: "Build reliable web applications.",
-  status: "Just Applied",
+  status: "Awaiting Response",
   workMode: "unknown",
   jobType: "internship",
   followUpNeeded: false,

@@ -11,7 +11,7 @@ const application: Application = {
   company: "Example Company",
   jobTitle: "Product Intern",
   jobDescription: "",
-  status: "Just Applied",
+  status: "Awaiting Response",
   workMode: "unknown",
   jobType: "internship",
   followUpNeeded: false,

@@ -1,5 +1,4 @@
 export type ApplicationStatus =
-  | "Just Applied"
   | "Awaiting Response"
   | "Interviewing"
   | "Offered"

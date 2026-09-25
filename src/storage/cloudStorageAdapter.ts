@@ -1,4 +1,7 @@
-import { DEFAULT_USER_SETTINGS } from "../lib/domain";
+import {
+  DEFAULT_USER_SETTINGS,
+  normalizeApplicationStatus,
+} from "../lib/domain";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -121,9 +124,9 @@ export function createCloudStorageAdapter({
     const remoteState = await api.getState();
 
     if (remoteState) {
-      cloudState = remoteState;
-      await refreshCache(remoteState.snapshot);
-      return normalizeSnapshot(remoteState.snapshot);
+      cloudState = normalizeCloudState(remoteState);
+      await refreshCache(cloudState.snapshot);
+      return cloudState.snapshot;
     }
 
     const localFiles = await cache.listResumeFiles();
@@ -134,13 +137,13 @@ export function createCloudStorageAdapter({
     );
 
     try {
-      cloudState = await api.saveState(localSnapshot, null);
+      cloudState = normalizeCloudState(await api.saveState(localSnapshot, null));
     } catch (error) {
       if (!(error instanceof CloudRevisionConflictError) || !error.current) {
         throw error;
       }
 
-      cloudState = error.current;
+      cloudState = normalizeCloudState(error.current);
     }
 
     await refreshCache(cloudState.snapshot, localFiles);
@@ -179,7 +182,9 @@ export function createCloudStorageAdapter({
         const nextSnapshot = update(structuredClone(current.snapshot));
 
         try {
-          const saved = await api.saveState(nextSnapshot, current.revision);
+          const saved = normalizeCloudState(
+            await api.saveState(nextSnapshot, current.revision),
+          );
           cloudState = saved;
           await refreshCache(saved.snapshot, localFiles);
           return saved.snapshot;
@@ -188,7 +193,7 @@ export function createCloudStorageAdapter({
             throw error;
           }
 
-          current = error.current;
+          current = normalizeCloudState(error.current);
           cloudState = current;
         }
       }
@@ -556,9 +561,20 @@ export function createCloudStorageAdapter({
 
 export const cloudStorageAdapter = createCloudStorageAdapter();
 
+function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
+  return {
+    ...state,
+    snapshot: normalizeSnapshot(state.snapshot),
+  };
+}
+
 function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
   return {
     ...snapshot,
+    applications: snapshot.applications.map((application) => ({
+      ...application,
+      status: normalizeApplicationStatus(application.status),
+    })),
     coverLetters: snapshot.coverLetters ?? [],
   };
 }

@@ -24,6 +24,7 @@ import {
   createId,
   createTimestamp,
   DEFAULT_ANALYTICS_SETTINGS,
+  DEFAULT_APPLICATION_STATUS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
   normalizeUserSettings,
@@ -348,7 +349,7 @@ export function useTrackerStore(): TrackerStore {
       resumeId: resumeUpload?.resume.id ?? input.resumeId,
       coverLetterId:
         coverLetterUpload?.coverLetter.id ?? input.coverLetterId,
-      status: input.status || "Just Applied",
+      status: input.status || DEFAULT_APPLICATION_STATUS,
       contactsCount: 0,
       createdAt,
       updatedAt: createdAt,
