@@ -31,7 +31,7 @@ const application: Application = {
   jobTitle: "Engineer",
   jobType: "full-time",
   priority: "medium",
-  status: "Just Applied",
+  status: "Awaiting Response",
   updatedAt: "2026-09-22T00:00:00.000Z",
   workMode: "hybrid",
 };
@@ -187,6 +187,28 @@ describe("cloud storage adapter", () => {
     await expect(cache.exportSnapshot()).resolves.toMatchObject({
       applications: [{ company: "Cloud" }],
     });
+  });
+
+  it("normalizes legacy application statuses from cloud state", async () => {
+    const cache = createCache("cloud-status-migration");
+    const api = new FakeCloudApi();
+    const legacyApplication = {
+      ...application,
+      status: "Just Applied",
+    } as unknown as Application;
+    api.state = {
+      revision: 7,
+      snapshot: createSnapshot([legacyApplication]),
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    };
+    const adapter = createCloudStorageAdapter({ api, cache });
+
+    await expect(adapter.initialize()).resolves.toMatchObject({
+      applications: [{ status: "Awaiting Response" }],
+    });
+    await expect(adapter.listApplications()).resolves.toMatchObject([
+      { status: "Awaiting Response" },
+    ]);
   });
 
   it("rebases a mutation on the newest cloud revision after a conflict", async () => {

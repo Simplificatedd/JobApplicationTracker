@@ -2,6 +2,7 @@ import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
+  normalizeApplicationStatus,
   normalizeUserSettings,
 } from "../lib/domain";
 import type { AnalyticsSettings } from "../types/analytics";
@@ -905,7 +906,7 @@ function normalizeApplication(application: Partial<Application>): Application {
     jobTitle: application.jobTitle ?? "Untitled application",
     jobType: application.jobType ?? "internship",
     priority: application.priority ?? "medium",
-    status: application.status ?? "Just Applied",
+    status: normalizeApplicationStatus(application.status),
     updatedAt: timestamp,
     workMode: application.workMode ?? "unknown",
   };

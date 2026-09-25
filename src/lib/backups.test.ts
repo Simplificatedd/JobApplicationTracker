@@ -21,7 +21,7 @@ function createApplication(overrides: Partial<Application> = {}): Application {
     company: "Example Company",
     jobTitle: "Product Intern",
     jobDescription: "",
-    status: "Just Applied",
+    status: "Awaiting Response",
     workMode: "unknown",
     jobType: "internship",
     followUpNeeded: false,
@@ -77,6 +77,21 @@ describe("parseBackupFile", () => {
   it("accepts a valid empty backup", async () => {
     await expect(parseBackupFile(createBackupFile(createSnapshot()))).resolves
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("migrates the legacy Just Applied status", async () => {
+    const application = {
+      ...createApplication(),
+      status: "Just Applied",
+    } as unknown as Application;
+    const snapshot = createSnapshot({ applications: [application] });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [{ status: "Awaiting Response" }],
+        },
+      });
   });
 
   it("rejects oversized backups before parsing", async () => {

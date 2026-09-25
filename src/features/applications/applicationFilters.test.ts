@@ -3,8 +3,10 @@ import type { Application } from "../../types/application";
 import {
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
+  DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
   normalizeApplicationFilters,
+  sortApplications,
 } from "./applicationFilters";
 
 const baseApplication: Application = {
@@ -12,7 +14,7 @@ const baseApplication: Application = {
   company: "Example Company",
   jobTitle: "Software Engineer",
   jobDescription: "Build reliable software.",
-  status: "Just Applied",
+  status: "Awaiting Response",
   workMode: "unknown",
   jobType: "internship",
   followUpNeeded: false,
@@ -56,7 +58,7 @@ describe("application company and location filters", () => {
         ...DEFAULT_APPLICATION_FILTERS,
         company: "Example Company",
         location: "Tokyo",
-        status: "Just Applied",
+        status: "Awaiting Response",
       }),
     ).toEqual([applications[1]]);
   });
@@ -86,6 +88,29 @@ describe("application company and location filters", () => {
     expect(
       normalizeApplicationFilters({ location: "Tokyo" }).company,
     ).toBe("");
+  });
+});
+
+describe("default application sorting", () => {
+  it("shows the most recently updated applications first", () => {
+    const olderApplication = {
+      ...baseApplication,
+      id: "older",
+      updatedAt: "2026-09-20T00:00:00.000Z",
+    };
+    const newerApplication = {
+      ...baseApplication,
+      id: "newer",
+      updatedAt: "2026-09-21T00:00:00.000Z",
+    };
+
+    expect(DEFAULT_SORT_STATE).toEqual({
+      column: "updatedAt",
+      direction: "descending",
+    });
+    expect(
+      sortApplications([olderApplication, newerApplication], DEFAULT_SORT_STATE),
+    ).toEqual([newerApplication, olderApplication]);
   });
 });
 

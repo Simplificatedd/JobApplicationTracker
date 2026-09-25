@@ -3,7 +3,10 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
-import { APPLICATION_SOURCES } from "../../lib/domain";
+import {
+  APPLICATION_SOURCES,
+  DEFAULT_APPLICATION_STATUS,
+} from "../../lib/domain";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
@@ -88,7 +91,7 @@ function createInitialFormState(
     company: "",
     jobTitle: "",
     jobDescription: "",
-    status: "",
+    status: DEFAULT_APPLICATION_STATUS,
     location: "",
     workMode: "unknown",
     jobType: "internship",
@@ -271,7 +274,7 @@ export function AddApplicationModal({
       company: trimOptional(form.company) ?? "",
       jobTitle: trimmedTitle,
       jobDescription: trimOptional(form.jobDescription) ?? "",
-      status: form.status || "Just Applied",
+      status: form.status || DEFAULT_APPLICATION_STATUS,
       location: trimOptional(form.location),
       workMode: form.workMode,
       jobType: form.jobType,
@@ -444,7 +447,6 @@ export function AddApplicationModal({
                 }
                 value={form.status}
               >
-                <option value=""></option>
                 {APPLICATION_STATUSES.map((status) => (
                   <option key={status} value={status}>
                     {status}
