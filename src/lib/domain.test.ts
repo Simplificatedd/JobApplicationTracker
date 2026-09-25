@@ -1,12 +1,38 @@
 import { describe, expect, it } from "vitest";
 import {
   APPLICATION_STATUSES,
+  createDateStamp,
   DEFAULT_APPLICATION_STATUS,
   DEFAULT_USER_SETTINGS,
   normalizeApplicationStatus,
   normalizeUserSettings,
   REQUIRED_APPLICATION_COLUMNS,
 } from "./domain";
+
+describe("createDateStamp", () => {
+  it("uses the user's local calendar date instead of the UTC date", () => {
+    const earlyMorningSingaporeDate = Object.assign(
+      new Date("2026-09-25T20:24:00.000Z"),
+      {
+        getDate: () => 26,
+        getFullYear: () => 2026,
+        getMonth: () => 8,
+      },
+    );
+
+    expect(createDateStamp(earlyMorningSingaporeDate)).toBe("2026-09-26");
+  });
+
+  it("pads single-digit months and days", () => {
+    const localDate = Object.assign(new Date("2026-01-03T20:24:00.000Z"), {
+      getDate: () => 4,
+      getFullYear: () => 2026,
+      getMonth: () => 0,
+    });
+
+    expect(createDateStamp(localDate)).toBe("2026-01-04");
+  });
+});
 
 describe("application statuses", () => {
   it("starts applications at Awaiting Response", () => {
