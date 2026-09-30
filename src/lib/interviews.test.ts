@@ -113,6 +113,21 @@ describe("buildInterviewRecord", () => {
 });
 
 describe("reconcileCanonicalInterviews", () => {
+  it("does not create an empty record from interviewing status alone", () => {
+    const statusOnlyApplication: Application = {
+      ...application,
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+      interviewProctored: false,
+    };
+
+    const result = reconcileCanonicalInterviews([statusOnlyApplication], []);
+
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews).toEqual([]);
+  });
+
   it("migrates legacy application-only interview details into history", () => {
     const legacyApplication = {
       ...application,

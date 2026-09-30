@@ -557,10 +557,7 @@ export function useTrackerStore(): TrackerStore {
       input,
       updatedAt,
     );
-    const updatedInterview = shouldPersistInterviewUpdate(
-      currentApplication,
-      input,
-    )
+    const updatedInterview = shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
@@ -1761,13 +1758,9 @@ function hasInterviewChange(input: ApplicationUpdate) {
 }
 
 function shouldPersistInterviewUpdate(
-  application: Application,
   input: ApplicationUpdate,
 ) {
-  return (
-    hasInterviewChange(input) ||
-    (input.status === "Interviewing" && application.status !== "Interviewing")
-  );
+  return hasInterviewChange(input);
 }
 
 function getStorageErrorMessage(error: unknown) {

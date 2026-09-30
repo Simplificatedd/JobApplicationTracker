@@ -112,10 +112,7 @@ export function reconcileCanonicalInterviews(
       application.interviewRound,
     );
 
-    if (
-      (!projectedInterview && hasExplicitInterviewProjection(application)) ||
-      (applicationInterviews.length === 0 && application.status === "Interviewing")
-    ) {
+    if (!projectedInterview && hasExplicitInterviewProjection(application)) {
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
