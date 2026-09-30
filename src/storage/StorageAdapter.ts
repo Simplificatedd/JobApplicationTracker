@@ -10,7 +10,10 @@ import type {
 import type { NotificationState, UserSettings } from "../types/settings";
 import type { TablePreferences } from "../types/tablePreferences";
 
+export const TRACKER_DATA_VERSION = 2;
+
 export interface StorageSnapshot {
+  dataVersion?: number;
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];

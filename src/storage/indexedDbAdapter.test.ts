@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { DEFAULT_USER_SETTINGS } from "../lib/domain";
+import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 import type {
   Activity,
   Application,
@@ -89,6 +90,7 @@ describe("indexedDbStorageAdapter", () => {
     const adapter = createTestStorageAdapter();
 
     await expect(adapter.initialize()).resolves.toMatchObject({
+      dataVersion: TRACKER_DATA_VERSION,
       activities: [],
       applications: [],
       contacts: [],

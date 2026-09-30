@@ -22,6 +22,7 @@ import type {
   StorageMutation,
   StorageSnapshot,
 } from "./StorageAdapter";
+import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
 export const TRACKER_DB_VERSION = 4;
@@ -500,6 +501,7 @@ export function createIndexedDbStorageAdapter(
 
   async function exportSnapshot(): Promise<StorageSnapshot> {
     return {
+      dataVersion: TRACKER_DATA_VERSION,
       activities: await listActivities(),
       analyticsSettings: await getAnalyticsSettings(),
       applications: await listApplications(),
