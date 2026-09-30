@@ -21,10 +21,16 @@ export function App() {
     () =>
       deriveReminderNotifications({
         applications: tracker.applications,
+        interviews: tracker.interviews,
         notificationState: tracker.notificationState,
         settings: tracker.settings,
       }),
-    [tracker.applications, tracker.notificationState, tracker.settings],
+    [
+      tracker.applications,
+      tracker.interviews,
+      tracker.notificationState,
+      tracker.settings,
+    ],
   );
 
   const visibleView =

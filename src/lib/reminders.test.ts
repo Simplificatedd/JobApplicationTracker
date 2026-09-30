@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Application } from "../types/application";
+import type { Application, Interview } from "../types/application";
 import { DEFAULT_USER_SETTINGS } from "./domain";
 import {
   calculateFollowUpDueDate,
@@ -115,4 +115,75 @@ describe("deriveApplicationNotifications", () => {
       });
     },
   );
+
+  it("creates distinct stable reminders for multiple interview records", () => {
+    const interviews: Interview[] = [
+      {
+        id: "interview-1",
+        applicationId: baseApplication.id,
+        dateTime: "2026-09-21T10:00",
+        round: 1,
+        type: "technical",
+        mode: "video",
+        proctored: false,
+        createdAt: baseApplication.createdAt,
+        updatedAt: baseApplication.updatedAt,
+      },
+      {
+        id: "interview-2",
+        applicationId: baseApplication.id,
+        dateTime: "2026-09-22T10:00",
+        round: 2,
+        type: "recruiter",
+        mode: "phone",
+        proctored: false,
+        createdAt: baseApplication.createdAt,
+        updatedAt: baseApplication.updatedAt,
+      },
+    ];
+    const application = { ...baseApplication, status: "Interviewing" as const };
+    const now = new Date("2026-09-20T12:00:00.000Z");
+    const notifications = deriveApplicationNotifications(
+      application,
+      { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+      now,
+      interviews,
+    ).filter((notification) => notification.type === "interview");
+    const changedTimeNotifications = deriveApplicationNotifications(
+      application,
+      { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+      now,
+      [{ ...interviews[0], dateTime: "2026-09-23T10:00" }, interviews[1]],
+    ).filter((notification) => notification.type === "interview");
+
+    expect(notifications).toHaveLength(2);
+    expect(notifications.map((notification) => notification.interviewId)).toEqual([
+      "interview-1",
+      "interview-2",
+    ]);
+    expect(changedTimeNotifications[0].id).toBe(notifications[0].id);
+  });
+
+  it("keeps past interview records out of active reminders", () => {
+    const interview: Interview = {
+      id: "interview-past",
+      applicationId: baseApplication.id,
+      dateTime: "2026-09-19T10:00",
+      deadline: "2026-09-19T12:00",
+      type: "HackerRank",
+      mode: "video",
+      proctored: true,
+      createdAt: baseApplication.createdAt,
+      updatedAt: baseApplication.updatedAt,
+    };
+
+    const notifications = deriveApplicationNotifications(
+      { ...baseApplication, followUpNeeded: false, status: "Interviewing" },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+      [interview],
+    );
+
+    expect(notifications).toEqual([]);
+  });
 });
