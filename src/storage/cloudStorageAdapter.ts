@@ -21,11 +21,12 @@ import {
   type CloudStateEnvelope,
 } from "./cloudApi";
 import { indexedDbStorageAdapter } from "./indexedDbAdapter";
-import type {
-  ResumeBlobRecord,
-  StorageAdapter,
-  StorageMutation,
-  StorageSnapshot,
+import {
+  TRACKER_DATA_VERSION,
+  type ResumeBlobRecord,
+  type StorageAdapter,
+  type StorageMutation,
+  type StorageSnapshot,
 } from "./StorageAdapter";
 
 const MAX_CONFLICT_RETRIES = 3;
@@ -569,11 +570,18 @@ function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
 }
 
 function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
+  const hasLegacyOfferSemantics =
+    (snapshot.dataVersion ?? 1) < TRACKER_DATA_VERSION;
+
   return {
     ...snapshot,
+    dataVersion: TRACKER_DATA_VERSION,
     applications: snapshot.applications.map((application) => ({
       ...application,
-      status: normalizeApplicationStatus(application.status),
+      status:
+        hasLegacyOfferSemantics && application.status === "Offered"
+          ? "Accepted"
+          : normalizeApplicationStatus(application.status),
     })),
     coverLetters: snapshot.coverLetters ?? [],
   };
