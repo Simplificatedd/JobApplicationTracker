@@ -112,6 +112,8 @@ export interface Activity {
     | "contact_updated"
     | "contact_deleted";
   message: string;
+  statusFrom?: ApplicationStatus;
+  statusTo?: ApplicationStatus;
   createdAt: string;
 }
 

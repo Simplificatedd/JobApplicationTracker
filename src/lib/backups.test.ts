@@ -117,6 +117,35 @@ describe("parseBackupFile", () => {
       });
   });
 
+  it("accepts structured status transition activities", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication()],
+      activities: [
+        {
+          id: "activity-status",
+          applicationId: "app-1",
+          type: "status_changed",
+          message: "Status changed to Interviewing.",
+          statusFrom: "Awaiting Response",
+          statusTo: "Interviewing",
+          createdAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          activities: [
+            {
+              statusFrom: "Awaiting Response",
+              statusTo: "Interviewing",
+            },
+          ],
+        },
+      });
+  });
+
   it("rejects oversized backups before parsing", async () => {
     const file = createBackupFile(createSnapshot());
     Object.defineProperty(file, "size", { value: MAX_BACKUP_FILE_BYTES + 1 });

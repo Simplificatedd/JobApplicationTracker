@@ -11,6 +11,7 @@ import type {
   ResumeMetadata,
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
+import { normalizeStatusActivities } from "./statusHistory";
 
 export const BACKUP_SCHEMA_VERSION = 2;
 const LEGACY_BACKUP_SCHEMA_VERSION = 1;
@@ -124,6 +125,10 @@ export async function parseBackupFile(file: File) {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     snapshot: {
       ...backup.snapshot,
+      activities: normalizeStatusActivities(
+        backup.snapshot.activities,
+        hasLegacyOfferSemantics,
+      ),
       dataVersion: TRACKER_DATA_VERSION,
       applications: backup.snapshot.applications.map((application) => ({
         ...application,
@@ -572,6 +577,15 @@ function isApplication(value: unknown): value is Application {
 }
 
 function isActivity(value: unknown): value is Activity {
+  const statuses = [
+    "Awaiting Response",
+    "Interviewing",
+    "Offered",
+    "Accepted",
+    "Rejected",
+    "Withdrawn",
+  ] as const;
+
   return (
     isRecord(value) &&
     isNonBlankString(value.id) &&
@@ -587,6 +601,8 @@ function isActivity(value: unknown): value is Activity {
       "contact_deleted",
     ]) &&
     typeof value.message === "string" &&
+    isOptionalOneOf(value.statusFrom, statuses) &&
+    isOptionalOneOf(value.statusTo, statuses) &&
     isTimestamp(value.createdAt)
   );
 }

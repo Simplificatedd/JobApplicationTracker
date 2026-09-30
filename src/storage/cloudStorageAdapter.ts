@@ -2,6 +2,7 @@ import {
   DEFAULT_USER_SETTINGS,
   normalizeApplicationStatus,
 } from "../lib/domain";
+import { normalizeStatusActivities } from "../lib/statusHistory";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -575,6 +576,10 @@ function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
 
   return {
     ...snapshot,
+    activities: normalizeStatusActivities(
+      snapshot.activities,
+      hasLegacyOfferSemantics,
+    ),
     dataVersion: TRACKER_DATA_VERSION,
     applications: snapshot.applications.map((application) => ({
       ...application,

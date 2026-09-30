@@ -373,6 +373,7 @@ export function useTrackerStore(): TrackerStore {
       "created",
       `Created application for ${application.jobTitle}.`,
       createdAt,
+      { statusTo: application.status },
     );
     const interview = buildInterviewRecord(application, [], createdAt);
     const markedResume = resumeUpload
@@ -727,6 +728,7 @@ export function useTrackerStore(): TrackerStore {
                 "status_changed",
                 `Status changed to ${status}.`,
                 timestamp,
+                { statusFrom: application.status, statusTo: status },
               ),
             ]
           : []),
@@ -1661,12 +1663,14 @@ function createActivity(
   type: Activity["type"],
   message: string,
   createdAt = createTimestamp(),
+  statusTransition: Pick<Activity, "statusFrom" | "statusTo"> = {},
 ): Activity {
   return {
     id: createId("activity"),
     applicationId,
     type,
     message,
+    ...statusTransition,
     createdAt,
   };
 }
@@ -1721,6 +1725,7 @@ function buildApplicationUpdateActivities(
         "status_changed",
         `Status changed to ${next.status}.`,
         createdAt,
+        { statusFrom: previous.status, statusTo: next.status },
       ),
     );
   }
