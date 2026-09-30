@@ -163,19 +163,37 @@ export function ApplicationsPage({
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
     filters,
+    interviews,
   );
   const focusedApplications = needsAttentionOnly
     ? filteredApplications.filter((application) =>
-        isNeedsAttention(application, settings),
+        isNeedsAttention(
+          application,
+          settings,
+          new Date(),
+          interviews.filter(
+            (interview) => interview.applicationId === application.id,
+          ),
+        ),
       )
     : filteredApplications;
   const visibleApplications = sortApplications(focusedApplications, sort);
   const attentionCount = baseApplications.filter(
     (application) =>
-      deriveApplicationNotifications(application, settings).length > 0,
+      deriveApplicationNotifications(
+        application,
+        settings,
+        new Date(),
+        interviews.filter(
+          (interview) => interview.applicationId === application.id,
+        ),
+      ).length > 0,
   ).length;
-  const interviewCount = baseApplications.filter(
-    (application) => application.interviewDateTime,
+  const baseApplicationIds = new Set(
+    baseApplications.map((application) => application.id),
+  );
+  const interviewCount = interviews.filter((interview) =>
+    baseApplicationIds.has(interview.applicationId),
   ).length;
   const selectedApplication = useMemo(
     () =>

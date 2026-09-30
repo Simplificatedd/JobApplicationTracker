@@ -2,6 +2,7 @@ import type {
   Application,
   ApplicationStatus,
   DeadlineEntryMode,
+  Interview,
   InterviewType,
   JobType,
   Priority,
@@ -119,8 +120,15 @@ export const DEFAULT_SORT_STATE: SortState = {
 export function applyApplicationFilters(
   applications: Application[],
   filters: ApplicationFilters,
+  interviews?: Interview[],
 ) {
   return applications.filter((application) => {
+    const applicationInterviews = interviews?.filter(
+      (interview) => interview.applicationId === application.id,
+    );
+    const hasScheduledInterview = applicationInterviews
+      ? applicationInterviews.some((interview) => interview.dateTime)
+      : Boolean(application.interviewDateTime);
     if (
       filters.company &&
       normalizeFilterValue(application.company) !==
@@ -147,11 +155,11 @@ export function applyApplicationFilters(
       return false;
     }
 
-    if (filters.interview === "scheduled" && !application.interviewDateTime) {
+    if (filters.interview === "scheduled" && !hasScheduledInterview) {
       return false;
     }
 
-    if (filters.interview === "unscheduled" && application.interviewDateTime) {
+    if (filters.interview === "unscheduled" && hasScheduledInterview) {
       return false;
     }
 
@@ -205,14 +213,25 @@ export function applyApplicationFilters(
 
     if (
       filters.interviewRound &&
-      !matchesInterviewRound(application.interviewRound, filters.interviewRound)
+      !(applicationInterviews
+        ? applicationInterviews.some((interview) =>
+            matchesInterviewRound(interview.round, filters.interviewRound),
+          )
+        : matchesInterviewRound(
+            application.interviewRound,
+            filters.interviewRound,
+          ))
     ) {
       return false;
     }
 
     if (
       filters.interviewType &&
-      application.interviewType !== filters.interviewType
+      !(applicationInterviews
+        ? applicationInterviews.some(
+            (interview) => interview.type === filters.interviewType,
+          )
+        : application.interviewType === filters.interviewType)
     ) {
       return false;
     }
@@ -330,8 +349,14 @@ export function isNeedsAttention(
   application: Application,
   settings: UserSettings,
   now = new Date(),
+  interviews?: Interview[],
 ) {
-  return deriveApplicationNotifications(application, settings, now).length > 0;
+  return deriveApplicationNotifications(
+    application,
+    settings,
+    now,
+    interviews,
+  ).length > 0;
 }
 
 export function sortApplications(
