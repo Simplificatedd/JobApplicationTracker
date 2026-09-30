@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../types/application";
 import {
   buildInterviewRecord,
+  calculateInterviewDeadline,
   createInterviewRecord,
   getNextInterviewRound,
   isValidInterviewRound,
@@ -360,5 +361,43 @@ describe("interview record mutations", () => {
     expect(isValidInterviewRound(0)).toBe(false);
     expect(isValidInterviewRound(-1)).toBe(false);
     expect(isValidInterviewRound(1.5)).toBe(false);
+  });
+});
+
+describe("calculateInterviewDeadline", () => {
+  it.each([
+    ["1_day", "2026-10-02T08:00:00.000Z"],
+    ["2_days", "2026-10-03T08:00:00.000Z"],
+    ["3_days", "2026-10-04T08:00:00.000Z"],
+    ["72_hours", "2026-10-04T08:00:00.000Z"],
+  ] as const)("calculates a %s deadline from its received time", (mode, expected) => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadlineEntryMode: mode,
+        deadlineReceivedAt: "2026-10-01T08:00:00.000Z",
+      }),
+    ).toBe(expected);
+  });
+
+  it("preserves an editable stored deadline", () => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadline: "2026-10-05T17:30",
+        deadlineEntryMode: "2_days",
+        deadlineReceivedAt: "2026-10-01T08:00:00.000Z",
+      }),
+    ).toBe("2026-10-05T17:30");
+  });
+
+  it("does not invent an exact deadline", () => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadline: undefined,
+        deadlineEntryMode: "exact",
+      }),
+    ).toBeUndefined();
   });
 });

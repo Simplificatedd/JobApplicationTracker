@@ -1,6 +1,7 @@
 import { createId } from "./domain";
 import type {
   Application,
+  DeadlineEntryMode,
   Interview,
   InterviewInput,
   InterviewUpdate,
@@ -95,6 +96,36 @@ export function getNextInterviewRound(interviews: Interview[]) {
 
 export function isValidInterviewRound(round: number | undefined) {
   return round === undefined || (Number.isInteger(round) && round > 0);
+}
+
+export function calculateInterviewDeadline(interview: Interview) {
+  if (interview.deadline) {
+    return interview.deadline;
+  }
+
+  const entryMode = interview.deadlineEntryMode ?? "exact";
+
+  if (entryMode === "exact") {
+    return undefined;
+  }
+
+  const receivedAt = interview.deadlineReceivedAt ?? interview.createdAt;
+  const receivedDate = new Date(receivedAt);
+
+  if (Number.isNaN(receivedDate.getTime())) {
+    return undefined;
+  }
+
+  const hoursByMode = {
+    "1_day": 24,
+    "2_days": 48,
+    "3_days": 72,
+    "72_hours": 72,
+  } satisfies Record<Exclude<DeadlineEntryMode, "exact">, number>;
+
+  return new Date(
+    receivedDate.getTime() + hoursByMode[entryMode] * 60 * 60 * 1000,
+  ).toISOString();
 }
 
 export function reconcileCanonicalInterviews(
