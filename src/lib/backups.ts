@@ -11,6 +11,7 @@ import type {
   ResumeMetadata,
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
+import { normalizeStatusActivities } from "./statusHistory";
 
 export const BACKUP_SCHEMA_VERSION = 2;
 const LEGACY_BACKUP_SCHEMA_VERSION = 1;
@@ -124,6 +125,10 @@ export async function parseBackupFile(file: File) {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     snapshot: {
       ...backup.snapshot,
+      activities: normalizeStatusActivities(
+        backup.snapshot.activities,
+        hasLegacyOfferSemantics,
+      ),
       dataVersion: TRACKER_DATA_VERSION,
       applications: backup.snapshot.applications.map((application) => ({
         ...application,

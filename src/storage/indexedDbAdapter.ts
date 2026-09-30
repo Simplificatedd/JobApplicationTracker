@@ -5,6 +5,7 @@ import {
   normalizeApplicationStatus,
   normalizeUserSettings,
 } from "../lib/domain";
+import { normalizeStatusActivities } from "../lib/statusHistory";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -277,11 +278,13 @@ export function createIndexedDbStorageAdapter(
   }
 
   async function listActivities(applicationId?: string) {
-    return getMaybeByApplicationId<Activity>(
+    const activities = await getMaybeByApplicationId<Activity>(
       await getDatabase(),
       "activities",
       applicationId,
     );
+
+    return normalizeStatusActivities(activities);
   }
 
   async function appendActivity(activity: Activity) {
