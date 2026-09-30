@@ -36,8 +36,9 @@ import type {
   ApplicationStatus,
   CoverLetterMetadata,
   DeadlineEntryMode,
-  InterviewMode,
-  InterviewType,
+  Interview,
+  InterviewInput,
+  InterviewUpdate,
   JobType,
   Priority,
   ResumeMetadata,
@@ -45,6 +46,7 @@ import type {
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
 import { deadlineValueForEntryMode } from "./applicationForm";
+import { InterviewsSection } from "./InterviewsSection";
 
 interface ApplicationDetailPanelProps {
   activities: Activity[];
@@ -54,6 +56,10 @@ interface ApplicationDetailPanelProps {
   coverLetterActionError: string;
   coverLetters: CoverLetterMetadata[];
   onClose: () => void;
+  onAddInterview: (
+    input: InterviewInput,
+  ) => Promise<MutationResult<Interview>>;
+  onDeleteInterview: (id: string) => Promise<MutationResult>;
   onDownloadCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
   onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
@@ -64,6 +70,11 @@ interface ApplicationDetailPanelProps {
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingResumeUpload,
   ) => Promise<MutationResult>;
+  onUpdateInterview: (
+    id: string,
+    input: InterviewUpdate,
+  ) => Promise<MutationResult<Interview>>;
+  interviews: Interview[];
   resume?: ResumeMetadata;
   resumes: ResumeMetadata[];
   resumeActionError: string;
@@ -78,12 +89,16 @@ export function ApplicationDetailPanel({
   coverLetter,
   coverLetterActionError,
   coverLetters,
+  interviews,
+  onAddInterview,
   onClose,
+  onDeleteInterview,
   onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
   onPreviewCoverLetter,
   onUpdate,
+  onUpdateInterview,
   resume,
   resumes,
   resumeActionError,
@@ -112,7 +127,6 @@ export function ApplicationDetailPanel({
   }
 
   async function saveChanges() {
-    const isInterviewing = draft.status === "Interviewing";
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setIsSaving(true);
@@ -133,19 +147,6 @@ export function ApplicationDetailPanel({
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
-      ...(isInterviewing
-        ? {
-            interviewRound: Number(draft.interviewRound) || undefined,
-            interviewDateTime: trimOptional(draft.interviewDateTime),
-            interviewType: draft.interviewType,
-            interviewMode: draft.interviewMode,
-            interviewLocation: trimOptional(draft.interviewLocation),
-            interviewMeetingUrl: trimOptional(draft.interviewMeetingUrl),
-            interviewPlatform: trimOptional(draft.interviewPlatform),
-            interviewProctored: draft.interviewProctored,
-            interviewDeadline: trimOptional(draft.interviewDeadline),
-          }
-        : {}),
       priority: draft.priority,
       resumeId: trimOptional(draft.resumeId),
       coverLetterId: trimOptional(draft.coverLetterId),
@@ -319,11 +320,15 @@ export function ApplicationDetailPanel({
               contacts={contacts}
               coverLetter={coverLetter}
               coverLetterActionError={coverLetterActionError}
+              interviews={interviews}
+              onAddInterview={onAddInterview}
+              onDeleteInterview={onDeleteInterview}
               onDownloadCoverLetter={onDownloadCoverLetter}
               onDownloadResume={onDownloadResume}
               onPreviewResume={onPreviewResume}
               onPreviewCoverLetter={onPreviewCoverLetter}
               onUpdate={onUpdate}
+              onUpdateInterview={onUpdateInterview}
               resume={resume}
               resumeActionError={resumeActionError}
               workingResumeId={workingResumeId}
@@ -350,11 +355,15 @@ function ReadOnlyDetails({
   contacts,
   coverLetter,
   coverLetterActionError,
+  interviews,
+  onAddInterview,
+  onDeleteInterview,
   onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
   onPreviewCoverLetter,
   onUpdate,
+  onUpdateInterview,
   resume,
   resumeActionError,
   workingResumeId,
@@ -365,6 +374,11 @@ function ReadOnlyDetails({
   contacts: ApplicationContact[];
   coverLetter?: CoverLetterMetadata;
   coverLetterActionError: string;
+  interviews: Interview[];
+  onAddInterview: (
+    input: InterviewInput,
+  ) => Promise<MutationResult<Interview>>;
+  onDeleteInterview: (id: string) => Promise<MutationResult>;
   onDownloadCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
   onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
@@ -373,6 +387,10 @@ function ReadOnlyDetails({
     id: string,
     input: ApplicationUpdate,
   ) => Promise<MutationResult>;
+  onUpdateInterview: (
+    id: string,
+    input: InterviewUpdate,
+  ) => Promise<MutationResult<Interview>>;
   resume?: ResumeMetadata;
   resumeActionError: string;
   workingResumeId: string | null;
@@ -511,6 +529,14 @@ function ReadOnlyDetails({
 
       <TextBlock label="Job description" value={application.jobDescription} />
       <TextBlock label="Notes" value={application.notes} />
+
+      <InterviewsSection
+        application={application}
+        interviews={interviews}
+        onAdd={onAddInterview}
+        onDelete={onDeleteInterview}
+        onUpdate={onUpdateInterview}
+      />
 
       <section>
         <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
@@ -868,110 +894,6 @@ function EditForm({
         draft={draft}
         setDraft={setDraft}
       />
-      {draft.status === "Interviewing" ? (
-        <>
-          <Field label="Interview Number">
-            <input
-              className="field-control"
-              min="1"
-              onChange={(event) => updateDraft("interviewRound", event.target.value)}
-              type="number"
-              value={draft.interviewRound}
-            />
-          </Field>
-          <Field label="Interview Type">
-            <select
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewType", event.target.value as InterviewType)
-              }
-              value={draft.interviewType}
-            >
-              <option value="unknown"></option>
-              <option value="technical">Technical</option>
-              <option value="face-to-face">Face-to-face</option>
-              <option value="HireVue">HireVue</option>
-              <option value="other">Other</option>
-            </select>
-          </Field>
-          <Field label="Interview Date/Time">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewDateTime", event.target.value)
-              }
-              type="datetime-local"
-              value={draft.interviewDateTime}
-            />
-          </Field>
-          <Field label="Interview Mode">
-            <select
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewMode", event.target.value as InterviewMode)
-              }
-              value={draft.interviewMode}
-            >
-              <option value="other">Other</option>
-              <option value="phone">Phone</option>
-              <option value="video">Video</option>
-              <option value="onsite">Onsite</option>
-              <option value="take-home">Take-home</option>
-            </select>
-          </Field>
-          <Field label="Interview Location">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewLocation", event.target.value)
-              }
-              type="text"
-              value={draft.interviewLocation}
-            />
-          </Field>
-          <Field label="Meeting URL">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewMeetingUrl", event.target.value)
-              }
-              type="url"
-              value={draft.interviewMeetingUrl}
-            />
-          </Field>
-          <Field label="Interview Platform">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewPlatform", event.target.value)
-              }
-              type="text"
-              value={draft.interviewPlatform}
-            />
-          </Field>
-          <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-            <input
-              checked={draft.interviewProctored}
-              className="h-4 w-4 rounded border-border text-primary"
-              onChange={(event) =>
-                updateDraft("interviewProctored", event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>Proctored assessment</span>
-          </label>
-          <Field label="Assessment Deadline">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("interviewDeadline", event.target.value)
-              }
-              type="datetime-local"
-              value={draft.interviewDeadline}
-            />
-          </Field>
-        </>
-      ) : null}
       <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
         <input
           checked={draft.followUpNeeded}
@@ -1204,17 +1126,6 @@ function toDraft(application: Application) {
     roleEndDate: application.roleEndDate ?? "",
     followUpNeeded: application.followUpNeeded,
     followUpDate: application.followUpDate ?? "",
-    interviewRound: application.interviewRound
-      ? String(application.interviewRound)
-      : "",
-    interviewDateTime: toDateTimeLocal(application.interviewDateTime),
-    interviewType: application.interviewType ?? "unknown",
-    interviewMode: application.interviewMode ?? "other",
-    interviewLocation: application.interviewLocation ?? "",
-    interviewMeetingUrl: application.interviewMeetingUrl ?? "",
-    interviewPlatform: application.interviewPlatform ?? "",
-    interviewProctored: application.interviewProctored,
-    interviewDeadline: toDateTimeLocal(application.interviewDeadline),
     priority: application.priority,
     resumeId: application.resumeId ?? "",
     resumeUploadName: "",
@@ -1230,14 +1141,6 @@ function toDraft(application: Application) {
 
 function isDraftDirty(draft: ApplicationDraft, application: Application) {
   return JSON.stringify(draft) !== JSON.stringify(toDraft(application));
-}
-
-function toDateTimeLocal(value?: string) {
-  if (!value) {
-    return "";
-  }
-
-  return value.slice(0, 16);
 }
 
 function trimOptional(value: string) {
