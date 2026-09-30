@@ -65,6 +65,7 @@ export function App() {
         setOpenApplicationId(id);
       }}
       onUpdateApplication={tracker.updateApplication}
+      onUpdateInterview={tracker.updateInterview}
       onViewChange={setCurrentView}
     >
       {tracker.storageError ? (

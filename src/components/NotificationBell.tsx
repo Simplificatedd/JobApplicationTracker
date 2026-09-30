@@ -15,6 +15,7 @@ import {
   type ReminderNotification,
 } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
+import type { InterviewUpdate } from "../types/application";
 
 interface NotificationBellProps {
   grouped: boolean;
@@ -23,6 +24,7 @@ interface NotificationBellProps {
   onMarkOpened: () => void;
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+  onUpdateInterview: (id: string, input: InterviewUpdate) => void;
 }
 
 const groupLabels: Record<NotificationGroup, string> = {
@@ -38,6 +40,7 @@ export function NotificationBell({
   onMarkOpened,
   onOpenApplication,
   onUpdateApplication,
+  onUpdateInterview,
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -138,6 +141,7 @@ export function NotificationBell({
                 onOpenApplication(id);
               }}
               onUpdateApplication={onUpdateApplication}
+              onUpdateInterview={onUpdateInterview}
             />
           ) : (
             <div className="mt-3 space-y-2">
@@ -151,6 +155,7 @@ export function NotificationBell({
                     onOpenApplication(id);
                   }}
                   onUpdateApplication={onUpdateApplication}
+                  onUpdateInterview={onUpdateInterview}
                 />
               ))}
             </div>
@@ -166,11 +171,13 @@ function GroupedNotifications({
   onDismiss,
   onOpenApplication,
   onUpdateApplication,
+  onUpdateInterview,
 }: {
   notifications: ReminderNotification[];
   onDismiss: (id: string) => void;
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+  onUpdateInterview: (id: string, input: InterviewUpdate) => void;
 }) {
   const groups: NotificationGroup[] = ["followups", "interviews", "other"];
 
@@ -198,6 +205,7 @@ function GroupedNotifications({
                   onDismiss={onDismiss}
                   onOpenApplication={onOpenApplication}
                   onUpdateApplication={onUpdateApplication}
+                  onUpdateInterview={onUpdateInterview}
                 />
               ))}
             </div>
@@ -213,11 +221,13 @@ function NotificationItem({
   onDismiss,
   onOpenApplication,
   onUpdateApplication,
+  onUpdateInterview,
 }: {
   notification: ReminderNotification;
   onDismiss: (id: string) => void;
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
+  onUpdateInterview: (id: string, input: InterviewUpdate) => void;
 }) {
   const dueText =
     notification.type === "follow_up"
@@ -276,7 +286,12 @@ function NotificationItem({
             <SmallActionButton
               label="Change follow-up date"
               onClick={() =>
-                changeDate(notification, onUpdateApplication, "follow_up")
+                changeDate(
+                  notification,
+                  onUpdateApplication,
+                  onUpdateInterview,
+                  "follow_up",
+                )
               }
             >
               <CalendarPlus aria-hidden="true" size={14} />
@@ -288,7 +303,12 @@ function NotificationItem({
           <SmallActionButton
             label="Change interview date and time"
             onClick={() =>
-              changeDate(notification, onUpdateApplication, "interview")
+              changeDate(
+                notification,
+                onUpdateApplication,
+                onUpdateInterview,
+                "interview",
+              )
             }
           >
             <CalendarClock aria-hidden="true" size={14} />
@@ -299,7 +319,12 @@ function NotificationItem({
           <SmallActionButton
             label="Change assessment deadline"
             onClick={() =>
-              changeDate(notification, onUpdateApplication, "deadline")
+              changeDate(
+                notification,
+                onUpdateApplication,
+                onUpdateInterview,
+                "deadline",
+              )
             }
           >
             <CalendarClock aria-hidden="true" size={14} />
@@ -336,6 +361,7 @@ function SmallActionButton({
 function changeDate(
   notification: ReminderNotification,
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void,
+  onUpdateInterview: (id: string, input: InterviewUpdate) => void,
   mode: "follow_up" | "interview" | "deadline",
 ) {
   const isFollowUp = mode === "follow_up";
@@ -343,9 +369,7 @@ function changeDate(
     isFollowUp ? "Set follow-up date (YYYY-MM-DD)" : "Set date/time (YYYY-MM-DDTHH:mm)",
     isFollowUp
       ? notification.application.followUpDate ?? ""
-      : (mode === "interview"
-          ? notification.application.interviewDateTime
-          : notification.application.interviewDeadline) ?? "",
+      : notification.dueAt ?? "",
   );
 
   if (nextValue === null) {
@@ -371,18 +395,18 @@ function changeDate(
   }
 
   if (mode === "interview") {
-    onUpdateApplication(notification.applicationId, {
-      interviewDateTime: trimmedValue,
-      status: "Interviewing",
-    });
+    if (notification.interviewId) {
+      onUpdateInterview(notification.interviewId, { dateTime: trimmedValue });
+    }
     return;
   }
 
-  onUpdateApplication(notification.applicationId, {
-    interviewDeadline: trimmedValue,
-    interviewProctored: true,
-    status: "Interviewing",
-  });
+  if (notification.interviewId) {
+    onUpdateInterview(notification.interviewId, {
+      deadline: trimmedValue,
+      proctored: true,
+    });
+  }
 }
 
 function getNotificationTone(severity: ReminderNotification["severity"]) {
