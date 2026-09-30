@@ -57,6 +57,7 @@ function createBackupFile(
   snapshot: unknown,
   resumeFiles: unknown[] = [],
   coverLetterFiles?: unknown[],
+  schemaVersion = BACKUP_SCHEMA_VERSION,
 ) {
   return new File(
     [
@@ -64,7 +65,7 @@ function createBackupFile(
         exportedAt: timestamp,
         ...(coverLetterFiles === undefined ? {} : { coverLetterFiles }),
         resumeFiles,
-        schemaVersion: BACKUP_SCHEMA_VERSION,
+        schemaVersion,
         snapshot,
       }),
     ],
@@ -90,6 +91,28 @@ describe("parseBackupFile", () => {
       .toMatchObject({
         snapshot: {
           applications: [{ status: "Awaiting Response" }],
+        },
+      });
+  });
+
+  it("migrates legacy backup Offered records without changing new ones", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication({ status: "Offered" })],
+    });
+
+    await expect(
+      parseBackupFile(createBackupFile(snapshot, [], undefined, 1)),
+    ).resolves.toMatchObject({
+      schemaVersion: BACKUP_SCHEMA_VERSION,
+      snapshot: {
+        applications: [{ status: "Accepted" }],
+      },
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [{ status: "Offered" }],
         },
       });
   });

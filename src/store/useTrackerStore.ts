@@ -712,7 +712,7 @@ export function useTrackerStore(): TrackerStore {
       const applicationInterviews = [interview, ...currentInterviews];
       const status =
         isUpcomingInterview(interview, new Date(timestamp)) &&
-        !FINAL_APPLICATION_STATUSES.has(application.status)
+        !INTERVIEW_STATUS_LOCKED_STATUSES.has(application.status)
           ? "Interviewing"
           : application.status;
       const updatedApplication = applyInterviewProjection(
@@ -1683,8 +1683,9 @@ function sortResumes(resumes: ResumeMetadata[]) {
   );
 }
 
-const FINAL_APPLICATION_STATUSES = new Set([
+const INTERVIEW_STATUS_LOCKED_STATUSES = new Set([
   "Offered",
+  "Accepted",
   "Rejected",
   "Withdrawn",
 ]);

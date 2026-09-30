@@ -17,7 +17,10 @@ import {
   createCloudStorageAdapter,
 } from "./cloudStorageAdapter";
 import { createIndexedDbStorageAdapter } from "./indexedDbAdapter";
-import type { StorageSnapshot } from "./StorageAdapter";
+import {
+  TRACKER_DATA_VERSION,
+  type StorageSnapshot,
+} from "./StorageAdapter";
 
 const application: Application = {
   company: "Example Co",
@@ -209,6 +212,45 @@ describe("cloud storage adapter", () => {
     await expect(adapter.listApplications()).resolves.toMatchObject([
       { status: "Awaiting Response" },
     ]);
+  });
+
+  it("migrates legacy cloud Offered records without changing new ones", async () => {
+    const legacyCache = createCache("cloud-legacy-offered");
+    const legacyApi = new FakeCloudApi();
+    legacyApi.state = {
+      revision: 7,
+      snapshot: createSnapshot([{ ...application, status: "Offered" }]),
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    };
+    const legacyAdapter = createCloudStorageAdapter({
+      api: legacyApi,
+      cache: legacyCache,
+    });
+
+    await expect(legacyAdapter.initialize()).resolves.toMatchObject({
+      applications: [{ status: "Accepted" }],
+      dataVersion: TRACKER_DATA_VERSION,
+    });
+
+    const currentCache = createCache("cloud-current-offered");
+    const currentApi = new FakeCloudApi();
+    currentApi.state = {
+      revision: 8,
+      snapshot: {
+        ...createSnapshot([{ ...application, status: "Offered" }]),
+        dataVersion: TRACKER_DATA_VERSION,
+      },
+      updatedAt: "2026-09-22T00:01:00.000Z",
+    };
+    const currentAdapter = createCloudStorageAdapter({
+      api: currentApi,
+      cache: currentCache,
+    });
+
+    await expect(currentAdapter.initialize()).resolves.toMatchObject({
+      applications: [{ status: "Offered" }],
+      dataVersion: TRACKER_DATA_VERSION,
+    });
   });
 
   it("rebases a mutation on the newest cloud revision after a conflict", async () => {

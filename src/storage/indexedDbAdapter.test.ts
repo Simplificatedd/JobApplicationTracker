@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { DEFAULT_USER_SETTINGS } from "../lib/domain";
+import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 import type {
   Activity,
   Application,
@@ -89,6 +90,7 @@ describe("indexedDbStorageAdapter", () => {
     const adapter = createTestStorageAdapter();
 
     await expect(adapter.initialize()).resolves.toMatchObject({
+      dataVersion: TRACKER_DATA_VERSION,
       activities: [],
       applications: [],
       contacts: [],
@@ -130,6 +132,24 @@ describe("indexedDbStorageAdapter", () => {
 
     await expect(adapter.listApplications()).resolves.toMatchObject([
       { status: "Awaiting Response" },
+    ]);
+  });
+
+  it("migrates the legacy terminal Offered status to Accepted", async () => {
+    const indexedDb = new IDBFactory();
+    const databaseName = "legacy-offered-status";
+
+    await seedVersionFourApplication(indexedDb, databaseName, {
+      ...application,
+      status: "Offered",
+    });
+
+    const adapter = createTestStorageAdapter({ databaseName, indexedDb });
+
+    await adapter.initialize();
+
+    await expect(adapter.listApplications()).resolves.toMatchObject([
+      { status: "Accepted" },
     ]);
   });
 
@@ -387,3 +407,26 @@ describe("indexedDbStorageAdapter", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+function seedVersionFourApplication(
+  indexedDb: IDBFactory,
+  databaseName: string,
+  record: Application,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const request = indexedDb.open(databaseName, 4);
+
+    request.onerror = () => reject(request.error);
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore("applications", {
+        keyPath: "id",
+      });
+
+      store.put(record);
+    };
+    request.onsuccess = () => {
+      request.result.close();
+      resolve();
+    };
+  });
+}

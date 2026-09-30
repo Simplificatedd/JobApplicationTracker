@@ -4,6 +4,13 @@ import type {
 } from "../../types/application";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 
+const INTERVIEW_STATUS_LOCKED_STATUSES = new Set<ApplicationStatus>([
+  "Offered",
+  "Accepted",
+  "Rejected",
+  "Withdrawn",
+]);
+
 export function createStatusQuickEdit(status: ApplicationStatus) {
   return { status } satisfies ApplicationUpdate;
 }
@@ -24,7 +31,8 @@ export function createInterviewQuickEdit(
 ) {
   return {
     interviewDateTime: interviewDateTime || undefined,
-    ...(interviewDateTime && application.status !== "Interviewing"
+    ...(interviewDateTime &&
+      !INTERVIEW_STATUS_LOCKED_STATUSES.has(application.status)
       ? { status: "Interviewing" as const }
       : {}),
   } satisfies ApplicationUpdate;

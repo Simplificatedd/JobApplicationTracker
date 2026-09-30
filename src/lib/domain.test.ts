@@ -38,6 +38,7 @@ describe("application statuses", () => {
   it("starts applications at Awaiting Response", () => {
     expect(DEFAULT_APPLICATION_STATUS).toBe("Awaiting Response");
     expect(APPLICATION_STATUSES[0]).toBe("Awaiting Response");
+    expect(APPLICATION_STATUSES).toContain("Accepted");
     expect(APPLICATION_STATUSES).not.toContain("Just Applied");
   });
 

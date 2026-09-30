@@ -1,4 +1,7 @@
-import type { StorageSnapshot } from "../storage/StorageAdapter";
+import {
+  TRACKER_DATA_VERSION,
+  type StorageSnapshot,
+} from "../storage/StorageAdapter";
 import type {
   Activity,
   Application,
@@ -9,7 +12,8 @@ import type {
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
 
-export const BACKUP_SCHEMA_VERSION = 1;
+export const BACKUP_SCHEMA_VERSION = 2;
+const LEGACY_BACKUP_SCHEMA_VERSION = 1;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_BACKUP_RECORDS_PER_COLLECTION = 50_000;
 
@@ -23,7 +27,9 @@ export interface TrackerBackup {
   coverLetterFiles: ResumeFileBackup[];
   exportedAt: string;
   resumeFiles: ResumeFileBackup[];
-  schemaVersion: typeof BACKUP_SCHEMA_VERSION;
+  schemaVersion:
+    | typeof LEGACY_BACKUP_SCHEMA_VERSION
+    | typeof BACKUP_SCHEMA_VERSION;
   snapshot: StorageSnapshot;
 }
 
@@ -110,17 +116,24 @@ export async function parseBackupFile(file: File) {
   }
 
   const backup = parsed as TrackerBackup;
+  const hasLegacyOfferSemantics =
+    backup.schemaVersion === LEGACY_BACKUP_SCHEMA_VERSION;
 
   return {
     ...backup,
+    schemaVersion: BACKUP_SCHEMA_VERSION,
     snapshot: {
       ...backup.snapshot,
+      dataVersion: TRACKER_DATA_VERSION,
       applications: backup.snapshot.applications.map((application) => ({
         ...application,
-        status: normalizeApplicationStatus(application.status),
+        status:
+          hasLegacyOfferSemantics && application.status === "Offered"
+            ? "Accepted"
+            : normalizeApplicationStatus(application.status),
       })),
     },
-  };
+  } satisfies TrackerBackup;
 }
 
 export function getBackupImportPreview(
@@ -200,7 +213,10 @@ function getBackupValidationError(value: unknown) {
     return "This backup file does not match the tracker backup schema.";
   }
 
-  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+  if (
+    value.schemaVersion !== LEGACY_BACKUP_SCHEMA_VERSION &&
+    value.schemaVersion !== BACKUP_SCHEMA_VERSION
+  ) {
     return "This backup file uses an unsupported schema version.";
   }
 
@@ -487,6 +503,7 @@ function isApplication(value: unknown): value is Application {
       "Awaiting Response",
       "Interviewing",
       "Offered",
+      "Accepted",
       "Rejected",
       "Withdrawn",
     ]) &&

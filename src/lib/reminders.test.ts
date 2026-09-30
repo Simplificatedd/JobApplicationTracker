@@ -75,9 +75,22 @@ describe("classifyReminderSeverity", () => {
 });
 
 describe("deriveApplicationNotifications", () => {
-  it("excludes final application statuses", () => {
+  it.each(["Accepted", "Rejected", "Withdrawn"] as const)(
+    "excludes the final %s status",
+    (status) => {
+      const notifications = deriveApplicationNotifications(
+        { ...baseApplication, status },
+        DEFAULT_USER_SETTINGS,
+        new Date("2026-09-20T12:00:00.000Z"),
+      );
+
+      expect(notifications).toEqual([]);
+    },
+  );
+
+  it("pauses ordinary reminders while an offer is pending", () => {
     const notifications = deriveApplicationNotifications(
-      { ...baseApplication, status: "Rejected" },
+      { ...baseApplication, status: "Offered" },
       DEFAULT_USER_SETTINGS,
       new Date("2026-09-20T12:00:00.000Z"),
     );
