@@ -6,6 +6,8 @@ import type {
   ApplicationContact,
   CoverLetterMetadata,
   Interview,
+  InterviewInput,
+  InterviewUpdate,
   ResumeMetadata,
 } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
@@ -42,8 +44,14 @@ import {
   updateCoverLetterMetadata,
 } from "../lib/resumeFiles";
 import {
+  applyInterviewProjection,
   buildInterviewRecord,
+  createInterviewRecord,
+  isValidInterviewRound,
+  isUpcomingInterview,
   reconcileCanonicalInterviews,
+  selectCurrentInterview,
+  updateInterviewRecord,
   upsertInterviewHistory,
 } from "../lib/interviews";
 import { createMutationQueue } from "../lib/mutationQueue";
@@ -108,6 +116,7 @@ export interface TrackerStore {
   storageError: string | null;
   tablePreferences: TablePreferences | null;
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
+  addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
   appendActivity: (
     applicationId: string,
     type: Activity["type"],
@@ -122,6 +131,7 @@ export interface TrackerStore {
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
   deleteCoverLetter: (id: string) => Promise<MutationResult>;
+  deleteInterview: (id: string) => Promise<MutationResult>;
   deleteResume: (id: string) => Promise<MutationResult>;
   dismissNotification: (id: string) => Promise<boolean>;
   exportApplicationsCsv: () => Blob;
@@ -163,6 +173,10 @@ export interface TrackerStore {
     id: string,
     input: Partial<ContactInput>,
   ) => Promise<MutationResult>;
+  updateInterview: (
+    id: string,
+    input: InterviewUpdate,
+  ) => Promise<MutationResult<Interview>>;
   updateSettings: (input: Partial<UserSettings>) => Promise<boolean>;
   updateTablePreferences: (input: Partial<TablePreferences>) => Promise<boolean>;
 }
@@ -547,7 +561,12 @@ export function useTrackerStore(): TrackerStore {
       currentApplication,
       input,
     )
-      ? buildInterviewRecord(updatedApplication, currentInterviews, updatedAt)
+      ? buildInterviewRecord(
+          updatedApplication,
+          currentInterviews,
+          updatedAt,
+          selectCurrentInterview(currentInterviews, new Date(updatedAt))?.id,
+        )
       : undefined;
     const markedResume = resumeUpload
       ? resumeUpload.resume
@@ -666,6 +685,209 @@ export function useTrackerStore(): TrackerStore {
         current.map((candidate) =>
           candidate.id === id ? archivedApplication : candidate,
         ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success();
+    });
+  }
+
+  async function addInterview(
+    input: InterviewInput,
+  ): Promise<MutationResult<Interview>> {
+    return runApplicationMutation(async () => {
+      if (!isValidInterviewRound(input.round)) {
+        return failure(
+          "Interview round must be a positive whole number or left blank.",
+        );
+      }
+
+      const [application, currentInterviews] = await Promise.all([
+        cloudStorageAdapter.getApplication(input.applicationId),
+        cloudStorageAdapter.listInterviews(input.applicationId),
+      ]);
+
+      if (!application) {
+        return failure("Application could not be found.");
+      }
+
+      const timestamp = createTimestamp();
+      const interview = createInterviewRecord(input, timestamp);
+      const applicationInterviews = [interview, ...currentInterviews];
+      const status =
+        isUpcomingInterview(interview, new Date(timestamp)) &&
+        !FINAL_APPLICATION_STATUSES.has(application.status)
+          ? "Interviewing"
+          : application.status;
+      const updatedApplication = applyInterviewProjection(
+        { ...application, status, updatedAt: timestamp },
+        selectCurrentInterview(applicationInterviews, new Date(timestamp)),
+      );
+      const activities = [
+        ...(status !== application.status
+          ? [
+              createActivity(
+                application.id,
+                "status_changed",
+                `Status changed to ${status}.`,
+                timestamp,
+              ),
+            ]
+          : []),
+        createActivity(
+          application.id,
+          "updated",
+          `Added ${formatInterviewActivityLabel(interview)}.`,
+          timestamp,
+        ),
+      ];
+      const result = await commitMutation({
+        activities,
+        applications: [updatedApplication],
+        interviews: [interview],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) => [
+        interview,
+        ...current.filter((candidate) => candidate.id !== interview.id),
+      ]);
+      setActivities((current) => sortActivities([...activities, ...current]));
+      return success(interview);
+    });
+  }
+
+  async function updateInterview(
+    id: string,
+    input: InterviewUpdate,
+  ): Promise<MutationResult<Interview>> {
+    return runApplicationMutation(async () => {
+      if (!isValidInterviewRound(input.round)) {
+        return failure(
+          "Interview round must be a positive whole number or left blank.",
+        );
+      }
+
+      const allInterviews = await cloudStorageAdapter.listInterviews();
+      const interview = allInterviews.find((candidate) => candidate.id === id);
+
+      if (!interview) {
+        return failure("Interview could not be found.");
+      }
+
+      const application = await cloudStorageAdapter.getApplication(
+        interview.applicationId,
+      );
+
+      if (!application) {
+        return failure("Application could not be found.");
+      }
+
+      const timestamp = createTimestamp();
+      const updatedInterview = updateInterviewRecord(interview, input, timestamp);
+      const applicationInterviews = allInterviews
+        .filter((candidate) => candidate.applicationId === interview.applicationId)
+        .map((candidate) =>
+          candidate.id === id ? updatedInterview : candidate,
+        );
+      const updatedApplication = applyInterviewProjection(
+        { ...application, updatedAt: timestamp },
+        selectCurrentInterview(applicationInterviews, new Date(timestamp)),
+      );
+      const activity = createActivity(
+        application.id,
+        "updated",
+        `Updated ${formatInterviewActivityLabel(updatedInterview)}.`,
+        timestamp,
+      );
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [updatedApplication],
+        interviews: [updatedInterview],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? updatedInterview : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success(updatedInterview);
+    });
+  }
+
+  async function deleteInterview(id: string): Promise<MutationResult> {
+    return runApplicationMutation(async () => {
+      const allInterviews = await cloudStorageAdapter.listInterviews();
+      const interview = allInterviews.find((candidate) => candidate.id === id);
+
+      if (!interview) {
+        return failure("Interview could not be found.");
+      }
+
+      const application = await cloudStorageAdapter.getApplication(
+        interview.applicationId,
+      );
+
+      if (!application) {
+        return failure("Application could not be found.");
+      }
+
+      const timestamp = createTimestamp();
+      const remainingInterviews = allInterviews.filter(
+        (candidate) =>
+          candidate.applicationId === interview.applicationId &&
+          candidate.id !== id,
+      );
+      const updatedApplication = applyInterviewProjection(
+        { ...application, updatedAt: timestamp },
+        selectCurrentInterview(remainingInterviews, new Date(timestamp)),
+      );
+      const activity = createActivity(
+        application.id,
+        "updated",
+        `Deleted ${formatInterviewActivityLabel(interview)}.`,
+        timestamp,
+      );
+      const result = await commitMutation({
+        activities: [activity],
+        applications: [updatedApplication],
+        deleteInterviewIds: [id],
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) =>
+        current.filter((candidate) => candidate.id !== id),
       );
       setActivities((current) => sortActivities([activity, ...current]));
       return success();
@@ -1404,12 +1626,14 @@ export function useTrackerStore(): TrackerStore {
     storageError,
     tablePreferences,
     addContact,
+    addInterview,
     appendActivity,
     archiveApplication,
     createApplication,
     deleteApplication,
     deleteContact,
     deleteCoverLetter,
+    deleteInterview,
     deleteResume,
     dismissNotification,
     exportApplicationsCsv,
@@ -1429,6 +1653,7 @@ export function useTrackerStore(): TrackerStore {
     updateApplication,
     updateAnalyticsSettings,
     updateContact,
+    updateInterview,
     updateSettings,
     updateTablePreferences,
   };
@@ -1459,6 +1684,16 @@ function sortResumes(resumes: ResumeMetadata[]) {
   return [...resumes].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt),
   );
+}
+
+const FINAL_APPLICATION_STATUSES = new Set([
+  "Offered",
+  "Rejected",
+  "Withdrawn",
+]);
+
+function formatInterviewActivityLabel(interview: Interview) {
+  return interview.round ? `interview ${interview.round}` : "interview";
 }
 
 function withContactCounts(
