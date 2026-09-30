@@ -487,6 +487,7 @@ function isApplication(value: unknown): value is Application {
       "Awaiting Response",
       "Interviewing",
       "Offered",
+      "Accepted",
       "Rejected",
       "Withdrawn",
     ]) &&

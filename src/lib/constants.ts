@@ -43,6 +43,7 @@ export const STATUS_TONE: Record<
   "Awaiting Response": "warning",
   Interviewing: "warning",
   Offered: "success",
+  Accepted: "success",
   Rejected: "danger",
   Withdrawn: "neutral",
 };

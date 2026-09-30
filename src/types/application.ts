@@ -2,6 +2,7 @@ export type ApplicationStatus =
   | "Awaiting Response"
   | "Interviewing"
   | "Offered"
+  | "Accepted"
   | "Rejected"
   | "Withdrawn";
 

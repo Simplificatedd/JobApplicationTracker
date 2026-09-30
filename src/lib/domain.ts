@@ -6,6 +6,7 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   "Awaiting Response",
   "Interviewing",
   "Offered",
+  "Accepted",
   "Rejected",
   "Withdrawn",
 ];
