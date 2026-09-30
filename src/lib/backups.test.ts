@@ -211,6 +211,31 @@ describe("parseBackupFile", () => {
     );
   });
 
+  it("accepts the planned interview type and unknown mode options", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          interviewMode: "unknown",
+          interviewType: "recruiter",
+        }),
+      ],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: "app-1",
+          type: "HackerRank",
+          mode: "unknown",
+          proctored: true,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
   it("rejects application contact counts that disagree with contact records", async () => {
     const snapshot = createSnapshot({
       applications: [createApplication({ contactsCount: 1 })],
