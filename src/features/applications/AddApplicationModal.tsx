@@ -523,11 +523,7 @@ export function AddApplicationModal({
                     >
                       {interviewRoundError}
                     </p>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted">
-                      Optional; unusually high rounds will require confirmation.
-                    </p>
-                  )}
+                  ) : null}
                 </Field>
 
                 <Field label="Interview Date/Time">
