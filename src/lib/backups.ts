@@ -572,6 +572,15 @@ function isApplication(value: unknown): value is Application {
 }
 
 function isActivity(value: unknown): value is Activity {
+  const statuses = [
+    "Awaiting Response",
+    "Interviewing",
+    "Offered",
+    "Accepted",
+    "Rejected",
+    "Withdrawn",
+  ] as const;
+
   return (
     isRecord(value) &&
     isNonBlankString(value.id) &&
@@ -587,6 +596,8 @@ function isActivity(value: unknown): value is Activity {
       "contact_deleted",
     ]) &&
     typeof value.message === "string" &&
+    isOptionalOneOf(value.statusFrom, statuses) &&
+    isOptionalOneOf(value.statusTo, statuses) &&
     isTimestamp(value.createdAt)
   );
 }
