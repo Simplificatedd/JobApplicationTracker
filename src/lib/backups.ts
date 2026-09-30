@@ -652,6 +652,14 @@ function isInterview(value: unknown): value is Interview {
     isOptionalString(value.platform) &&
     typeof value.proctored === "boolean" &&
     isOptionalDateTime(value.deadline) &&
+    isOptionalOneOf(value.deadlineEntryMode, [
+      "exact",
+      "1_day",
+      "2_days",
+      "3_days",
+      "72_hours",
+    ]) &&
+    isOptionalDateTime(value.deadlineReceivedAt) &&
     isOptionalString(value.notes) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)

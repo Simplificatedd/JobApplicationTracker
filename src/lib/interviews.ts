@@ -43,6 +43,8 @@ export function buildInterviewRecord(
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
+    deadlineEntryMode: application.deadlineEntryMode,
+    deadlineReceivedAt: existing?.deadlineReceivedAt ?? application.createdAt,
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -65,6 +67,7 @@ export function createInterviewRecord(
 ): Interview {
   return {
     ...input,
+    deadlineEntryMode: input.deadlineEntryMode ?? "exact",
     id: createId("interview"),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -211,6 +214,8 @@ function interviewFromApplicationProjection(
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
+    deadlineEntryMode: application.deadlineEntryMode,
+    deadlineReceivedAt: application.createdAt,
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,

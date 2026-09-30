@@ -328,6 +328,7 @@ describe("interview record mutations", () => {
     const second = createInterviewRecord(input, application.updatedAt);
 
     expect(first.id).not.toBe(second.id);
+    expect(first.deadlineEntryMode).toBe("exact");
     expect(upsertInterviewHistory([first], second)).toHaveLength(2);
   });
 

@@ -130,6 +130,8 @@ export interface Interview {
   platform?: string;
   proctored: boolean;
   deadline?: string;
+  deadlineEntryMode?: DeadlineEntryMode;
+  deadlineReceivedAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
