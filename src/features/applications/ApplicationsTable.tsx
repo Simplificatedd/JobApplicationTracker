@@ -230,7 +230,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "interviewRound",
     key: "interviewRound",
-    label: "Interview Number",
+    label: "Interview Round",
     minWidth: 92,
     width: 150,
   },
@@ -1067,7 +1067,7 @@ function ApplicationColumnCell({
       <TextCell
         value={
           application.interviewRound
-            ? `Interview ${application.interviewRound}`
+            ? `Round ${application.interviewRound}`
             : undefined
         }
       />

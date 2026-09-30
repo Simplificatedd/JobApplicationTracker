@@ -356,7 +356,7 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   followUpNeeded: "Whether this application needs a follow-up.",
   followUpPromptDays: "Default reminder timing for follow-up prompts.",
   interviewDateTime: "Scheduled interview date and time.",
-  interviewRound: "Current interview number for this application.",
+  interviewRound: "Current interview round for this application.",
   interviewType: "Interview format, such as technical or face-to-face.",
   jobDescription: "Saved description or notes from the job posting.",
   jobTitle: "Role title; clicking it opens the application details.",
@@ -637,7 +637,7 @@ function MoreFiltersModal({
 
           <FilterSelect
             icon={SlidersHorizontal}
-            label="Interview number"
+            label="Interview round"
             onChange={(value) =>
               onFilterChange?.({
                 interviewRound: value as ApplicationFilters["interviewRound"],
@@ -645,10 +645,10 @@ function MoreFiltersModal({
             }
             value={currentFilters.interviewRound}
           >
-            <option value="">Interview number</option>
-            <option value="1">Interview 1</option>
-            <option value="2">Interview 2</option>
-            <option value="3_plus">Interview 3+</option>
+            <option value="">Interview round</option>
+            <option value="1">Round 1</option>
+            <option value="2">Round 2</option>
+            <option value="3_plus">Round 3+</option>
           </FilterSelect>
 
           <FilterSelect
