@@ -16,7 +16,10 @@ import {
   type ReactNode,
   useState,
 } from "react";
-import { APPLICATION_STATUSES } from "../../lib/constants";
+import {
+  APPLICATION_STATUSES,
+  INTERVIEW_TYPE_OPTIONS,
+} from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
@@ -659,11 +662,11 @@ function MoreFiltersModal({
             value={currentFilters.interviewType}
           >
             <option value="">Interview type</option>
-            <option value="technical">Technical</option>
-            <option value="face-to-face">Face-to-face</option>
-            <option value="HireVue">HireVue</option>
-            <option value="other">Other</option>
-            <option value="unknown">Unknown</option>
+            {INTERVIEW_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </FilterSelect>
 
           <FilterSelect
