@@ -329,9 +329,6 @@ function InterviewForm({
             type="number"
             value={draft.round}
           />
-          <p className="mt-1 text-xs text-muted">
-            Optional; duplicate or unusually high rounds require confirmation.
-          </p>
         </FormField>
         <FormField label="Interview type">
           <select
