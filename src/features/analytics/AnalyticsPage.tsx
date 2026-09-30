@@ -6,13 +6,14 @@ import {
   severityLabel,
 } from "../../lib/reminders";
 import type { AnalyticsSettings } from "../../types/analytics";
-import type { Activity, Application } from "../../types/application";
+import type { Activity, Application, Interview } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
 
 interface AnalyticsPageProps {
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
+  interviews: Interview[];
   onUpdateAnalyticsSettings: (settings: Partial<AnalyticsSettings>) => void;
   userSettings: UserSettings;
 }
@@ -31,6 +32,7 @@ export function AnalyticsPage({
   activities,
   analyticsSettings,
   applications,
+  interviews,
   onUpdateAnalyticsSettings,
   userSettings,
 }: AnalyticsPageProps) {
@@ -43,8 +45,14 @@ export function AnalyticsPage({
   const scopedActivities = activities.filter((activity) =>
     scopedApplicationIds.has(activity.applicationId),
   );
+  const scopedInterviews = interviews.filter((interview) =>
+    scopedApplicationIds.has(interview.applicationId),
+  );
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
-  const hasData = scopedApplications.length > 0 || scopedActivities.length > 0;
+  const hasData =
+    scopedApplications.length > 0 ||
+    scopedActivities.length > 0 ||
+    scopedInterviews.length > 0;
 
   function toggleChart(chartId: string, checked: boolean) {
     onUpdateAnalyticsSettings({
@@ -179,7 +187,7 @@ export function AnalyticsPage({
             <BarChart
               title="Interviews over time"
               data={deriveInterviewsOverTime(
-                scopedApplications,
+                scopedInterviews,
                 analyticsSettings.defaultTimeGrouping,
               )}
             />
@@ -191,6 +199,7 @@ export function AnalyticsPage({
             <ActivityCalendar
               activities={scopedActivities}
               applications={scopedApplications}
+              interviews={scopedInterviews}
             />
           ) : null}
         </section>
@@ -236,11 +245,13 @@ function BarChart({ data, title }: { data: ChartDatum[]; title: string }) {
 function ActivityCalendar({
   activities,
   applications,
+  interviews,
 }: {
   activities: Activity[];
   applications: Application[];
+  interviews: Interview[];
 }) {
-  const days = deriveActivityCalendarDays(applications, activities);
+  const days = deriveActivityCalendarDays(applications, activities, interviews);
 
   return (
     <article className="surface-panel rounded-lg p-4 xl:col-span-2">
@@ -343,14 +354,14 @@ function deriveActivityOverTime(
   );
 }
 
-function deriveInterviewsOverTime(
-  applications: Application[],
+export function deriveInterviewsOverTime(
+  interviews: Interview[],
   grouping: AnalyticsSettings["defaultTimeGrouping"],
 ) {
   return toChartData(
     groupDates(
-      applications
-        .map((application) => application.interviewDateTime)
+      interviews
+        .map((interview) => interview.dateTime)
         .filter((value): value is string => Boolean(value)),
       grouping,
     ),
@@ -370,13 +381,17 @@ function deriveOutcomes(applications: Application[]) {
   ];
 }
 
-function deriveActivityCalendarDays(
+export function deriveActivityCalendarDays(
   applications: Application[],
   activities: Activity[],
+  interviews: Interview[],
 ) {
   const dateValues = [
     ...applications.map((application) => application.dateApplied || application.createdAt),
     ...activities.map((activity) => activity.createdAt),
+    ...interviews
+      .map((interview) => interview.dateTime)
+      .filter((value): value is string => Boolean(value)),
   ];
   const earliest = dateValues
     .map((value) => new Date(value))
@@ -386,6 +401,7 @@ function deriveActivityCalendarDays(
   const end = endOfMonth(new Date());
   const activityByDate = new Map<string, Activity[]>();
   const applicationByDate = new Map<string, Application[]>();
+  const interviewsByDate = new Map<string, Interview[]>();
 
   activities.forEach((activity) => {
     const key = toDateKey(activity.createdAt);
@@ -394,6 +410,11 @@ function deriveActivityCalendarDays(
   applications.forEach((application) => {
     const key = toDateKey(application.dateApplied || application.createdAt);
     applicationByDate.set(key, [...(applicationByDate.get(key) ?? []), application]);
+  });
+  interviews.forEach((interview) => {
+    if (!interview.dateTime) return;
+    const key = toDateKey(interview.dateTime);
+    interviewsByDate.set(key, [...(interviewsByDate.get(key) ?? []), interview]);
   });
 
   const days = [];
@@ -406,10 +427,19 @@ function deriveActivityCalendarDays(
     const key = toDateKey(cursor.toISOString());
     const dayActivities = activityByDate.get(key) ?? [];
     const dayApplications = applicationByDate.get(key) ?? [];
-    const eventCounts = getCalendarEventCounts(dayApplications, dayActivities);
+    const dayInterviews = interviewsByDate.get(key) ?? [];
+    const eventCounts = getCalendarEventCounts(
+      dayApplications,
+      dayActivities,
+      dayInterviews,
+    );
     const summaryParts = [
-      countLabel(eventCounts.applications, "job applied"),
-      countLabel(eventCounts.interviews, "interview completed"),
+      countLabel(eventCounts.applications, "job applied", "jobs applied"),
+      countLabel(
+        eventCounts.interviews,
+        "interview completed",
+        "interviews completed",
+      ),
       countLabel(eventCounts.offers, "offer"),
       countLabel(eventCounts.rejections, "rejection"),
       countLabel(eventCounts.statusChanges, "major status change"),
@@ -443,6 +473,7 @@ function deriveActivityCalendarDays(
 function getCalendarEventCounts(
   applications: Application[],
   activities: Activity[],
+  interviews: Interview[],
 ) {
   const lowerCaseMessages = activities.map((activity) =>
     activity.message.toLowerCase(),
@@ -450,9 +481,7 @@ function getCalendarEventCounts(
 
   return {
     applications: applications.length,
-    interviews: lowerCaseMessages.filter((message) =>
-      message.includes("interview"),
-    ).length,
+    interviews: interviews.length,
     offers: lowerCaseMessages.filter((message) => message.includes("offer"))
       .length,
     rejections: lowerCaseMessages.filter((message) =>
@@ -516,10 +545,10 @@ function toDateKey(value: string) {
   return new Date(value).toISOString().slice(0, 10);
 }
 
-function countLabel(count: number, singular: string) {
+function countLabel(count: number, singular: string, plural = `${singular}s`) {
   if (count === 0) {
     return null;
   }
 
-  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+  return `${count} ${count === 1 ? singular : plural}`;
 }

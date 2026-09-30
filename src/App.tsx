@@ -192,6 +192,7 @@ function renderView(
         activities={tracker.activities}
         analyticsSettings={tracker.analyticsSettings}
         applications={tracker.applications}
+        interviews={tracker.interviews}
         onUpdateAnalyticsSettings={tracker.updateAnalyticsSettings}
         userSettings={tracker.settings}
       />
