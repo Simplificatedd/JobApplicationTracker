@@ -728,6 +728,7 @@ export function useTrackerStore(): TrackerStore {
                 "status_changed",
                 `Status changed to ${status}.`,
                 timestamp,
+                { statusFrom: application.status, statusTo: status },
               ),
             ]
           : []),
