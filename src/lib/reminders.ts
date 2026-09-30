@@ -19,7 +19,7 @@ export interface ReminderNotification {
   type: NotificationType;
 }
 
-const FINAL_STATUSES = new Set(["Offered", "Rejected", "Withdrawn"]);
+const FINAL_STATUSES = new Set(["Accepted", "Rejected", "Withdrawn"]);
 
 export function calculateFollowUpDueDate(
   application: Application,
@@ -135,7 +135,11 @@ export function deriveApplicationNotifications(
   now = new Date(),
   interviews?: Interview[],
 ): ReminderNotification[] {
-  if (application.archivedAt || FINAL_STATUSES.has(application.status)) {
+  if (
+    application.archivedAt ||
+    application.status === "Offered" ||
+    FINAL_STATUSES.has(application.status)
+  ) {
     return [];
   }
 

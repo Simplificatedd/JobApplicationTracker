@@ -26,6 +26,7 @@ const application: Application = {
 describe("application quick-edit updates", () => {
   it("creates explicit status updates", () => {
     expect(createStatusQuickEdit("Offered")).toEqual({ status: "Offered" });
+    expect(createStatusQuickEdit("Accepted")).toEqual({ status: "Accepted" });
   });
 
   it("clears an empty follow-up date without changing the chosen toggle", () => {
@@ -47,4 +48,16 @@ describe("application quick-edit updates", () => {
       interviewDateTime: undefined,
     });
   });
+
+  it.each(["Offered", "Accepted", "Rejected", "Withdrawn"] as const)(
+    "does not overwrite the %s status when scheduling interview history",
+    (status) => {
+      expect(
+        createInterviewQuickEdit(
+          { ...application, status },
+          "2026-10-01T14:30",
+        ),
+      ).toEqual({ interviewDateTime: "2026-10-01T14:30" });
+    },
+  );
 });
