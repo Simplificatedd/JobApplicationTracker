@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../types/application";
 import {
   buildInterviewRecord,
+  createInterviewRecord,
+  getNextInterviewRound,
+  isValidInterviewRound,
   reconcileCanonicalInterviews,
   selectCurrentInterview,
+  updateInterviewRecord,
   upsertInterviewHistory,
 } from "./interviews";
 
@@ -65,6 +69,26 @@ describe("buildInterviewRecord", () => {
     expect(nextRound).toMatchObject({ applicationId: application.id, round: 2 });
     expect(nextRound?.id).not.toBe(firstRound.id);
     expect(upsertInterviewHistory([firstRound], nextRound!)).toHaveLength(2);
+  });
+
+  it("updates the projected record by ID when round numbers are duplicated", () => {
+    const duplicateRound = {
+      ...firstRound,
+      id: "interview-duplicate",
+      updatedAt: "2026-09-21T00:00:00.000Z",
+    };
+
+    expect(
+      buildInterviewRecord(
+        { ...application, interviewDateTime: "2026-09-22T10:00" },
+        [firstRound, duplicateRound],
+        "2026-09-22T00:00:00.000Z",
+        firstRound.id,
+      ),
+    ).toMatchObject({
+      dateTime: "2026-09-22T10:00",
+      id: firstRound.id,
+    });
   });
 
   it("supports an unscheduled interview record", () => {
@@ -140,26 +164,32 @@ describe("reconcileCanonicalInterviews", () => {
     expect(result.interviews).toHaveLength(2);
   });
 
-  it("keeps an explicitly selected earlier round current across refresh", () => {
+  it("projects the nearest upcoming interview instead of a stale round", () => {
     const secondRound: Interview = {
       ...firstRound,
       id: "interview-2",
+      dateTime: "2026-09-24T10:00",
       round: 2,
       type: "face-to-face",
       mode: "onsite",
       updatedAt: "2026-09-21T00:00:00.000Z",
     };
+    const earlierRound = {
+      ...firstRound,
+      dateTime: "2026-09-22T10:00",
+    };
     const result = reconcileCanonicalInterviews(
       [application],
-      [firstRound, secondRound],
+      [earlierRound, secondRound],
+      new Date("2026-09-23T00:00:00.000Z"),
     );
 
     expect(result.applications[0]).toMatchObject({
-      interviewMode: firstRound.mode,
-      interviewRound: 1,
-      interviewType: firstRound.type,
+      interviewMode: secondRound.mode,
+      interviewRound: 2,
+      interviewType: secondRound.type,
     });
-    expect(result.applicationWrites).toEqual([]);
+    expect(result.applicationWrites).toEqual([result.applications[0]]);
   });
 
   it("preserves a newer application-only round when older history exists", () => {
@@ -214,33 +244,105 @@ describe("reconcileCanonicalInterviews", () => {
 });
 
 describe("selectCurrentInterview", () => {
-  it("prefers the highest round and then its most recent revision", () => {
-    const olderSecondRound = {
-      ...firstRound,
-      id: "interview-2-old",
-      round: 2,
-    };
-    const latestSecondRound = {
-      ...olderSecondRound,
-      id: "interview-2-latest",
-      updatedAt: "2026-09-21T00:00:00.000Z",
-    };
-
-    expect(
-      selectCurrentInterview([latestSecondRound, firstRound, olderSecondRound]),
-    ).toBe(latestSecondRound);
-  });
-
-  it("uses the persisted round selection before the highest round", () => {
-    const secondRound = {
+  it("prefers the nearest upcoming interview", () => {
+    const laterRound = {
       ...firstRound,
       id: "interview-2",
+      dateTime: "2026-10-05T10:00",
       round: 2,
-      updatedAt: "2026-09-21T00:00:00.000Z",
+    };
+    const nextRound = {
+      ...firstRound,
+      dateTime: "2026-10-02T10:00",
     };
 
     expect(
-      selectCurrentInterview([firstRound, secondRound], { round: 1 }),
-    ).toBe(firstRound);
+      selectCurrentInterview(
+        [laterRound, nextRound],
+        new Date("2026-10-01T00:00:00.000Z"),
+      ),
+    ).toBe(nextRound);
+  });
+
+  it("falls back to the most recent past interview", () => {
+    const olderRound = {
+      ...firstRound,
+      id: "interview-2",
+      dateTime: "2026-09-20T10:00",
+      round: 2,
+    };
+    const recentRound = {
+      ...firstRound,
+      dateTime: "2026-09-25T10:00",
+    };
+
+    expect(
+      selectCurrentInterview(
+        [olderRound, recentRound],
+        new Date("2026-10-01T00:00:00.000Z"),
+      ),
+    ).toBe(recentRound);
+  });
+
+  it("uses the nearest upcoming deadline for an assessment", () => {
+    const assessment = {
+      ...firstRound,
+      deadline: "2026-10-02T12:00",
+      id: "assessment-1",
+      round: 2,
+    };
+
+    expect(
+      selectCurrentInterview(
+        [firstRound, assessment],
+        new Date("2026-10-01T00:00:00.000Z"),
+      ),
+    ).toBe(assessment);
+  });
+});
+
+describe("interview record mutations", () => {
+  it("creates distinct IDs even when round numbers are blank or duplicated", () => {
+    const input = {
+      applicationId: application.id,
+      type: "technical" as const,
+      mode: "video" as const,
+      proctored: false,
+    };
+    const first = createInterviewRecord(input, application.createdAt);
+    const second = createInterviewRecord(input, application.updatedAt);
+
+    expect(first.id).not.toBe(second.id);
+    expect(upsertInterviewHistory([first], second)).toHaveLength(2);
+  });
+
+  it("updates by record identity without changing ownership or creation time", () => {
+    expect(
+      updateInterviewRecord(
+        firstRound,
+        { round: 3, type: "recruiter" },
+        "2026-09-22T00:00:00.000Z",
+      ),
+    ).toMatchObject({
+      applicationId: firstRound.applicationId,
+      createdAt: firstRound.createdAt,
+      id: firstRound.id,
+      round: 3,
+      type: "recruiter",
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    });
+  });
+
+  it("suggests the round after the highest numbered interview", () => {
+    expect(getNextInterviewRound([firstRound, { ...firstRound, round: 4 }])).toBe(5);
+    expect(getNextInterviewRound([])).toBe(1);
+  });
+
+  it("only accepts blank or positive whole-number rounds", () => {
+    expect(isValidInterviewRound(undefined)).toBe(true);
+    expect(isValidInterviewRound(1)).toBe(true);
+    expect(isValidInterviewRound(0)).toBe(false);
+    expect(isValidInterviewRound(-1)).toBe(false);
+    expect(isValidInterviewRound(1.5)).toBe(false);
   });
 });

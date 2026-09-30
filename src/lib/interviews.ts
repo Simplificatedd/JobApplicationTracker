@@ -1,5 +1,10 @@
 import { createId } from "./domain";
-import type { Application, Interview } from "../types/application";
+import type {
+  Application,
+  Interview,
+  InterviewInput,
+  InterviewUpdate,
+} from "../types/application";
 
 export interface InterviewReconciliation {
   applicationWrites: Application[];
@@ -12,16 +17,19 @@ export function buildInterviewRecord(
   application: Application,
   interviews: Interview[],
   timestamp: string,
+  interviewId?: string,
 ) {
   if (application.status !== "Interviewing") {
     return undefined;
   }
 
-  const existing = findInterviewRound(
-    interviews,
-    application.id,
-    application.interviewRound,
-  );
+  const existing = interviewId
+    ? interviews.find((interview) => interview.id === interviewId)
+    : findInterviewRound(
+        interviews,
+        application.id,
+        application.interviewRound,
+      );
 
   return {
     id: existing?.id ?? createId("interview"),
@@ -29,7 +37,7 @@ export function buildInterviewRecord(
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
     type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "other",
+    mode: application.interviewMode ?? "unknown",
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
     platform: application.interviewPlatform,
@@ -51,9 +59,45 @@ export function upsertInterviewHistory(
   ];
 }
 
+export function createInterviewRecord(
+  input: InterviewInput,
+  timestamp: string,
+): Interview {
+  return {
+    ...input,
+    id: createId("interview"),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+export function updateInterviewRecord(
+  interview: Interview,
+  input: InterviewUpdate,
+  timestamp: string,
+): Interview {
+  return {
+    ...interview,
+    ...input,
+    applicationId: interview.applicationId,
+    id: interview.id,
+    createdAt: interview.createdAt,
+    updatedAt: timestamp,
+  };
+}
+
+export function getNextInterviewRound(interviews: Interview[]) {
+  return Math.max(0, ...interviews.map((interview) => interview.round ?? 0)) + 1;
+}
+
+export function isValidInterviewRound(round: number | undefined) {
+  return round === undefined || (Number.isInteger(round) && round > 0);
+}
+
 export function reconcileCanonicalInterviews(
   applications: Application[],
   interviews: Interview[],
+  now = new Date(),
 ): InterviewReconciliation {
   const nextInterviews = [...interviews];
   const interviewWrites: Interview[] = [];
@@ -79,9 +123,7 @@ export function reconcileCanonicalInterviews(
       applicationInterviews = [...applicationInterviews, migratedInterview];
     }
 
-    const currentInterview = selectCurrentInterview(applicationInterviews, {
-      round: application.interviewRound,
-    });
+    const currentInterview = selectCurrentInterview(applicationInterviews, now);
 
     if (!currentInterview) {
       return application;
@@ -110,21 +152,50 @@ export function reconcileCanonicalInterviews(
 
 export function selectCurrentInterview(
   interviews: Interview[],
-  preferred?: { round?: number },
+  now = new Date(),
 ) {
-  const sortedInterviews = [...interviews].sort((left, right) => {
+  const nowTime = now.getTime();
+
+  return [...interviews].sort((left, right) => {
+    const leftUpcoming = getUpcomingTime(left, nowTime);
+    const rightUpcoming = getUpcomingTime(right, nowTime);
+
+    if (leftUpcoming !== undefined || rightUpcoming !== undefined) {
+      if (leftUpcoming === undefined) return 1;
+      if (rightUpcoming === undefined) return -1;
+      if (leftUpcoming !== rightUpcoming) return leftUpcoming - rightUpcoming;
+    } else {
+      const leftPast = getPastTime(left, nowTime);
+      const rightPast = getPastTime(right, nowTime);
+
+      if (leftPast !== rightPast) return rightPast - leftPast;
+    }
+
     const roundDifference = (right.round ?? 0) - (left.round ?? 0);
-
     return roundDifference || right.updatedAt.localeCompare(left.updatedAt);
-  });
+  })[0];
+}
 
-  return (
-    (preferred
-      ? sortedInterviews.find(
-          (interview) => interview.round === preferred.round,
-        )
-      : undefined) ?? sortedInterviews[0]
-  );
+export function isUpcomingInterview(interview: Interview, now = new Date()) {
+  return getUpcomingTime(interview, now.getTime()) !== undefined;
+}
+
+export function applyInterviewProjection(
+  application: Application,
+  interview?: Interview,
+): Application {
+  return {
+    ...application,
+    interviewDateTime: interview?.dateTime,
+    interviewRound: interview?.round,
+    interviewType: interview?.type,
+    interviewMode: interview?.mode,
+    interviewLocation: interview?.location,
+    interviewMeetingUrl: interview?.meetingUrl,
+    interviewPlatform: interview?.platform,
+    interviewProctored: interview?.proctored ?? false,
+    interviewDeadline: interview?.deadline,
+  };
 }
 
 function interviewFromApplicationProjection(
@@ -137,7 +208,7 @@ function interviewFromApplicationProjection(
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
     type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "other",
+    mode: application.interviewMode ?? "unknown",
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
     platform: application.interviewPlatform,
@@ -146,24 +217,6 @@ function interviewFromApplicationProjection(
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,
-  };
-}
-
-function applyInterviewProjection(
-  application: Application,
-  interview: Interview,
-): Application {
-  return {
-    ...application,
-    interviewDateTime: interview.dateTime,
-    interviewRound: interview.round,
-    interviewType: interview.type,
-    interviewMode: interview.mode,
-    interviewLocation: interview.location,
-    interviewMeetingUrl: interview.meetingUrl,
-    interviewPlatform: interview.platform,
-    interviewProctored: interview.proctored,
-    interviewDeadline: interview.deadline,
   };
 }
 
@@ -179,6 +232,26 @@ function hasExplicitInterviewProjection(application: Application) {
       application.interviewProctored ||
       application.interviewDeadline,
   );
+}
+
+function getInterviewTimes(interview: Interview) {
+  return [interview.dateTime, interview.deadline]
+    .map((value) => (value ? new Date(value).getTime() : Number.NaN))
+    .filter((value) => !Number.isNaN(value));
+}
+
+function getUpcomingTime(interview: Interview, nowTime: number) {
+  const upcomingTimes = getInterviewTimes(interview).filter(
+    (value) => value >= nowTime,
+  );
+
+  return upcomingTimes.length > 0 ? Math.min(...upcomingTimes) : undefined;
+}
+
+function getPastTime(interview: Interview, nowTime: number) {
+  const pastTimes = getInterviewTimes(interview).filter((value) => value < nowTime);
+
+  return pastTimes.length > 0 ? Math.max(...pastTimes) : Number.NEGATIVE_INFINITY;
 }
 
 function hasDifferentInterviewProjection(
