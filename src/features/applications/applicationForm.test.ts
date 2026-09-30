@@ -4,7 +4,42 @@ import {
   deadlineValueForEntryMode,
   findDuplicateApplication,
   suggestFollowUpDate,
+  validateInterviewRound,
 } from "./applicationForm";
+
+describe("validateInterviewRound", () => {
+  it("allows a blank round", () => {
+    expect(validateInterviewRound("")).toEqual({
+      round: undefined,
+      warnings: [],
+    });
+  });
+
+  it.each(["0", "-1", "1.5", "not-a-number"])(
+    "rejects invalid round %s",
+    (value) => {
+      expect(validateInterviewRound(value).error).toContain(
+        "positive whole number",
+      );
+    },
+  );
+
+  it("warns without rejecting unusually high rounds", () => {
+    expect(validateInterviewRound("100")).toEqual({
+      round: 100,
+      warnings: [
+        "Round 100 is unusually high; the recommended maximum is 99.",
+      ],
+    });
+  });
+
+  it("warns without rejecting duplicate rounds", () => {
+    expect(validateInterviewRound("2", [1, 2])).toEqual({
+      round: 2,
+      warnings: ["Round 2 already exists for this application."],
+    });
+  });
+});
 
 describe("deadlineValueForEntryMode", () => {
   it("preserves exact date/time values", () => {
