@@ -490,7 +490,17 @@ export function AddApplicationModal({
             </Field>
 
             {form.status === "Interviewing" ? (
-              <>
+              <section
+                aria-labelledby="initial-interview-details-heading"
+                className="grid gap-4 rounded-lg border border-border bg-surface-raised p-4 md:col-span-2 md:grid-cols-2"
+              >
+                <h3
+                  className="text-sm font-semibold text-foreground md:col-span-2"
+                  id="initial-interview-details-heading"
+                >
+                  Interview details
+                </h3>
+
                 <Field label="Interview Round">
                   <input
                     aria-describedby={
@@ -518,6 +528,17 @@ export function AddApplicationModal({
                       Optional; unusually high rounds will require confirmation.
                     </p>
                   )}
+                </Field>
+
+                <Field label="Interview Date/Time">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewDateTime", event.target.value)
+                    }
+                    type="datetime-local"
+                    value={form.interviewDateTime}
+                  />
                 </Field>
 
                 <Field label="Interview Type">
@@ -592,7 +613,30 @@ export function AddApplicationModal({
                     value={form.interviewPlatform}
                   />
                 </Field>
-              </>
+
+                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
+                  <input
+                    checked={form.interviewProctored}
+                    className="h-4 w-4 rounded border-border text-primary"
+                    onChange={(event) =>
+                      updateForm("interviewProctored", event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span>Proctored assessment</span>
+                </label>
+
+                <Field label="Assessment Deadline">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewDeadline", event.target.value)
+                    }
+                    type="datetime-local"
+                    value={form.interviewDeadline}
+                  />
+                </Field>
+              </section>
             ) : null}
 
             <Field label="Applied Date">
@@ -604,7 +648,7 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Deadline">
+            <Field label="Application Deadline">
               <input
                 className="field-control"
                 onChange={(event) => updateForm("deadline", event.target.value)}
@@ -615,18 +659,23 @@ export function AddApplicationModal({
               />
             </Field>
 
-            {form.status === "Interviewing" ? (
-              <Field label="Interview Date/Time">
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateForm("interviewDateTime", event.target.value)
-                  }
-                  type="datetime-local"
-                  value={form.interviewDateTime}
-                />
-              </Field>
-            ) : null}
+            <Field label="Application Deadline Timing">
+              <select
+                className="field-control"
+                onChange={(event) =>
+                  updateDeadlineEntryMode(
+                    event.target.value as DeadlineEntryMode,
+                  )
+                }
+                value={form.deadlineEntryMode}
+              >
+                <option value="exact">Exact date/time</option>
+                <option value="1_day">1 day</option>
+                <option value="2_days">2 days</option>
+                <option value="3_days">3 days</option>
+                <option value="72_hours">72 hours</option>
+              </select>
+            </Field>
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
               <Field label="Resume">
@@ -823,51 +872,6 @@ export function AddApplicationModal({
                 value={form.roleEndDate}
               />
             </Field>
-
-            <Field label="Deadline Timing">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateDeadlineEntryMode(
-                    event.target.value as DeadlineEntryMode,
-                  )
-                }
-                value={form.deadlineEntryMode}
-              >
-                <option value="exact">Exact date/time</option>
-                <option value="1_day">1 day</option>
-                <option value="2_days">2 days</option>
-                <option value="3_days">3 days</option>
-                <option value="72_hours">72 hours</option>
-              </select>
-            </Field>
-
-            {form.status === "Interviewing" ? (
-              <>
-                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-                  <input
-                    checked={form.interviewProctored}
-                    className="h-4 w-4 rounded border-border text-primary"
-                    onChange={(event) =>
-                      updateForm("interviewProctored", event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span>Proctored assessment</span>
-                </label>
-
-                <Field label="Assessment Deadline">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewDeadline", event.target.value)
-                    }
-                    type="datetime-local"
-                    value={form.interviewDeadline}
-                  />
-                </Field>
-              </>
-            ) : null}
 
             <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground md:col-span-2">
               <input
