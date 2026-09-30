@@ -211,7 +211,6 @@ export function deriveApplicationNotifications(
 
     if (
       application.status === "Interviewing" &&
-      interview.proctored &&
       interview.deadline &&
       deadlineDate &&
       deadlineDate >= now

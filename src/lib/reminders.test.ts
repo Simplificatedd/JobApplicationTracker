@@ -186,4 +186,30 @@ describe("deriveApplicationNotifications", () => {
 
     expect(notifications).toEqual([]);
   });
+
+  it("reminds users about non-proctored assessment deadlines", () => {
+    const interview: Interview = {
+      id: "interview-take-home",
+      applicationId: baseApplication.id,
+      deadline: "2026-09-21T12:00",
+      type: "technical",
+      mode: "take-home",
+      proctored: false,
+      createdAt: baseApplication.createdAt,
+      updatedAt: baseApplication.updatedAt,
+    };
+
+    const notifications = deriveApplicationNotifications(
+      { ...baseApplication, followUpNeeded: false, status: "Interviewing" },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+      [interview],
+    );
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      interviewId: interview.id,
+      type: "deadline",
+    });
+  });
 });
