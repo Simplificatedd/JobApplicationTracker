@@ -25,7 +25,7 @@ import type {
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 4;
+export const TRACKER_DB_VERSION = 5;
 
 type StoreName =
   | "activities"
@@ -744,6 +744,37 @@ function runMigrations(
   if (oldVersion < 3 && transaction) {
     removeSeededDemoData(database, transaction);
   }
+
+  if (oldVersion < 5 && transaction) {
+    migrateLegacyOfferedApplications(database, transaction);
+  }
+}
+
+function migrateLegacyOfferedApplications(
+  database: IDBDatabase,
+  transaction: IDBTransaction,
+) {
+  if (!database.objectStoreNames.contains("applications")) {
+    return;
+  }
+
+  const request = transaction.objectStore("applications").openCursor();
+
+  request.onsuccess = () => {
+    const cursor = request.result;
+
+    if (!cursor) {
+      return;
+    }
+
+    const application = cursor.value as Application;
+
+    if (application.status === "Offered") {
+      cursor.update({ ...application, status: "Accepted" });
+    }
+
+    cursor.continue();
+  };
 }
 
 function removeSeededDemoData(
