@@ -1,4 +1,4 @@
-import type { Application } from "../types/application";
+import type { Application, Interview } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 
 export type ReminderSeverity = "overdue" | "due_today" | "due_soon" | "upcoming";
@@ -12,6 +12,7 @@ export interface ReminderNotification {
   dueAt?: string;
   group: NotificationGroup;
   id: string;
+  interviewId?: string;
   severity: ReminderSeverity;
   sortAt: number;
   title: string;
@@ -69,12 +70,14 @@ export function classifyReminderSeverity(
 
 export function deriveReminderNotifications({
   applications,
+  interviews,
   notificationState,
   settings,
   includeArchived = false,
   now = new Date(),
 }: {
   applications: Application[];
+  interviews?: Interview[];
   includeArchived?: boolean;
   notificationState: NotificationState;
   now?: Date;
@@ -84,7 +87,14 @@ export function deriveReminderNotifications({
   const notifications = applications
     .filter((application) => includeArchived || !application.archivedAt)
     .flatMap((application) =>
-      deriveApplicationNotifications(application, settings, now),
+      deriveApplicationNotifications(
+        application,
+        settings,
+        now,
+        interviews?.filter(
+          (interview) => interview.applicationId === application.id,
+        ),
+      ),
     )
     .filter((notification) => !dismissedIds.has(notification.id));
 
@@ -93,10 +103,12 @@ export function deriveReminderNotifications({
 
 export function deriveNeedsAttentionApplicationIds({
   applications,
+  interviews,
   settings,
   now = new Date(),
 }: {
   applications: Application[];
+  interviews?: Interview[];
   now?: Date;
   settings: UserSettings;
 }) {
@@ -104,7 +116,14 @@ export function deriveNeedsAttentionApplicationIds({
     applications
       .filter((application) => !application.archivedAt)
       .flatMap((application) =>
-        deriveApplicationNotifications(application, settings, now),
+        deriveApplicationNotifications(
+          application,
+          settings,
+          now,
+          interviews?.filter(
+            (interview) => interview.applicationId === application.id,
+          ),
+        ),
       )
       .map((notification) => notification.applicationId),
   );
@@ -114,6 +133,7 @@ export function deriveApplicationNotifications(
   application: Application,
   settings: UserSettings,
   now = new Date(),
+  interviews?: Interview[],
 ): ReminderNotification[] {
   if (application.archivedAt || FINAL_STATUSES.has(application.status)) {
     return [];
@@ -150,72 +170,106 @@ export function deriveApplicationNotifications(
     }
   }
 
-  const interviewDate = parseDate(application.interviewDateTime);
+  const interviewRecords =
+    interviews ?? getProjectedInterviewRecords(application);
 
-  if (
-    settings.includeUpcomingInterviewsInAttention &&
-    application.status === "Interviewing" &&
-    interviewDate &&
-    interviewDate >= now
-  ) {
-    const severity = classifyReminderSeverity(
-      interviewDate,
-      settings.dueSoonDays,
-      now,
-    );
+  interviewRecords.forEach((interview) => {
+    const interviewDate = parseDate(interview.dateTime);
+    const roundLabel = interview.round ? ` ${interview.round}` : "";
 
-    notifications.push({
-      application,
-      applicationId: application.id,
-      body: [application.company, severityLabel(severity)]
-        .filter(Boolean)
-        .join(" / "),
-      dueAt: application.interviewDateTime,
-      group: "interviews",
-      id: buildNotificationId(
-        application.id,
-        "interview",
-        application.interviewDateTime,
-      ),
-      severity,
-      sortAt: interviewDate.getTime(),
-      title: `Interview for ${application.jobTitle}`,
-      type: "interview",
-    });
-  }
+    if (
+      settings.includeUpcomingInterviewsInAttention &&
+      application.status === "Interviewing" &&
+      interview.dateTime &&
+      interviewDate &&
+      interviewDate >= now
+    ) {
+      const severity = classifyReminderSeverity(
+        interviewDate,
+        settings.dueSoonDays,
+        now,
+      );
 
-  const interviewDeadline = calculateInterviewDeadline(application);
-  const deadlineDate = parseDate(interviewDeadline);
+      notifications.push({
+        application,
+        applicationId: application.id,
+        body: [application.company, severityLabel(severity)]
+          .filter(Boolean)
+          .join(" / "),
+        dueAt: interview.dateTime,
+        group: "interviews",
+        id: buildNotificationId(application.id, "interview", interview.id),
+        interviewId: interview.id,
+        severity,
+        sortAt: interviewDate.getTime(),
+        title: `Interview${roundLabel} for ${application.jobTitle}`,
+        type: "interview",
+      });
+    }
 
-  if (
-    application.status === "Interviewing" &&
-    application.interviewProctored &&
-    interviewDeadline &&
-    deadlineDate
-  ) {
-    const severity = classifyReminderSeverity(
-      deadlineDate,
-      settings.dueSoonDays,
-      now,
-    );
+    const deadlineDate = parseDate(interview.deadline);
 
-    notifications.push({
-      application,
-      applicationId: application.id,
-      body: [application.company, severityLabel(severity)]
-        .filter(Boolean)
-        .join(" / "),
-      dueAt: interviewDeadline,
-      group: "interviews",
-      id: buildNotificationId(application.id, "deadline", interviewDeadline),
-      severity,
-      sortAt: deadlineDate.getTime(),
-      title: `Assessment deadline for ${application.jobTitle}`,
-      type: "deadline",
-    });
-  }
+    if (
+      application.status === "Interviewing" &&
+      interview.deadline &&
+      deadlineDate &&
+      deadlineDate >= now
+    ) {
+      const severity = classifyReminderSeverity(
+        deadlineDate,
+        settings.dueSoonDays,
+        now,
+      );
+
+      notifications.push({
+        application,
+        applicationId: application.id,
+        body: [application.company, severityLabel(severity)]
+          .filter(Boolean)
+          .join(" / "),
+        dueAt: interview.deadline,
+        group: "interviews",
+        id: buildNotificationId(application.id, "deadline", interview.id),
+        interviewId: interview.id,
+        severity,
+        sortAt: deadlineDate.getTime(),
+        title: `Assessment${roundLabel} deadline for ${application.jobTitle}`,
+        type: "deadline",
+      });
+    }
+  });
 
   return notifications;
+}
+
+function getProjectedInterviewRecords(application: Application): Interview[] {
+  if (
+    !application.interviewDateTime &&
+    !application.interviewDeadline &&
+    !application.interviewRound &&
+    !application.interviewType &&
+    !application.interviewMode
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      id: `projected-${application.id}`,
+      applicationId: application.id,
+      dateTime: application.interviewDateTime,
+      deadline: calculateInterviewDeadline(application),
+      location: application.interviewLocation,
+      meetingUrl: application.interviewMeetingUrl,
+      mode: application.interviewMode ?? "unknown",
+      platform: application.interviewPlatform,
+      proctored: application.interviewProctored,
+      round: application.interviewRound,
+      type: application.interviewType ?? "unknown",
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+    },
+  ];
 }
 
 export function calculateInterviewDeadline(application: Application) {

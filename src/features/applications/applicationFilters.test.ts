@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Application } from "../../types/application";
+import type { Application, Interview } from "../../types/application";
 import {
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
@@ -134,5 +134,55 @@ describe("cover letter filter", () => {
         coverLetterVersion: "filled",
       }),
     ).toEqual([stored, legacy]);
+  });
+});
+
+describe("canonical interview filters", () => {
+  const interviews: Interview[] = [
+    {
+      id: "interview-1",
+      applicationId: baseApplication.id,
+      dateTime: "2026-10-01T10:00",
+      round: 1,
+      type: "technical",
+      mode: "video",
+      proctored: false,
+      createdAt: baseApplication.createdAt,
+      updatedAt: baseApplication.updatedAt,
+    },
+    {
+      id: "interview-2",
+      applicationId: baseApplication.id,
+      round: 2,
+      type: "recruiter",
+      mode: "phone",
+      proctored: false,
+      createdAt: baseApplication.createdAt,
+      updatedAt: baseApplication.updatedAt,
+    },
+  ];
+
+  it("matches type and round against any interview record", () => {
+    expect(
+      applyApplicationFilters(
+        [baseApplication],
+        {
+          ...DEFAULT_APPLICATION_FILTERS,
+          interviewRound: "2",
+          interviewType: "technical",
+        },
+        interviews,
+      ),
+    ).toEqual([baseApplication]);
+  });
+
+  it("uses all interview records for scheduled presence", () => {
+    expect(
+      applyApplicationFilters(
+        [baseApplication],
+        { ...DEFAULT_APPLICATION_FILTERS, interview: "scheduled" },
+        interviews,
+      ),
+    ).toEqual([baseApplication]);
   });
 });

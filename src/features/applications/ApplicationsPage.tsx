@@ -33,6 +33,9 @@ import type {
   Application,
   ApplicationContact,
   CoverLetterMetadata,
+  Interview,
+  InterviewInput,
+  InterviewUpdate,
   ResumeMetadata,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
@@ -41,15 +44,18 @@ import type { TablePreferences } from "../../types/tablePreferences";
 interface ApplicationsPageProps {
   activities: Activity[];
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
+  addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
   applications: Application[];
   archiveApplication: (id: string) => void;
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
+  deleteInterview: (id: string) => Promise<MutationResult>;
   enableDeleteActiveApplications: boolean;
   getResumeFile: (id: string) => Promise<Blob>;
   getCoverLetterFile: (id: string) => Promise<Blob>;
+  interviews: Interview[];
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
@@ -62,6 +68,10 @@ interface ApplicationsPageProps {
     id: string,
     input: Partial<ContactInput>,
   ) => Promise<MutationResult>;
+  updateInterview: (
+    id: string,
+    input: InterviewUpdate,
+  ) => Promise<MutationResult<Interview>>;
   updateApplication: (
     id: string,
     input: ApplicationUpdate,
@@ -75,15 +85,18 @@ interface ApplicationsPageProps {
 export function ApplicationsPage({
   activities,
   addContact,
+  addInterview,
   applications,
   archiveApplication,
   contacts,
   coverLetters,
   deleteApplication,
   deleteContact,
+  deleteInterview,
   enableDeleteActiveApplications,
   getResumeFile,
   getCoverLetterFile,
+  interviews,
   openApplicationId,
   onOpenApplicationHandled,
   restoreApplication,
@@ -93,6 +106,7 @@ export function ApplicationsPage({
   viewMode = "active",
   resetTablePreferences,
   updateContact,
+  updateInterview,
   updateApplication,
   updateSettings,
   updateTablePreferences,
@@ -149,19 +163,37 @@ export function ApplicationsPage({
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
     filters,
+    interviews,
   );
   const focusedApplications = needsAttentionOnly
     ? filteredApplications.filter((application) =>
-        isNeedsAttention(application, settings),
+        isNeedsAttention(
+          application,
+          settings,
+          new Date(),
+          interviews.filter(
+            (interview) => interview.applicationId === application.id,
+          ),
+        ),
       )
     : filteredApplications;
   const visibleApplications = sortApplications(focusedApplications, sort);
   const attentionCount = baseApplications.filter(
     (application) =>
-      deriveApplicationNotifications(application, settings).length > 0,
+      deriveApplicationNotifications(
+        application,
+        settings,
+        new Date(),
+        interviews.filter(
+          (interview) => interview.applicationId === application.id,
+        ),
+      ).length > 0,
   ).length;
-  const interviewCount = baseApplications.filter(
-    (application) => application.interviewDateTime,
+  const baseApplicationIds = new Set(
+    baseApplications.map((application) => application.id),
+  );
+  const interviewCount = interviews.filter((interview) =>
+    baseApplicationIds.has(interview.applicationId),
   ).length;
   const selectedApplication = useMemo(
     () =>
@@ -333,12 +365,18 @@ export function ApplicationsPage({
           contacts={contacts.filter(
             (contact) => contact.applicationId === selectedApplication.id,
           )}
+          interviews={interviews.filter(
+            (interview) => interview.applicationId === selectedApplication.id,
+          )}
+          onAddInterview={addInterview}
           onClose={() => setSelectedApplicationId(null)}
+          onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}
           onPreviewResume={previewResume}
           onPreviewCoverLetter={previewCoverLetter}
           onUpdate={updateApplication}
+          onUpdateInterview={updateInterview}
           resume={
             selectedApplication.resumeId
               ? resumes.find((resume) => resume.id === selectedApplication.resumeId)

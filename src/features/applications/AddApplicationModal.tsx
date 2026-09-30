@@ -2,7 +2,11 @@ import { Upload, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { APPLICATION_STATUSES } from "../../lib/constants";
+import {
+  APPLICATION_STATUSES,
+  INTERVIEW_MODE_OPTIONS,
+  INTERVIEW_TYPE_OPTIONS,
+} from "../../lib/constants";
 import {
   APPLICATION_SOURCES,
   DEFAULT_APPLICATION_STATUS,
@@ -14,6 +18,7 @@ import {
   type DuplicateApplicationMatch,
   findDuplicateApplication,
   suggestFollowUpDate,
+  validateInterviewRound,
 } from "./applicationForm";
 import type {
   ApplicationInput,
@@ -105,10 +110,10 @@ function createInitialFormState(
     followUpNeeded: false,
     followUpDate: suggestFollowUpDate("", defaultFollowUpPromptDays),
     followUpPromptDays: "",
-    interviewRound: "",
+    interviewRound: "1",
     interviewDateTime: "",
     interviewType: "unknown",
-    interviewMode: "other",
+    interviewMode: "unknown",
     interviewLocation: "",
     interviewMeetingUrl: "",
     interviewPlatform: "",
@@ -150,6 +155,7 @@ export function AddApplicationModal({
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [interviewRoundError, setInterviewRoundError] = useState("");
   const [duplicateMatch, setDuplicateMatch] =
     useState<DuplicateApplicationMatch | null>(null);
 
@@ -172,6 +178,9 @@ export function AddApplicationModal({
     if (key === "jobTitle") {
       setTitleError("");
     }
+    if (key === "interviewRound") {
+      setInterviewRoundError("");
+    }
   }
 
   function requestClose() {
@@ -190,6 +199,7 @@ export function AddApplicationModal({
   function closeModal() {
     setDuplicateMatch(null);
     setTitleError("");
+    setInterviewRoundError("");
     setResumeUploadError("");
     setCoverLetterUploadError("");
     onClose();
@@ -204,6 +214,7 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setInterviewRoundError("");
     onClose();
   }
 
@@ -261,7 +272,10 @@ export function AddApplicationModal({
     await saveApplication(false);
   }
 
-  async function saveApplication(skipDuplicateCheck: boolean) {
+  async function saveApplication(
+    skipDuplicateCheck: boolean,
+    skipRoundWarning = false,
+  ) {
     const trimmedTitle = form.jobTitle.trim();
 
     if (!trimmedTitle) {
@@ -270,6 +284,27 @@ export function AddApplicationModal({
     }
 
     const isInterviewing = form.status === "Interviewing";
+    const roundValidation = validateInterviewRound(
+      isInterviewing ? form.interviewRound : "",
+    );
+
+    if (roundValidation.error) {
+      setInterviewRoundError(roundValidation.error);
+      return;
+    }
+
+    setInterviewRoundError("");
+
+    if (
+      !skipRoundWarning &&
+      roundValidation.warnings.length > 0 &&
+      !window.confirm(
+        `${roundValidation.warnings.join("\n")}\n\nSave this interview round anyway?`,
+      )
+    ) {
+      return;
+    }
+
     const input: ApplicationInput = {
       company: trimOptional(form.company) ?? "",
       jobTitle: trimmedTitle,
@@ -289,8 +324,7 @@ export function AddApplicationModal({
       followUpDate: trimOptional(form.followUpDate),
       followUpPromptDays:
         Number(form.followUpPromptDays) || defaultFollowUpPromptDays,
-      interviewRound:
-        isInterviewing ? Number(form.interviewRound) || undefined : undefined,
+      interviewRound: isInterviewing ? roundValidation.round : undefined,
       interviewDateTime: isInterviewing
         ? trimOptional(form.interviewDateTime)
         : undefined,
@@ -456,16 +490,50 @@ export function AddApplicationModal({
             </Field>
 
             {form.status === "Interviewing" ? (
-              <>
-                <Field label="Interview Number">
+              <section
+                aria-labelledby="initial-interview-details-heading"
+                className="grid gap-4 rounded-lg border border-border bg-surface-raised p-4 md:col-span-2 md:grid-cols-2"
+              >
+                <h3
+                  className="text-sm font-semibold text-foreground md:col-span-2"
+                  id="initial-interview-details-heading"
+                >
+                  Interview details
+                </h3>
+
+                <Field label="Interview Round">
                   <input
+                    aria-describedby={
+                      interviewRoundError ? "interview-round-error" : undefined
+                    }
+                    aria-invalid={interviewRoundError ? "true" : "false"}
                     className="field-control"
                     min="1"
                     onChange={(event) =>
                       updateForm("interviewRound", event.target.value)
                     }
+                    step="1"
                     type="number"
                     value={form.interviewRound}
+                  />
+                  {interviewRoundError ? (
+                    <p
+                      className="mt-1 text-xs font-medium text-destructive"
+                      id="interview-round-error"
+                    >
+                      {interviewRoundError}
+                    </p>
+                  ) : null}
+                </Field>
+
+                <Field label="Interview Date/Time">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewDateTime", event.target.value)
+                    }
+                    type="datetime-local"
+                    value={form.interviewDateTime}
                   />
                 </Field>
 
@@ -481,11 +549,11 @@ export function AddApplicationModal({
                     }
                     value={form.interviewType}
                   >
-                    <option value="unknown"></option>
-                    <option value="technical">Technical</option>
-                    <option value="face-to-face">Face-to-face</option>
-                    <option value="HireVue">HireVue</option>
-                    <option value="other">Other</option>
+                    {INTERVIEW_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </Field>
 
@@ -501,11 +569,11 @@ export function AddApplicationModal({
                     }
                     value={form.interviewMode}
                   >
-                    <option value="other">Other</option>
-                    <option value="phone">Phone</option>
-                    <option value="video">Video</option>
-                    <option value="onsite">Onsite</option>
-                    <option value="take-home">Take-home</option>
+                    {INTERVIEW_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </Field>
 
@@ -541,7 +609,30 @@ export function AddApplicationModal({
                     value={form.interviewPlatform}
                   />
                 </Field>
-              </>
+
+                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
+                  <input
+                    checked={form.interviewProctored}
+                    className="h-4 w-4 rounded border-border text-primary"
+                    onChange={(event) =>
+                      updateForm("interviewProctored", event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span>Proctored assessment</span>
+                </label>
+
+                <Field label="Assessment Deadline">
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("interviewDeadline", event.target.value)
+                    }
+                    type="datetime-local"
+                    value={form.interviewDeadline}
+                  />
+                </Field>
+              </section>
             ) : null}
 
             <Field label="Applied Date">
@@ -553,7 +644,7 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Deadline">
+            <Field label="Application Deadline">
               <input
                 className="field-control"
                 onChange={(event) => updateForm("deadline", event.target.value)}
@@ -564,18 +655,23 @@ export function AddApplicationModal({
               />
             </Field>
 
-            {form.status === "Interviewing" ? (
-              <Field label="Interview Date/Time">
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateForm("interviewDateTime", event.target.value)
-                  }
-                  type="datetime-local"
-                  value={form.interviewDateTime}
-                />
-              </Field>
-            ) : null}
+            <Field label="Application Deadline Timing">
+              <select
+                className="field-control"
+                onChange={(event) =>
+                  updateDeadlineEntryMode(
+                    event.target.value as DeadlineEntryMode,
+                  )
+                }
+                value={form.deadlineEntryMode}
+              >
+                <option value="exact">Exact date/time</option>
+                <option value="1_day">1 day</option>
+                <option value="2_days">2 days</option>
+                <option value="3_days">3 days</option>
+                <option value="72_hours">72 hours</option>
+              </select>
+            </Field>
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
               <Field label="Resume">
@@ -773,51 +869,6 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <Field label="Deadline Timing">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateDeadlineEntryMode(
-                    event.target.value as DeadlineEntryMode,
-                  )
-                }
-                value={form.deadlineEntryMode}
-              >
-                <option value="exact">Exact date/time</option>
-                <option value="1_day">1 day</option>
-                <option value="2_days">2 days</option>
-                <option value="3_days">3 days</option>
-                <option value="72_hours">72 hours</option>
-              </select>
-            </Field>
-
-            {form.status === "Interviewing" ? (
-              <>
-                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-                  <input
-                    checked={form.interviewProctored}
-                    className="h-4 w-4 rounded border-border text-primary"
-                    onChange={(event) =>
-                      updateForm("interviewProctored", event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span>Proctored assessment</span>
-                </label>
-
-                <Field label="Assessment Deadline">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewDeadline", event.target.value)
-                    }
-                    type="datetime-local"
-                    value={form.interviewDeadline}
-                  />
-                </Field>
-              </>
-            ) : null}
-
             <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground md:col-span-2">
               <input
                 className="h-4 w-4 rounded border-border text-primary"
@@ -921,7 +972,7 @@ export function AddApplicationModal({
             isSaving={isSaving}
             match={duplicateMatch}
             onCancel={() => setDuplicateMatch(null)}
-            onConfirm={() => void saveApplication(true)}
+            onConfirm={() => void saveApplication(true, true)}
           />
         ) : null}
       </div>

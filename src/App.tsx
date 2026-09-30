@@ -21,10 +21,16 @@ export function App() {
     () =>
       deriveReminderNotifications({
         applications: tracker.applications,
+        interviews: tracker.interviews,
         notificationState: tracker.notificationState,
         settings: tracker.settings,
       }),
-    [tracker.applications, tracker.notificationState, tracker.settings],
+    [
+      tracker.applications,
+      tracker.interviews,
+      tracker.notificationState,
+      tracker.settings,
+    ],
   );
 
   const visibleView =
@@ -59,6 +65,7 @@ export function App() {
         setOpenApplicationId(id);
       }}
       onUpdateApplication={tracker.updateApplication}
+      onUpdateInterview={tracker.updateInterview}
       onViewChange={setCurrentView}
     >
       {tracker.storageError ? (
@@ -148,12 +155,15 @@ function renderView(
       <ApplicationsPage
         activities={tracker.activities}
         addContact={tracker.addContact}
+        addInterview={tracker.addInterview}
         applications={tracker.applications}
+        interviews={tracker.interviews}
         archiveApplication={tracker.archiveApplication}
         contacts={tracker.contacts}
         coverLetters={tracker.coverLetters}
         deleteApplication={tracker.deleteApplication}
         deleteContact={tracker.deleteContact}
+        deleteInterview={tracker.deleteInterview}
         enableDeleteActiveApplications={
           tracker.settings.enableDeleteActiveApplications
         }
@@ -168,6 +178,7 @@ function renderView(
         viewMode={view === "archive" ? "archive" : "active"}
         resetTablePreferences={tracker.resetTablePreferences}
         updateContact={tracker.updateContact}
+        updateInterview={tracker.updateInterview}
         updateApplication={tracker.updateApplication}
         updateSettings={tracker.updateSettings}
         updateTablePreferences={tracker.updateTablePreferences}
@@ -181,6 +192,7 @@ function renderView(
         activities={tracker.activities}
         analyticsSettings={tracker.analyticsSettings}
         applications={tracker.applications}
+        interviews={tracker.interviews}
         onUpdateAnalyticsSettings={tracker.updateAnalyticsSettings}
         userSettings={tracker.settings}
       />

@@ -16,12 +16,20 @@ export type JobType =
 
 export type InterviewType =
   | "technical"
+  | "recruiter"
   | "face-to-face"
   | "HireVue"
+  | "HackerRank"
   | "other"
   | "unknown";
 
-export type InterviewMode = "phone" | "video" | "onsite" | "take-home" | "other";
+export type InterviewMode =
+  | "phone"
+  | "video"
+  | "onsite"
+  | "take-home"
+  | "other"
+  | "unknown";
 
 export type Priority = "low" | "medium" | "high";
 
@@ -123,6 +131,12 @@ export interface Interview {
   createdAt: string;
   updatedAt: string;
 }
+
+export type InterviewInput = Omit<Interview, "id" | "createdAt" | "updatedAt">;
+
+export type InterviewUpdate = Partial<
+  Omit<Interview, "id" | "applicationId" | "createdAt" | "updatedAt">
+>;
 
 export interface ApplicationContact {
   id: string;

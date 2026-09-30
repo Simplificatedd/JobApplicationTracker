@@ -8,6 +8,48 @@ export interface DuplicateApplicationMatch {
   matchedBy: "application URL" | "company and job title";
 }
 
+export const INTERVIEW_ROUND_SOFT_LIMIT = 99;
+
+export interface InterviewRoundValidation {
+  error?: string;
+  round?: number;
+  warnings: string[];
+}
+
+export function validateInterviewRound(
+  value: string,
+  existingRounds: number[] = [],
+): InterviewRoundValidation {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return { round: undefined, warnings: [] };
+  }
+
+  const round = Number(trimmedValue);
+
+  if (!Number.isInteger(round) || round < 1) {
+    return {
+      error: "Interview round must be a positive whole number or left blank.",
+      warnings: [],
+    };
+  }
+
+  const warnings = [];
+
+  if (round > INTERVIEW_ROUND_SOFT_LIMIT) {
+    warnings.push(
+      `Round ${round} is unusually high; the recommended maximum is ${INTERVIEW_ROUND_SOFT_LIMIT}.`,
+    );
+  }
+
+  if (existingRounds.includes(round)) {
+    warnings.push(`Round ${round} already exists for this application.`);
+  }
+
+  return { round, warnings };
+}
+
 export function deadlineValueForEntryMode(
   value: string,
   entryMode: DeadlineEntryMode,

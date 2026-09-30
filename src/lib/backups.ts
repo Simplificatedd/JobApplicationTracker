@@ -512,8 +512,10 @@ function isApplication(value: unknown): value is Application {
     isOptionalNonNegativeInteger(value.interviewRound) &&
     isOptionalOneOf(value.interviewType, [
       "technical",
+      "recruiter",
       "face-to-face",
       "HireVue",
+      "HackerRank",
       "other",
       "unknown",
     ]) &&
@@ -523,6 +525,7 @@ function isApplication(value: unknown): value is Application {
       "onsite",
       "take-home",
       "other",
+      "unknown",
     ]) &&
     isOptionalDateTime(value.interviewDateTime) &&
     isOptionalString(value.interviewLocation) &&
@@ -594,12 +597,21 @@ function isInterview(value: unknown): value is Interview {
     isNonBlankString(value.applicationId) &&
     isOneOf(value.type, [
       "technical",
+      "recruiter",
       "face-to-face",
       "HireVue",
+      "HackerRank",
       "other",
       "unknown",
     ]) &&
-    isOneOf(value.mode, ["phone", "video", "onsite", "take-home", "other"]) &&
+    isOneOf(value.mode, [
+      "phone",
+      "video",
+      "onsite",
+      "take-home",
+      "other",
+      "unknown",
+    ]) &&
     isOptionalDateTime(value.dateTime) &&
     isOptionalNonNegativeInteger(value.round) &&
     isOptionalString(value.location) &&
