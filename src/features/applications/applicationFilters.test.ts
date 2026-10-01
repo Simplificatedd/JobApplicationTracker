@@ -122,6 +122,54 @@ describe("default application sorting", () => {
       }),
     ).toEqual(DEFAULT_SORT_STATE);
   });
+
+  it("sorts applications by offer deadline", () => {
+    const laterOffer = {
+      ...baseApplication,
+      id: "later-offer",
+      offerDeadline: "2026-10-05T17:00",
+    };
+    const earlierOffer = {
+      ...baseApplication,
+      id: "earlier-offer",
+      offerDeadline: "2026-10-03T17:00",
+    };
+
+    expect(
+      sortApplications([laterOffer, earlierOffer], {
+        column: "offerDeadline",
+        direction: "ascending",
+      }),
+    ).toEqual([earlierOffer, laterOffer]);
+  });
+});
+
+describe("offer deadline filter", () => {
+  const offered = {
+    ...baseApplication,
+    id: "offered",
+    offerDeadline: "2026-10-03T17:00",
+    status: "Offered" as const,
+  };
+  const noDeadline = { ...baseApplication, id: "no-deadline" };
+
+  it("finds applications with an offer deadline", () => {
+    expect(
+      applyApplicationFilters([offered, noDeadline], {
+        ...DEFAULT_APPLICATION_FILTERS,
+        offerDeadline: "scheduled",
+      }),
+    ).toEqual([offered]);
+  });
+
+  it("finds applications without an offer deadline", () => {
+    expect(
+      applyApplicationFilters([offered, noDeadline], {
+        ...DEFAULT_APPLICATION_FILTERS,
+        offerDeadline: "blank",
+      }),
+    ).toEqual([noDeadline]);
+  });
 });
 
 describe("cover letter filter", () => {

@@ -82,13 +82,16 @@ describe("createApplicationsCsv", () => {
         createApplication({
           deadline: "2026-09-25T12:00",
           interviewDeadline: "2026-09-26T12:00",
+          offerDeadline: "2026-09-27T12:00",
         }),
       ],
       resumes: [],
     }).text();
 
     expect(csv).toContain("interview_deadline");
+    expect(csv).toContain("offer_deadline");
     expect(csv).toContain("2026-09-26T12:00");
+    expect(csv).toContain("2026-09-27T12:00");
     expect(csv).not.toContain("2026-09-25T12:00");
   });
 });
@@ -258,6 +261,30 @@ describe("parseBackupFile", () => {
 
     await expect(parseBackupFile(createBackupFile(snapshot))).resolves
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("accepts an offer deadline", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          offerDeadline: "2026-10-03T17:00",
+          status: "Offered",
+        }),
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("rejects a malformed offer deadline", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication({ offerDeadline: "next Friday" })],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid application data",
+    );
   });
 
   it("rejects malformed interview date-times", async () => {

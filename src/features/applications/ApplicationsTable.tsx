@@ -24,7 +24,7 @@ import {
   RowActionsMenu,
   StatusQuickEditCell,
 } from "./TableCells";
-import { formatDate, formatUpdatedAt } from "../../lib/format";
+import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
@@ -63,6 +63,7 @@ export type ApplicationColumnId =
   | "applicationUrl"
   | "status"
   | "dateApplied"
+  | "offerDeadline"
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
@@ -167,6 +168,14 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     label: "Applied Date",
     minWidth: 80,
     width: 135,
+  },
+  {
+    canHide: true,
+    id: "offerDeadline",
+    key: "offerDeadline",
+    label: "Offer Deadline",
+    minWidth: 96,
+    width: 160,
   },
   {
     canHide: true,
@@ -1004,6 +1013,10 @@ function ApplicationColumnCell({
 
   if (columnId === "dateApplied") {
     return <TextCell value={formatDate(application.dateApplied)} />;
+  }
+
+  if (columnId === "offerDeadline") {
+    return <TextCell value={formatDateTime(application.offerDeadline)} />;
   }
 
   if (columnId === "roleStartDate") {

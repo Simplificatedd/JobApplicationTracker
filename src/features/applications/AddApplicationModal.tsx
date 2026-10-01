@@ -77,6 +77,7 @@ interface AddApplicationFormState {
   interviewDeadline: string;
   interviewDeadlineEntryMode: DeadlineEntryMode;
   interviewDeadlineReceivedAt: string;
+  offerDeadline: string;
   priority: Priority;
   resumeId: string;
   resumeUploadName: string;
@@ -119,6 +120,7 @@ function createInitialFormState(
     interviewDeadline: "",
     interviewDeadlineEntryMode: "exact",
     interviewDeadlineReceivedAt: "",
+    offerDeadline: "",
     priority: "medium",
     resumeId: "",
     resumeUploadName: "",
@@ -378,6 +380,10 @@ export function AddApplicationModal({
       interviewDeadlineReceivedAt: isInterviewing
         ? trimOptional(form.interviewDeadlineReceivedAt)
         : undefined,
+      offerDeadline:
+        form.status === "Offered"
+          ? trimOptional(form.offerDeadline)
+          : undefined,
       priority: form.priority,
       resumeId: trimOptional(form.resumeId),
       coverLetterId: trimOptional(form.coverLetterId),
@@ -523,6 +529,19 @@ export function AddApplicationModal({
                 ))}
               </select>
             </Field>
+
+            {form.status === "Offered" ? (
+              <Field label="Offer Deadline">
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("offerDeadline", event.target.value)
+                  }
+                  type="datetime-local"
+                  value={form.offerDeadline}
+                />
+              </Field>
+            ) : null}
 
             {form.status === "Interviewing" ? (
               <section

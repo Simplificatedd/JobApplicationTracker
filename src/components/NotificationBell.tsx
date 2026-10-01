@@ -30,6 +30,7 @@ interface NotificationBellProps {
 const groupLabels: Record<NotificationGroup, string> = {
   followups: "Follow-ups",
   interviews: "Interviews",
+  offers: "Offers",
   other: "Other",
 };
 
@@ -129,7 +130,7 @@ export function NotificationBell({
                 No reminders right now
               </p>
               <p className="mt-1 text-sm text-muted">
-                Follow-ups, interviews, and assessment deadlines will appear here.
+                Follow-ups, interviews, and offer deadlines will appear here.
               </p>
             </div>
           ) : grouped ? (
@@ -179,7 +180,12 @@ function GroupedNotifications({
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
 }) {
-  const groups: NotificationGroup[] = ["followups", "interviews", "other"];
+  const groups: NotificationGroup[] = [
+    "followups",
+    "interviews",
+    "offers",
+    "other",
+  ];
 
   return (
     <div className="mt-3 space-y-4">
@@ -331,6 +337,35 @@ function NotificationItem({
             Deadline
           </SmallActionButton>
         ) : null}
+        {notification.type === "offer_deadline" ? (
+          <>
+            <SmallActionButton
+              label="Mark offer accepted"
+              onClick={() =>
+                onUpdateApplication(notification.applicationId, {
+                  status: "Accepted",
+                })
+              }
+            >
+              <CalendarCheck aria-hidden="true" size={14} />
+              Accepted
+            </SmallActionButton>
+            <SmallActionButton
+              label="Change offer deadline"
+              onClick={() =>
+                changeDate(
+                  notification,
+                  onUpdateApplication,
+                  onUpdateInterview,
+                  "offer_deadline",
+                )
+              }
+            >
+              <CalendarClock aria-hidden="true" size={14} />
+              Deadline
+            </SmallActionButton>
+          </>
+        ) : null}
       </div>
     </article>
   );
@@ -362,7 +397,7 @@ function changeDate(
   notification: ReminderNotification,
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void,
   onUpdateInterview: (id: string, input: InterviewUpdate) => void,
-  mode: "follow_up" | "interview" | "deadline",
+  mode: "follow_up" | "interview" | "deadline" | "offer_deadline",
 ) {
   const isFollowUp = mode === "follow_up";
   const nextValue = window.prompt(
@@ -390,6 +425,13 @@ function changeDate(
     onUpdateApplication(notification.applicationId, {
       followUpDate: trimmedValue,
       followUpNeeded: true,
+    });
+    return;
+  }
+
+  if (mode === "offer_deadline") {
+    onUpdateApplication(notification.applicationId, {
+      offerDeadline: trimmedValue,
     });
     return;
   }

@@ -349,6 +349,7 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   contacts: "Number of people linked to this application.",
   coverLetterVersion: "Stored cover letter used for this application.",
   dateApplied: "Date you submitted the application.",
+  offerDeadline: "Date and time by which the pending offer needs a response.",
   followUp: "Follow-up date and whether the follow-up is needed.",
   followUpNeeded: "Whether this application needs a follow-up.",
   followUpPromptDays: "Default reminder timing for follow-up prompts.",
@@ -559,6 +560,23 @@ function MoreFiltersModal({
             }
             value={currentFilters.dateApplied}
           />
+
+          <FilterSelect
+            icon={CalendarDays}
+            label="Offer deadline"
+            onChange={(value) =>
+              onFilterChange?.({
+                offerDeadline: value as ApplicationFilters["offerDeadline"],
+              })
+            }
+            value={currentFilters.offerDeadline}
+          >
+            <option value="">Offer deadline</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="blank">Blank</option>
+            <option value="overdue">Overdue</option>
+            <option value="upcoming">Next 7 days</option>
+          </FilterSelect>
 
           <PresenceFilterSelect
             label="Role start date"
@@ -825,6 +843,7 @@ function countActiveFilters(
     filters.contacts,
     filters.coverLetterVersion,
     filters.dateApplied,
+    filters.offerDeadline,
     filters.status,
     filters.followUp,
     filters.followUpPromptDays,

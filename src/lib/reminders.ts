@@ -3,8 +3,13 @@ import type { NotificationState, UserSettings } from "../types/settings";
 import { calculateInterviewDeadline } from "./interviews";
 
 export type ReminderSeverity = "overdue" | "due_today" | "due_soon" | "upcoming";
-export type NotificationType = "follow_up" | "interview" | "deadline" | "flagged";
-export type NotificationGroup = "followups" | "interviews" | "other";
+export type NotificationType =
+  | "follow_up"
+  | "interview"
+  | "deadline"
+  | "offer_deadline"
+  | "flagged";
+export type NotificationGroup = "followups" | "interviews" | "offers" | "other";
 
 export interface ReminderNotification {
   application: Application;
@@ -138,10 +143,13 @@ export function deriveApplicationNotifications(
 ): ReminderNotification[] {
   if (
     application.archivedAt ||
-    application.status === "Offered" ||
     FINAL_STATUSES.has(application.status)
   ) {
     return [];
+  }
+
+  if (application.status === "Offered") {
+    return deriveOfferDeadlineNotification(application, settings, now);
   }
 
   const notifications: ReminderNotification[] = [];
@@ -246,6 +254,53 @@ export function deriveApplicationNotifications(
   });
 
   return notifications;
+}
+
+function deriveOfferDeadlineNotification(
+  application: Application,
+  settings: UserSettings,
+  now: Date,
+): ReminderNotification[] {
+  if (!application.offerDeadline) {
+    return [];
+  }
+
+  const deadlineDate = parseDate(application.offerDeadline);
+
+  if (!deadlineDate) {
+    return [];
+  }
+
+  const severity = classifyReminderSeverity(
+    deadlineDate,
+    settings.dueSoonDays,
+    now,
+  );
+
+  if (severity === "upcoming") {
+    return [];
+  }
+
+  return [
+    {
+      application,
+      applicationId: application.id,
+      body: [application.company, severityLabel(severity)]
+        .filter(Boolean)
+        .join(" / "),
+      dueAt: application.offerDeadline,
+      group: "offers",
+      id: buildNotificationId(
+        application.id,
+        "offer_deadline",
+        application.offerDeadline,
+      ),
+      severity,
+      sortAt: deadlineDate.getTime(),
+      title: `Offer deadline for ${application.jobTitle}`,
+      type: "offer_deadline",
+    },
+  ];
 }
 
 function getProjectedInterviewRecords(application: Application): Interview[] {

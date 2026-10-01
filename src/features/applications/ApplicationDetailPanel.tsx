@@ -142,6 +142,10 @@ export function ApplicationDetailPanel({
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
+      offerDeadline:
+        draft.status === "Offered"
+          ? trimOptional(draft.offerDeadline)
+          : application.offerDeadline,
       priority: draft.priority,
       resumeId: trimOptional(draft.resumeId),
       coverLetterId: trimOptional(draft.coverLetterId),
@@ -448,6 +452,12 @@ function ReadOnlyDetails({
         <DetailRow label="Job type" value={application.jobType} />
         <DetailRow label="Source" value={application.source} />
         <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
+        {application.status === "Offered" || application.offerDeadline ? (
+          <DetailRow
+            label="Offer deadline"
+            value={formatDateTime(application.offerDeadline)}
+          />
+        ) : null}
         <DetailRow
           label="Role dates"
           value={formatDateRange(
@@ -673,6 +683,18 @@ function EditForm({
           <option value="high">High</option>
         </select>
       </Field>
+      {draft.status === "Offered" ? (
+        <Field label="Offer Deadline">
+          <input
+            className="field-control"
+            onChange={(event) =>
+              updateDraft("offerDeadline", event.target.value)
+            }
+            type="datetime-local"
+            value={draft.offerDeadline}
+          />
+        </Field>
+      ) : null}
       <Field label="Location">
         <input
           className="field-control"
@@ -1083,6 +1105,7 @@ function toDraft(application: Application) {
     roleEndDate: application.roleEndDate ?? "",
     followUpNeeded: application.followUpNeeded,
     followUpDate: application.followUpDate ?? "",
+    offerDeadline: toDateTimeLocal(application.offerDeadline),
     priority: application.priority,
     resumeId: application.resumeId ?? "",
     resumeUploadName: "",
@@ -1094,6 +1117,24 @@ function toDraft(application: Application) {
     salary: application.salary ?? "",
     notes: application.notes ?? "",
   };
+}
+
+function toDateTimeLocal(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 16);
+  }
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function isDraftDirty(draft: ApplicationDraft, application: Application) {
