@@ -688,7 +688,7 @@ export function AddApplicationModal({
                   </Field>
                 ) : null}
 
-                <Field label="Assessment Deadline">
+                <Field label="Interview Deadline">
                   <input
                     className="field-control"
                     onChange={(event) =>

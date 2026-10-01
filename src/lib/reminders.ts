@@ -1,5 +1,6 @@
 import type { Application, Interview } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
+import { calculateInterviewDeadline } from "./interviews";
 
 export type ReminderSeverity = "overdue" | "due_today" | "due_soon" | "upcoming";
 export type NotificationType = "follow_up" | "interview" | "deadline" | "flagged";
@@ -211,11 +212,12 @@ export function deriveApplicationNotifications(
       });
     }
 
-    const deadlineDate = parseDate(interview.deadline);
+    const deadline = calculateInterviewDeadline(interview);
+    const deadlineDate = parseDate(deadline);
 
     if (
       application.status === "Interviewing" &&
-      interview.deadline &&
+      deadline &&
       deadlineDate &&
       deadlineDate >= now
     ) {
@@ -231,13 +233,13 @@ export function deriveApplicationNotifications(
         body: [application.company, severityLabel(severity)]
           .filter(Boolean)
           .join(" / "),
-        dueAt: interview.deadline,
+        dueAt: deadline,
         group: "interviews",
         id: buildNotificationId(application.id, "deadline", interview.id),
         interviewId: interview.id,
         severity,
         sortAt: deadlineDate.getTime(),
-        title: `Assessment${roundLabel} deadline for ${application.jobTitle}`,
+        title: `Interview${roundLabel} deadline for ${application.jobTitle}`,
         type: "deadline",
       });
     }
@@ -252,7 +254,9 @@ function getProjectedInterviewRecords(application: Application): Interview[] {
     !application.interviewDeadline &&
     !application.interviewRound &&
     !application.interviewType &&
-    !application.interviewMode
+    !application.interviewMode &&
+    !application.interviewDeadlineEntryMode &&
+    !application.interviewDeadlineReceivedAt
   ) {
     return [];
   }
@@ -262,7 +266,9 @@ function getProjectedInterviewRecords(application: Application): Interview[] {
       id: `projected-${application.id}`,
       applicationId: application.id,
       dateTime: application.interviewDateTime,
-      deadline: calculateInterviewDeadline(application),
+      deadline: application.interviewDeadline,
+      deadlineEntryMode: application.interviewDeadlineEntryMode,
+      deadlineReceivedAt: application.interviewDeadlineReceivedAt,
       location: application.interviewLocation,
       meetingUrl: application.interviewMeetingUrl,
       mode: application.interviewMode ?? "unknown",
@@ -274,25 +280,6 @@ function getProjectedInterviewRecords(application: Application): Interview[] {
       updatedAt: application.updatedAt,
     },
   ];
-}
-
-export function calculateInterviewDeadline(application: Application) {
-  const entryMode = application.deadlineEntryMode ?? "exact";
-
-  if (entryMode === "exact") {
-    return application.interviewDeadline || application.deadline;
-  }
-
-  const receivedAt = application.createdAt;
-  const hoursByMode = {
-    "1_day": 24,
-    "2_days": 48,
-    "3_days": 72,
-    "72_hours": 72,
-  } satisfies Record<Exclude<NonNullable<Application["deadlineEntryMode"]>, "exact">, number>;
-  const hours = hoursByMode[entryMode];
-
-  return hours ? new Date(new Date(receivedAt).getTime() + hours * 60 * 60 * 1000).toISOString() : undefined;
 }
 
 export function sortNotifications(notifications: ReminderNotification[]) {

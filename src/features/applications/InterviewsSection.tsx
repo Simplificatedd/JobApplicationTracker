@@ -456,7 +456,7 @@ function InterviewForm({
             />
           </FormField>
         ) : null}
-        <FormField label="Assessment deadline">
+        <FormField label="Interview deadline">
           <input
             className="field-control"
             onChange={(event) => update("deadline", event.target.value)}

@@ -225,4 +225,71 @@ describe("deriveApplicationNotifications", () => {
       type: "deadline",
     });
   });
+
+  it("derives a reminder from canonical relative deadline timing", () => {
+    const interview: Interview = {
+      id: "interview-relative",
+      applicationId: baseApplication.id,
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: "2026-09-20T08:00:00.000Z",
+      type: "technical",
+      mode: "take-home",
+      proctored: false,
+      createdAt: baseApplication.createdAt,
+      updatedAt: baseApplication.updatedAt,
+    };
+
+    const notifications = deriveApplicationNotifications(
+      { ...baseApplication, followUpNeeded: false, status: "Interviewing" },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+      [interview],
+    );
+
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        dueAt: "2026-09-22T08:00:00.000Z",
+        interviewId: interview.id,
+        type: "deadline",
+      }),
+    ]);
+  });
+
+  it("uses interview projection timing without a canonical record", () => {
+    const notifications = deriveApplicationNotifications(
+      {
+        ...baseApplication,
+        followUpNeeded: false,
+        status: "Interviewing",
+        interviewRound: 1,
+        interviewDeadlineEntryMode: "1_day",
+        interviewDeadlineReceivedAt: "2026-09-20T08:00:00.000Z",
+      },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+    );
+
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        dueAt: "2026-09-21T08:00:00.000Z",
+        type: "deadline",
+      }),
+    ]);
+  });
+
+  it("ignores a legacy generic deadline after migration", () => {
+    const notifications = deriveApplicationNotifications(
+      {
+        ...baseApplication,
+        deadline: "2026-09-21T12:00",
+        followUpNeeded: false,
+        status: "Interviewing",
+        interviewRound: 1,
+      },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+    );
+
+    expect(notifications).toEqual([]);
+  });
 });
