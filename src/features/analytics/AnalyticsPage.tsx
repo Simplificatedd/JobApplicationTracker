@@ -30,7 +30,7 @@ const chartOptions = [
   { id: "activityCalendar", label: "Activity calendar" },
   { id: "statusChangesOverTime", label: "Status changes over time" },
   { id: "interviewsOverTime", label: "Interviews over time" },
-  { id: "outcomes", label: "Offers vs rejections" },
+  { id: "outcomes", label: "Offers and rejections" },
   { id: "applicationPaths", label: "Application paths" },
 ];
 
@@ -199,7 +199,14 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("outcomes") ? (
-            <BarChart title="Offers vs rejections" data={deriveOutcomes(scopedApplications)} />
+            <BarChart
+              title="Offers and rejections"
+              data={deriveOutcomes(
+                scopedApplications,
+                scopedActivities,
+                scopedInterviews,
+              )}
+            />
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
             <BarChart
@@ -321,7 +328,7 @@ function deriveApplicationsOverTime(
   );
 }
 
-function derivePipelineByStatus(applications: Application[]) {
+export function derivePipelineByStatus(applications: Application[]) {
   return APPLICATION_STATUSES.map((status) => ({
     label: status,
     value: applications.filter((application) => application.status === status).length,
@@ -384,15 +391,42 @@ export function deriveInterviewsOverTime(
   );
 }
 
-function deriveOutcomes(applications: Application[]) {
+export function deriveOutcomes(
+  applications: Application[],
+  activities: Activity[],
+  interviews: Interview[],
+) {
+  const outcomePaths = applications.map((application) =>
+    classifyApplicationOutcomePath(application, activities, interviews),
+  );
+  const offerPaths: ApplicationOutcomePath[] = [
+    "accepted",
+    "offer_pending",
+    "offered_rejected",
+  ];
+  const rejectionPaths: ApplicationOutcomePath[] = [
+    "offered_rejected",
+    "interviewed_rejected",
+    "rejected_without_interview",
+  ];
+
   return [
     {
-      label: "Offered",
-      value: applications.filter((application) => application.status === "Offered").length,
+      label: "Offers received",
+      value: outcomePaths.filter((outcomePath) =>
+        offerPaths.includes(outcomePath),
+      ).length,
+    },
+    {
+      label: "Accepted",
+      value: outcomePaths.filter((outcomePath) => outcomePath === "accepted")
+        .length,
     },
     {
       label: "Rejected",
-      value: applications.filter((application) => application.status === "Rejected").length,
+      value: outcomePaths.filter((outcomePath) =>
+        rejectionPaths.includes(outcomePath),
+      ).length,
     },
   ];
 }
