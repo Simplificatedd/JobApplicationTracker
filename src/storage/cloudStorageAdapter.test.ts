@@ -214,6 +214,42 @@ describe("cloud storage adapter", () => {
     ]);
   });
 
+  it("materializes legacy derived follow-up dates from cloud state", async () => {
+    const cache = createCache("cloud-follow-up-migration");
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 7,
+      snapshot: {
+        ...createSnapshot([
+          {
+            ...application,
+            dateApplied: "2026-09-24",
+            followUpNeeded: true,
+          },
+        ]),
+        settings: {
+          ...DEFAULT_USER_SETTINGS,
+          defaultFollowUpPromptDays: 3,
+        },
+      },
+      updatedAt: "2026-09-22T00:00:00.000Z",
+    };
+    const adapter = createCloudStorageAdapter({ api, cache });
+
+    await expect(adapter.initialize()).resolves.toMatchObject({
+      applications: [
+        {
+          followUpAutoResetEnabled: false,
+          followUpDate: "2026-09-27",
+          followUpNeeded: true,
+        },
+      ],
+    });
+    await expect(cache.listApplications()).resolves.toMatchObject([
+      { followUpDate: "2026-09-27" },
+    ]);
+  });
+
   it("migrates legacy cloud Offered records without changing new ones", async () => {
     const legacyCache = createCache("cloud-legacy-offered");
     const legacyApi = new FakeCloudApi();

@@ -3,6 +3,7 @@ import {
   normalizeApplicationStatus,
 } from "../lib/domain";
 import { normalizeStatusActivities } from "../lib/statusHistory";
+import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -573,6 +574,8 @@ function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
 function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
   const hasLegacyOfferSemantics =
     (snapshot.dataVersion ?? 1) < TRACKER_DATA_VERSION;
+  const defaultFollowUpPromptDays =
+    snapshot.settings.defaultFollowUpPromptDays;
 
   return {
     ...snapshot,
@@ -581,13 +584,20 @@ function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
       hasLegacyOfferSemantics,
     ),
     dataVersion: TRACKER_DATA_VERSION,
-    applications: snapshot.applications.map((application) => ({
-      ...application,
-      status:
-        hasLegacyOfferSemantics && application.status === "Offered"
-          ? "Accepted"
-          : normalizeApplicationStatus(application.status),
-    })),
+    applications: snapshot.applications.map((application) => {
+      const migratedApplication = migrateLegacyFollowUpSchedule(
+        application,
+        defaultFollowUpPromptDays,
+      );
+
+      return {
+        ...migratedApplication,
+        status:
+          hasLegacyOfferSemantics && application.status === "Offered"
+            ? "Accepted"
+            : normalizeApplicationStatus(application.status),
+      };
+    }),
     coverLetters: snapshot.coverLetters ?? [],
   };
 }
