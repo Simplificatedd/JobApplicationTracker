@@ -97,6 +97,7 @@ export const DEFAULT_ANALYTICS_SETTINGS: AnalyticsSettings = {
     "statusPipeline",
     "followUpLoad",
     "activityCalendar",
+    "applicationPaths",
   ],
   includeArchived: false,
 };
