@@ -935,6 +935,7 @@ function normalizeApplication(application: Partial<Application>): Application {
     contactsCount: application.contactsCount ?? 0,
     createdAt: application.createdAt ?? timestamp,
     deadlineEntryMode: application.deadlineEntryMode ?? "exact",
+    followUpAutoResetEnabled: application.followUpAutoResetEnabled ?? false,
     followUpNeeded: application.followUpNeeded ?? false,
     id: application.id ?? `app-${timestamp}`,
     interviewProctored: application.interviewProctored ?? false,

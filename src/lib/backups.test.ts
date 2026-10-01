@@ -102,6 +102,31 @@ describe("parseBackupFile", () => {
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
   });
 
+  it("accepts legacy applications without a follow-up auto-reset flag", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication()],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [{ id: "app-1" }],
+        },
+      });
+  });
+
+  it("rejects invalid follow-up auto-reset flags", async () => {
+    const application = {
+      ...createApplication(),
+      followUpAutoResetEnabled: "yes",
+    } as unknown as Application;
+    const snapshot = createSnapshot({ applications: [application] });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid application data",
+    );
+  });
+
   it("migrates the legacy Just Applied status", async () => {
     const application = {
       ...createApplication(),

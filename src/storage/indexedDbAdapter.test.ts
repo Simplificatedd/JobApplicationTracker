@@ -22,6 +22,7 @@ const application: Application = {
   status: "Interviewing",
   workMode: "unknown",
   jobType: "internship",
+  followUpAutoResetEnabled: false,
   followUpNeeded: false,
   interviewRound: 1,
   interviewType: "technical",
@@ -132,6 +133,21 @@ describe("indexedDbStorageAdapter", () => {
 
     await expect(adapter.listApplications()).resolves.toMatchObject([
       { status: "Awaiting Response" },
+    ]);
+  });
+
+  it("disables follow-up auto-reset for legacy applications", async () => {
+    const adapter = createTestStorageAdapter();
+    const legacyApplication = {
+      ...application,
+      followUpAutoResetEnabled: undefined,
+    };
+
+    await adapter.initialize();
+    await adapter.commitMutation({ applications: [legacyApplication] });
+
+    await expect(adapter.listApplications()).resolves.toMatchObject([
+      { followUpAutoResetEnabled: false },
     ]);
   });
 

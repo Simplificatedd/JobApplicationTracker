@@ -532,6 +532,7 @@ function isApplication(value: unknown): value is Application {
     isOptionalDate(value.roleEndDate) &&
     typeof value.followUpNeeded === "boolean" &&
     isOptionalDate(value.followUpDate) &&
+    isOptionalBoolean(value.followUpAutoResetEnabled) &&
     isOptionalNonNegativeInteger(value.followUpPromptDays) &&
     isOptionalNonNegativeInteger(value.interviewRound) &&
     isOptionalOneOf(value.interviewType, [
@@ -840,6 +841,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
+}
+
+function isOptionalBoolean(value: unknown): value is boolean | undefined {
+  return value === undefined || typeof value === "boolean";
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

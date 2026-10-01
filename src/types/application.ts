@@ -74,6 +74,7 @@ export interface Application {
   roleEndDate?: string;
   followUpNeeded: boolean;
   followUpDate?: string;
+  followUpAutoResetEnabled?: boolean;
   followUpPromptDays?: number;
   // Denormalized current-interview projection. Interview records are canonical.
   interviewRound?: number;
