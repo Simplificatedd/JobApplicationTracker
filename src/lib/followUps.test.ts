@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createFollowUpScheduleUpdate,
   createHandledFollowUpUpdate,
+  migrateLegacyFollowUpSchedule,
   normalizeFollowUpDateInput,
   normalizeFollowUpPromptDays,
   scheduleFollowUpAfterDays,
@@ -139,5 +140,68 @@ describe("createHandledFollowUpUpdate", () => {
         now,
       ),
     ).toEqual({ followUpDate: "2026-10-08", followUpNeeded: true });
+  });
+});
+
+describe("migrateLegacyFollowUpSchedule", () => {
+  const application = {
+    id: "legacy-app",
+    company: "Example Company",
+    jobTitle: "Engineer",
+    jobDescription: "",
+    status: "Awaiting Response" as const,
+    workMode: "unknown" as const,
+    jobType: "full-time" as const,
+    dateApplied: "2026-09-24",
+    followUpNeeded: true,
+    followUpPromptDays: 7,
+    interviewProctored: false,
+    priority: "medium" as const,
+    contactsCount: 0,
+    createdAt: "2026-09-24T00:00:00.000Z",
+    updatedAt: "2026-09-24T00:00:00.000Z",
+  };
+
+  it("materializes the previously derived date for a required follow-up", () => {
+    expect(migrateLegacyFollowUpSchedule(application)).toMatchObject({
+      followUpAutoResetEnabled: false,
+      followUpDate: "2026-10-01",
+      followUpNeeded: true,
+    });
+  });
+
+  it("keeps optional legacy entries blank", () => {
+    expect(
+      migrateLegacyFollowUpSchedule({
+        ...application,
+        followUpNeeded: false,
+      }),
+    ).toMatchObject({
+      followUpAutoResetEnabled: false,
+      followUpNeeded: false,
+    });
+  });
+
+  it("preserves an explicit date", () => {
+    expect(
+      migrateLegacyFollowUpSchedule({
+        ...application,
+        followUpDate: "2026-10-03",
+      }),
+    ).toMatchObject({
+      followUpAutoResetEnabled: false,
+      followUpDate: "2026-10-03",
+    });
+  });
+
+  it("does not reinterpret records already using the new semantics", () => {
+    const currentApplication = {
+      ...application,
+      followUpAutoResetEnabled: false,
+    };
+
+    expect(migrateLegacyFollowUpSchedule(currentApplication)).toBe(
+      currentApplication,
+    );
   });
 });

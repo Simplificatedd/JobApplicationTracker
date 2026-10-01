@@ -114,6 +114,74 @@ export function createHandledFollowUpUpdate(
   };
 }
 
+export function migrateLegacyFollowUpSchedule(
+  application: Application,
+  defaultPromptDays = DEFAULT_FOLLOW_UP_PROMPT_DAYS,
+): Application {
+  if (application.followUpAutoResetEnabled !== undefined) {
+    return application;
+  }
+
+  const promptDays =
+    typeof application.followUpPromptDays === "number" &&
+    Number.isInteger(application.followUpPromptDays) &&
+    application.followUpPromptDays >= 0
+      ? application.followUpPromptDays
+      : defaultPromptDays;
+  const followUpDate =
+    application.followUpDate ??
+    (application.followUpNeeded
+      ? addDaysToDateStamp(
+          application.dateApplied || application.createdAt,
+          promptDays,
+        )
+      : undefined);
+
+  return {
+    ...application,
+    followUpAutoResetEnabled: false,
+    followUpDate,
+  };
+}
+
+function addDaysToDateStamp(value: string, days: number) {
+  const dateStampMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const baseDate = dateStampMatch
+    ? new Date(
+        Date.UTC(
+          Number(dateStampMatch[1]),
+          Number(dateStampMatch[2]) - 1,
+          Number(dateStampMatch[3]),
+        ),
+      )
+    : new Date(value);
+
+  if (Number.isNaN(baseDate.getTime())) {
+    return undefined;
+  }
+
+  if (dateStampMatch) {
+    const isValidDateStamp =
+      baseDate.getUTCFullYear() === Number(dateStampMatch[1]) &&
+      baseDate.getUTCMonth() === Number(dateStampMatch[2]) - 1 &&
+      baseDate.getUTCDate() === Number(dateStampMatch[3]);
+
+    if (!isValidDateStamp) {
+      return undefined;
+    }
+
+    baseDate.setUTCDate(baseDate.getUTCDate() + days);
+    return baseDate.toISOString().slice(0, 10);
+  }
+
+  const localDate = new Date(
+    Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()),
+  );
+  localDate.setUTCDate(localDate.getUTCDate() + days);
+
+  return localDate.toISOString().slice(0, 10);
+}
+
 function parseLocalDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
 
