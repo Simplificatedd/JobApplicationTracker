@@ -30,22 +30,12 @@ describe("calculateFollowUpDueDate", () => {
     expect(
       calculateFollowUpDueDate(
         { ...baseApplication, followUpDate: "2026-09-12" },
-        7,
       ),
     ).toBe("2026-09-12");
   });
 
-  it("derives a follow-up date from the application date without timezone drift", () => {
-    expect(calculateFollowUpDueDate(baseApplication, 7)).toBe("2026-09-08");
-  });
-
-  it("rejects an invalid application date", () => {
-    expect(
-      calculateFollowUpDueDate(
-        { ...baseApplication, dateApplied: "2026-02-31" },
-        7,
-      ),
-    ).toBeUndefined();
+  it("does not invent a due date when the stored date is blank", () => {
+    expect(calculateFollowUpDueDate(baseApplication)).toBeUndefined();
   });
 });
 
