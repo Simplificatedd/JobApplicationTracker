@@ -1,7 +1,6 @@
 import type {
   Application,
   ApplicationStatus,
-  DeadlineEntryMode,
   Interview,
   InterviewType,
   JobType,
@@ -14,7 +13,6 @@ import { deriveApplicationNotifications } from "../../lib/reminders";
 export type FollowUpFilter = "" | "needed" | "optional";
 export type InterviewFilter = "" | "scheduled" | "unscheduled";
 export type ContactFilter = "" | "linked" | "none";
-export type DeadlineFilter = "" | "scheduled" | "blank" | "overdue" | "upcoming";
 export type FollowUpPromptFilter = "" | "1" | "3" | "7" | "14_plus";
 export type InterviewRoundFilter = "" | "1" | "2" | "3_plus";
 export type PresenceFilter = "" | "filled" | "blank";
@@ -31,8 +29,6 @@ export type SortColumn =
   | "applicationUrl"
   | "status"
   | "dateApplied"
-  | "deadline"
-  | "deadlineEntryMode"
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
@@ -57,8 +53,6 @@ export interface ApplicationFilters {
   contacts: ContactFilter;
   coverLetterVersion: PresenceFilter;
   dateApplied: PresenceFilter;
-  deadline: DeadlineFilter;
-  deadlineEntryMode: DeadlineEntryMode | "";
   followUp: FollowUpFilter;
   followUpPromptDays: FollowUpPromptFilter;
   interview: InterviewFilter;
@@ -90,8 +84,6 @@ export const DEFAULT_APPLICATION_FILTERS: ApplicationFilters = {
   contacts: "",
   coverLetterVersion: "",
   dateApplied: "",
-  deadline: "",
-  deadlineEntryMode: "",
   followUp: "",
   followUpPromptDays: "",
   interview: "",
@@ -116,6 +108,52 @@ export const DEFAULT_SORT_STATE: SortState = {
   column: "updatedAt",
   direction: "descending",
 };
+
+const APPLICATION_SORT_COLUMNS: SortColumn[] = [
+  "jobTitle",
+  "jobDescription",
+  "company",
+  "location",
+  "workMode",
+  "jobType",
+  "source",
+  "applicationUrl",
+  "status",
+  "dateApplied",
+  "roleStartDate",
+  "roleEndDate",
+  "followUp",
+  "followUpNeeded",
+  "followUpPromptDays",
+  "interviewRound",
+  "interviewDateTime",
+  "interviewType",
+  "priority",
+  "resume",
+  "contacts",
+  "coverLetterVersion",
+  "salary",
+  "notes",
+  "updatedAt",
+  "actions",
+];
+
+export function normalizeApplicationSort(
+  sort: { column?: string; direction?: string } | null | undefined,
+): SortState {
+  if (
+    !sort?.column ||
+    !APPLICATION_SORT_COLUMNS.includes(sort.column as SortColumn) ||
+    (sort.direction !== "ascending" && sort.direction !== "descending")
+  ) {
+    return DEFAULT_SORT_STATE;
+  }
+
+  return {
+    column: sort.column as SortColumn,
+    direction: sort.direction,
+  };
+}
 
 export function applyApplicationFilters(
   applications: Application[],
@@ -183,20 +221,6 @@ export function applyApplicationFilters(
     if (
       filters.dateApplied &&
       !matchesPresence(application.dateApplied, filters.dateApplied)
-    ) {
-      return false;
-    }
-
-    if (
-      filters.deadline &&
-      !matchesDeadline(application.deadline, filters.deadline)
-    ) {
-      return false;
-    }
-
-    if (
-      filters.deadlineEntryMode &&
-      application.deadlineEntryMode !== filters.deadlineEntryMode
     ) {
       return false;
     }
@@ -388,7 +412,6 @@ function getSortValue(application: Application, column: SortColumn) {
 
   if (
     column === "dateApplied" ||
-    column === "deadline" ||
     column === "roleStartDate" ||
     column === "roleEndDate" ||
     column === "interviewDateTime" ||
@@ -452,29 +475,6 @@ function matchesPresence(value: string | undefined, filter: PresenceFilter) {
 
 function normalizeFilterValue(value: string | undefined) {
   return value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
-}
-
-function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
-  if (filter === "scheduled" || filter === "blank") {
-    return matchesPresence(value, filter === "scheduled" ? "filled" : "blank");
-  }
-
-  if (!value) {
-    return false;
-  }
-
-  const today = startOfDay(new Date());
-  const deadline = startOfDay(new Date(value));
-
-  if (filter === "overdue") {
-    return deadline < today;
-  }
-
-  if (filter === "upcoming") {
-    return deadline >= today && deadline <= addDays(today, 7);
-  }
-
-  return true;
 }
 
 function matchesFollowUpPromptDays(

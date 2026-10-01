@@ -1,7 +1,4 @@
-import type {
-  Application,
-  DeadlineEntryMode,
-} from "../../types/application";
+import type { Application } from "../../types/application";
 
 export interface DuplicateApplicationMatch {
   application: Application;
@@ -48,21 +45,6 @@ export function validateInterviewRound(
   }
 
   return { round, warnings };
-}
-
-export function deadlineValueForEntryMode(
-  value: string,
-  entryMode: DeadlineEntryMode,
-) {
-  if (!value) {
-    return "";
-  }
-
-  if (entryMode === "exact") {
-    return value.includes("T") ? value.slice(0, 16) : `${value.slice(0, 10)}T23:59`;
-  }
-
-  return value.slice(0, 10);
 }
 
 export function findDuplicateApplication(

@@ -76,6 +76,18 @@ describe("normalizeUserSettings", () => {
     ).toBe(true);
   });
 
+  it("removes retired application deadline columns", () => {
+    expect(
+      normalizeUserSettings({
+        visibleApplicationColumns: [
+          "company",
+          "deadline",
+          "deadlineEntryMode",
+        ],
+      }).visibleApplicationColumns,
+    ).toEqual(["company", ...REQUIRED_APPLICATION_COLUMNS]);
+  });
+
   it("normalizes unavailable Add Job modes to the implemented workflow", () => {
     expect(
       normalizeUserSettings({

@@ -6,6 +6,7 @@ import {
   DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
   normalizeApplicationFilters,
+  normalizeApplicationSort,
   sortApplications,
 } from "./applicationFilters";
 
@@ -111,6 +112,15 @@ describe("default application sorting", () => {
     expect(
       sortApplications([olderApplication, newerApplication], DEFAULT_SORT_STATE),
     ).toEqual([newerApplication, olderApplication]);
+  });
+
+  it("resets a removed deadline sort from saved preferences", () => {
+    expect(
+      normalizeApplicationSort({
+        column: "deadline",
+        direction: "ascending",
+      }),
+    ).toEqual(DEFAULT_SORT_STATE);
   });
 });
 

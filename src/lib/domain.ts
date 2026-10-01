@@ -76,7 +76,9 @@ export function normalizeUserSettings(
     ...(settings?.visibleApplicationColumns ??
       DEFAULT_USER_SETTINGS.visibleApplicationColumns),
     ...REQUIRED_APPLICATION_COLUMNS,
-  ];
+  ].filter(
+    (column) => column !== "deadline" && column !== "deadlineEntryMode",
+  );
 
   return {
     ...DEFAULT_USER_SETTINGS,

@@ -1,6 +1,7 @@
 import { createId } from "./domain";
 import type {
   Application,
+  DeadlineEntryMode,
   Interview,
   InterviewInput,
   InterviewUpdate,
@@ -43,6 +44,12 @@ export function buildInterviewRecord(
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
+    deadlineEntryMode:
+      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
+    deadlineReceivedAt:
+      application.interviewDeadlineReceivedAt ??
+      existing?.deadlineReceivedAt ??
+      application.createdAt,
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -65,6 +72,7 @@ export function createInterviewRecord(
 ): Interview {
   return {
     ...input,
+    deadlineEntryMode: input.deadlineEntryMode ?? "exact",
     id: createId("interview"),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -94,6 +102,43 @@ export function isValidInterviewRound(round: number | undefined) {
   return round === undefined || (Number.isInteger(round) && round > 0);
 }
 
+export function calculateInterviewDeadline(interview: Interview) {
+  if (interview.deadline) {
+    return interview.deadline;
+  }
+
+  return suggestInterviewDeadline(
+    interview.deadlineEntryMode ?? "exact",
+    interview.deadlineReceivedAt ?? interview.createdAt,
+  );
+}
+
+export function suggestInterviewDeadline(
+  entryMode: DeadlineEntryMode,
+  receivedAt: string,
+) {
+  if (entryMode === "exact" || !receivedAt) {
+    return undefined;
+  }
+
+  const receivedDate = new Date(receivedAt);
+
+  if (Number.isNaN(receivedDate.getTime())) {
+    return undefined;
+  }
+
+  const hoursByMode = {
+    "1_day": 24,
+    "2_days": 48,
+    "3_days": 72,
+    "72_hours": 72,
+  } satisfies Record<Exclude<DeadlineEntryMode, "exact">, number>;
+
+  return new Date(
+    receivedDate.getTime() + hoursByMode[entryMode] * 60 * 60 * 1000,
+  ).toISOString();
+}
+
 export function reconcileCanonicalInterviews(
   applications: Application[],
   interviews: Interview[],
@@ -106,11 +151,39 @@ export function reconcileCanonicalInterviews(
     let applicationInterviews = nextInterviews.filter(
       (interview) => interview.applicationId === application.id,
     );
-    const projectedInterview = findInterviewRound(
+    let projectedInterview = findInterviewRound(
       applicationInterviews,
       application.id,
       application.interviewRound,
     );
+    const legacyDeadlineTarget =
+      projectedInterview ??
+      (applicationInterviews.length === 1 ? applicationInterviews[0] : undefined);
+
+    if (
+      legacyDeadlineTarget &&
+      !legacyDeadlineTarget.deadline &&
+      !application.interviewDeadline &&
+      application.deadline
+    ) {
+      const migratedInterview = withLegacyApplicationDeadline(
+        legacyDeadlineTarget,
+        application,
+      );
+      const interviewIndex = nextInterviews.findIndex(
+        (interview) => interview.id === migratedInterview.id,
+      );
+
+      nextInterviews[interviewIndex] = migratedInterview;
+      interviewWrites.push(migratedInterview);
+      applicationInterviews = applicationInterviews.map((interview) =>
+        interview.id === migratedInterview.id ? migratedInterview : interview,
+      );
+      projectedInterview =
+        projectedInterview?.id === migratedInterview.id
+          ? migratedInterview
+          : projectedInterview;
+    }
 
     if (!projectedInterview && hasExplicitInterviewProjection(application)) {
       const migratedInterview = interviewFromApplicationProjection(application);
@@ -192,6 +265,8 @@ export function applyInterviewProjection(
     interviewPlatform: interview?.platform,
     interviewProctored: interview?.proctored ?? false,
     interviewDeadline: interview?.deadline,
+    interviewDeadlineEntryMode: interview?.deadlineEntryMode,
+    interviewDeadlineReceivedAt: interview?.deadlineReceivedAt,
   };
 }
 
@@ -199,6 +274,10 @@ function interviewFromApplicationProjection(
   application: Application,
   existing?: Interview,
 ): Interview {
+  const legacyDeadline = hasInterviewDetailProjection(application)
+    ? application.deadline
+    : undefined;
+
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
@@ -210,14 +289,32 @@ function interviewFromApplicationProjection(
     meetingUrl: application.interviewMeetingUrl,
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
-    deadline: application.interviewDeadline,
+    deadline: application.interviewDeadline ?? legacyDeadline,
+    deadlineEntryMode:
+      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
+    deadlineReceivedAt:
+      application.interviewDeadlineReceivedAt ?? application.createdAt,
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,
   };
 }
 
-function hasExplicitInterviewProjection(application: Application) {
+function withLegacyApplicationDeadline(
+  interview: Interview,
+  application: Application,
+): Interview {
+  return {
+    ...interview,
+    deadline: application.deadline,
+    deadlineEntryMode:
+      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
+    deadlineReceivedAt:
+      application.interviewDeadlineReceivedAt ?? application.createdAt,
+  };
+}
+
+function hasInterviewDetailProjection(application: Application) {
   return Boolean(
     application.interviewDateTime ||
       application.interviewRound ||
@@ -226,8 +323,16 @@ function hasExplicitInterviewProjection(application: Application) {
       application.interviewLocation ||
       application.interviewMeetingUrl ||
       application.interviewPlatform ||
-      application.interviewProctored ||
-      application.interviewDeadline,
+      application.interviewProctored,
+  );
+}
+
+function hasExplicitInterviewProjection(application: Application) {
+  return Boolean(
+    hasInterviewDetailProjection(application) ||
+      application.interviewDeadline ||
+      application.interviewDeadlineEntryMode ||
+      application.interviewDeadlineReceivedAt,
   );
 }
 
@@ -265,6 +370,8 @@ function hasDifferentInterviewProjection(
     "interviewPlatform",
     "interviewProctored",
     "interviewDeadline",
+    "interviewDeadlineEntryMode",
+    "interviewDeadlineReceivedAt",
   ].some(
     (key) =>
       previous[key as keyof Application] !== next[key as keyof Application],

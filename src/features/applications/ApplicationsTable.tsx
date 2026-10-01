@@ -24,7 +24,7 @@ import {
   RowActionsMenu,
   StatusQuickEditCell,
 } from "./TableCells";
-import { formatDate, formatDeadline, formatUpdatedAt } from "../../lib/format";
+import { formatDate, formatUpdatedAt } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
@@ -63,8 +63,6 @@ export type ApplicationColumnId =
   | "applicationUrl"
   | "status"
   | "dateApplied"
-  | "deadline"
-  | "deadlineEntryMode"
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
@@ -169,22 +167,6 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     label: "Applied Date",
     minWidth: 80,
     width: 135,
-  },
-  {
-    canHide: true,
-    id: "deadline",
-    key: "deadline",
-    label: "Deadline",
-    minWidth: 80,
-    width: 135,
-  },
-  {
-    canHide: true,
-    id: "deadlineEntryMode",
-    key: "deadlineEntryMode",
-    label: "Deadline Timing",
-    minWidth: 96,
-    width: 170,
   },
   {
     canHide: true,
@@ -1022,14 +1004,6 @@ function ApplicationColumnCell({
 
   if (columnId === "dateApplied") {
     return <TextCell value={formatDate(application.dateApplied)} />;
-  }
-
-  if (columnId === "deadline") {
-    return <TextCell value={formatDeadline(application.deadline)} />;
-  }
-
-  if (columnId === "deadlineEntryMode") {
-    return <TextCell value={formatOption(application.deadlineEntryMode)} />;
   }
 
   if (columnId === "roleStartDate") {

@@ -174,10 +174,10 @@ export function createApplicationsCsv({
     application.jobTitle,
     application.status,
     application.dateApplied,
-    application.deadline,
     application.followUpNeeded ? "yes" : "no",
     application.followUpDate,
     application.interviewDateTime,
+    application.interviewDeadline,
     application.source,
     application.location,
     application.jobType,
@@ -196,10 +196,10 @@ export function createApplicationsCsv({
     "job_title",
     "status",
     "applied_date",
-    "deadline",
     "follow_up_needed",
     "follow_up_date",
     "interview_date_time",
+    "interview_deadline",
     "source",
     "location",
     "job_type",
@@ -555,7 +555,15 @@ function isApplication(value: unknown): value is Application {
     isOptionalString(value.interviewPlatform) &&
     typeof value.interviewProctored === "boolean" &&
     isOptionalDateTime(value.interviewDeadline) &&
-    isOneOf(value.deadlineEntryMode, [
+    isOptionalOneOf(value.interviewDeadlineEntryMode, [
+      "exact",
+      "1_day",
+      "2_days",
+      "3_days",
+      "72_hours",
+    ]) &&
+    isOptionalDateTime(value.interviewDeadlineReceivedAt) &&
+    isOptionalOneOf(value.deadlineEntryMode, [
       "exact",
       "1_day",
       "2_days",
@@ -652,6 +660,14 @@ function isInterview(value: unknown): value is Interview {
     isOptionalString(value.platform) &&
     typeof value.proctored === "boolean" &&
     isOptionalDateTime(value.deadline) &&
+    isOptionalOneOf(value.deadlineEntryMode, [
+      "exact",
+      "1_day",
+      "2_days",
+      "3_days",
+      "72_hours",
+    ]) &&
+    isOptionalDateTime(value.deadlineReceivedAt) &&
     isOptionalString(value.notes) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)

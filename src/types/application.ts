@@ -85,7 +85,10 @@ export interface Application {
   interviewPlatform?: string;
   interviewProctored: boolean;
   interviewDeadline?: string;
-  deadlineEntryMode: DeadlineEntryMode;
+  interviewDeadlineEntryMode?: DeadlineEntryMode;
+  interviewDeadlineReceivedAt?: string;
+  // Legacy application-level deadline fields retained for backup compatibility.
+  deadlineEntryMode?: DeadlineEntryMode;
   nextAction?: string;
   priority: Priority;
   resumeId?: string;
@@ -130,6 +133,8 @@ export interface Interview {
   platform?: string;
   proctored: boolean;
   deadline?: string;
+  deadlineEntryMode?: DeadlineEntryMode;
+  deadlineReceivedAt?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../types/application";
 import {
   buildInterviewRecord,
+  calculateInterviewDeadline,
   createInterviewRecord,
   getNextInterviewRound,
   isValidInterviewRound,
@@ -101,6 +102,24 @@ describe("buildInterviewRecord", () => {
     ).toMatchObject({ applicationId: application.id, dateTime: undefined });
   });
 
+  it("uses interview-specific deadline timing metadata", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          deadlineEntryMode: "1_day",
+          interviewDeadlineEntryMode: "3_days",
+          interviewDeadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+        },
+        [],
+        "2026-09-21T09:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadlineEntryMode: "3_days",
+      deadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+    });
+  });
+
   it("does not rewrite history after the application leaves interviewing", () => {
     expect(
       buildInterviewRecord(
@@ -143,6 +162,101 @@ describe("reconcileCanonicalInterviews", () => {
       dateTime: "2026-09-22T10:00",
       location: "Career centre",
       round: 1,
+    });
+  });
+
+  it("moves an unambiguous legacy application deadline to a new interview", () => {
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "2_days" as const,
+      interviewDateTime: "2026-09-22T10:00",
+    };
+    const result = reconcileCanonicalInterviews([legacyApplication], []);
+
+    expect(result.interviews[0]).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: application.createdAt,
+    });
+    expect(result.applications[0]).toMatchObject({
+      interviewDeadline: "2026-09-23T17:00",
+      interviewDeadlineEntryMode: "2_days",
+    });
+  });
+
+  it("moves a legacy deadline to the sole canonical interview", () => {
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews(
+      [legacyApplication],
+      [firstRound],
+    );
+
+    expect(result.interviewWrites).toEqual([
+      expect.objectContaining({
+        id: firstRound.id,
+        deadline: "2026-09-23T17:00",
+      }),
+    ]);
+    expect(result.applications[0].interviewDeadline).toBe(
+      "2026-09-23T17:00",
+    );
+  });
+
+  it("does not treat a generic deadline as interview evidence", () => {
+    const deadlineOnlyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews([deadlineOnlyApplication], []);
+
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews).toEqual([]);
+    expect(result.applications).toEqual([deadlineOnlyApplication]);
+  });
+
+  it("does not guess which interview owns an ambiguous legacy deadline", () => {
+    const secondRound: Interview = {
+      ...firstRound,
+      id: "interview-2",
+      round: 2,
+    };
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews(
+      [legacyApplication],
+      [firstRound, secondRound],
+    );
+
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews.every((interview) => !interview.deadline)).toBe(true);
+  });
+
+  it("projects interview deadline timing metadata back to the application", () => {
+    const timedInterview: Interview = {
+      ...firstRound,
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+    };
+    const result = reconcileCanonicalInterviews([application], [timedInterview]);
+
+    expect(result.applications[0]).toMatchObject({
+      interviewDeadlineEntryMode: "2_days",
+      interviewDeadlineReceivedAt: "2026-09-21T08:00:00.000Z",
     });
   });
 
@@ -328,6 +442,7 @@ describe("interview record mutations", () => {
     const second = createInterviewRecord(input, application.updatedAt);
 
     expect(first.id).not.toBe(second.id);
+    expect(first.deadlineEntryMode).toBe("exact");
     expect(upsertInterviewHistory([first], second)).toHaveLength(2);
   });
 
@@ -359,5 +474,43 @@ describe("interview record mutations", () => {
     expect(isValidInterviewRound(0)).toBe(false);
     expect(isValidInterviewRound(-1)).toBe(false);
     expect(isValidInterviewRound(1.5)).toBe(false);
+  });
+});
+
+describe("calculateInterviewDeadline", () => {
+  it.each([
+    ["1_day", "2026-10-02T08:00:00.000Z"],
+    ["2_days", "2026-10-03T08:00:00.000Z"],
+    ["3_days", "2026-10-04T08:00:00.000Z"],
+    ["72_hours", "2026-10-04T08:00:00.000Z"],
+  ] as const)("calculates a %s deadline from its received time", (mode, expected) => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadlineEntryMode: mode,
+        deadlineReceivedAt: "2026-10-01T08:00:00.000Z",
+      }),
+    ).toBe(expected);
+  });
+
+  it("preserves an editable stored deadline", () => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadline: "2026-10-05T17:30",
+        deadlineEntryMode: "2_days",
+        deadlineReceivedAt: "2026-10-01T08:00:00.000Z",
+      }),
+    ).toBe("2026-10-05T17:30");
+  });
+
+  it("does not invent an exact deadline", () => {
+    expect(
+      calculateInterviewDeadline({
+        ...firstRound,
+        deadline: undefined,
+        deadlineEntryMode: "exact",
+      }),
+    ).toBeUndefined();
   });
 });
