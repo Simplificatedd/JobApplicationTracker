@@ -347,10 +347,7 @@ function deriveFollowUpLoad(
   };
 
   applications.forEach((application) => {
-    const dueDate = calculateFollowUpDueDate(
-      application,
-      userSettings.defaultFollowUpPromptDays,
-    );
+    const dueDate = calculateFollowUpDueDate(application);
 
     if (!dueDate) {
       return;

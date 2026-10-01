@@ -27,10 +27,7 @@ export interface ReminderNotification {
 
 const FINAL_STATUSES = new Set(["Accepted", "Rejected", "Withdrawn"]);
 
-export function calculateFollowUpDueDate(
-  application: Application,
-  _defaultPromptDays?: number,
-) {
+export function calculateFollowUpDueDate(application: Application) {
   return application.followUpDate;
 }
 

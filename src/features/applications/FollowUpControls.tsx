@@ -30,7 +30,7 @@ export function FollowUpScheduleControls({
     Number.isInteger(parsedCustomDays) &&
     parsedCustomDays >= 0;
 
-  function useDuration(days: number) {
+  function applyDuration(days: number) {
     const scheduledDate = scheduleFollowUpAfterDays(days);
 
     if (scheduledDate) {
@@ -80,7 +80,7 @@ export function FollowUpScheduleControls({
               <button
                 className="rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-foreground hover:bg-slate-50"
                 key={days}
-                onClick={() => useDuration(days)}
+                onClick={() => applyDuration(days)}
                 type="button"
               >
                 {days === 0 ? "Now" : `+${days}d`}
@@ -101,7 +101,7 @@ export function FollowUpScheduleControls({
             <button
               className="h-9 shrink-0 rounded-md border border-border bg-white px-3 text-xs font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canApplyCustomDays}
-              onClick={() => useDuration(parsedCustomDays)}
+              onClick={() => applyDuration(parsedCustomDays)}
               type="button"
             >
               Apply
