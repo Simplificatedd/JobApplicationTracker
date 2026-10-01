@@ -30,6 +30,8 @@ import {
   createFollowUpScheduleUpdate,
   createHandledFollowUpUpdate,
   normalizeFollowUpDateInput,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -192,12 +194,17 @@ export function FollowUpAutoResetCell({
       return;
     }
 
-    const promptDays = Number(draftPromptDays || 7);
+    const validationError = validateFollowUpAutoReset(
+      draftEnabled,
+      draftPromptDays,
+    );
 
-    if (!Number.isInteger(promptDays) || promptDays < 1) {
-      setError("Auto-reset days must be a positive whole number.");
+    if (validationError) {
+      setError(validationError);
       return;
     }
+
+    const promptDays = normalizeFollowUpPromptDays(draftPromptDays) ?? 7;
 
     onUpdate({
       followUpAutoResetEnabled: true,
@@ -237,6 +244,7 @@ export function FollowUpAutoResetCell({
         <FollowUpAutoResetControls
           defaultPromptDays={7}
           enabled={draftEnabled}
+          error={error}
           onEnabledChange={(value) => {
             setDraftEnabled(value);
             setError("");
@@ -247,9 +255,6 @@ export function FollowUpAutoResetCell({
           }}
           promptDays={draftPromptDays}
         />
-        {error ? (
-          <p className="text-xs font-medium text-destructive">{error}</p>
-        ) : null}
         <QuickEditActions
           label="follow-up auto-reset"
           onCancel={() => setIsEditing(false)}

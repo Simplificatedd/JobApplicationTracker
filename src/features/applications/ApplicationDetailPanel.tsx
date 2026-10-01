@@ -24,6 +24,8 @@ import { getSafeHttpUrl } from "../../lib/urls";
 import {
   createHandledFollowUpUpdate,
   normalizeFollowUpDateInput,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
@@ -121,6 +123,7 @@ export function ApplicationDetailPanel({
     useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
+  const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
@@ -129,6 +132,7 @@ export function ApplicationDetailPanel({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setFollowUpError("");
+    setFollowUpAutoResetError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(true);
@@ -146,6 +150,20 @@ export function ApplicationDetailPanel({
     }
 
     setFollowUpError("");
+
+    const followUpAutoResetValidationError = validateFollowUpAutoReset(
+      draft.followUpAutoResetEnabled,
+      draft.followUpPromptDays,
+    );
+
+    if (followUpAutoResetValidationError) {
+      setFollowUpAutoResetError(followUpAutoResetValidationError);
+      return;
+    }
+
+    setFollowUpAutoResetError("");
+    const followUpPromptDays =
+      normalizeFollowUpPromptDays(draft.followUpPromptDays) ?? 7;
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setIsSaving(true);
@@ -165,10 +183,7 @@ export function ApplicationDetailPanel({
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
       followUpAutoResetEnabled: draft.followUpAutoResetEnabled,
-      followUpPromptDays:
-        Number(draft.followUpPromptDays) ||
-        application.followUpPromptDays ||
-        7,
+      followUpPromptDays,
       offerDeadline:
         draft.status === "Offered"
           ? trimOptional(draft.offerDeadline)
@@ -223,6 +238,7 @@ export function ApplicationDetailPanel({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setFollowUpError("");
+    setFollowUpAutoResetError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(false);
@@ -334,7 +350,11 @@ export function ApplicationDetailPanel({
               coverLetterUploadError={coverLetterUploadError}
               coverLetters={coverLetters}
               draft={draft}
+              followUpAutoResetError={followUpAutoResetError}
               followUpError={followUpError}
+              onFollowUpAutoResetChange={() =>
+                setFollowUpAutoResetError("")
+              }
               onFollowUpChange={() => setFollowUpError("")}
               resumeUploadError={resumeUploadError}
               resumes={resumes}
@@ -664,7 +684,9 @@ function EditForm({
   coverLetterUploadError,
   coverLetters,
   draft,
+  followUpAutoResetError,
   followUpError,
+  onFollowUpAutoResetChange,
   onFollowUpChange,
   resumeUploadError,
   resumes,
@@ -675,7 +697,9 @@ function EditForm({
   coverLetterUploadError: string;
   coverLetters: CoverLetterMetadata[];
   draft: ApplicationDraft;
+  followUpAutoResetError: string;
   followUpError: string;
+  onFollowUpAutoResetChange: () => void;
   onFollowUpChange: () => void;
   resumeUploadError: string;
   resumes: ResumeMetadata[];
@@ -949,12 +973,15 @@ function EditForm({
         <FollowUpAutoResetControls
           defaultPromptDays={7}
           enabled={draft.followUpAutoResetEnabled}
-          onEnabledChange={(value) =>
+          error={followUpAutoResetError}
+          onEnabledChange={(value) => {
+            onFollowUpAutoResetChange();
             updateDraft("followUpAutoResetEnabled", value)
-          }
-          onPromptDaysChange={(value) =>
+          }}
+          onPromptDaysChange={(value) => {
+            onFollowUpAutoResetChange();
             updateDraft("followUpPromptDays", value)
-          }
+          }}
           promptDays={draft.followUpPromptDays}
         />
       </section>

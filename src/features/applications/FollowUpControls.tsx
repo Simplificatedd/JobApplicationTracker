@@ -121,7 +121,10 @@ export function FollowUpScheduleControls({
       )}
 
       {error ? (
-        <p className="text-xs font-medium text-danger" id={`${dateId}-error`}>
+        <p
+          className="text-xs font-medium text-destructive"
+          id={`${dateId}-error`}
+        >
           {error}
         </p>
       ) : null}
@@ -132,6 +135,7 @@ export function FollowUpScheduleControls({
 interface FollowUpAutoResetControlsProps {
   defaultPromptDays: number;
   enabled: boolean;
+  error?: string;
   onEnabledChange: (value: boolean) => void;
   onPromptDaysChange: (value: string) => void;
   promptDays: string;
@@ -140,6 +144,7 @@ interface FollowUpAutoResetControlsProps {
 export function FollowUpAutoResetControls({
   defaultPromptDays,
   enabled,
+  error,
   onEnabledChange,
   onPromptDaysChange,
   promptDays,
@@ -165,6 +170,8 @@ export function FollowUpAutoResetControls({
               Days after handling
             </span>
             <input
+              aria-describedby={error ? `${promptDaysId}-error` : undefined}
+              aria-invalid={Boolean(error)}
               className="field-control"
               id={promptDaysId}
               min="1"
@@ -187,6 +194,14 @@ export function FollowUpAutoResetControls({
               </button>
             ))}
           </div>
+          {error ? (
+            <p
+              className="text-xs font-medium text-destructive"
+              id={`${promptDaysId}-error`}
+            >
+              {error}
+            </p>
+          ) : null}
         </div>
       ) : (
         <p className="text-xs text-muted">

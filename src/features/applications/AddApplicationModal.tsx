@@ -14,6 +14,8 @@ import {
 import { suggestInterviewDeadline } from "../../lib/interviews";
 import {
   type FollowUpRequirement,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
@@ -163,6 +165,7 @@ export function AddApplicationModal({
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
   const [followUpError, setFollowUpError] = useState("");
+  const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [interviewRoundError, setInterviewRoundError] = useState("");
   const [duplicateMatch, setDuplicateMatch] =
     useState<DuplicateApplicationMatch | null>(null);
@@ -192,6 +195,12 @@ export function AddApplicationModal({
     if (key === "followUpDate" || key === "followUpNeeded") {
       setFollowUpError("");
     }
+    if (
+      key === "followUpAutoResetEnabled" ||
+      key === "followUpPromptDays"
+    ) {
+      setFollowUpAutoResetError("");
+    }
   }
 
   function requestClose() {
@@ -211,6 +220,7 @@ export function AddApplicationModal({
     setDuplicateMatch(null);
     setTitleError("");
     setFollowUpError("");
+    setFollowUpAutoResetError("");
     setInterviewRoundError("");
     setResumeUploadError("");
     setCoverLetterUploadError("");
@@ -227,6 +237,7 @@ export function AddApplicationModal({
     setCoverLetterUploadError("");
     setTitleError("");
     setFollowUpError("");
+    setFollowUpAutoResetError("");
     setInterviewRoundError("");
     onClose();
   }
@@ -315,6 +326,24 @@ export function AddApplicationModal({
 
     setFollowUpError("");
 
+    const followUpAutoResetValidationError = validateFollowUpAutoReset(
+      form.followUpAutoResetEnabled,
+      form.followUpPromptDays,
+      defaultFollowUpPromptDays,
+    );
+
+    if (followUpAutoResetValidationError) {
+      setFollowUpAutoResetError(followUpAutoResetValidationError);
+      return;
+    }
+
+    setFollowUpAutoResetError("");
+    const followUpPromptDays =
+      normalizeFollowUpPromptDays(
+        form.followUpPromptDays,
+        defaultFollowUpPromptDays,
+      ) ?? defaultFollowUpPromptDays;
+
     const isInterviewing = form.status === "Interviewing";
     const roundValidation = validateInterviewRound(
       isInterviewing ? form.interviewRound : "",
@@ -353,8 +382,7 @@ export function AddApplicationModal({
       followUpNeeded: form.followUpNeeded,
       followUpDate: trimOptional(form.followUpDate),
       followUpAutoResetEnabled: form.followUpAutoResetEnabled,
-      followUpPromptDays:
-        Number(form.followUpPromptDays) || defaultFollowUpPromptDays,
+      followUpPromptDays,
       interviewRound: isInterviewing ? roundValidation.round : undefined,
       interviewDateTime: isInterviewing
         ? trimOptional(form.interviewDateTime)
@@ -443,6 +471,7 @@ export function AddApplicationModal({
     setCoverLetterUploadError("");
     setTitleError("");
     setFollowUpError("");
+    setFollowUpAutoResetError("");
     onClose();
   }
 
@@ -952,6 +981,7 @@ export function AddApplicationModal({
               <FollowUpAutoResetControls
                 defaultPromptDays={defaultFollowUpPromptDays}
                 enabled={form.followUpAutoResetEnabled}
+                error={followUpAutoResetError}
                 onEnabledChange={(value) =>
                   updateForm("followUpAutoResetEnabled", value)
                 }
