@@ -28,6 +28,8 @@ import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
 import {
   createFollowUpScheduleUpdate,
+  createHandledFollowUpUpdate,
+  normalizeFollowUpDateInput,
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -685,7 +687,9 @@ export function RowActionsMenu({
 
   function changeFollowUpDate() {
     const nextDate = window.prompt(
-      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpNeeded
+        ? "Set the compulsory follow-up date (YYYY-MM-DD)"
+        : "Set the optional follow-up date (YYYY-MM-DD), or leave blank for No Follow-Up",
       application.followUpDate ?? "",
     );
 
@@ -693,17 +697,21 @@ export function RowActionsMenu({
       return;
     }
 
-    const trimmedDate = nextDate.trim();
+    const followUpDate = normalizeFollowUpDateInput(nextDate);
+    const validationError = validateFollowUpSchedule(
+      application.followUpNeeded ? "compulsory" : "optional",
+      nextDate,
+    );
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
-      window.alert("Use a date in YYYY-MM-DD format.");
+    if (followUpDate === null || validationError) {
+      window.alert(validationError ?? "Use a valid YYYY-MM-DD date.");
       return;
     }
 
     setIsOpen(false);
     onUpdateApplication(application.id, {
-      followUpDate: trimmedDate,
-      followUpNeeded: true,
+      followUpDate,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
@@ -711,16 +719,16 @@ export function RowActionsMenu({
     setIsOpen(false);
     onUpdateApplication(application.id, {
       followUpDate: undefined,
-      followUpNeeded: false,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
-  function markFollowUpDone() {
+  function handleFollowUp() {
     setIsOpen(false);
-    onUpdateApplication(application.id, {
-      followUpDate: undefined,
-      followUpNeeded: false,
-    });
+    onUpdateApplication(
+      application.id,
+      createHandledFollowUpUpdate(application),
+    );
   }
 
   return (
@@ -740,7 +748,7 @@ export function RowActionsMenu({
       {isOpen
         ? createPortal(
             <div
-              className="fixed z-[60] w-44 rounded-lg border border-border bg-surface p-1 shadow-popover"
+              className="fixed z-[60] w-52 rounded-lg border border-border bg-surface p-1 shadow-popover"
               id={menuId}
               onClick={(event) => event.stopPropagation()}
               onKeyDown={moveMenuFocus}
@@ -781,14 +789,18 @@ export function RowActionsMenu({
               <CalendarPlus aria-hidden="true" size={16} />
               Change follow-up
             </MenuButton>
-            <MenuButton onClick={clearFollowUpDate}>
-              <CalendarX aria-hidden="true" size={16} />
-              Clear follow-up
-            </MenuButton>
-            <MenuButton onClick={markFollowUpDone}>
-              <CalendarCheck aria-hidden="true" size={16} />
-              Mark done
-            </MenuButton>
+            {!application.followUpNeeded && application.followUpDate ? (
+              <MenuButton onClick={clearFollowUpDate}>
+                <CalendarX aria-hidden="true" size={16} />
+                Clear follow-up date
+              </MenuButton>
+            ) : null}
+            {application.followUpDate ? (
+              <MenuButton onClick={handleFollowUp}>
+                <CalendarCheck aria-hidden="true" size={16} />
+                Follow-up handled
+              </MenuButton>
+            ) : null}
           </>
         ) : null}
         {canDelete ? (
