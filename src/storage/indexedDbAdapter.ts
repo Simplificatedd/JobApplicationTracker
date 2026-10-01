@@ -6,6 +6,7 @@ import {
   normalizeUserSettings,
 } from "../lib/domain";
 import { normalizeStatusActivities } from "../lib/statusHistory";
+import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -26,7 +27,7 @@ import type {
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 5;
+export const TRACKER_DB_VERSION = 6;
 
 type StoreName =
   | "activities"
@@ -751,6 +752,56 @@ function runMigrations(
   if (oldVersion < 5 && transaction) {
     migrateLegacyOfferedApplications(database, transaction);
   }
+
+  if (oldVersion < 6 && transaction) {
+    migrateLegacyFollowUpSchedules(database, transaction);
+  }
+}
+
+function migrateLegacyFollowUpSchedules(
+  database: IDBDatabase,
+  transaction: IDBTransaction,
+) {
+  if (
+    !database.objectStoreNames.contains("applications") ||
+    !database.objectStoreNames.contains("settings")
+  ) {
+    return;
+  }
+
+  const settingsRequest = transaction.objectStore("settings").get(SETTINGS_KEY);
+
+  settingsRequest.onsuccess = () => {
+    const settingsRecord = settingsRequest.result as
+      | StoredValue<UserSettings>
+      | undefined;
+    const defaultPromptDays =
+      settingsRecord?.value.defaultFollowUpPromptDays ??
+      DEFAULT_USER_SETTINGS.defaultFollowUpPromptDays;
+    const cursorRequest = transaction
+      .objectStore("applications")
+      .openCursor();
+
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+
+      if (!cursor) {
+        return;
+      }
+
+      const application = cursor.value as Application;
+      const migratedApplication = migrateLegacyFollowUpSchedule(
+        application,
+        defaultPromptDays,
+      );
+
+      if (migratedApplication !== application) {
+        cursor.update(migratedApplication);
+      }
+
+      cursor.continue();
+    };
+  };
 }
 
 function migrateLegacyOfferedApplications(

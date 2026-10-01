@@ -169,6 +169,32 @@ describe("indexedDbStorageAdapter", () => {
     ]);
   });
 
+  it("materializes legacy derived follow-up dates during version six migration", async () => {
+    const indexedDb = new IDBFactory();
+    const databaseName = "legacy-follow-up-schedule";
+
+    await seedVersionFiveApplication(indexedDb, databaseName, {
+      ...application,
+      dateApplied: "2026-09-24",
+      followUpAutoResetEnabled: undefined,
+      followUpDate: undefined,
+      followUpNeeded: true,
+      followUpPromptDays: undefined,
+    });
+
+    const adapter = createTestStorageAdapter({ databaseName, indexedDb });
+
+    await adapter.initialize();
+
+    await expect(adapter.listApplications()).resolves.toMatchObject([
+      {
+        followUpAutoResetEnabled: false,
+        followUpDate: "2026-09-27",
+        followUpNeeded: true,
+      },
+    ]);
+  });
+
   it("commits a complete domain mutation atomically", async () => {
     const indexedDb = new IDBFactory();
     const databaseName = "atomic-domain-mutation";
@@ -439,6 +465,39 @@ function seedVersionFourApplication(
       });
 
       store.put(record);
+    };
+    request.onsuccess = () => {
+      request.result.close();
+      resolve();
+    };
+  });
+}
+
+function seedVersionFiveApplication(
+  indexedDb: IDBFactory,
+  databaseName: string,
+  record: Application,
+) {
+  return new Promise<void>((resolve, reject) => {
+    const request = indexedDb.open(databaseName, 5);
+
+    request.onerror = () => reject(request.error);
+    request.onupgradeneeded = () => {
+      const applicationStore = request.result.createObjectStore("applications", {
+        keyPath: "id",
+      });
+      const settingsStore = request.result.createObjectStore("settings", {
+        keyPath: "key",
+      });
+
+      applicationStore.put(record);
+      settingsStore.put({
+        key: "userSettings",
+        value: {
+          ...DEFAULT_USER_SETTINGS,
+          defaultFollowUpPromptDays: 3,
+        },
+      });
     };
     request.onsuccess = () => {
       request.result.close();
