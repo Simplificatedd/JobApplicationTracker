@@ -8,10 +8,10 @@ analytics.
 
 - Applications table with search, filters, sorting, adjustable desktop columns,
   mobile cards, archive, restore, and optional active-delete protection.
-- Add and edit flows for job details, deadlines, follow-up prompts, interview
-  dates, proctored assessment deadlines, priority, notes, contacts, and resumes.
-- Follow-up and interview reminders with a notification bell, badge count,
-  grouped notification panel, dismiss state, and quick actions.
+- Add and edit flows for job details, follow-up prompts, multiple interview
+  rounds, interview and offer deadlines, priority, notes, contacts, and resumes.
+- Follow-up, interview, and pending-offer reminders with a notification bell,
+  badge count, grouped notification panel, dismiss state, and quick actions.
 - Needs-attention focus mode that composes with search, filters, and sorting.
 - Resume library with local PDF/DOCX file storage, metadata, version labels, and
   application linking.
@@ -49,6 +49,35 @@ signed-in user's cloud data and refreshes the browser cache.
 - Demo seed data uses fictional companies, people, and URLs.
 
 ### Data model decisions
+
+#### Status and deadline semantics
+
+- New applications start at **Awaiting Response**. **Offered** means an offer is
+  pending; **Accepted** is the final successful outcome. Records created before
+  that distinction was introduced migrate their legacy `Offered` value to
+  `Accepted` so an old final outcome is not reinterpreted as a pending offer.
+- Interview records are the canonical one-to-many history for an application.
+  The interview fields on an application are only a projection of the current
+  interview for table and form compatibility.
+- Each interview owns its scheduled date/time and optional deadline. Deadline
+  timing can be exact or relative to a recorded received time; the calculated
+  deadline remains editable. The former application-level deadline is no
+  longer written or used for reminders.
+- During loading or backup import, a legacy application deadline moves to an
+  interview only when a matching or sole interview makes ownership
+  unambiguous. Legacy fields remain readable for backup compatibility and are
+  otherwise left untouched rather than guessed.
+- `offerDeadline` belongs to the application because an offer is a single
+  application status. It drives reminders only while status is **Offered** and
+  remains stored after acceptance or rejection as historical context.
+- Status activities store structured `statusFrom` and `statusTo` values.
+  Pipeline analytics count current statuses; application-path analytics use
+  the full history. For a rejected application, reaching **Offered** takes
+  precedence over reaching **Interviewing**, which keeps
+  `Offered → Rejected` distinct from `Interviewed → Rejected`.
+- Outcome analytics are event-oriented: **Offers received** includes pending,
+  accepted, and later-rejected offers, while **Rejected** includes every
+  rejected path. One application can therefore contribute to both totals.
 
 - Application deletion is a confirmed permanent removal intended for accidental
   or test entries. It removes the application and its activity timeline, so the
