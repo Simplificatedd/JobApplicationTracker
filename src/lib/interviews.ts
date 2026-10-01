@@ -151,11 +151,39 @@ export function reconcileCanonicalInterviews(
     let applicationInterviews = nextInterviews.filter(
       (interview) => interview.applicationId === application.id,
     );
-    const projectedInterview = findInterviewRound(
+    let projectedInterview = findInterviewRound(
       applicationInterviews,
       application.id,
       application.interviewRound,
     );
+    const legacyDeadlineTarget =
+      projectedInterview ??
+      (applicationInterviews.length === 1 ? applicationInterviews[0] : undefined);
+
+    if (
+      legacyDeadlineTarget &&
+      !legacyDeadlineTarget.deadline &&
+      !application.interviewDeadline &&
+      application.deadline
+    ) {
+      const migratedInterview = withLegacyApplicationDeadline(
+        legacyDeadlineTarget,
+        application,
+      );
+      const interviewIndex = nextInterviews.findIndex(
+        (interview) => interview.id === migratedInterview.id,
+      );
+
+      nextInterviews[interviewIndex] = migratedInterview;
+      interviewWrites.push(migratedInterview);
+      applicationInterviews = applicationInterviews.map((interview) =>
+        interview.id === migratedInterview.id ? migratedInterview : interview,
+      );
+      projectedInterview =
+        projectedInterview?.id === migratedInterview.id
+          ? migratedInterview
+          : projectedInterview;
+    }
 
     if (!projectedInterview && hasExplicitInterviewProjection(application)) {
       const migratedInterview = interviewFromApplicationProjection(application);
@@ -246,6 +274,10 @@ function interviewFromApplicationProjection(
   application: Application,
   existing?: Interview,
 ): Interview {
+  const legacyDeadline = hasInterviewDetailProjection(application)
+    ? application.deadline
+    : undefined;
+
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
@@ -257,7 +289,7 @@ function interviewFromApplicationProjection(
     meetingUrl: application.interviewMeetingUrl,
     platform: application.interviewPlatform,
     proctored: application.interviewProctored,
-    deadline: application.interviewDeadline,
+    deadline: application.interviewDeadline ?? legacyDeadline,
     deadlineEntryMode:
       application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
     deadlineReceivedAt:
@@ -268,7 +300,21 @@ function interviewFromApplicationProjection(
   };
 }
 
-function hasExplicitInterviewProjection(application: Application) {
+function withLegacyApplicationDeadline(
+  interview: Interview,
+  application: Application,
+): Interview {
+  return {
+    ...interview,
+    deadline: application.deadline,
+    deadlineEntryMode:
+      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
+    deadlineReceivedAt:
+      application.interviewDeadlineReceivedAt ?? application.createdAt,
+  };
+}
+
+function hasInterviewDetailProjection(application: Application) {
   return Boolean(
     application.interviewDateTime ||
       application.interviewRound ||
@@ -277,7 +323,13 @@ function hasExplicitInterviewProjection(application: Application) {
       application.interviewLocation ||
       application.interviewMeetingUrl ||
       application.interviewPlatform ||
-      application.interviewProctored ||
+      application.interviewProctored,
+  );
+}
+
+function hasExplicitInterviewProjection(application: Application) {
+  return Boolean(
+    hasInterviewDetailProjection(application) ||
       application.interviewDeadline ||
       application.interviewDeadlineEntryMode ||
       application.interviewDeadlineReceivedAt,

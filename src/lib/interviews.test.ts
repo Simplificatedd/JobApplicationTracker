@@ -165,6 +165,87 @@ describe("reconcileCanonicalInterviews", () => {
     });
   });
 
+  it("moves an unambiguous legacy application deadline to a new interview", () => {
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "2_days" as const,
+      interviewDateTime: "2026-09-22T10:00",
+    };
+    const result = reconcileCanonicalInterviews([legacyApplication], []);
+
+    expect(result.interviews[0]).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: application.createdAt,
+    });
+    expect(result.applications[0]).toMatchObject({
+      interviewDeadline: "2026-09-23T17:00",
+      interviewDeadlineEntryMode: "2_days",
+    });
+  });
+
+  it("moves a legacy deadline to the sole canonical interview", () => {
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews(
+      [legacyApplication],
+      [firstRound],
+    );
+
+    expect(result.interviewWrites).toEqual([
+      expect.objectContaining({
+        id: firstRound.id,
+        deadline: "2026-09-23T17:00",
+      }),
+    ]);
+    expect(result.applications[0].interviewDeadline).toBe(
+      "2026-09-23T17:00",
+    );
+  });
+
+  it("does not treat a generic deadline as interview evidence", () => {
+    const deadlineOnlyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews([deadlineOnlyApplication], []);
+
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews).toEqual([]);
+    expect(result.applications).toEqual([deadlineOnlyApplication]);
+  });
+
+  it("does not guess which interview owns an ambiguous legacy deadline", () => {
+    const secondRound: Interview = {
+      ...firstRound,
+      id: "interview-2",
+      round: 2,
+    };
+    const legacyApplication = {
+      ...application,
+      deadline: "2026-09-23T17:00",
+      interviewRound: undefined,
+      interviewType: undefined,
+      interviewMode: undefined,
+    };
+    const result = reconcileCanonicalInterviews(
+      [legacyApplication],
+      [firstRound, secondRound],
+    );
+
+    expect(result.interviewWrites).toEqual([]);
+    expect(result.interviews.every((interview) => !interview.deadline)).toBe(true);
+  });
+
   it("projects interview deadline timing metadata back to the application", () => {
     const timedInterview: Interview = {
       ...firstRound,
