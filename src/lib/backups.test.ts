@@ -8,6 +8,7 @@ import {
 } from "./domain";
 import {
   BACKUP_SCHEMA_VERSION,
+  createApplicationsCsv,
   MAX_BACKUP_FILE_BYTES,
   parseBackupFile,
 } from "./backups";
@@ -73,6 +74,24 @@ function createBackupFile(
     { type: "application/json" },
   );
 }
+
+describe("createApplicationsCsv", () => {
+  it("exports the current interview deadline instead of the legacy deadline", async () => {
+    const csv = await createApplicationsCsv({
+      applications: [
+        createApplication({
+          deadline: "2026-09-25T12:00",
+          interviewDeadline: "2026-09-26T12:00",
+        }),
+      ],
+      resumes: [],
+    }).text();
+
+    expect(csv).toContain("interview_deadline");
+    expect(csv).toContain("2026-09-26T12:00");
+    expect(csv).not.toContain("2026-09-25T12:00");
+  });
+});
 
 describe("parseBackupFile", () => {
   it("accepts a valid empty backup", async () => {

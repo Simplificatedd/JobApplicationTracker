@@ -15,7 +15,6 @@ import { suggestInterviewDeadline } from "../../lib/interviews";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
-  deadlineValueForEntryMode,
   type DuplicateApplicationMatch,
   findDuplicateApplication,
   suggestFollowUpDate,
@@ -62,8 +61,6 @@ interface AddApplicationFormState {
   source: string;
   applicationUrl: string;
   dateApplied: string;
-  deadline: string;
-  deadlineEntryMode: DeadlineEntryMode;
   roleStartDate: string;
   roleEndDate: string;
   followUpNeeded: boolean;
@@ -106,8 +103,6 @@ function createInitialFormState(
     source: "",
     applicationUrl: "",
     dateApplied: "",
-    deadline: "",
-    deadlineEntryMode: "exact",
     roleStartDate: "",
     roleEndDate: "",
     followUpNeeded: false,
@@ -257,14 +252,6 @@ export function AddApplicationModal({
     }));
   }
 
-  function updateDeadlineEntryMode(value: DeadlineEntryMode) {
-    setForm((current) => ({
-      ...current,
-      deadline: deadlineValueForEntryMode(current.deadline, value),
-      deadlineEntryMode: value,
-    }));
-  }
-
   function updateInterviewDeadlineEntryMode(value: DeadlineEntryMode) {
     setForm((current) => {
       const receivedAt =
@@ -360,8 +347,6 @@ export function AddApplicationModal({
       source: trimOptional(form.source),
       applicationUrl: trimOptional(form.applicationUrl),
       dateApplied: trimOptional(form.dateApplied),
-      deadline: trimOptional(form.deadline),
-      deadlineEntryMode: form.deadlineEntryMode,
       roleStartDate: trimOptional(form.roleStartDate),
       roleEndDate: trimOptional(form.roleEndDate),
       followUpNeeded: form.followUpNeeded,
@@ -723,35 +708,6 @@ export function AddApplicationModal({
                 type="date"
                 value={form.dateApplied}
               />
-            </Field>
-
-            <Field label="Application Deadline">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("deadline", event.target.value)}
-                type={
-                  form.deadlineEntryMode === "exact" ? "datetime-local" : "date"
-                }
-                value={form.deadline}
-              />
-            </Field>
-
-            <Field label="Application Deadline Timing">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateDeadlineEntryMode(
-                    event.target.value as DeadlineEntryMode,
-                  )
-                }
-                value={form.deadlineEntryMode}
-              >
-                <option value="exact">Exact date/time</option>
-                <option value="1_day">1 day</option>
-                <option value="2_days">2 days</option>
-                <option value="3_days">3 days</option>
-                <option value="72_hours">72 hours</option>
-              </select>
             </Field>
 
             <div className="grid gap-4 md:col-span-2 md:grid-cols-2">

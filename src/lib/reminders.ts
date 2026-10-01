@@ -277,7 +277,9 @@ function getProjectedInterviewRecords(application: Application): Interview[] {
 }
 
 export function calculateInterviewDeadline(application: Application) {
-  if (application.deadlineEntryMode === "exact") {
+  const entryMode = application.deadlineEntryMode ?? "exact";
+
+  if (entryMode === "exact") {
     return application.interviewDeadline || application.deadline;
   }
 
@@ -287,8 +289,8 @@ export function calculateInterviewDeadline(application: Application) {
     "2_days": 48,
     "3_days": 72,
     "72_hours": 72,
-  } satisfies Record<Exclude<Application["deadlineEntryMode"], "exact">, number>;
-  const hours = hoursByMode[application.deadlineEntryMode];
+  } satisfies Record<Exclude<NonNullable<Application["deadlineEntryMode"]>, "exact">, number>;
+  const hours = hoursByMode[entryMode];
 
   return hours ? new Date(new Date(receivedAt).getTime() + hours * 60 * 60 * 1000).toISOString() : undefined;
 }

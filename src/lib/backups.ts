@@ -174,10 +174,10 @@ export function createApplicationsCsv({
     application.jobTitle,
     application.status,
     application.dateApplied,
-    application.deadline,
     application.followUpNeeded ? "yes" : "no",
     application.followUpDate,
     application.interviewDateTime,
+    application.interviewDeadline,
     application.source,
     application.location,
     application.jobType,
@@ -196,10 +196,10 @@ export function createApplicationsCsv({
     "job_title",
     "status",
     "applied_date",
-    "deadline",
     "follow_up_needed",
     "follow_up_date",
     "interview_date_time",
+    "interview_deadline",
     "source",
     "location",
     "job_type",
@@ -563,7 +563,7 @@ function isApplication(value: unknown): value is Application {
       "72_hours",
     ]) &&
     isOptionalDateTime(value.interviewDeadlineReceivedAt) &&
-    isOneOf(value.deadlineEntryMode, [
+    isOptionalOneOf(value.deadlineEntryMode, [
       "exact",
       "1_day",
       "2_days",

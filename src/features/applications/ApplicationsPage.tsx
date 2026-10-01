@@ -14,6 +14,7 @@ import {
   getApplicationFilterOptions,
   isNeedsAttention,
   normalizeApplicationFilters,
+  normalizeApplicationSort,
   sortApplications,
   type ApplicationFilters,
   type SortColumn,
@@ -144,7 +145,7 @@ export function ApplicationsPage({
     rememberedTablePreferences?.searchQuery ?? "",
   );
   const [sort, setSort] = useState(
-    rememberedTablePreferences?.sort ?? DEFAULT_SORT_STATE,
+    normalizeApplicationSort(rememberedTablePreferences?.sort),
   );
   const activeApplications = applications.filter(
     (application) => !application.archivedAt,

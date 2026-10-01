@@ -31,7 +31,6 @@ import {
   type ApplicationFilters,
 } from "./applicationFilters";
 import type {
-  DeadlineEntryMode,
   InterviewType,
   JobType,
   Priority,
@@ -350,8 +349,6 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   contacts: "Number of people linked to this application.",
   coverLetterVersion: "Stored cover letter used for this application.",
   dateApplied: "Date you submitted the application.",
-  deadline: "Application or assessment deadline.",
-  deadlineEntryMode: "How the deadline timing was entered.",
   followUp: "Follow-up date and whether the follow-up is needed.",
   followUpNeeded: "Whether this application needs a follow-up.",
   followUpPromptDays: "Default reminder timing for follow-up prompts.",
@@ -562,41 +559,6 @@ function MoreFiltersModal({
             }
             value={currentFilters.dateApplied}
           />
-
-          <FilterSelect
-            icon={CalendarDays}
-            label="Deadline"
-            onChange={(value) =>
-              onFilterChange?.({
-                deadline: value as ApplicationFilters["deadline"],
-              })
-            }
-            value={currentFilters.deadline}
-          >
-            <option value="">Deadline</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="blank">Blank</option>
-            <option value="overdue">Overdue</option>
-            <option value="upcoming">Next 7 days</option>
-          </FilterSelect>
-
-          <FilterSelect
-            icon={SlidersHorizontal}
-            label="Deadline timing"
-            onChange={(value) =>
-              onFilterChange?.({
-                deadlineEntryMode: value as DeadlineEntryMode | "",
-              })
-            }
-            value={currentFilters.deadlineEntryMode}
-          >
-            <option value="">Deadline timing</option>
-            <option value="exact">Exact date/time</option>
-            <option value="1_day">1 day</option>
-            <option value="2_days">2 days</option>
-            <option value="3_days">3 days</option>
-            <option value="72_hours">72 hours</option>
-          </FilterSelect>
 
           <PresenceFilterSelect
             label="Role start date"
@@ -863,8 +825,6 @@ function countActiveFilters(
     filters.contacts,
     filters.coverLetterVersion,
     filters.dateApplied,
-    filters.deadline,
-    filters.deadlineEntryMode,
     filters.status,
     filters.followUp,
     filters.followUpPromptDays,
