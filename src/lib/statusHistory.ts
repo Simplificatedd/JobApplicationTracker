@@ -16,6 +16,30 @@ const LEGACY_STATUS_MAP: Record<string, ApplicationStatus> = {
   Withdrawn: "Withdrawn",
 };
 
+export type ApplicationOutcomePath =
+  | "accepted"
+  | "offered_rejected"
+  | "interviewed_rejected"
+  | "rejected_without_interview"
+  | "withdrawn"
+  | "offer_pending"
+  | "interviewing"
+  | "awaiting_response";
+
+export const APPLICATION_OUTCOME_PATH_LABELS: Record<
+  ApplicationOutcomePath,
+  string
+> = {
+  accepted: "Accepted",
+  offered_rejected: "Offered → Rejected",
+  interviewed_rejected: "Interviewed → Rejected",
+  rejected_without_interview: "Rejected before interview",
+  withdrawn: "Withdrawn",
+  offer_pending: "Offer pending",
+  interviewing: "Interviewing",
+  awaiting_response: "Awaiting response",
+};
+
 export function normalizeStatusActivities(
   activities: Activity[],
   legacyOfferSemantics = false,
@@ -126,6 +150,44 @@ export function deriveApplicationStatusPath(
     });
 
   return path;
+}
+
+export function classifyApplicationOutcomePath(
+  application: Application,
+  activities: Activity[],
+  interviews: Interview[] = [],
+): ApplicationOutcomePath {
+  const path = deriveApplicationStatusPath(application, activities, interviews);
+  const reachedOffer = path.includes("Offered");
+  const reachedInterview =
+    path.includes("Interviewing") ||
+    interviews.some((interview) => interview.applicationId === application.id);
+
+  if (application.status === "Accepted") {
+    return "accepted";
+  }
+
+  if (application.status === "Rejected") {
+    if (reachedOffer) {
+      return "offered_rejected";
+    }
+
+    return reachedInterview
+      ? "interviewed_rejected"
+      : "rejected_without_interview";
+  }
+
+  if (application.status === "Withdrawn") {
+    return "withdrawn";
+  }
+
+  if (application.status === "Offered") {
+    return "offer_pending";
+  }
+
+  return application.status === "Interviewing"
+    ? "interviewing"
+    : "awaiting_response";
 }
 
 function statusFromLegacyMessage(message: string) {

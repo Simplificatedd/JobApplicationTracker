@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Activity, Application, Interview } from "../types/application";
 import {
+  classifyApplicationOutcomePath,
   deriveApplicationStatusPath,
   normalizeStatusActivity,
 } from "./statusHistory";
@@ -140,5 +141,92 @@ describe("deriveApplicationStatusPath", () => {
     expect(
       deriveApplicationStatusPath(application, [repeated, repeated]),
     ).toEqual(["Awaiting Response", "Rejected"]);
+  });
+});
+
+describe("classifyApplicationOutcomePath", () => {
+  it("distinguishes offered then rejected from a direct rejection", () => {
+    const activities: Activity[] = [
+      {
+        ...activity,
+        id: "offered",
+        statusFrom: "Awaiting Response",
+        statusTo: "Offered",
+        createdAt: "2026-10-02T00:00:00.000Z",
+      },
+      {
+        ...activity,
+        id: "rejected",
+        statusFrom: "Offered",
+        statusTo: "Rejected",
+        createdAt: "2026-10-03T00:00:00.000Z",
+      },
+    ];
+
+    expect(
+      classifyApplicationOutcomePath(application, activities),
+    ).toBe("offered_rejected");
+    expect(
+      classifyApplicationOutcomePath(application, [
+        {
+          ...activities[1],
+          statusFrom: "Awaiting Response",
+        },
+      ]),
+    ).toBe("rejected_without_interview");
+  });
+
+  it("classifies an interviewed then rejected path", () => {
+    const interview: Interview = {
+      id: "interview-1",
+      applicationId: application.id,
+      type: "technical",
+      mode: "video",
+      proctored: false,
+      createdAt: "2026-10-02T00:00:00.000Z",
+      updatedAt: "2026-10-02T00:00:00.000Z",
+    };
+
+    expect(
+      classifyApplicationOutcomePath(application, [], [interview]),
+    ).toBe("interviewed_rejected");
+  });
+
+  it("uses the furthest reached stage for a rejected application", () => {
+    const activities: Activity[] = [
+      {
+        ...activity,
+        id: "interviewing",
+        statusFrom: "Awaiting Response",
+        statusTo: "Interviewing",
+        createdAt: "2026-10-02T00:00:00.000Z",
+      },
+      {
+        ...activity,
+        id: "offered",
+        statusFrom: "Interviewing",
+        statusTo: "Offered",
+        createdAt: "2026-10-03T00:00:00.000Z",
+      },
+    ];
+
+    expect(
+      classifyApplicationOutcomePath(application, activities),
+    ).toBe("offered_rejected");
+  });
+
+  it.each([
+    ["Accepted", "accepted"],
+    ["Withdrawn", "withdrawn"],
+    ["Offered", "offer_pending"],
+    ["Interviewing", "interviewing"],
+    ["Awaiting Response", "awaiting_response"],
+  ] as const)("classifies %s as %s", (status, expected) => {
+    expect(
+      classifyApplicationOutcomePath(
+        { ...application, status },
+        [],
+      ),
+    ).toBe(expected);
   });
 });

@@ -5,6 +5,11 @@ import {
   classifyReminderSeverity,
   severityLabel,
 } from "../../lib/reminders";
+import {
+  APPLICATION_OUTCOME_PATH_LABELS,
+  classifyApplicationOutcomePath,
+  type ApplicationOutcomePath,
+} from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
 import type { Activity, Application, Interview } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
@@ -25,7 +30,8 @@ const chartOptions = [
   { id: "activityCalendar", label: "Activity calendar" },
   { id: "statusChangesOverTime", label: "Status changes over time" },
   { id: "interviewsOverTime", label: "Interviews over time" },
-  { id: "outcomes", label: "Offers vs rejections" },
+  { id: "outcomes", label: "Offers and rejections" },
+  { id: "applicationPaths", label: "Application paths" },
 ];
 
 export function AnalyticsPage({
@@ -193,7 +199,24 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("outcomes") ? (
-            <BarChart title="Offers vs rejections" data={deriveOutcomes(scopedApplications)} />
+            <BarChart
+              title="Offers and rejections"
+              data={deriveOutcomes(
+                scopedApplications,
+                scopedActivities,
+                scopedInterviews,
+              )}
+            />
+          ) : null}
+          {visibleCharts.has("applicationPaths") ? (
+            <BarChart
+              title="Application paths"
+              data={deriveApplicationPaths(
+                scopedApplications,
+                scopedActivities,
+                scopedInterviews,
+              )}
+            />
           ) : null}
           {visibleCharts.has("activityCalendar") ? (
             <ActivityCalendar
@@ -305,7 +328,7 @@ function deriveApplicationsOverTime(
   );
 }
 
-function derivePipelineByStatus(applications: Application[]) {
+export function derivePipelineByStatus(applications: Application[]) {
   return APPLICATION_STATUSES.map((status) => ({
     label: status,
     value: applications.filter((application) => application.status === status).length,
@@ -368,17 +391,78 @@ export function deriveInterviewsOverTime(
   );
 }
 
-function deriveOutcomes(applications: Application[]) {
+export function deriveOutcomes(
+  applications: Application[],
+  activities: Activity[],
+  interviews: Interview[],
+) {
+  const outcomePaths = applications.map((application) =>
+    classifyApplicationOutcomePath(application, activities, interviews),
+  );
+  const offerPaths: ApplicationOutcomePath[] = [
+    "accepted",
+    "offer_pending",
+    "offered_rejected",
+  ];
+  const rejectionPaths: ApplicationOutcomePath[] = [
+    "offered_rejected",
+    "interviewed_rejected",
+    "rejected_without_interview",
+  ];
+
   return [
     {
-      label: "Offered",
-      value: applications.filter((application) => application.status === "Offered").length,
+      label: "Offers received",
+      value: outcomePaths.filter((outcomePath) =>
+        offerPaths.includes(outcomePath),
+      ).length,
+    },
+    {
+      label: "Accepted",
+      value: outcomePaths.filter((outcomePath) => outcomePath === "accepted")
+        .length,
     },
     {
       label: "Rejected",
-      value: applications.filter((application) => application.status === "Rejected").length,
+      value: outcomePaths.filter((outcomePath) =>
+        rejectionPaths.includes(outcomePath),
+      ).length,
     },
   ];
+}
+
+const APPLICATION_OUTCOME_PATH_ORDER: ApplicationOutcomePath[] = [
+  "accepted",
+  "offer_pending",
+  "offered_rejected",
+  "interviewing",
+  "interviewed_rejected",
+  "rejected_without_interview",
+  "awaiting_response",
+  "withdrawn",
+];
+
+export function deriveApplicationPaths(
+  applications: Application[],
+  activities: Activity[],
+  interviews: Interview[],
+) {
+  const counts = new Map<ApplicationOutcomePath, number>();
+
+  applications.forEach((application) => {
+    const outcomePath = classifyApplicationOutcomePath(
+      application,
+      activities,
+      interviews,
+    );
+
+    counts.set(outcomePath, (counts.get(outcomePath) ?? 0) + 1);
+  });
+
+  return APPLICATION_OUTCOME_PATH_ORDER.map((outcomePath) => ({
+    label: APPLICATION_OUTCOME_PATH_LABELS[outcomePath],
+    value: counts.get(outcomePath) ?? 0,
+  })).filter((item) => item.value > 0);
 }
 
 export function deriveActivityCalendarDays(
