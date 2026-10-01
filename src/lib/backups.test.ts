@@ -260,6 +260,30 @@ describe("parseBackupFile", () => {
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
   });
 
+  it("accepts an offer deadline", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          offerDeadline: "2026-10-03T17:00",
+          status: "Offered",
+        }),
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("rejects a malformed offer deadline", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication({ offerDeadline: "next Friday" })],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid application data",
+    );
+  });
+
   it("rejects malformed interview date-times", async () => {
     const snapshot = createSnapshot({
       applications: [createApplication()],

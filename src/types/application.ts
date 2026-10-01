@@ -87,6 +87,7 @@ export interface Application {
   interviewDeadline?: string;
   interviewDeadlineEntryMode?: DeadlineEntryMode;
   interviewDeadlineReceivedAt?: string;
+  offerDeadline?: string;
   // Legacy application-level deadline fields retained for backup compatibility.
   deadlineEntryMode?: DeadlineEntryMode;
   nextAction?: string;

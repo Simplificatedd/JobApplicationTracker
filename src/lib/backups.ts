@@ -563,6 +563,7 @@ function isApplication(value: unknown): value is Application {
       "72_hours",
     ]) &&
     isOptionalDateTime(value.interviewDeadlineReceivedAt) &&
+    isOptionalDateTime(value.offerDeadline) &&
     isOptionalOneOf(value.deadlineEntryMode, [
       "exact",
       "1_day",
