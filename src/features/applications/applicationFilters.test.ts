@@ -172,6 +172,36 @@ describe("offer deadline filter", () => {
   });
 });
 
+describe("follow-up auto-reset filter", () => {
+  const disabled = {
+    ...baseApplication,
+    id: "auto-reset-off",
+    followUpAutoResetEnabled: false,
+    followUpPromptDays: 7,
+  };
+  const enabled = {
+    ...baseApplication,
+    id: "auto-reset-on",
+    followUpAutoResetEnabled: true,
+    followUpPromptDays: 7,
+  };
+
+  it("distinguishes disabled auto-reset from a stored prompt duration", () => {
+    expect(
+      applyApplicationFilters([disabled, enabled], {
+        ...DEFAULT_APPLICATION_FILTERS,
+        followUpPromptDays: "off",
+      }),
+    ).toEqual([disabled]);
+    expect(
+      applyApplicationFilters([disabled, enabled], {
+        ...DEFAULT_APPLICATION_FILTERS,
+        followUpPromptDays: "7",
+      }),
+    ).toEqual([enabled]);
+  });
+});
+
 describe("cover letter filter", () => {
   it("treats stored cover letters and legacy version labels as assigned", () => {
     const stored = {

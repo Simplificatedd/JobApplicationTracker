@@ -10,6 +10,11 @@ import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { formatDate, formatDateTime } from "../lib/format";
 import {
+  createHandledFollowUpUpdate,
+  normalizeFollowUpDateInput,
+  validateFollowUpSchedule,
+} from "../lib/followUps";
+import {
   severityLabel,
   type NotificationGroup,
   type ReminderNotification,
@@ -278,16 +283,16 @@ function NotificationItem({
         {notification.type === "follow_up" || notification.type === "flagged" ? (
           <>
             <SmallActionButton
-              label="Mark follow-up done"
+              label="Follow-up handled"
               onClick={() =>
-                onUpdateApplication(notification.applicationId, {
-                  followUpDate: undefined,
-                  followUpNeeded: false,
-                })
+                onUpdateApplication(
+                  notification.applicationId,
+                  createHandledFollowUpUpdate(notification.application),
+                )
               }
             >
               <CalendarCheck aria-hidden="true" size={14} />
-              Done
+              Handled
             </SmallActionButton>
             <SmallActionButton
               label="Change follow-up date"
@@ -401,7 +406,11 @@ function changeDate(
 ) {
   const isFollowUp = mode === "follow_up";
   const nextValue = window.prompt(
-    isFollowUp ? "Set follow-up date (YYYY-MM-DD)" : "Set date/time (YYYY-MM-DDTHH:mm)",
+    isFollowUp
+      ? notification.application.followUpNeeded
+        ? "Set the compulsory follow-up date (YYYY-MM-DD)"
+        : "Set the optional follow-up date (YYYY-MM-DD), or leave blank for No Follow-Up"
+      : "Set date/time (YYYY-MM-DDTHH:mm)",
     isFollowUp
       ? notification.application.followUpDate ?? ""
       : notification.dueAt ?? "",
@@ -411,21 +420,29 @@ function changeDate(
     return;
   }
 
-  const trimmedValue = nextValue.trim();
-  const pattern = isFollowUp
-    ? /^\d{4}-\d{2}-\d{2}$/
-    : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+  if (mode === "follow_up") {
+    const followUpDate = normalizeFollowUpDateInput(nextValue);
+    const validationError = validateFollowUpSchedule(
+      notification.application.followUpNeeded ? "compulsory" : "optional",
+      nextValue,
+    );
 
-  if (!pattern.test(trimmedValue)) {
-    window.alert(isFollowUp ? "Use YYYY-MM-DD." : "Use YYYY-MM-DDTHH:mm.");
+    if (followUpDate === null || validationError) {
+      window.alert(validationError ?? "Use a valid YYYY-MM-DD date.");
+      return;
+    }
+
+    onUpdateApplication(notification.applicationId, {
+      followUpDate,
+      followUpNeeded: notification.application.followUpNeeded,
+    });
     return;
   }
 
-  if (mode === "follow_up") {
-    onUpdateApplication(notification.applicationId, {
-      followUpDate: trimmedValue,
-      followUpNeeded: true,
-    });
+  const trimmedValue = nextValue.trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmedValue)) {
+    window.alert("Use YYYY-MM-DDTHH:mm.");
     return;
   }
 

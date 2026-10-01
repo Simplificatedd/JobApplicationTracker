@@ -27,22 +27,8 @@ export interface ReminderNotification {
 
 const FINAL_STATUSES = new Set(["Accepted", "Rejected", "Withdrawn"]);
 
-export function calculateFollowUpDueDate(
-  application: Application,
-  defaultPromptDays: number,
-) {
-  if (application.followUpDate) {
-    return application.followUpDate;
-  }
-
-  if (!application.followUpNeeded) {
-    return undefined;
-  }
-
-  return addDaysToDateStamp(
-    application.dateApplied || application.createdAt,
-    application.followUpPromptDays ?? defaultPromptDays,
-  );
+export function calculateFollowUpDueDate(application: Application) {
+  return application.followUpDate;
 }
 
 export function classifyReminderSeverity(
@@ -153,10 +139,7 @@ export function deriveApplicationNotifications(
   }
 
   const notifications: ReminderNotification[] = [];
-  const followUpDueDate = calculateFollowUpDueDate(
-    application,
-    settings.defaultFollowUpPromptDays,
-  );
+  const followUpDueDate = calculateFollowUpDueDate(application);
 
   if (followUpDueDate) {
     const severity = classifyReminderSeverity(
@@ -383,44 +366,6 @@ function buildNotificationId(
   sourceValue?: string,
 ) {
   return `${type}:${applicationId}:${sourceValue ?? "none"}`;
-}
-
-function addDaysToDateStamp(value: string, days: number) {
-  const dateStampMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const baseDate = dateStampMatch
-    ? new Date(
-        Date.UTC(
-          Number(dateStampMatch[1]),
-          Number(dateStampMatch[2]) - 1,
-          Number(dateStampMatch[3]),
-        ),
-      )
-    : new Date(value);
-
-  if (Number.isNaN(baseDate.getTime())) {
-    return undefined;
-  }
-
-  if (dateStampMatch) {
-    const isValidDateStamp =
-      baseDate.getUTCFullYear() === Number(dateStampMatch[1]) &&
-      baseDate.getUTCMonth() === Number(dateStampMatch[2]) - 1 &&
-      baseDate.getUTCDate() === Number(dateStampMatch[3]);
-
-    if (!isValidDateStamp) {
-      return undefined;
-    }
-
-    baseDate.setUTCDate(baseDate.getUTCDate() + days);
-    return baseDate.toISOString().slice(0, 10);
-  }
-
-  const localDate = new Date(
-    Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()),
-  );
-  localDate.setUTCDate(localDate.getUTCDate() + days);
-
-  return localDate.toISOString().slice(0, 10);
 }
 
 function addDays(date: Date, days: number) {

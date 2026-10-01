@@ -21,6 +21,13 @@ import {
   formatUpdatedAt,
 } from "../../lib/format";
 import { getSafeHttpUrl } from "../../lib/urls";
+import {
+  createHandledFollowUpUpdate,
+  normalizeFollowUpDateInput,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
+  validateFollowUpSchedule,
+} from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type {
@@ -44,6 +51,10 @@ import type {
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
 import { InterviewsSection } from "./InterviewsSection";
+import {
+  FollowUpAutoResetControls,
+  FollowUpScheduleControls,
+} from "./FollowUpControls";
 
 interface ApplicationDetailPanelProps {
   activities: Activity[];
@@ -111,6 +122,8 @@ export function ApplicationDetailPanel({
   const [coverLetterUploadFile, setCoverLetterUploadFile] =
     useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [followUpError, setFollowUpError] = useState("");
+  const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
 
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
@@ -118,12 +131,39 @@ export function ApplicationDetailPanel({
     setDraft(toDraft(application));
     setResumeUploadError("");
     setCoverLetterUploadError("");
+    setFollowUpError("");
+    setFollowUpAutoResetError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(true);
   }
 
   async function saveChanges() {
+    const followUpValidationError = validateFollowUpSchedule(
+      draft.followUpNeeded ? "compulsory" : "optional",
+      draft.followUpDate,
+    );
+
+    if (followUpValidationError) {
+      setFollowUpError(followUpValidationError);
+      return;
+    }
+
+    setFollowUpError("");
+
+    const followUpAutoResetValidationError = validateFollowUpAutoReset(
+      draft.followUpAutoResetEnabled,
+      draft.followUpPromptDays,
+    );
+
+    if (followUpAutoResetValidationError) {
+      setFollowUpAutoResetError(followUpAutoResetValidationError);
+      return;
+    }
+
+    setFollowUpAutoResetError("");
+    const followUpPromptDays =
+      normalizeFollowUpPromptDays(draft.followUpPromptDays) ?? 7;
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setIsSaving(true);
@@ -142,6 +182,8 @@ export function ApplicationDetailPanel({
       roleEndDate: trimOptional(draft.roleEndDate),
       followUpNeeded: draft.followUpNeeded,
       followUpDate: trimOptional(draft.followUpDate),
+      followUpAutoResetEnabled: draft.followUpAutoResetEnabled,
+      followUpPromptDays,
       offerDeadline:
         draft.status === "Offered"
           ? trimOptional(draft.offerDeadline)
@@ -195,6 +237,8 @@ export function ApplicationDetailPanel({
     setDraft(toDraft(application));
     setResumeUploadError("");
     setCoverLetterUploadError("");
+    setFollowUpError("");
+    setFollowUpAutoResetError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(false);
@@ -306,6 +350,12 @@ export function ApplicationDetailPanel({
               coverLetterUploadError={coverLetterUploadError}
               coverLetters={coverLetters}
               draft={draft}
+              followUpAutoResetError={followUpAutoResetError}
+              followUpError={followUpError}
+              onFollowUpAutoResetChange={() =>
+                setFollowUpAutoResetError("")
+              }
+              onFollowUpChange={() => setFollowUpError("")}
               resumeUploadError={resumeUploadError}
               resumes={resumes}
               setDraft={setDraft}
@@ -396,10 +446,11 @@ function ReadOnlyDetails({
   workingCoverLetterId: string | null;
 }) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
-
   function changeFollowUpDate() {
     const nextDate = window.prompt(
-      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpNeeded
+        ? "Set the compulsory follow-up date (YYYY-MM-DD)"
+        : "Set the optional follow-up date (YYYY-MM-DD), or leave blank for No Follow-Up",
       application.followUpDate ?? "",
     );
 
@@ -407,31 +458,33 @@ function ReadOnlyDetails({
       return;
     }
 
-    const trimmedDate = nextDate.trim();
+    const followUpDate = normalizeFollowUpDateInput(nextDate);
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
-      window.alert("Use a date in YYYY-MM-DD format.");
+    const validationError = validateFollowUpSchedule(
+      application.followUpNeeded ? "compulsory" : "optional",
+      nextDate,
+    );
+
+    if (followUpDate === null || validationError) {
+      window.alert(validationError ?? "Use a valid YYYY-MM-DD date.");
       return;
     }
 
     onUpdate(application.id, {
-      followUpDate: trimmedDate,
-      followUpNeeded: true,
+      followUpDate,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
   function clearFollowUpDate() {
     onUpdate(application.id, {
       followUpDate: undefined,
-      followUpNeeded: false,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
-  function markFollowUpDone() {
-    onUpdate(application.id, {
-      followUpDate: undefined,
-      followUpNeeded: false,
-    });
+  function handleFollowUp() {
+    onUpdate(application.id, createHandledFollowUpUpdate(application));
   }
 
   return (
@@ -469,10 +522,20 @@ function ReadOnlyDetails({
           label="Follow-up"
           value={
             application.followUpNeeded
-              ? ["Needed", formatDate(application.followUpDate)]
-                  .filter(Boolean)
-                  .join(" ")
-              : formatDate(application.followUpDate)
+              ? application.followUpDate
+                ? `Compulsory / ${formatDate(application.followUpDate)}`
+                : "Compulsory / Date required"
+              : application.followUpDate
+                ? `Optional / ${formatDate(application.followUpDate)}`
+                : "No Follow-Up"
+          }
+        />
+        <DetailRow
+          label="Follow-up auto-reset"
+          value={
+            application.followUpAutoResetEnabled
+              ? `On / ${application.followUpPromptDays ?? 7} days`
+              : "Off"
           }
         />
         <DetailRow
@@ -507,14 +570,18 @@ function ReadOnlyDetails({
               <CalendarPlus aria-hidden="true" size={16} />
               Change date
             </DetailActionButton>
-            <DetailActionButton onClick={clearFollowUpDate}>
-              <CalendarX aria-hidden="true" size={16} />
-              Clear
-            </DetailActionButton>
-            <DetailActionButton onClick={markFollowUpDone}>
+            {!application.followUpNeeded && application.followUpDate ? (
+              <DetailActionButton onClick={clearFollowUpDate}>
+                <CalendarX aria-hidden="true" size={16} />
+                Clear date
+              </DetailActionButton>
+            ) : null}
+            {application.followUpDate ? (
+              <DetailActionButton onClick={handleFollowUp}>
               <CalendarCheck aria-hidden="true" size={16} />
-              Mark done
-            </DetailActionButton>
+                Follow-up handled
+              </DetailActionButton>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -617,6 +684,10 @@ function EditForm({
   coverLetterUploadError,
   coverLetters,
   draft,
+  followUpAutoResetError,
+  followUpError,
+  onFollowUpAutoResetChange,
+  onFollowUpChange,
   resumeUploadError,
   resumes,
   setDraft,
@@ -626,6 +697,10 @@ function EditForm({
   coverLetterUploadError: string;
   coverLetters: CoverLetterMetadata[];
   draft: ApplicationDraft;
+  followUpAutoResetError: string;
+  followUpError: string;
+  onFollowUpAutoResetChange: () => void;
+  onFollowUpChange: () => void;
   resumeUploadError: string;
   resumes: ResumeMetadata[];
   setDraft: React.Dispatch<React.SetStateAction<ApplicationDraft>>;
@@ -873,21 +948,43 @@ function EditForm({
         draft={draft}
         setDraft={setDraft}
       />
-      <DateField
-        label="Follow-up Date"
-        name="followUpDate"
-        draft={draft}
-        setDraft={setDraft}
-      />
-      <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground">
-        <input
-          checked={draft.followUpNeeded}
-          className="h-4 w-4 rounded border-border text-primary"
-          onChange={(event) => updateDraft("followUpNeeded", event.target.checked)}
-          type="checkbox"
+      <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
+          Follow-up
+        </h3>
+        <FollowUpScheduleControls
+          date={draft.followUpDate}
+          error={followUpError}
+          onDateChange={(value) => {
+            onFollowUpChange();
+            updateDraft("followUpDate", value);
+          }}
+          onRequirementChange={(value) => {
+            onFollowUpChange();
+            updateDraft("followUpNeeded", value === "compulsory");
+          }}
+          requirement={draft.followUpNeeded ? "compulsory" : "optional"}
         />
-        <span>Follow-up Needed</span>
-      </label>
+      </section>
+      <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
+          Follow-up auto-reset
+        </h3>
+        <FollowUpAutoResetControls
+          defaultPromptDays={7}
+          enabled={draft.followUpAutoResetEnabled}
+          error={followUpAutoResetError}
+          onEnabledChange={(value) => {
+            onFollowUpAutoResetChange();
+            updateDraft("followUpAutoResetEnabled", value)
+          }}
+          onPromptDaysChange={(value) => {
+            onFollowUpAutoResetChange();
+            updateDraft("followUpPromptDays", value)
+          }}
+          promptDays={draft.followUpPromptDays}
+        />
+      </section>
       <Field className="md:col-span-2" label="Job Description">
         <textarea
           className="field-control min-h-32 resize-y"
@@ -1105,6 +1202,8 @@ function toDraft(application: Application) {
     roleEndDate: application.roleEndDate ?? "",
     followUpNeeded: application.followUpNeeded,
     followUpDate: application.followUpDate ?? "",
+    followUpAutoResetEnabled: application.followUpAutoResetEnabled ?? false,
+    followUpPromptDays: String(application.followUpPromptDays ?? ""),
     offerDeadline: toDateTimeLocal(application.offerDeadline),
     priority: application.priority,
     resumeId: application.resumeId ?? "",

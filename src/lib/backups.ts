@@ -11,6 +11,7 @@ import type {
   ResumeMetadata,
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
+import { migrateLegacyFollowUpSchedule } from "./followUps";
 import { normalizeStatusActivities } from "./statusHistory";
 
 export const BACKUP_SCHEMA_VERSION = 2;
@@ -130,13 +131,20 @@ export async function parseBackupFile(file: File) {
         hasLegacyOfferSemantics,
       ),
       dataVersion: TRACKER_DATA_VERSION,
-      applications: backup.snapshot.applications.map((application) => ({
-        ...application,
-        status:
-          hasLegacyOfferSemantics && application.status === "Offered"
-            ? "Accepted"
-            : normalizeApplicationStatus(application.status),
-      })),
+      applications: backup.snapshot.applications.map((application) => {
+        const migratedApplication = migrateLegacyFollowUpSchedule(
+          application,
+          backup.snapshot.settings.defaultFollowUpPromptDays,
+        );
+
+        return {
+          ...migratedApplication,
+          status:
+            hasLegacyOfferSemantics && application.status === "Offered"
+              ? "Accepted"
+              : normalizeApplicationStatus(application.status),
+        };
+      }),
     },
   } satisfies TrackerBackup;
 }
@@ -174,8 +182,10 @@ export function createApplicationsCsv({
     application.jobTitle,
     application.status,
     application.dateApplied,
-    application.followUpNeeded ? "yes" : "no",
+    application.followUpNeeded ? "compulsory" : "optional",
     application.followUpDate,
+    application.followUpAutoResetEnabled ? "yes" : "no",
+    application.followUpPromptDays?.toString(),
     application.interviewDateTime,
     application.interviewDeadline,
     application.offerDeadline,
@@ -197,8 +207,10 @@ export function createApplicationsCsv({
     "job_title",
     "status",
     "applied_date",
-    "follow_up_needed",
+    "follow_up_requirement",
     "follow_up_date",
+    "follow_up_auto_reset",
+    "follow_up_prompt_days",
     "interview_date_time",
     "interview_deadline",
     "offer_deadline",
@@ -532,6 +544,7 @@ function isApplication(value: unknown): value is Application {
     isOptionalDate(value.roleEndDate) &&
     typeof value.followUpNeeded === "boolean" &&
     isOptionalDate(value.followUpDate) &&
+    isOptionalBoolean(value.followUpAutoResetEnabled) &&
     isOptionalNonNegativeInteger(value.followUpPromptDays) &&
     isOptionalNonNegativeInteger(value.interviewRound) &&
     isOptionalOneOf(value.interviewType, [
@@ -840,6 +853,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
+}
+
+function isOptionalBoolean(value: unknown): value is boolean | undefined {
+  return value === undefined || typeof value === "boolean";
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

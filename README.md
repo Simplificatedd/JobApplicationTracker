@@ -50,6 +50,19 @@ signed-in user's cloud data and refreshes the browser cache.
 
 ### Data model decisions
 
+#### Follow-up semantics
+
+- A follow-up is either **Optional** or **Compulsory**. Optional follow-ups may
+  have no date and display as **No Follow-Up**; compulsory follow-ups require a
+  real calendar date.
+- Follow-up auto-reset is independent of the current requirement and date. When
+  enabled, **Follow-up handled** schedules the next date from the handling date
+  using the per-application prompt days. When disabled, handling clears the date
+  and returns the requirement to Optional.
+- Reminder dates are always explicit. Prompt days never create or advance a
+  reminder merely because its previous date passed, so overdue items remain
+  visible until the user handles or reschedules them.
+
 #### Status and deadline semantics
 
 - New applications start at **Awaiting Response**. **Offered** means an offer is

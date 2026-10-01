@@ -38,12 +38,17 @@ export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
 
 export const STATUS_TONE: Record<
   ApplicationStatus,
-  "info" | "warning" | "success" | "neutral" | "danger"
+  | "awaiting"
+  | "interviewing"
+  | "offered"
+  | "accepted"
+  | "rejected"
+  | "withdrawn"
 > = {
-  "Awaiting Response": "warning",
-  Interviewing: "warning",
-  Offered: "info",
-  Accepted: "success",
-  Rejected: "danger",
-  Withdrawn: "neutral",
+  "Awaiting Response": "awaiting",
+  Interviewing: "interviewing",
+  Offered: "offered",
+  Accepted: "accepted",
+  Rejected: "rejected",
+  Withdrawn: "withdrawn",
 };

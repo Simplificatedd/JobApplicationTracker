@@ -26,7 +26,14 @@ import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
-import { calculateFollowUpDueDate } from "../../lib/reminders";
+import {
+  createFollowUpScheduleUpdate,
+  createHandledFollowUpUpdate,
+  normalizeFollowUpDateInput,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
+  validateFollowUpSchedule,
+} from "../../lib/followUps";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type {
   ApplicationStatus,
@@ -34,11 +41,14 @@ import type {
   ResumeFile,
 } from "../../types/application";
 import {
-  createFollowUpQuickEdit,
   createInterviewQuickEdit,
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
 import { StatusBadge } from "./StatusBadge";
+import {
+  FollowUpAutoResetControls,
+  FollowUpScheduleControls,
+} from "./FollowUpControls";
 
 export function DescriptionPreview({ description }: { description: string }) {
   return (
@@ -60,73 +70,198 @@ export function FollowUpCell({
   const [isEditing, setIsEditing] = useState(false);
   const [draftDate, setDraftDate] = useState(application.followUpDate ?? "");
   const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
-  const dueDate = calculateFollowUpDueDate(
-    application,
-    application.followUpPromptDays ?? 7,
-  );
+  const [error, setError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function startEditing() {
     setDraftDate(application.followUpDate ?? "");
     setDraftNeeded(application.followUpNeeded);
+    setError("");
     setIsEditing(true);
   }
 
-  if (isEditing) {
-    return (
-      <QuickEditContainer onCancel={() => setIsEditing(false)}>
-        <input
-          aria-label="Follow-up date"
-          className="field-control h-9 w-full min-w-0 text-xs"
-          onChange={(event) => setDraftDate(event.target.value)}
-          type="date"
-          value={draftDate}
-        />
-        <label className="flex items-center gap-2 text-xs font-medium text-foreground">
-          <input
-            checked={draftNeeded}
-            className="h-4 w-4 rounded border-border text-primary"
-            onChange={(event) => setDraftNeeded(event.target.checked)}
-            type="checkbox"
-          />
-          Needed
-        </label>
-        <QuickEditActions
-          label="follow-up"
-          onCancel={() => setIsEditing(false)}
-          onConfirm={() => {
-            onUpdate(createFollowUpQuickEdit(draftNeeded, draftDate));
-            setIsEditing(false);
-          }}
-        />
-      </QuickEditContainer>
-    );
+  function save() {
+    const requirement = draftNeeded ? "compulsory" : "optional";
+    const validationError = validateFollowUpSchedule(requirement, draftDate);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const update = createFollowUpScheduleUpdate(requirement, draftDate);
+
+    if (update) {
+      onUpdate(update);
+      setIsEditing(false);
+    }
   }
 
   return (
-    <button
-      aria-label="Quick edit follow-up"
-      className="group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
-      onClick={startEditing}
-      type="button"
-    >
-      <span className="min-w-0 max-w-full overflow-hidden">
-        <span
-          className={`block truncate text-sm font-medium ${
-            application.followUpNeeded ? "text-warning" : "text-foreground"
-          }`}
-        >
-          {formatDate(dueDate)}
+    <>
+      <button
+        aria-expanded={isEditing}
+        aria-haspopup="dialog"
+        aria-label="Quick edit follow-up"
+        className="group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
+        onClick={startEditing}
+        ref={triggerRef}
+        type="button"
+      >
+        <span className="min-w-0 max-w-full overflow-hidden">
+          <span
+            className={`block truncate text-sm font-medium ${
+              application.followUpNeeded && !application.followUpDate
+                ? "text-destructive"
+                : application.followUpNeeded
+                  ? "text-warning"
+                  : "text-foreground"
+            }`}
+          >
+            {application.followUpDate
+              ? formatDate(application.followUpDate)
+              : application.followUpNeeded
+                ? "Date required"
+                : "No Follow-Up"}
+          </span>
+          <span className="mt-1 block truncate text-xs text-muted">
+            {application.followUpNeeded ? "Compulsory" : "Optional"}
+          </span>
         </span>
-        <span className="mt-1 block truncate text-xs text-muted">
-          {application.followUpNeeded ? "Needed" : "Optional"}
+        <Pencil
+          aria-hidden="true"
+          className="mt-0.5 shrink-0 text-muted"
+          size={14}
+        />
+      </button>
+      <AnchoredQuickEdit
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="Edit follow-up"
+        triggerRef={triggerRef}
+      >
+        <FollowUpScheduleControls
+          date={draftDate}
+          error={error}
+          onDateChange={(value) => {
+            setDraftDate(value);
+            setError("");
+          }}
+          onRequirementChange={(value) => {
+            setDraftNeeded(value === "compulsory");
+            setError("");
+          }}
+          requirement={draftNeeded ? "compulsory" : "optional"}
+        />
+        <QuickEditActions
+          label="follow-up"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={save}
+        />
+      </AnchoredQuickEdit>
+    </>
+  );
+}
+
+export function FollowUpAutoResetCell({
+  application,
+  onUpdate,
+}: {
+  application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEnabled, setDraftEnabled] = useState(
+    application.followUpAutoResetEnabled ?? false,
+  );
+  const [draftPromptDays, setDraftPromptDays] = useState(
+    String(application.followUpPromptDays ?? ""),
+  );
+  const [error, setError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  function startEditing() {
+    setDraftEnabled(application.followUpAutoResetEnabled ?? false);
+    setDraftPromptDays(String(application.followUpPromptDays ?? ""));
+    setError("");
+    setIsEditing(true);
+  }
+
+  function save() {
+    if (!draftEnabled) {
+      onUpdate({ followUpAutoResetEnabled: false });
+      setIsEditing(false);
+      return;
+    }
+
+    const validationError = validateFollowUpAutoReset(
+      draftEnabled,
+      draftPromptDays,
+    );
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const promptDays = normalizeFollowUpPromptDays(draftPromptDays) ?? 7;
+
+    onUpdate({
+      followUpAutoResetEnabled: true,
+      followUpPromptDays: promptDays,
+    });
+    setIsEditing(false);
+  }
+
+  return (
+    <>
+      <button
+        aria-expanded={isEditing}
+        aria-haspopup="dialog"
+        aria-label="Quick edit follow-up auto-reset"
+        className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+        onClick={startEditing}
+        ref={triggerRef}
+        type="button"
+      >
+        <span className="truncate text-sm text-foreground">
+          {application.followUpAutoResetEnabled
+            ? `${application.followUpPromptDays ?? 7} days`
+            : "Off"}
         </span>
-      </span>
-      <Pencil
-        aria-hidden="true"
-        className="mt-0.5 shrink-0 text-muted"
-        size={14}
-      />
-    </button>
+        <Pencil
+          aria-hidden="true"
+          className="shrink-0 text-muted"
+          size={14}
+        />
+      </button>
+      <AnchoredQuickEdit
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="Edit follow-up auto-reset"
+        triggerRef={triggerRef}
+      >
+        <FollowUpAutoResetControls
+          defaultPromptDays={7}
+          enabled={draftEnabled}
+          error={error}
+          onEnabledChange={(value) => {
+            setDraftEnabled(value);
+            setError("");
+          }}
+          onPromptDaysChange={(value) => {
+            setDraftPromptDays(value);
+            setError("");
+          }}
+          promptDays={draftPromptDays}
+        />
+        <QuickEditActions
+          label="follow-up auto-reset"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={save}
+        />
+      </AnchoredQuickEdit>
+    </>
   );
 }
 
@@ -261,62 +396,97 @@ export function StatusQuickEditCell({
   );
 }
 
-export function FollowUpNeededQuickEditCell({
-  application,
-  onUpdate,
+function AnchoredQuickEdit({
+  children,
+  isOpen,
+  onClose,
+  title,
+  triggerRef,
 }: {
-  application: JobApplication;
-  onUpdate: (input: ApplicationUpdate) => void;
+  children: ReactNode;
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftNeeded, setDraftNeeded] = useState(application.followUpNeeded);
+  const [position, setPosition] = useState({ left: 0, top: 0 });
+  const editorRef = useRef<HTMLDivElement>(null);
 
-  if (isEditing) {
-    return (
-      <QuickEditContainer onCancel={() => setIsEditing(false)}>
-        <label className="flex items-center gap-2 text-sm text-foreground">
-          <input
-            checked={draftNeeded}
-            className="h-4 w-4 rounded border-border text-primary"
-            onChange={(event) => setDraftNeeded(event.target.checked)}
-            type="checkbox"
-          />
-          {draftNeeded ? "Yes" : "No"}
-        </label>
-        <QuickEditActions
-          label="follow-up needed"
-          onCancel={() => setIsEditing(false)}
-          onConfirm={() => {
-            onUpdate(
-              createFollowUpQuickEdit(
-                draftNeeded,
-                application.followUpDate ?? "",
-              ),
-            );
-            setIsEditing(false);
-          }}
-        />
-      </QuickEditContainer>
-    );
+  useEscapeKey(isOpen, () => {
+    onClose();
+    triggerRef.current?.focus();
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (
+        !editorRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        onClose();
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [isOpen, onClose, triggerRef]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function updatePosition() {
+      if (!triggerRef.current || !editorRef.current) {
+        return;
+      }
+
+      setPosition(
+        getAnchoredMenuPosition({
+          anchor: triggerRef.current.getBoundingClientRect(),
+          menuHeight: editorRef.current.offsetHeight,
+          menuWidth: editorRef.current.offsetWidth,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+        }),
+      );
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, triggerRef]);
+
+  if (!isOpen) {
+    return null;
   }
 
-  return (
-    <button
-      aria-label="Quick edit follow-up needed"
-      className="group flex w-full items-center justify-between gap-2 rounded-md text-sm text-foreground"
-      onClick={() => {
-        setDraftNeeded(application.followUpNeeded);
-        setIsEditing(true);
-      }}
-      type="button"
+  return createPortal(
+    <div
+      aria-label={title}
+      className="fixed z-[60] w-80 max-w-[calc(100vw-1rem)] space-y-3 rounded-lg border border-border bg-surface p-4 shadow-popover"
+      onClick={(event) => event.stopPropagation()}
+      ref={editorRef}
+      role="dialog"
+      style={{ left: position.left, top: position.top }}
     >
-      <span>{application.followUpNeeded ? "Yes" : "No"}</span>
-      <Pencil
-        aria-hidden="true"
-        className="shrink-0 text-muted"
-        size={14}
-      />
-    </button>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {children}
+    </div>,
+    document.body,
   );
 }
 
@@ -522,7 +692,9 @@ export function RowActionsMenu({
 
   function changeFollowUpDate() {
     const nextDate = window.prompt(
-      "Set follow-up date (YYYY-MM-DD)",
+      application.followUpNeeded
+        ? "Set the compulsory follow-up date (YYYY-MM-DD)"
+        : "Set the optional follow-up date (YYYY-MM-DD), or leave blank for No Follow-Up",
       application.followUpDate ?? "",
     );
 
@@ -530,17 +702,21 @@ export function RowActionsMenu({
       return;
     }
 
-    const trimmedDate = nextDate.trim();
+    const followUpDate = normalizeFollowUpDateInput(nextDate);
+    const validationError = validateFollowUpSchedule(
+      application.followUpNeeded ? "compulsory" : "optional",
+      nextDate,
+    );
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
-      window.alert("Use a date in YYYY-MM-DD format.");
+    if (followUpDate === null || validationError) {
+      window.alert(validationError ?? "Use a valid YYYY-MM-DD date.");
       return;
     }
 
     setIsOpen(false);
     onUpdateApplication(application.id, {
-      followUpDate: trimmedDate,
-      followUpNeeded: true,
+      followUpDate,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
@@ -548,16 +724,16 @@ export function RowActionsMenu({
     setIsOpen(false);
     onUpdateApplication(application.id, {
       followUpDate: undefined,
-      followUpNeeded: false,
+      followUpNeeded: application.followUpNeeded,
     });
   }
 
-  function markFollowUpDone() {
+  function handleFollowUp() {
     setIsOpen(false);
-    onUpdateApplication(application.id, {
-      followUpDate: undefined,
-      followUpNeeded: false,
-    });
+    onUpdateApplication(
+      application.id,
+      createHandledFollowUpUpdate(application),
+    );
   }
 
   return (
@@ -577,7 +753,7 @@ export function RowActionsMenu({
       {isOpen
         ? createPortal(
             <div
-              className="fixed z-[60] w-44 rounded-lg border border-border bg-surface p-1 shadow-popover"
+              className="fixed z-[60] w-52 rounded-lg border border-border bg-surface p-1 shadow-popover"
               id={menuId}
               onClick={(event) => event.stopPropagation()}
               onKeyDown={moveMenuFocus}
@@ -618,14 +794,18 @@ export function RowActionsMenu({
               <CalendarPlus aria-hidden="true" size={16} />
               Change follow-up
             </MenuButton>
-            <MenuButton onClick={clearFollowUpDate}>
-              <CalendarX aria-hidden="true" size={16} />
-              Clear follow-up
-            </MenuButton>
-            <MenuButton onClick={markFollowUpDone}>
-              <CalendarCheck aria-hidden="true" size={16} />
-              Mark done
-            </MenuButton>
+            {!application.followUpNeeded && application.followUpDate ? (
+              <MenuButton onClick={clearFollowUpDate}>
+                <CalendarX aria-hidden="true" size={16} />
+                Clear follow-up date
+              </MenuButton>
+            ) : null}
+            {application.followUpDate ? (
+              <MenuButton onClick={handleFollowUp}>
+                <CalendarCheck aria-hidden="true" size={16} />
+                Follow-up handled
+              </MenuButton>
+            ) : null}
           </>
         ) : null}
         {canDelete ? (

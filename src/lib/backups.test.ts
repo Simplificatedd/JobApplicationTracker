@@ -94,12 +94,84 @@ describe("createApplicationsCsv", () => {
     expect(csv).toContain("2026-09-27T12:00");
     expect(csv).not.toContain("2026-09-25T12:00");
   });
+
+  it("exports follow-up requirement and auto-reset settings separately", async () => {
+    const csv = await createApplicationsCsv({
+      applications: [
+        createApplication({
+          followUpAutoResetEnabled: true,
+          followUpDate: "2026-10-08",
+          followUpNeeded: true,
+          followUpPromptDays: 7,
+        }),
+      ],
+      resumes: [],
+    }).text();
+
+    expect(csv).toContain("follow_up_requirement");
+    expect(csv).toContain("follow_up_auto_reset");
+    expect(csv).toContain("follow_up_prompt_days");
+    expect(csv).toContain("compulsory,2026-10-08,yes,7");
+  });
 });
 
 describe("parseBackupFile", () => {
   it("accepts a valid empty backup", async () => {
     await expect(parseBackupFile(createBackupFile(createSnapshot()))).resolves
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("accepts legacy applications without a follow-up auto-reset flag", async () => {
+    const snapshot = createSnapshot({
+      applications: [createApplication()],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [{ id: "app-1" }],
+        },
+      });
+  });
+
+  it("materializes legacy derived follow-up dates during backup import", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          dateApplied: "2026-09-24",
+          followUpNeeded: true,
+        }),
+      ],
+      settings: {
+        ...DEFAULT_USER_SETTINGS,
+        defaultFollowUpPromptDays: 3,
+      },
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [
+            {
+              followUpAutoResetEnabled: false,
+              followUpDate: "2026-09-27",
+              followUpNeeded: true,
+            },
+          ],
+        },
+      });
+  });
+
+  it("rejects invalid follow-up auto-reset flags", async () => {
+    const application = {
+      ...createApplication(),
+      followUpAutoResetEnabled: "yes",
+    } as unknown as Application;
+    const snapshot = createSnapshot({ applications: [application] });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid application data",
+    );
   });
 
   it("migrates the legacy Just Applied status", async () => {

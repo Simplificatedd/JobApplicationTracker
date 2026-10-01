@@ -88,6 +88,14 @@ describe("normalizeUserSettings", () => {
     ).toEqual(["company", ...REQUIRED_APPLICATION_COLUMNS]);
   });
 
+  it("removes the retired standalone follow-up requirement column", () => {
+    expect(
+      normalizeUserSettings({
+        visibleApplicationColumns: ["company", "followUpNeeded"],
+      }).visibleApplicationColumns,
+    ).toEqual(["company", ...REQUIRED_APPLICATION_COLUMNS]);
+  });
+
   it("normalizes unavailable Add Job modes to the implemented workflow", () => {
     expect(
       normalizeUserSettings({

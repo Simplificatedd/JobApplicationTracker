@@ -12,12 +12,17 @@ import {
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
 import { suggestInterviewDeadline } from "../../lib/interviews";
+import {
+  type FollowUpRequirement,
+  normalizeFollowUpPromptDays,
+  validateFollowUpAutoReset,
+  validateFollowUpSchedule,
+} from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
   type DuplicateApplicationMatch,
   findDuplicateApplication,
-  suggestFollowUpDate,
   validateInterviewRound,
 } from "./applicationForm";
 import type {
@@ -35,6 +40,10 @@ import type {
   ResumeMetadata,
   WorkMode,
 } from "../../types/application";
+import {
+  FollowUpAutoResetControls,
+  FollowUpScheduleControls,
+} from "./FollowUpControls";
 
 interface AddApplicationModalProps {
   applications: Application[];
@@ -65,6 +74,7 @@ interface AddApplicationFormState {
   roleEndDate: string;
   followUpNeeded: boolean;
   followUpDate: string;
+  followUpAutoResetEnabled: boolean;
   followUpPromptDays: string;
   interviewRound: string;
   interviewDateTime: string;
@@ -90,9 +100,7 @@ interface AddApplicationFormState {
   notes: string;
 }
 
-function createInitialFormState(
-  defaultFollowUpPromptDays: number,
-): AddApplicationFormState {
+function createInitialFormState(): AddApplicationFormState {
   return {
     company: "",
     jobTitle: "",
@@ -107,7 +115,8 @@ function createInitialFormState(
     roleStartDate: "",
     roleEndDate: "",
     followUpNeeded: false,
-    followUpDate: suggestFollowUpDate("", defaultFollowUpPromptDays),
+    followUpDate: "",
+    followUpAutoResetEnabled: false,
     followUpPromptDays: "",
     interviewRound: "1",
     interviewDateTime: "",
@@ -144,11 +153,9 @@ export function AddApplicationModal({
   resumes,
 }: AddApplicationModalProps) {
   const [cleanForm, setCleanForm] = useState<AddApplicationFormState>(() =>
-    createInitialFormState(defaultFollowUpPromptDays),
+    createInitialFormState(),
   );
   const [form, setForm] = useState<AddApplicationFormState>(cleanForm);
-  const [isFollowUpDateCustomized, setIsFollowUpDateCustomized] =
-    useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
   const [coverLetterUploadFile, setCoverLetterUploadFile] =
@@ -157,6 +164,8 @@ export function AddApplicationModal({
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [followUpError, setFollowUpError] = useState("");
+  const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [interviewRoundError, setInterviewRoundError] = useState("");
   const [duplicateMatch, setDuplicateMatch] =
     useState<DuplicateApplicationMatch | null>(null);
@@ -183,6 +192,15 @@ export function AddApplicationModal({
     if (key === "interviewRound") {
       setInterviewRoundError("");
     }
+    if (key === "followUpDate" || key === "followUpNeeded") {
+      setFollowUpError("");
+    }
+    if (
+      key === "followUpAutoResetEnabled" ||
+      key === "followUpPromptDays"
+    ) {
+      setFollowUpAutoResetError("");
+    }
   }
 
   function requestClose() {
@@ -201,6 +219,8 @@ export function AddApplicationModal({
   function closeModal() {
     setDuplicateMatch(null);
     setTitleError("");
+    setFollowUpError("");
+    setFollowUpAutoResetError("");
     setInterviewRoundError("");
     setResumeUploadError("");
     setCoverLetterUploadError("");
@@ -216,42 +236,17 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setFollowUpError("");
+    setFollowUpAutoResetError("");
     setInterviewRoundError("");
     onClose();
   }
 
   function resetForm() {
-    const nextForm = createInitialFormState(defaultFollowUpPromptDays);
+    const nextForm = createInitialFormState();
 
     setCleanForm(nextForm);
     setForm(nextForm);
-    setIsFollowUpDateCustomized(false);
-  }
-
-  function updateAppliedDate(value: string) {
-    setForm((current) => ({
-      ...current,
-      dateApplied: value,
-      followUpDate: isFollowUpDateCustomized
-        ? current.followUpDate
-        : suggestFollowUpDate(
-            value,
-            Number(current.followUpPromptDays) || defaultFollowUpPromptDays,
-          ),
-    }));
-  }
-
-  function updateFollowUpPromptDays(value: string) {
-    setForm((current) => ({
-      ...current,
-      followUpPromptDays: value,
-      followUpDate: isFollowUpDateCustomized
-        ? current.followUpDate
-        : suggestFollowUpDate(
-            current.dateApplied,
-            Number(value) || defaultFollowUpPromptDays,
-          ),
-    }));
   }
 
   function updateInterviewDeadlineEntryMode(value: DeadlineEntryMode) {
@@ -316,6 +311,39 @@ export function AddApplicationModal({
       return;
     }
 
+    const followUpRequirement: FollowUpRequirement = form.followUpNeeded
+      ? "compulsory"
+      : "optional";
+    const followUpValidationError = validateFollowUpSchedule(
+      followUpRequirement,
+      form.followUpDate,
+    );
+
+    if (followUpValidationError) {
+      setFollowUpError(followUpValidationError);
+      return;
+    }
+
+    setFollowUpError("");
+
+    const followUpAutoResetValidationError = validateFollowUpAutoReset(
+      form.followUpAutoResetEnabled,
+      form.followUpPromptDays,
+      defaultFollowUpPromptDays,
+    );
+
+    if (followUpAutoResetValidationError) {
+      setFollowUpAutoResetError(followUpAutoResetValidationError);
+      return;
+    }
+
+    setFollowUpAutoResetError("");
+    const followUpPromptDays =
+      normalizeFollowUpPromptDays(
+        form.followUpPromptDays,
+        defaultFollowUpPromptDays,
+      ) ?? defaultFollowUpPromptDays;
+
     const isInterviewing = form.status === "Interviewing";
     const roundValidation = validateInterviewRound(
       isInterviewing ? form.interviewRound : "",
@@ -353,8 +381,8 @@ export function AddApplicationModal({
       roleEndDate: trimOptional(form.roleEndDate),
       followUpNeeded: form.followUpNeeded,
       followUpDate: trimOptional(form.followUpDate),
-      followUpPromptDays:
-        Number(form.followUpPromptDays) || defaultFollowUpPromptDays,
+      followUpAutoResetEnabled: form.followUpAutoResetEnabled,
+      followUpPromptDays,
       interviewRound: isInterviewing ? roundValidation.round : undefined,
       interviewDateTime: isInterviewing
         ? trimOptional(form.interviewDateTime)
@@ -442,6 +470,8 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setFollowUpError("");
+    setFollowUpAutoResetError("");
     onClose();
   }
 
@@ -723,7 +753,9 @@ export function AddApplicationModal({
             <Field label="Applied Date">
               <input
                 className="field-control"
-                onChange={(event) => updateAppliedDate(event.target.value)}
+                onChange={(event) =>
+                  updateForm("dateApplied", event.target.value)
+                }
                 type="date"
                 value={form.dateApplied}
               />
@@ -925,42 +957,40 @@ export function AddApplicationModal({
               />
             </Field>
 
-            <label className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm font-medium text-foreground md:col-span-2">
-              <input
-                className="h-4 w-4 rounded border-border text-primary"
-                checked={form.followUpNeeded}
-                onChange={(event) =>
-                  updateForm("followUpNeeded", event.target.checked)
+            <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Follow-up
+              </h3>
+              <FollowUpScheduleControls
+                date={form.followUpDate}
+                error={followUpError}
+                onDateChange={(value) => updateForm("followUpDate", value)}
+                onRequirementChange={(value) =>
+                  updateForm("followUpNeeded", value === "compulsory")
                 }
-                type="checkbox"
-              />
-              <span>Follow-up Needed</span>
-            </label>
-
-            <Field label="Follow-up Date">
-              <input
-                className="field-control"
-                onChange={(event) => {
-                  setIsFollowUpDateCustomized(true);
-                  updateForm("followUpDate", event.target.value);
-                }}
-                type="date"
-                value={form.followUpDate}
-              />
-            </Field>
-
-            <Field label="Follow-up Prompt Days">
-              <input
-                className="field-control"
-                min="1"
-                onChange={(event) =>
-                  updateFollowUpPromptDays(event.target.value)
+                requirement={
+                  form.followUpNeeded ? "compulsory" : "optional"
                 }
-                placeholder={String(defaultFollowUpPromptDays)}
-                type="number"
-                value={form.followUpPromptDays}
               />
-            </Field>
+            </section>
+
+            <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Follow-up auto-reset
+              </h3>
+              <FollowUpAutoResetControls
+                defaultPromptDays={defaultFollowUpPromptDays}
+                enabled={form.followUpAutoResetEnabled}
+                error={followUpAutoResetError}
+                onEnabledChange={(value) =>
+                  updateForm("followUpAutoResetEnabled", value)
+                }
+                onPromptDaysChange={(value) =>
+                  updateForm("followUpPromptDays", value)
+                }
+                promptDays={form.followUpPromptDays}
+              />
+            </section>
 
             <Field label="Priority">
               <select
