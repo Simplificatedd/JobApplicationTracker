@@ -34,7 +34,6 @@ export type SortColumn =
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
-  | "followUpNeeded"
   | "followUpPromptDays"
   | "interviewRound"
   | "interviewDateTime"
@@ -128,7 +127,6 @@ const APPLICATION_SORT_COLUMNS: SortColumn[] = [
   "roleStartDate",
   "roleEndDate",
   "followUp",
-  "followUpNeeded",
   "followUpPromptDays",
   "interviewRound",
   "interviewDateTime",
@@ -431,10 +429,6 @@ function getSortValue(application: Application, column: SortColumn) {
     column === "updatedAt"
   ) {
     return application[column] ? new Date(application[column]).getTime() : 0;
-  }
-
-  if (column === "followUpNeeded") {
-    return application.followUpNeeded ? 1 : 0;
   }
 
   if (column === "followUpPromptDays") {

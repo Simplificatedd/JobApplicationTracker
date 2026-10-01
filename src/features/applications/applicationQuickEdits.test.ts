@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Application } from "../../types/application";
 import {
-  createFollowUpQuickEdit,
   createInterviewQuickEdit,
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
@@ -27,13 +26,6 @@ describe("application quick-edit updates", () => {
   it("creates explicit status updates", () => {
     expect(createStatusQuickEdit("Offered")).toEqual({ status: "Offered" });
     expect(createStatusQuickEdit("Accepted")).toEqual({ status: "Accepted" });
-  });
-
-  it("clears an empty follow-up date without changing the chosen toggle", () => {
-    expect(createFollowUpQuickEdit(false, "")).toEqual({
-      followUpDate: undefined,
-      followUpNeeded: false,
-    });
   });
 
   it("moves an application into Interviewing when scheduling an interview", () => {

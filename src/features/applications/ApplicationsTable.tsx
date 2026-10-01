@@ -18,7 +18,6 @@ import {
   ContactsButton,
   DescriptionPreview,
   FollowUpCell,
-  FollowUpNeededQuickEditCell,
   InterviewCell,
   ResumeCell,
   RowActionsMenu,
@@ -67,7 +66,6 @@ export type ApplicationColumnId =
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
-  | "followUpNeeded"
   | "followUpPromptDays"
   | "interviewRound"
   | "interviewDateTime"
@@ -199,14 +197,6 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     key: "followUp",
     label: "Follow-up",
     minWidth: 84,
-    width: 150,
-  },
-  {
-    canHide: true,
-    id: "followUpNeeded",
-    key: "followUpNeeded",
-    label: "Follow-up Needed",
-    minWidth: 92,
     width: 150,
   },
   {
@@ -1030,15 +1020,6 @@ function ApplicationColumnCell({
   if (columnId === "followUp") {
     return (
       <FollowUpCell
-        application={application}
-        onUpdate={(input) => onUpdateApplication(application.id, input)}
-      />
-    );
-  }
-
-  if (columnId === "followUpNeeded") {
-    return (
-      <FollowUpNeededQuickEditCell
         application={application}
         onUpdate={(input) => onUpdateApplication(application.id, input)}
       />

@@ -15,16 +15,6 @@ export function createStatusQuickEdit(status: ApplicationStatus) {
   return { status } satisfies ApplicationUpdate;
 }
 
-export function createFollowUpQuickEdit(
-  followUpNeeded: boolean,
-  followUpDate: string,
-) {
-  return {
-    followUpDate: followUpDate || undefined,
-    followUpNeeded,
-  } satisfies ApplicationUpdate;
-}
-
 export function createInterviewQuickEdit(
   application: Application,
   interviewDateTime: string,

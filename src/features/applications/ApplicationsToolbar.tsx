@@ -351,7 +351,6 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   dateApplied: "Date you submitted the application.",
   offerDeadline: "Date and time by which the pending offer needs a response.",
   followUp: "Follow-up date and whether the follow-up is needed.",
-  followUpNeeded: "Whether this application needs a follow-up.",
   followUpPromptDays: "Default reminder timing for follow-up prompts.",
   interviewDateTime: "Scheduled interview date and time.",
   interviewRound: "Current interview round for this application.",
