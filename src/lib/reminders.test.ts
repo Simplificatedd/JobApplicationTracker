@@ -98,6 +98,62 @@ describe("deriveApplicationNotifications", () => {
     expect(notifications).toEqual([]);
   });
 
+  it.each([
+    ["2026-09-23T17:00", "due_soon"],
+    ["2026-09-20T17:00", "due_today"],
+    ["2026-09-19T17:00", "overdue"],
+  ] as const)(
+    "flags an offer deadline dated %s as %s",
+    (offerDeadline, expectedSeverity) => {
+      const notifications = deriveApplicationNotifications(
+        {
+          ...baseApplication,
+          offerDeadline,
+          status: "Offered",
+        },
+        { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+        new Date("2026-09-20T12:00:00.000Z"),
+      );
+
+      expect(notifications).toEqual([
+        expect.objectContaining({
+          dueAt: offerDeadline,
+          group: "offers",
+          severity: expectedSeverity,
+          type: "offer_deadline",
+        }),
+      ]);
+    },
+  );
+
+  it("does not flag an offer deadline before the due-soon window", () => {
+    const notifications = deriveApplicationNotifications(
+      {
+        ...baseApplication,
+        offerDeadline: "2026-09-30T17:00",
+        status: "Offered",
+      },
+      { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+      new Date("2026-09-20T12:00:00.000Z"),
+    );
+
+    expect(notifications).toEqual([]);
+  });
+
+  it("stops offer deadline reminders after the offer is accepted", () => {
+    const notifications = deriveApplicationNotifications(
+      {
+        ...baseApplication,
+        offerDeadline: "2026-09-20T17:00",
+        status: "Accepted",
+      },
+      DEFAULT_USER_SETTINGS,
+      new Date("2026-09-20T12:00:00.000Z"),
+    );
+
+    expect(notifications).toEqual([]);
+  });
+
   it("does not flag a follow-up before the due-soon window", () => {
     const notifications = deriveApplicationNotifications(
       { ...baseApplication, followUpDate: "2026-09-30" },

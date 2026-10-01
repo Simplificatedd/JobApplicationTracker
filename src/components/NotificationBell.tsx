@@ -30,6 +30,7 @@ interface NotificationBellProps {
 const groupLabels: Record<NotificationGroup, string> = {
   followups: "Follow-ups",
   interviews: "Interviews",
+  offers: "Offers",
   other: "Other",
 };
 
@@ -129,7 +130,7 @@ export function NotificationBell({
                 No reminders right now
               </p>
               <p className="mt-1 text-sm text-muted">
-                Follow-ups, interviews, and assessment deadlines will appear here.
+                Follow-ups, interviews, and offer deadlines will appear here.
               </p>
             </div>
           ) : grouped ? (
@@ -179,7 +180,12 @@ function GroupedNotifications({
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
 }) {
-  const groups: NotificationGroup[] = ["followups", "interviews", "other"];
+  const groups: NotificationGroup[] = [
+    "followups",
+    "interviews",
+    "offers",
+    "other",
+  ];
 
   return (
     <div className="mt-3 space-y-4">
