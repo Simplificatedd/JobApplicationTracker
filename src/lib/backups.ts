@@ -555,6 +555,14 @@ function isApplication(value: unknown): value is Application {
     isOptionalString(value.interviewPlatform) &&
     typeof value.interviewProctored === "boolean" &&
     isOptionalDateTime(value.interviewDeadline) &&
+    isOptionalOneOf(value.interviewDeadlineEntryMode, [
+      "exact",
+      "1_day",
+      "2_days",
+      "3_days",
+      "72_hours",
+    ]) &&
+    isOptionalDateTime(value.interviewDeadlineReceivedAt) &&
     isOneOf(value.deadlineEntryMode, [
       "exact",
       "1_day",

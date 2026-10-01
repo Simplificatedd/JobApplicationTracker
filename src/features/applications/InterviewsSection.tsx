@@ -5,11 +5,15 @@ import {
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
 import { formatDateTime } from "../../lib/format";
-import { getNextInterviewRound } from "../../lib/interviews";
+import {
+  getNextInterviewRound,
+  suggestInterviewDeadline,
+} from "../../lib/interviews";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { MutationResult } from "../../store/useTrackerStore";
 import type {
   Application,
+  DeadlineEntryMode,
   Interview,
   InterviewInput,
   InterviewMode,
@@ -32,6 +36,8 @@ interface InterviewsSectionProps {
 interface InterviewDraft {
   dateTime: string;
   deadline: string;
+  deadlineEntryMode: DeadlineEntryMode;
+  deadlineReceivedAt: string;
   location: string;
   meetingUrl: string;
   mode: InterviewMode;
@@ -303,6 +309,38 @@ function InterviewForm({
     onChange({ ...draft, [key]: value });
   }
 
+  function updateDeadlineEntryMode(value: DeadlineEntryMode) {
+    const receivedAt =
+      draft.deadlineReceivedAt || toDateTimeLocal(new Date().toISOString());
+    const suggestedDeadline = suggestInterviewDeadline(value, receivedAt);
+
+    onChange({
+      ...draft,
+      deadline:
+        suggestedDeadline !== undefined
+          ? toDateTimeLocal(suggestedDeadline)
+          : draft.deadline,
+      deadlineEntryMode: value,
+      deadlineReceivedAt: value === "exact" ? draft.deadlineReceivedAt : receivedAt,
+    });
+  }
+
+  function updateDeadlineReceivedAt(value: string) {
+    const suggestedDeadline = suggestInterviewDeadline(
+      draft.deadlineEntryMode,
+      value,
+    );
+
+    onChange({
+      ...draft,
+      deadline:
+        suggestedDeadline !== undefined
+          ? toDateTimeLocal(suggestedDeadline)
+          : draft.deadline,
+      deadlineReceivedAt: value,
+    });
+  }
+
   return (
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-center justify-between gap-3">
@@ -391,6 +429,33 @@ function InterviewForm({
             value={draft.platform}
           />
         </FormField>
+        <FormField label="Deadline timing">
+          <select
+            className="field-control"
+            onChange={(event) =>
+              updateDeadlineEntryMode(
+                event.target.value as DeadlineEntryMode,
+              )
+            }
+            value={draft.deadlineEntryMode}
+          >
+            <option value="exact">Exact date/time</option>
+            <option value="1_day">1 day after received</option>
+            <option value="2_days">2 days after received</option>
+            <option value="3_days">3 days after received</option>
+            <option value="72_hours">72 hours after received</option>
+          </select>
+        </FormField>
+        {draft.deadlineEntryMode !== "exact" ? (
+          <FormField label="Received date/time">
+            <input
+              className="field-control"
+              onChange={(event) => updateDeadlineReceivedAt(event.target.value)}
+              type="datetime-local"
+              value={draft.deadlineReceivedAt}
+            />
+          </FormField>
+        ) : null}
         <FormField label="Assessment deadline">
           <input
             className="field-control"
@@ -466,6 +531,8 @@ function createDraft(interview?: Interview, suggestedRound?: number): InterviewD
   return {
     dateTime: toDateTimeLocal(interview?.dateTime),
     deadline: toDateTimeLocal(interview?.deadline),
+    deadlineEntryMode: interview?.deadlineEntryMode ?? "exact",
+    deadlineReceivedAt: toDateTimeLocal(interview?.deadlineReceivedAt),
     location: interview?.location ?? "",
     meetingUrl: interview?.meetingUrl ?? "",
     mode: interview?.mode ?? "unknown",
@@ -484,6 +551,8 @@ function toInterviewUpdate(
   return {
     dateTime: trimOptional(draft.dateTime),
     deadline: trimOptional(draft.deadline),
+    deadlineEntryMode: draft.deadlineEntryMode,
+    deadlineReceivedAt: trimOptional(draft.deadlineReceivedAt),
     location: trimOptional(draft.location),
     meetingUrl: trimOptional(draft.meetingUrl),
     mode: draft.mode,
@@ -537,7 +606,21 @@ function formatOptionalDateTime(value?: string) {
 }
 
 function toDateTimeLocal(value?: string) {
-  return value?.slice(0, 16) ?? "";
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 16);
+  }
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function trimOptional(value: string) {

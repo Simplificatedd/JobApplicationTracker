@@ -85,6 +85,8 @@ export interface Application {
   interviewPlatform?: string;
   interviewProctored: boolean;
   interviewDeadline?: string;
+  interviewDeadlineEntryMode?: DeadlineEntryMode;
+  interviewDeadlineReceivedAt?: string;
   deadlineEntryMode: DeadlineEntryMode;
   nextAction?: string;
   priority: Priority;

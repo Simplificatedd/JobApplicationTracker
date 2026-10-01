@@ -102,6 +102,24 @@ describe("buildInterviewRecord", () => {
     ).toMatchObject({ applicationId: application.id, dateTime: undefined });
   });
 
+  it("uses interview-specific deadline timing metadata", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          deadlineEntryMode: "1_day",
+          interviewDeadlineEntryMode: "3_days",
+          interviewDeadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+        },
+        [],
+        "2026-09-21T09:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadlineEntryMode: "3_days",
+      deadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+    });
+  });
+
   it("does not rewrite history after the application leaves interviewing", () => {
     expect(
       buildInterviewRecord(
@@ -144,6 +162,20 @@ describe("reconcileCanonicalInterviews", () => {
       dateTime: "2026-09-22T10:00",
       location: "Career centre",
       round: 1,
+    });
+  });
+
+  it("projects interview deadline timing metadata back to the application", () => {
+    const timedInterview: Interview = {
+      ...firstRound,
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: "2026-09-21T08:00:00.000Z",
+    };
+    const result = reconcileCanonicalInterviews([application], [timedInterview]);
+
+    expect(result.applications[0]).toMatchObject({
+      interviewDeadlineEntryMode: "2_days",
+      interviewDeadlineReceivedAt: "2026-09-21T08:00:00.000Z",
     });
   });
 

@@ -1753,6 +1753,8 @@ function hasInterviewChange(input: ApplicationUpdate) {
   return [
     "interviewDateTime",
     "interviewDeadline",
+    "interviewDeadlineEntryMode",
+    "interviewDeadlineReceivedAt",
     "interviewLocation",
     "interviewMeetingUrl",
     "interviewMode",
