@@ -177,7 +177,7 @@ export function createApplicationsCsv({
     application.followUpNeeded ? "compulsory" : "optional",
     application.followUpDate,
     application.followUpAutoResetEnabled ? "yes" : "no",
-    application.followUpPromptDays,
+    application.followUpPromptDays?.toString(),
     application.interviewDateTime,
     application.interviewDeadline,
     application.offerDeadline,
