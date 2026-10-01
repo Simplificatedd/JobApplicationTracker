@@ -337,6 +337,35 @@ function NotificationItem({
             Deadline
           </SmallActionButton>
         ) : null}
+        {notification.type === "offer_deadline" ? (
+          <>
+            <SmallActionButton
+              label="Mark offer accepted"
+              onClick={() =>
+                onUpdateApplication(notification.applicationId, {
+                  status: "Accepted",
+                })
+              }
+            >
+              <CalendarCheck aria-hidden="true" size={14} />
+              Accepted
+            </SmallActionButton>
+            <SmallActionButton
+              label="Change offer deadline"
+              onClick={() =>
+                changeDate(
+                  notification,
+                  onUpdateApplication,
+                  onUpdateInterview,
+                  "offer_deadline",
+                )
+              }
+            >
+              <CalendarClock aria-hidden="true" size={14} />
+              Deadline
+            </SmallActionButton>
+          </>
+        ) : null}
       </div>
     </article>
   );
@@ -368,7 +397,7 @@ function changeDate(
   notification: ReminderNotification,
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void,
   onUpdateInterview: (id: string, input: InterviewUpdate) => void,
-  mode: "follow_up" | "interview" | "deadline",
+  mode: "follow_up" | "interview" | "deadline" | "offer_deadline",
 ) {
   const isFollowUp = mode === "follow_up";
   const nextValue = window.prompt(
@@ -396,6 +425,13 @@ function changeDate(
     onUpdateApplication(notification.applicationId, {
       followUpDate: trimmedValue,
       followUpNeeded: true,
+    });
+    return;
+  }
+
+  if (mode === "offer_deadline") {
+    onUpdateApplication(notification.applicationId, {
+      offerDeadline: trimmedValue,
     });
     return;
   }
