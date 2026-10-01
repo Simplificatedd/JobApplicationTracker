@@ -41,7 +41,10 @@ import {
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
 import { StatusBadge } from "./StatusBadge";
-import { FollowUpScheduleControls } from "./FollowUpControls";
+import {
+  FollowUpAutoResetControls,
+  FollowUpScheduleControls,
+} from "./FollowUpControls";
 
 export function DescriptionPreview({ description }: { description: string }) {
   return (
@@ -148,6 +151,105 @@ export function FollowUpCell({
         />
         <QuickEditActions
           label="follow-up"
+          onCancel={() => setIsEditing(false)}
+          onConfirm={save}
+        />
+      </AnchoredQuickEdit>
+    </>
+  );
+}
+
+export function FollowUpAutoResetCell({
+  application,
+  onUpdate,
+}: {
+  application: JobApplication;
+  onUpdate: (input: ApplicationUpdate) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEnabled, setDraftEnabled] = useState(
+    application.followUpAutoResetEnabled ?? false,
+  );
+  const [draftPromptDays, setDraftPromptDays] = useState(
+    String(application.followUpPromptDays ?? ""),
+  );
+  const [error, setError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  function startEditing() {
+    setDraftEnabled(application.followUpAutoResetEnabled ?? false);
+    setDraftPromptDays(String(application.followUpPromptDays ?? ""));
+    setError("");
+    setIsEditing(true);
+  }
+
+  function save() {
+    if (!draftEnabled) {
+      onUpdate({ followUpAutoResetEnabled: false });
+      setIsEditing(false);
+      return;
+    }
+
+    const promptDays = Number(draftPromptDays || 7);
+
+    if (!Number.isInteger(promptDays) || promptDays < 1) {
+      setError("Auto-reset days must be a positive whole number.");
+      return;
+    }
+
+    onUpdate({
+      followUpAutoResetEnabled: true,
+      followUpPromptDays: promptDays,
+    });
+    setIsEditing(false);
+  }
+
+  return (
+    <>
+      <button
+        aria-expanded={isEditing}
+        aria-haspopup="dialog"
+        aria-label="Quick edit follow-up auto-reset"
+        className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+        onClick={startEditing}
+        ref={triggerRef}
+        type="button"
+      >
+        <span className="truncate text-sm text-foreground">
+          {application.followUpAutoResetEnabled
+            ? `${application.followUpPromptDays ?? 7} days`
+            : "Off"}
+        </span>
+        <Pencil
+          aria-hidden="true"
+          className="shrink-0 text-muted"
+          size={14}
+        />
+      </button>
+      <AnchoredQuickEdit
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="Edit follow-up auto-reset"
+        triggerRef={triggerRef}
+      >
+        <FollowUpAutoResetControls
+          defaultPromptDays={7}
+          enabled={draftEnabled}
+          onEnabledChange={(value) => {
+            setDraftEnabled(value);
+            setError("");
+          }}
+          onPromptDaysChange={(value) => {
+            setDraftPromptDays(value);
+            setError("");
+          }}
+          promptDays={draftPromptDays}
+        />
+        {error ? (
+          <p className="text-xs font-medium text-destructive">{error}</p>
+        ) : null}
+        <QuickEditActions
+          label="follow-up auto-reset"
           onCancel={() => setIsEditing(false)}
           onConfirm={save}
         />

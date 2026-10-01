@@ -351,7 +351,8 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   dateApplied: "Date you submitted the application.",
   offerDeadline: "Date and time by which the pending offer needs a response.",
   followUp: "Follow-up date and whether the follow-up is needed.",
-  followUpPromptDays: "Default reminder timing for follow-up prompts.",
+  followUpPromptDays:
+    "Whether handling a follow-up schedules another one, and after how many days.",
   interviewDateTime: "Scheduled interview date and time.",
   interviewRound: "Current interview round for this application.",
   interviewType: "Interview format, such as technical or face-to-face.",
@@ -599,7 +600,7 @@ function MoreFiltersModal({
 
           <FilterSelect
             icon={SlidersHorizontal}
-            label="Follow-up prompt"
+            label="Follow-up auto-reset"
             onChange={(value) =>
               onFilterChange?.({
                 followUpPromptDays: value as ApplicationFilters["followUpPromptDays"],
@@ -607,7 +608,8 @@ function MoreFiltersModal({
             }
             value={currentFilters.followUpPromptDays}
           >
-            <option value="">Follow-up prompt</option>
+            <option value="">Follow-up auto-reset</option>
+            <option value="off">Off</option>
             <option value="1">1 day</option>
             <option value="3">3 days</option>
             <option value="7">7 days</option>

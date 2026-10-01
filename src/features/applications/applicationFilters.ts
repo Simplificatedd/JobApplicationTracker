@@ -14,7 +14,7 @@ export type FollowUpFilter = "" | "needed" | "optional";
 export type InterviewFilter = "" | "scheduled" | "unscheduled";
 export type ContactFilter = "" | "linked" | "none";
 export type DeadlineFilter = "" | "scheduled" | "blank" | "overdue" | "upcoming";
-export type FollowUpPromptFilter = "" | "1" | "3" | "7" | "14_plus";
+export type FollowUpPromptFilter = "" | "off" | "1" | "3" | "7" | "14_plus";
 export type InterviewRoundFilter = "" | "1" | "2" | "3_plus";
 export type PresenceFilter = "" | "filled" | "blank";
 export type ResumeFilter = "" | "assigned" | "unassigned";
@@ -238,6 +238,7 @@ export function applyApplicationFilters(
     if (
       filters.followUpPromptDays &&
       !matchesFollowUpPromptDays(
+        application.followUpAutoResetEnabled ?? false,
         application.followUpPromptDays,
         filters.followUpPromptDays,
       )
@@ -432,7 +433,9 @@ function getSortValue(application: Application, column: SortColumn) {
   }
 
   if (column === "followUpPromptDays") {
-    return application.followUpPromptDays ?? 0;
+    return application.followUpAutoResetEnabled
+      ? application.followUpPromptDays ?? 7
+      : 0;
   }
 
   if (column === "interviewRound") {
@@ -504,9 +507,18 @@ function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
 }
 
 function matchesFollowUpPromptDays(
+  enabled: boolean,
   value: number | undefined,
   filter: FollowUpPromptFilter,
 ) {
+  if (filter === "off") {
+    return !enabled;
+  }
+
+  if (!enabled) {
+    return false;
+  }
+
   const days = value ?? 7;
 
   if (filter === "14_plus") {

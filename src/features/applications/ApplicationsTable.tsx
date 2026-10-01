@@ -17,6 +17,7 @@ import {
 import {
   ContactsButton,
   DescriptionPreview,
+  FollowUpAutoResetCell,
   FollowUpCell,
   InterviewCell,
   ResumeCell,
@@ -203,7 +204,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "followUpPromptDays",
     key: "followUpPromptDays",
-    label: "Follow-up Prompt Days",
+    label: "Auto-reset",
     minWidth: 104,
     width: 180,
   },
@@ -1027,7 +1028,12 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "followUpPromptDays") {
-    return <TextCell value={`${application.followUpPromptDays ?? 7} days`} />;
+    return (
+      <FollowUpAutoResetCell
+        application={application}
+        onUpdate={(input) => onUpdateApplication(application.id, input)}
+      />
+    );
   }
 
   if (columnId === "interviewRound") {
