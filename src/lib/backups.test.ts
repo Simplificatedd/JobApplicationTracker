@@ -134,6 +134,34 @@ describe("parseBackupFile", () => {
       });
   });
 
+  it("materializes legacy derived follow-up dates during backup import", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          dateApplied: "2026-09-24",
+          followUpNeeded: true,
+        }),
+      ],
+      settings: {
+        ...DEFAULT_USER_SETTINGS,
+        defaultFollowUpPromptDays: 3,
+      },
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({
+        snapshot: {
+          applications: [
+            {
+              followUpAutoResetEnabled: false,
+              followUpDate: "2026-09-27",
+              followUpNeeded: true,
+            },
+          ],
+        },
+      });
+  });
+
   it("rejects invalid follow-up auto-reset flags", async () => {
     const application = {
       ...createApplication(),

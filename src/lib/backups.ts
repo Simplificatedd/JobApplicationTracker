@@ -11,6 +11,7 @@ import type {
   ResumeMetadata,
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
+import { migrateLegacyFollowUpSchedule } from "./followUps";
 import { normalizeStatusActivities } from "./statusHistory";
 
 export const BACKUP_SCHEMA_VERSION = 2;
@@ -130,13 +131,20 @@ export async function parseBackupFile(file: File) {
         hasLegacyOfferSemantics,
       ),
       dataVersion: TRACKER_DATA_VERSION,
-      applications: backup.snapshot.applications.map((application) => ({
-        ...application,
-        status:
-          hasLegacyOfferSemantics && application.status === "Offered"
-            ? "Accepted"
-            : normalizeApplicationStatus(application.status),
-      })),
+      applications: backup.snapshot.applications.map((application) => {
+        const migratedApplication = migrateLegacyFollowUpSchedule(
+          application,
+          backup.snapshot.settings.defaultFollowUpPromptDays,
+        );
+
+        return {
+          ...migratedApplication,
+          status:
+            hasLegacyOfferSemantics && application.status === "Offered"
+              ? "Accepted"
+              : normalizeApplicationStatus(application.status),
+        };
+      }),
     },
   } satisfies TrackerBackup;
 }
