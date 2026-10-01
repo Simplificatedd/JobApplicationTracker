@@ -13,6 +13,7 @@ import { deriveApplicationNotifications } from "../../lib/reminders";
 export type FollowUpFilter = "" | "needed" | "optional";
 export type InterviewFilter = "" | "scheduled" | "unscheduled";
 export type ContactFilter = "" | "linked" | "none";
+export type DeadlineFilter = "" | "scheduled" | "blank" | "overdue" | "upcoming";
 export type FollowUpPromptFilter = "" | "1" | "3" | "7" | "14_plus";
 export type InterviewRoundFilter = "" | "1" | "2" | "3_plus";
 export type PresenceFilter = "" | "filled" | "blank";
@@ -29,6 +30,7 @@ export type SortColumn =
   | "applicationUrl"
   | "status"
   | "dateApplied"
+  | "offerDeadline"
   | "roleStartDate"
   | "roleEndDate"
   | "followUp"
@@ -53,6 +55,7 @@ export interface ApplicationFilters {
   contacts: ContactFilter;
   coverLetterVersion: PresenceFilter;
   dateApplied: PresenceFilter;
+  offerDeadline: DeadlineFilter;
   followUp: FollowUpFilter;
   followUpPromptDays: FollowUpPromptFilter;
   interview: InterviewFilter;
@@ -84,6 +87,7 @@ export const DEFAULT_APPLICATION_FILTERS: ApplicationFilters = {
   contacts: "",
   coverLetterVersion: "",
   dateApplied: "",
+  offerDeadline: "",
   followUp: "",
   followUpPromptDays: "",
   interview: "",
@@ -120,6 +124,7 @@ const APPLICATION_SORT_COLUMNS: SortColumn[] = [
   "applicationUrl",
   "status",
   "dateApplied",
+  "offerDeadline",
   "roleStartDate",
   "roleEndDate",
   "followUp",
@@ -221,6 +226,13 @@ export function applyApplicationFilters(
     if (
       filters.dateApplied &&
       !matchesPresence(application.dateApplied, filters.dateApplied)
+    ) {
+      return false;
+    }
+
+    if (
+      filters.offerDeadline &&
+      !matchesDeadline(application.offerDeadline, filters.offerDeadline)
     ) {
       return false;
     }
@@ -412,6 +424,7 @@ function getSortValue(application: Application, column: SortColumn) {
 
   if (
     column === "dateApplied" ||
+    column === "offerDeadline" ||
     column === "roleStartDate" ||
     column === "roleEndDate" ||
     column === "interviewDateTime" ||
@@ -475,6 +488,25 @@ function matchesPresence(value: string | undefined, filter: PresenceFilter) {
 
 function normalizeFilterValue(value: string | undefined) {
   return value?.trim().replace(/\s+/g, " ").toLocaleLowerCase() ?? "";
+}
+
+function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
+  if (filter === "scheduled" || filter === "blank") {
+    return matchesPresence(value, filter === "scheduled" ? "filled" : "blank");
+  }
+
+  if (!value) {
+    return false;
+  }
+
+  const today = startOfDay(new Date());
+  const deadline = startOfDay(new Date(value));
+
+  if (filter === "overdue") {
+    return deadline < today;
+  }
+
+  return deadline >= today && deadline <= addDays(today, 7);
 }
 
 function matchesFollowUpPromptDays(

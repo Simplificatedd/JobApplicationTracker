@@ -82,13 +82,16 @@ describe("createApplicationsCsv", () => {
         createApplication({
           deadline: "2026-09-25T12:00",
           interviewDeadline: "2026-09-26T12:00",
+          offerDeadline: "2026-09-27T12:00",
         }),
       ],
       resumes: [],
     }).text();
 
     expect(csv).toContain("interview_deadline");
+    expect(csv).toContain("offer_deadline");
     expect(csv).toContain("2026-09-26T12:00");
+    expect(csv).toContain("2026-09-27T12:00");
     expect(csv).not.toContain("2026-09-25T12:00");
   });
 });
