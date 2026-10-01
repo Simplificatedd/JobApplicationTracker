@@ -99,7 +99,7 @@ describe("deriveApplicationNotifications", () => {
   });
 
   it.each([
-    ["2026-09-23T17:00", "due_soon"],
+    ["2026-09-23T10:00", "due_soon"],
     ["2026-09-20T17:00", "due_today"],
     ["2026-09-19T17:00", "overdue"],
   ] as const)(
@@ -112,7 +112,7 @@ describe("deriveApplicationNotifications", () => {
           status: "Offered",
         },
         { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
-        new Date("2026-09-20T12:00:00.000Z"),
+        new Date("2026-09-20T12:00"),
       );
 
       expect(notifications).toEqual([
@@ -134,7 +134,7 @@ describe("deriveApplicationNotifications", () => {
         status: "Offered",
       },
       { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
-      new Date("2026-09-20T12:00:00.000Z"),
+      new Date("2026-09-20T12:00"),
     );
 
     expect(notifications).toEqual([]);
@@ -148,7 +148,7 @@ describe("deriveApplicationNotifications", () => {
         status: "Accepted",
       },
       DEFAULT_USER_SETTINGS,
-      new Date("2026-09-20T12:00:00.000Z"),
+      new Date("2026-09-20T12:00"),
     );
 
     expect(notifications).toEqual([]);
