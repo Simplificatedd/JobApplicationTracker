@@ -3,7 +3,9 @@ import {
   createFollowUpScheduleUpdate,
   createHandledFollowUpUpdate,
   normalizeFollowUpDateInput,
+  normalizeFollowUpPromptDays,
   scheduleFollowUpAfterDays,
+  validateFollowUpAutoReset,
   validateFollowUpSchedule,
 } from "./followUps";
 
@@ -66,6 +68,24 @@ describe("scheduleFollowUpAfterDays", () => {
   });
 });
 
+describe("follow-up auto-reset validation", () => {
+  it("uses the configured fallback when the field is blank", () => {
+    expect(normalizeFollowUpPromptDays("", 3)).toBe(3);
+  });
+
+  it.each([-1, 0, 1.5, "tomorrow"])(
+    "rejects invalid prompt days %s",
+    (days) => {
+      expect(normalizeFollowUpPromptDays(days)).toBeNull();
+      expect(validateFollowUpAutoReset(true, days)).toContain("positive");
+    },
+  );
+
+  it("does not block invalid stored timing while auto-reset is disabled", () => {
+    expect(validateFollowUpAutoReset(false, -1)).toBeUndefined();
+  });
+});
+
 describe("createHandledFollowUpUpdate", () => {
   const now = new Date(2026, 9, 1, 14, 30);
 
@@ -106,5 +126,18 @@ describe("createHandledFollowUpUpdate", () => {
         now,
       ),
     ).toEqual({ followUpDate: "2026-10-08", followUpNeeded: false });
+  });
+
+  it("uses the safe default for a malformed legacy interval", () => {
+    expect(
+      createHandledFollowUpUpdate(
+        {
+          followUpAutoResetEnabled: true,
+          followUpNeeded: true,
+          followUpPromptDays: -3,
+        },
+        now,
+      ),
+    ).toEqual({ followUpDate: "2026-10-08", followUpNeeded: true });
   });
 });

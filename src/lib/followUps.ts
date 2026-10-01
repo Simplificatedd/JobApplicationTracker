@@ -63,6 +63,30 @@ export function scheduleFollowUpAfterDays(days: number, now = new Date()) {
   return formatLocalDate(date);
 }
 
+export function normalizeFollowUpPromptDays(
+  value: string | number | undefined,
+  fallback = DEFAULT_FOLLOW_UP_PROMPT_DAYS,
+) {
+  const normalizedValue =
+    typeof value === "string" && !value.trim() ? fallback : Number(value ?? fallback);
+
+  return Number.isInteger(normalizedValue) && normalizedValue >= 1
+    ? normalizedValue
+    : null;
+}
+
+export function validateFollowUpAutoReset(
+  enabled: boolean,
+  promptDays: string | number | undefined,
+  fallback = DEFAULT_FOLLOW_UP_PROMPT_DAYS,
+) {
+  if (!enabled || normalizeFollowUpPromptDays(promptDays, fallback) !== null) {
+    return undefined;
+  }
+
+  return "Auto-reset days must be a positive whole number.";
+}
+
 export function createHandledFollowUpUpdate(
   application: Pick<
     Application,
@@ -79,12 +103,13 @@ export function createHandledFollowUpUpdate(
     };
   }
 
+  const promptDays =
+    normalizeFollowUpPromptDays(application.followUpPromptDays) ??
+    DEFAULT_FOLLOW_UP_PROMPT_DAYS;
+
   return {
     followUpDate:
-      scheduleFollowUpAfterDays(
-        application.followUpPromptDays ?? DEFAULT_FOLLOW_UP_PROMPT_DAYS,
-        now,
-      ) ?? undefined,
+      scheduleFollowUpAfterDays(promptDays, now) ?? undefined,
     followUpNeeded: application.followUpNeeded,
   };
 }
