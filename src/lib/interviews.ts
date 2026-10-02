@@ -16,6 +16,9 @@ export interface InterviewReconciliation {
   interviews: Interview[];
 }
 
+export const MAX_DEADLINE_DURATION_DAYS = 3650;
+export const MAX_DEADLINE_DURATION_HOURS = MAX_DEADLINE_DURATION_DAYS * 24;
+
 export function buildInterviewRecord(
   application: Application,
   interviews: Interview[],
@@ -211,8 +214,19 @@ export function calculateDeadlineFromDuration(
   }
 
   const hours = unit === "days" ? amount * 24 : amount;
+  const deadlineTimestamp = receivedDate.getTime() + hours * 60 * 60 * 1000;
+  const deadlineDate = new Date(deadlineTimestamp);
 
-  return new Date(receivedDate.getTime() + hours * 60 * 60 * 1000).toISOString();
+  if (
+    !Number.isFinite(hours) ||
+    hours > MAX_DEADLINE_DURATION_HOURS ||
+    !Number.isFinite(deadlineTimestamp) ||
+    Number.isNaN(deadlineDate.getTime())
+  ) {
+    return undefined;
+  }
+
+  return deadlineDate.toISOString();
 }
 
 export function reconcileCanonicalInterviews(

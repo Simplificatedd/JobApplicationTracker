@@ -658,10 +658,31 @@ describe("calculateDeadlineFromDuration", () => {
     ["", 24],
     ["not-a-date", 24],
     ["2026-10-01T08:00:00.000Z", 0],
+    ["2026-10-01T08:00:00.000Z", -1],
     ["2026-10-01T08:00:00.000Z", Number.NaN],
   ])("rejects invalid duration input", (receivedAt, amount) => {
     expect(
       calculateDeadlineFromDuration(receivedAt, amount, "hours"),
+    ).toBeUndefined();
+  });
+
+  it("rejects a finite duration that exceeds the supported range", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        Number.MAX_VALUE,
+        "hours",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects a result outside JavaScript's valid date range", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "+275760-09-12T00:00:00.000Z",
+        48,
+        "hours",
+      ),
     ).toBeUndefined();
   });
 });

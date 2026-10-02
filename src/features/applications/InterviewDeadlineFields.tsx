@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { calculateDeadlineFromDuration } from "../../lib/interviews";
+import {
+  calculateDeadlineFromDuration,
+  MAX_DEADLINE_DURATION_DAYS,
+  MAX_DEADLINE_DURATION_HOURS,
+} from "../../lib/interviews";
 
 interface InterviewDeadlineFieldsProps {
   breakpoint?: "sm" | "md";
@@ -46,7 +50,7 @@ export function InterviewDeadlineFields({
     );
 
     if (!suggestedDeadline) {
-      setCustomError("Enter a duration greater than 0.");
+      setCustomError("Enter a duration within the supported range.");
       return;
     }
 
@@ -134,6 +138,11 @@ export function InterviewDeadlineFields({
               <input
                 aria-label="Custom duration amount"
                 className="field-control w-28"
+                max={
+                  customUnit === "days"
+                    ? MAX_DEADLINE_DURATION_DAYS
+                    : MAX_DEADLINE_DURATION_HOURS
+                }
                 min="0.01"
                 onChange={(event) => {
                   setCustomAmount(event.target.value);
