@@ -128,8 +128,8 @@ export function InterviewsSection({
 
   async function deleteInterview(interview: Interview) {
     const label = interview.round
-      ? `interview ${interview.round}`
-      : "this interview";
+      ? `interview or assessment ${interview.round}`
+      : "this interview or assessment";
 
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
 
@@ -143,9 +143,11 @@ export function InterviewsSection({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Interviews</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Interviews &amp; assessments
+          </h3>
           <p className="mt-1 text-sm text-muted">
-            Track each interview round and assessment separately.
+            Track each interview or assessment separately.
           </p>
         </div>
         {!application.archivedAt && editingId === null ? (
@@ -155,7 +157,7 @@ export function InterviewsSection({
             type="button"
           >
             <Plus aria-hidden="true" size={16} />
-            Add interview
+            Add interview or assessment
           </button>
         ) : null}
       </div>
@@ -181,7 +183,7 @@ export function InterviewsSection({
       <div className="mt-3 grid gap-3">
         {sortedInterviews.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted">
-            No interviews added yet.
+            No interviews or assessments added yet.
           </p>
         ) : (
           sortedInterviews.map((interview) => (
@@ -217,7 +219,9 @@ function InterviewCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-foreground">
-            {interview.round ? `Round ${interview.round}` : "Interview"}
+            {interview.round
+              ? `Round or stage ${interview.round}`
+              : "Interview or assessment"}
           </h4>
           <p className="mt-1 text-sm text-muted">
             {getOptionLabel(INTERVIEW_TYPE_OPTIONS, interview.type)} /{" "}
@@ -227,7 +231,7 @@ function InterviewCard({
         {!application.archivedAt ? (
           <div className="flex shrink-0 gap-1">
             <button
-              aria-label="Edit interview"
+              aria-label="Edit interview or assessment"
               className="icon-button"
               onClick={onEdit}
               type="button"
@@ -235,7 +239,7 @@ function InterviewCard({
               <Pencil aria-hidden="true" size={16} />
             </button>
             <button
-              aria-label="Delete interview"
+              aria-label="Delete interview or assessment"
               className="icon-button text-destructive"
               onClick={onDelete}
               type="button"
@@ -248,12 +252,12 @@ function InterviewCard({
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <InterviewDetail label="Scheduled" value={formatOptionalDateTime(interview.dateTime)} />
         <InterviewDetail label="Deadline" value={formatOptionalDateTime(interview.deadline)} />
-        <InterviewDetail label="Location" value={interview.location} />
-        <InterviewDetail label="Platform" value={interview.platform} />
+        <InterviewDetail label="Location or address" value={interview.location} />
+        <InterviewDetail label="Platform or provider" value={interview.platform} />
         <InterviewDetail label="Proctored" value={interview.proctored ? "Yes" : "No"} />
         {safeMeetingUrl ? (
           <div>
-            <p className="text-xs font-semibold uppercase text-muted">Meeting</p>
+            <p className="text-xs font-semibold uppercase text-muted">Link</p>
             <a
               className="mt-1 inline-flex items-center gap-1 font-medium text-primary hover:text-blue-700"
               href={safeMeetingUrl}
@@ -264,7 +268,7 @@ function InterviewCard({
             </a>
           </div>
         ) : (
-          <InterviewDetail label="Meeting" />
+          <InterviewDetail label="Link" />
         )}
       </div>
       {interview.notes ? (
@@ -345,10 +349,10 @@ function InterviewForm({
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-foreground">
-          {isNew ? "Add interview" : "Edit interview"}
+          {isNew ? "Add interview or assessment" : "Edit interview or assessment"}
         </h4>
         <button
-          aria-label="Cancel interview editing"
+          aria-label="Cancel interview or assessment editing"
           className="icon-button"
           disabled={isSaving}
           onClick={onCancel}
@@ -358,7 +362,7 @@ function InterviewForm({
         </button>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <FormField label="Interview round">
+        <FormField label="Round or stage number">
           <input
             className="field-control"
             min="1"
@@ -368,7 +372,7 @@ function InterviewForm({
             value={draft.round}
           />
         </FormField>
-        <FormField label="Interview type">
+        <FormField label="Stage type">
           <select
             className="field-control"
             onChange={(event) => update("type", event.target.value as InterviewType)}
@@ -380,9 +384,9 @@ function InterviewForm({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted">The category or stage of the interview.</p>
+          <p className="mt-1 text-xs text-muted">What this step involves.</p>
         </FormField>
-        <FormField label="Interview mode">
+        <FormField label="Format">
           <select
             className="field-control"
             onChange={(event) => update("mode", event.target.value as InterviewMode)}
@@ -394,9 +398,9 @@ function InterviewForm({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted">How the interview is conducted.</p>
+          <p className="mt-1 text-xs text-muted">How this step takes place.</p>
         </FormField>
-        <FormField label="Interview date/time">
+        <FormField label="Scheduled date/time">
           <input
             className="field-control"
             onChange={(event) => update("dateTime", event.target.value)}
@@ -404,7 +408,7 @@ function InterviewForm({
             value={draft.dateTime}
           />
         </FormField>
-        <FormField label="Location">
+        <FormField label="Location or address">
           <input
             className="field-control"
             onChange={(event) => update("location", event.target.value)}
@@ -412,7 +416,7 @@ function InterviewForm({
             value={draft.location}
           />
         </FormField>
-        <FormField label="Meeting URL">
+        <FormField label="Interview or assessment link">
           <input
             className="field-control"
             onChange={(event) => update("meetingUrl", event.target.value)}
@@ -420,7 +424,7 @@ function InterviewForm({
             value={draft.meetingUrl}
           />
         </FormField>
-        <FormField label="Platform">
+        <FormField label="Platform or provider">
           <input
             className="field-control"
             onChange={(event) => update("platform", event.target.value)}
@@ -471,9 +475,9 @@ function InterviewForm({
             onChange={(event) => update("proctored", event.target.checked)}
             type="checkbox"
           />
-          <span>Proctored assessment</span>
+          <span>This assessment is proctored</span>
         </label>
-        <FormField className="sm:col-span-2" label="Interview notes">
+        <FormField className="sm:col-span-2" label="Notes">
           <textarea
             className="field-control min-h-24 resize-y"
             onChange={(event) => update("notes", event.target.value)}
@@ -501,7 +505,11 @@ function InterviewForm({
           onClick={onSave}
           type="button"
         >
-          {isSaving ? "Saving…" : isNew ? "Add interview" : "Save interview"}
+          {isSaving
+            ? "Saving…"
+            : isNew
+              ? "Add interview or assessment"
+              : "Save interview or assessment"}
         </button>
       </div>
     </div>

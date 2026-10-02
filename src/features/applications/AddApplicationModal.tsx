@@ -582,10 +582,10 @@ export function AddApplicationModal({
                   className="text-sm font-semibold text-foreground md:col-span-2"
                   id="initial-interview-details-heading"
                 >
-                  Interview details
+                  Interview or assessment details
                 </h3>
 
-                <Field label="Interview Round">
+                <Field label="Round or stage number">
                   <input
                     aria-describedby={
                       interviewRoundError ? "interview-round-error" : undefined
@@ -610,7 +610,7 @@ export function AddApplicationModal({
                   ) : null}
                 </Field>
 
-                <Field label="Interview Date/Time">
+                <Field label="Scheduled date/time">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -621,7 +621,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Interview Type">
+                <Field label="Stage type">
                   <select
                     className="field-control"
                     onChange={(event) =>
@@ -641,7 +641,7 @@ export function AddApplicationModal({
                   </select>
                 </Field>
 
-                <Field label="Interview Mode">
+                <Field label="Format">
                   <select
                     className="field-control"
                     onChange={(event) =>
@@ -661,7 +661,7 @@ export function AddApplicationModal({
                   </select>
                 </Field>
 
-                <Field label="Interview Location">
+                <Field label="Location or address">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -672,7 +672,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Meeting URL">
+                <Field label="Interview or assessment link">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -683,7 +683,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Interview Platform">
+                <Field label="Platform or provider">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -703,7 +703,7 @@ export function AddApplicationModal({
                     }
                     type="checkbox"
                   />
-                  <span>Proctored assessment</span>
+                  <span>This assessment is proctored</span>
                 </label>
 
                 <Field label="Deadline Timing">

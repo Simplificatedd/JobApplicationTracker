@@ -27,7 +27,7 @@ export function validateInterviewRound(
 
   if (!Number.isInteger(round) || round < 1) {
     return {
-      error: "Interview round must be a positive whole number or left blank.",
+      error: "Round or stage number must be a positive whole number or left blank.",
       warnings: [],
     };
   }

@@ -15,12 +15,12 @@ export const INTERVIEW_TYPE_OPTIONS: ReadonlyArray<{
   label: string;
   value: InterviewType;
 }> = [
-  { label: "Unknown", value: "unknown" },
-  { label: "Technical", value: "technical" },
-  { label: "Recruiter", value: "recruiter" },
-  { label: "Face-to-face", value: "face-to-face" },
-  { label: "HireVue", value: "HireVue" },
-  { label: "HackerRank", value: "HackerRank" },
+  { label: "Not specified", value: "unknown" },
+  { label: "Technical interview", value: "technical" },
+  { label: "Recruiter screen", value: "recruiter" },
+  { label: "In-person interview", value: "face-to-face" },
+  { label: "HireVue assessment", value: "HireVue" },
+  { label: "HackerRank assessment", value: "HackerRank" },
   { label: "Other", value: "other" },
 ];
 
@@ -28,11 +28,11 @@ export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
   label: string;
   value: InterviewMode;
 }> = [
-  { label: "Unknown", value: "unknown" },
-  { label: "Online / video call", value: "video" },
-  { label: "Phone", value: "phone" },
-  { label: "Onsite", value: "onsite" },
-  { label: "Take-home / assessment", value: "take-home" },
+  { label: "Not specified", value: "unknown" },
+  { label: "Video call", value: "video" },
+  { label: "Phone call", value: "phone" },
+  { label: "On-site", value: "onsite" },
+  { label: "Asynchronous / take-home", value: "take-home" },
   { label: "Other", value: "other" },
 ];
 

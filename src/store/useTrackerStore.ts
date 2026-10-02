@@ -695,7 +695,7 @@ export function useTrackerStore(): TrackerStore {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
         return failure(
-          "Interview round must be a positive whole number or left blank.",
+          "Round or stage number must be a positive whole number or left blank.",
         );
       }
 
@@ -772,7 +772,7 @@ export function useTrackerStore(): TrackerStore {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
         return failure(
-          "Interview round must be a positive whole number or left blank.",
+          "Round or stage number must be a positive whole number or left blank.",
         );
       }
 
