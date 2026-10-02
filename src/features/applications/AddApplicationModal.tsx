@@ -11,7 +11,10 @@ import {
   APPLICATION_SOURCES,
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
-import { isAssessmentStage } from "../../lib/interviews";
+import {
+  isAssessmentStage,
+  shouldShowProctored,
+} from "../../lib/interviews";
 import {
   type FollowUpRequirement,
   normalizeFollowUpPromptDays,
@@ -261,10 +264,7 @@ export function AddApplicationModal({
   function updateInterviewType(value: AddApplicationFormState["interviewType"]) {
     setForm((current) => ({
       ...current,
-      interviewProctored: isAssessmentStage(
-        value ?? "unknown",
-        current.interviewMode ?? "unknown",
-      )
+      interviewProctored: isAssessmentStage(value ?? "unknown")
         ? current.interviewProctored
         : false,
       interviewType: value,
@@ -275,12 +275,6 @@ export function AddApplicationModal({
     setForm((current) => ({
       ...current,
       interviewMode: value,
-      interviewProctored: isAssessmentStage(
-        current.interviewType ?? "unknown",
-        value ?? "unknown",
-      )
-        ? current.interviewProctored
-        : false,
     }));
   }
 
@@ -688,9 +682,9 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                {isAssessmentStage(
+                {shouldShowProctored(
                   form.interviewType ?? "unknown",
-                  form.interviewMode ?? "unknown",
+                  form.interviewProctored,
                 ) ? (
                   <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
                     <input

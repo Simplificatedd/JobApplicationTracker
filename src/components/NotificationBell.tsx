@@ -463,7 +463,6 @@ function changeDate(
   if (notification.interviewId) {
     onUpdateInterview(notification.interviewId, {
       deadline: trimmedValue,
-      proctored: true,
     });
   }
 }

@@ -136,7 +136,7 @@ export function normalizeInterviewClassification(
     platform ||= legacyType;
   }
 
-  if (type === "unknown" && mode === "take-home") {
+  if ((type === "unknown" || type === "other") && mode === "take-home") {
     type = "take-home-assignment";
   }
 
@@ -145,11 +145,20 @@ export function normalizeInterviewClassification(
 
 export function isAssessmentStage(
   type: Interview["type"],
-  mode: Interview["mode"],
 ) {
+  const normalizedType = normalizeInterviewType(type);
+
   return (
-    mode === "take-home" || type === "HireVue" || type === "HackerRank"
+    normalizedType === "take-home-assignment" ||
+    normalizedType === "online-assessment"
   );
+}
+
+export function shouldShowProctored(
+  type: Interview["type"],
+  proctored: boolean,
+) {
+  return proctored || isAssessmentStage(type);
 }
 
 export function calculateInterviewDeadline(interview: Interview) {

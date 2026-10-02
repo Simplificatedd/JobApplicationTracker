@@ -9,6 +9,7 @@ import {
   calculateInterviewDeadline,
   getNextInterviewRound,
   isAssessmentStage,
+  shouldShowProctored,
 } from "../../lib/interviews";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { MutationResult } from "../../store/useTrackerStore";
@@ -254,7 +255,12 @@ function InterviewCard({
         <InterviewDetail label="Deadline" value={formatOptionalDateTime(interview.deadline)} />
         <InterviewDetail label="Location or address" value={interview.location} />
         <InterviewDetail label="Platform or provider" value={interview.platform} />
-        <InterviewDetail label="Proctored" value={interview.proctored ? "Yes" : "No"} />
+        {shouldShowProctored(interview.type, interview.proctored) ? (
+          <InterviewDetail
+            label="Proctored"
+            value={interview.proctored ? "Yes" : "No"}
+          />
+        ) : null}
         {safeMeetingUrl ? (
           <div>
             <p className="text-xs font-semibold uppercase text-muted">Link</p>
@@ -316,21 +322,13 @@ function InterviewForm({
   function updateStageType(value: InterviewType) {
     onChange({
       ...draft,
-      proctored: isAssessmentStage(value, draft.mode)
-        ? draft.proctored
-        : false,
+      proctored: isAssessmentStage(value) ? draft.proctored : false,
       type: value,
     });
   }
 
   function updateFormat(value: InterviewMode) {
-    onChange({
-      ...draft,
-      mode: value,
-      proctored: isAssessmentStage(draft.type, value)
-        ? draft.proctored
-        : false,
-    });
+    onChange({ ...draft, mode: value });
   }
 
   function updateDeadlineFields(value: {
@@ -441,7 +439,7 @@ function InterviewForm({
           onChange={updateDeadlineFields}
           receivedAt={draft.deadlineReceivedAt}
         />
-        {isAssessmentStage(draft.type, draft.mode) ? (
+        {shouldShowProctored(draft.type, draft.proctored) ? (
           <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground sm:col-span-2">
             <input
               checked={draft.proctored}

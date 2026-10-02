@@ -12,6 +12,7 @@ import {
   normalizeInterviewType,
   reconcileCanonicalInterviews,
   selectCurrentInterview,
+  shouldShowProctored,
   updateInterviewRecord,
   upsertInterviewHistory,
 } from "./interviews";
@@ -611,15 +612,24 @@ describe("calculateInterviewDeadline", () => {
 
 describe("isAssessmentStage", () => {
   it.each([
-    ["other", "take-home"],
-    ["HireVue", "video"],
-    ["HackerRank", "unknown"],
-  ] as const)("recognizes %s / %s as an assessment", (type, mode) => {
-    expect(isAssessmentStage(type, mode)).toBe(true);
+    "take-home-assignment",
+    "online-assessment",
+    "HireVue",
+    "HackerRank",
+  ] as const)("recognizes %s as an assessment", (type) => {
+    expect(isAssessmentStage(type)).toBe(true);
   });
 
   it("does not classify a live interview as an assessment", () => {
-    expect(isAssessmentStage("technical", "video")).toBe(false);
+    expect(isAssessmentStage("technical-interview")).toBe(false);
+  });
+
+  it("keeps a stored proctored value visible for a live stage", () => {
+    expect(shouldShowProctored("technical-interview", true)).toBe(true);
+  });
+
+  it("hides an empty proctored value for a live stage", () => {
+    expect(shouldShowProctored("technical-interview", false)).toBe(false);
   });
 });
 
