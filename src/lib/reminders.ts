@@ -198,7 +198,7 @@ export function deriveApplicationNotifications(
         interviewId: interview.id,
         severity,
         sortAt: interviewDate.getTime(),
-        title: `Interview${roundLabel} for ${application.jobTitle}`,
+        title: `Scheduled stage${roundLabel} for ${application.jobTitle}`,
         type: "interview",
       });
     }
@@ -230,7 +230,7 @@ export function deriveApplicationNotifications(
         interviewId: interview.id,
         severity,
         sortAt: deadlineDate.getTime(),
-        title: `Interview${roundLabel} deadline for ${application.jobTitle}`,
+        title: `Stage${roundLabel} deadline for ${application.jobTitle}`,
         type: "deadline",
       });
     }

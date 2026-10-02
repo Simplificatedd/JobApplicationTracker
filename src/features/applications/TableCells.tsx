@@ -23,7 +23,10 @@ import {
   useState,
 } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { APPLICATION_STATUSES } from "../../lib/constants";
+import {
+  APPLICATION_STATUSES,
+  getInterviewTypeLabel,
+} from "../../lib/constants";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
 import {
@@ -286,14 +289,14 @@ export function InterviewCell({
     return (
       <QuickEditContainer onCancel={() => setIsEditing(false)}>
         <input
-          aria-label="Interview date and time"
+          aria-label="Scheduled date and time"
           className="field-control h-9 w-full min-w-0 text-xs"
           onChange={(event) => setDraftDateTime(event.target.value)}
           type="datetime-local"
           value={draftDateTime}
         />
         <QuickEditActions
-          label="interview date and time"
+          label="scheduled date and time"
           onCancel={() => setIsEditing(false)}
           onConfirm={() => {
             onUpdate(createInterviewQuickEdit(application, draftDateTime));
@@ -306,7 +309,7 @@ export function InterviewCell({
 
   return (
     <button
-      aria-label="Quick edit interview date and time"
+      aria-label="Quick edit scheduled date and time"
       className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
       onClick={startEditing}
       type="button"
@@ -322,7 +325,7 @@ export function InterviewCell({
         </p>
         {application.interviewType ? (
           <p className="mt-1 truncate text-xs text-muted">
-            {application.interviewType}
+            {getInterviewTypeLabel(application.interviewType)}
           </p>
         ) : null}
       </div>

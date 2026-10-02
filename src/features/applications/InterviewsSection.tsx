@@ -1,6 +1,7 @@
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import {
+  getInterviewTypeLabel,
   INTERVIEW_MODE_OPTIONS,
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
@@ -104,7 +105,7 @@ export function InterviewsSection({
     if (
       roundValidation.warnings.length > 0 &&
       !window.confirm(
-        `${roundValidation.warnings.join("\n")}\n\nSave this interview round anyway?`,
+        `${roundValidation.warnings.join("\n")}\n\nSave this round anyway?`,
       )
     ) {
       return;
@@ -128,9 +129,7 @@ export function InterviewsSection({
   }
 
   async function deleteInterview(interview: Interview) {
-    const label = interview.round
-      ? `interview or assessment ${interview.round}`
-      : "this interview or assessment";
+    const label = interview.round ? `round ${interview.round}` : "this stage";
 
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
 
@@ -158,7 +157,7 @@ export function InterviewsSection({
             type="button"
           >
             <Plus aria-hidden="true" size={16} />
-            Add interview or assessment
+            Add stage
           </button>
         ) : null}
       </div>
@@ -184,7 +183,7 @@ export function InterviewsSection({
       <div className="mt-3 grid gap-3">
         {sortedInterviews.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted">
-            No interviews or assessments added yet.
+            No stages added yet.
           </p>
         ) : (
           sortedInterviews.map((interview) => (
@@ -220,19 +219,17 @@ function InterviewCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-foreground">
-            {interview.round
-              ? `Round or stage ${interview.round}`
-              : "Interview or assessment"}
+            {interview.round ? `Round ${interview.round}` : "Stage"}
           </h4>
           <p className="mt-1 text-sm text-muted">
-            {getOptionLabel(INTERVIEW_TYPE_OPTIONS, interview.type)} /{" "}
+            {getInterviewTypeLabel(interview.type)} /{" "}
             {getOptionLabel(INTERVIEW_MODE_OPTIONS, interview.mode)}
           </p>
         </div>
         {!application.archivedAt ? (
           <div className="flex shrink-0 gap-1">
             <button
-              aria-label="Edit interview or assessment"
+              aria-label="Edit stage"
               className="icon-button"
               onClick={onEdit}
               type="button"
@@ -240,7 +237,7 @@ function InterviewCard({
               <Pencil aria-hidden="true" size={16} />
             </button>
             <button
-              aria-label="Delete interview or assessment"
+              aria-label="Delete stage"
               className="icon-button text-destructive"
               onClick={onDelete}
               type="button"
@@ -346,10 +343,10 @@ function InterviewForm({
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-foreground">
-          {isNew ? "Add interview or assessment" : "Edit interview or assessment"}
+          {isNew ? "Add stage" : "Edit stage"}
         </h4>
         <button
-          aria-label="Cancel interview or assessment editing"
+          aria-label="Cancel stage editing"
           className="icon-button"
           disabled={isSaving}
           onClick={onCancel}
@@ -359,7 +356,7 @@ function InterviewForm({
         </button>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <FormField label="Round or stage number">
+        <FormField label="Round number">
           <input
             className="field-control"
             min="1"
@@ -417,7 +414,7 @@ function InterviewForm({
             value={draft.location}
           />
         </FormField>
-        <FormField label="Interview or assessment link">
+        <FormField label="Link">
           <input
             className="field-control"
             onChange={(event) => update("meetingUrl", event.target.value)}
@@ -481,8 +478,8 @@ function InterviewForm({
           {isSaving
             ? "Saving…"
             : isNew
-              ? "Add interview or assessment"
-              : "Save interview or assessment"}
+              ? "Add stage"
+              : "Save stage"}
         </button>
       </div>
     </div>

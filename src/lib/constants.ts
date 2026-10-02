@@ -17,13 +17,31 @@ export const INTERVIEW_TYPE_OPTIONS: ReadonlyArray<{
 }> = [
   { label: "Not specified", value: "unknown" },
   { label: "Recruiter screen", value: "recruiter-screen" },
-  { label: "Hiring manager interview", value: "hiring-manager-interview" },
-  { label: "Technical interview", value: "technical-interview" },
-  { label: "Behavioral interview", value: "behavioral-interview" },
+  { label: "Hiring manager", value: "hiring-manager-interview" },
+  { label: "Technical", value: "technical-interview" },
+  { label: "Behavioral", value: "behavioral-interview" },
   { label: "Take-home assignment", value: "take-home-assignment" },
   { label: "Online assessment", value: "online-assessment" },
   { label: "Other", value: "other" },
 ];
+
+export function getInterviewTypeLabel(value?: InterviewType) {
+  if (!value) return undefined;
+
+  const option = INTERVIEW_TYPE_OPTIONS.find(
+    (candidate) => candidate.value === value,
+  );
+
+  if (option) return option.label;
+  if (value === "technical") return "Technical";
+  if (value === "recruiter") return "Recruiter screen";
+  if (value === "face-to-face") return "In-person";
+  if (value === "HireVue" || value === "HackerRank") {
+    return "Online assessment";
+  }
+
+  return value;
+}
 
 export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
   label: string;

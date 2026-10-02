@@ -350,7 +350,7 @@ export function AddApplicationModal({
       !skipRoundWarning &&
       roundValidation.warnings.length > 0 &&
       !window.confirm(
-        `${roundValidation.warnings.join("\n")}\n\nSave this interview round anyway?`,
+        `${roundValidation.warnings.join("\n")}\n\nSave this round anyway?`,
       )
     ) {
       return;
@@ -575,7 +575,7 @@ export function AddApplicationModal({
                   Interview or assessment details
                 </h3>
 
-                <Field label="Round or stage number">
+                <Field label="Round number">
                   <input
                     aria-describedby={
                       interviewRoundError ? "interview-round-error" : undefined
@@ -660,7 +660,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Interview or assessment link">
+                <Field label="Link">
                   <input
                     className="field-control"
                     onChange={(event) =>
