@@ -6,6 +6,7 @@ import {
   calculateInterviewDeadline,
   createInterviewRecord,
   getNextInterviewRound,
+  isAssessmentStage,
   isValidInterviewRound,
   reconcileCanonicalInterviews,
   selectCurrentInterview,
@@ -513,6 +514,20 @@ describe("calculateInterviewDeadline", () => {
         deadlineEntryMode: "exact",
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("isAssessmentStage", () => {
+  it.each([
+    ["other", "take-home"],
+    ["HireVue", "video"],
+    ["HackerRank", "unknown"],
+  ] as const)("recognizes %s / %s as an assessment", (type, mode) => {
+    expect(isAssessmentStage(type, mode)).toBe(true);
+  });
+
+  it("does not classify a live interview as an assessment", () => {
+    expect(isAssessmentStage("technical", "video")).toBe(false);
   });
 });
 

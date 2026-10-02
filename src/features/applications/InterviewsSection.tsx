@@ -8,6 +8,7 @@ import { formatDateTime } from "../../lib/format";
 import {
   calculateInterviewDeadline,
   getNextInterviewRound,
+  isAssessmentStage,
 } from "../../lib/interviews";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { MutationResult } from "../../store/useTrackerStore";
@@ -312,6 +313,26 @@ function InterviewForm({
     onChange({ ...draft, [key]: value });
   }
 
+  function updateStageType(value: InterviewType) {
+    onChange({
+      ...draft,
+      proctored: isAssessmentStage(value, draft.mode)
+        ? draft.proctored
+        : false,
+      type: value,
+    });
+  }
+
+  function updateFormat(value: InterviewMode) {
+    onChange({
+      ...draft,
+      mode: value,
+      proctored: isAssessmentStage(draft.type, value)
+        ? draft.proctored
+        : false,
+    });
+  }
+
   function updateDeadlineFields(value: {
     deadline: string;
     receivedAt: string;
@@ -353,7 +374,9 @@ function InterviewForm({
         <FormField label="Stage type">
           <select
             className="field-control"
-            onChange={(event) => update("type", event.target.value as InterviewType)}
+            onChange={(event) =>
+              updateStageType(event.target.value as InterviewType)
+            }
             value={draft.type}
           >
             {INTERVIEW_TYPE_OPTIONS.map((option) => (
@@ -367,7 +390,9 @@ function InterviewForm({
         <FormField label="Format">
           <select
             className="field-control"
-            onChange={(event) => update("mode", event.target.value as InterviewMode)}
+            onChange={(event) =>
+              updateFormat(event.target.value as InterviewMode)
+            }
             value={draft.mode}
           >
             {INTERVIEW_MODE_OPTIONS.map((option) => (
@@ -416,15 +441,17 @@ function InterviewForm({
           onChange={updateDeadlineFields}
           receivedAt={draft.deadlineReceivedAt}
         />
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground sm:col-span-2">
-          <input
-            checked={draft.proctored}
-            className="h-4 w-4 rounded border-border text-primary"
-            onChange={(event) => update("proctored", event.target.checked)}
-            type="checkbox"
-          />
-          <span>This assessment is proctored</span>
-        </label>
+        {isAssessmentStage(draft.type, draft.mode) ? (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground sm:col-span-2">
+            <input
+              checked={draft.proctored}
+              className="h-4 w-4 rounded border-border text-primary"
+              onChange={(event) => update("proctored", event.target.checked)}
+              type="checkbox"
+            />
+            <span>This assessment is proctored</span>
+          </label>
+        ) : null}
         <FormField className="sm:col-span-2" label="Notes">
           <textarea
             className="field-control min-h-24 resize-y"

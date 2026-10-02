@@ -11,6 +11,7 @@ import {
   APPLICATION_SOURCES,
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
+import { isAssessmentStage } from "../../lib/interviews";
 import {
   type FollowUpRequirement,
   normalizeFollowUpPromptDays,
@@ -254,6 +255,32 @@ export function AddApplicationModal({
       ...current,
       interviewDeadline: value.deadline,
       interviewDeadlineReceivedAt: value.receivedAt,
+    }));
+  }
+
+  function updateInterviewType(value: AddApplicationFormState["interviewType"]) {
+    setForm((current) => ({
+      ...current,
+      interviewProctored: isAssessmentStage(
+        value ?? "unknown",
+        current.interviewMode ?? "unknown",
+      )
+        ? current.interviewProctored
+        : false,
+      interviewType: value,
+    }));
+  }
+
+  function updateInterviewMode(value: AddApplicationFormState["interviewMode"]) {
+    setForm((current) => ({
+      ...current,
+      interviewMode: value,
+      interviewProctored: isAssessmentStage(
+        current.interviewType ?? "unknown",
+        value ?? "unknown",
+      )
+        ? current.interviewProctored
+        : false,
     }));
   }
 
@@ -594,8 +621,7 @@ export function AddApplicationModal({
                   <select
                     className="field-control"
                     onChange={(event) =>
-                      updateForm(
-                        "interviewType",
+                      updateInterviewType(
                         event.target
                           .value as AddApplicationFormState["interviewType"],
                       )
@@ -614,8 +640,7 @@ export function AddApplicationModal({
                   <select
                     className="field-control"
                     onChange={(event) =>
-                      updateForm(
-                        "interviewMode",
+                      updateInterviewMode(
                         event.target
                           .value as AddApplicationFormState["interviewMode"],
                       )
@@ -663,17 +688,22 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
-                  <input
-                    checked={form.interviewProctored}
-                    className="h-4 w-4 rounded border-border text-primary"
-                    onChange={(event) =>
-                      updateForm("interviewProctored", event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span>This assessment is proctored</span>
-                </label>
+                {isAssessmentStage(
+                  form.interviewType ?? "unknown",
+                  form.interviewMode ?? "unknown",
+                ) ? (
+                  <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
+                    <input
+                      checked={form.interviewProctored}
+                      className="h-4 w-4 rounded border-border text-primary"
+                      onChange={(event) =>
+                        updateForm("interviewProctored", event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>This assessment is proctored</span>
+                  </label>
+                ) : null}
 
                 <InterviewDeadlineFields
                   breakpoint="md"

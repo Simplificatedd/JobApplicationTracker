@@ -102,6 +102,15 @@ export function isValidInterviewRound(round: number | undefined) {
   return round === undefined || (Number.isInteger(round) && round > 0);
 }
 
+export function isAssessmentStage(
+  type: Interview["type"],
+  mode: Interview["mode"],
+) {
+  return (
+    mode === "take-home" || type === "HireVue" || type === "HackerRank"
+  );
+}
+
 export function calculateInterviewDeadline(interview: Interview) {
   if (interview.deadline) {
     return interview.deadline;
