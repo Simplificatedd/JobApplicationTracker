@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   calculateDeadlineFromDuration,
   MAX_DEADLINE_DURATION_DAYS,
@@ -22,6 +22,7 @@ export function InterviewDeadlineFields({
   onChange,
   receivedAt,
 }: InterviewDeadlineFieldsProps) {
+  const receivedAtId = useId();
   const [customAmount, setCustomAmount] = useState("4");
   const [customError, setCustomError] = useState("");
   const [customUnit, setCustomUnit] = useState<DurationUnit>("days");
@@ -67,18 +68,23 @@ export function InterviewDeadlineFields({
 
   return (
     <div className={`grid gap-4 ${gridClassName}`}>
-      <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-foreground">
+      <div>
+        <label
+          className="mb-1.5 block text-sm font-medium text-foreground"
+          htmlFor={receivedAtId}
+        >
           Invitation received at
-        </span>
+        </label>
         <div className="flex gap-2">
           <input
             className="field-control min-w-0"
+            id={receivedAtId}
             onChange={(event) => updateReceivedAt(event.target.value)}
             type="datetime-local"
             value={receivedAt}
           />
           <button
+            aria-label="Set invitation received time to now"
             className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={() => updateReceivedAt(toDateTimeLocal(new Date()))}
             type="button"
@@ -86,7 +92,7 @@ export function InterviewDeadlineFields({
             Now
           </button>
         </div>
-      </label>
+      </div>
 
       <label className="block">
         <span className="mb-1.5 block text-sm font-medium text-foreground">
