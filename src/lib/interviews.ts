@@ -121,12 +121,6 @@ export function suggestInterviewDeadline(
     return undefined;
   }
 
-  const receivedDate = new Date(receivedAt);
-
-  if (Number.isNaN(receivedDate.getTime())) {
-    return undefined;
-  }
-
   const hoursByMode = {
     "1_day": 24,
     "2_days": 48,
@@ -134,9 +128,32 @@ export function suggestInterviewDeadline(
     "72_hours": 72,
   } satisfies Record<Exclude<DeadlineEntryMode, "exact">, number>;
 
-  return new Date(
-    receivedDate.getTime() + hoursByMode[entryMode] * 60 * 60 * 1000,
-  ).toISOString();
+  return calculateDeadlineFromDuration(
+    receivedAt,
+    hoursByMode[entryMode],
+    "hours",
+  );
+}
+
+export function calculateDeadlineFromDuration(
+  receivedAt: string,
+  amount: number,
+  unit: "hours" | "days",
+) {
+  const receivedDate = new Date(receivedAt);
+
+  if (
+    !receivedAt ||
+    Number.isNaN(receivedDate.getTime()) ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return undefined;
+  }
+
+  const hours = unit === "days" ? amount * 24 : amount;
+
+  return new Date(receivedDate.getTime() + hours * 60 * 60 * 1000).toISOString();
 }
 
 export function reconcileCanonicalInterviews(

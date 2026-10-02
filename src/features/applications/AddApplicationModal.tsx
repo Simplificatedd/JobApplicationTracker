@@ -11,7 +11,6 @@ import {
   APPLICATION_SOURCES,
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
-import { suggestInterviewDeadline } from "../../lib/interviews";
 import {
   type FollowUpRequirement,
   normalizeFollowUpPromptDays,
@@ -34,7 +33,6 @@ import type {
   ApplicationStatus,
   Application,
   CoverLetterMetadata,
-  DeadlineEntryMode,
   JobType,
   Priority,
   ResumeMetadata,
@@ -44,6 +42,7 @@ import {
   FollowUpAutoResetControls,
   FollowUpScheduleControls,
 } from "./FollowUpControls";
+import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface AddApplicationModalProps {
   applications: Application[];
@@ -85,7 +84,6 @@ interface AddApplicationFormState {
   interviewPlatform: string;
   interviewProctored: boolean;
   interviewDeadline: string;
-  interviewDeadlineEntryMode: DeadlineEntryMode;
   interviewDeadlineReceivedAt: string;
   offerDeadline: string;
   priority: Priority;
@@ -127,7 +125,6 @@ function createInitialFormState(): AddApplicationFormState {
     interviewPlatform: "",
     interviewProctored: false,
     interviewDeadline: "",
-    interviewDeadlineEntryMode: "exact",
     interviewDeadlineReceivedAt: "",
     offerDeadline: "",
     priority: "medium",
@@ -249,43 +246,15 @@ export function AddApplicationModal({
     setForm(nextForm);
   }
 
-  function updateInterviewDeadlineEntryMode(value: DeadlineEntryMode) {
-    setForm((current) => {
-      const receivedAt =
-        current.interviewDeadlineReceivedAt || toDateTimeLocal(new Date());
-      const suggestedDeadline = suggestInterviewDeadline(value, receivedAt);
-
-      return {
-        ...current,
-        interviewDeadline:
-          suggestedDeadline !== undefined
-            ? toDateTimeLocal(new Date(suggestedDeadline))
-            : current.interviewDeadline,
-        interviewDeadlineEntryMode: value,
-        interviewDeadlineReceivedAt:
-          value === "exact"
-            ? current.interviewDeadlineReceivedAt
-            : receivedAt,
-      };
-    });
-  }
-
-  function updateInterviewDeadlineReceivedAt(value: string) {
-    setForm((current) => {
-      const suggestedDeadline = suggestInterviewDeadline(
-        current.interviewDeadlineEntryMode,
-        value,
-      );
-
-      return {
-        ...current,
-        interviewDeadline:
-          suggestedDeadline !== undefined
-            ? toDateTimeLocal(new Date(suggestedDeadline))
-            : current.interviewDeadline,
-        interviewDeadlineReceivedAt: value,
-      };
-    });
+  function updateInterviewDeadlineFields(value: {
+    deadline: string;
+    receivedAt: string;
+  }) {
+    setForm((current) => ({
+      ...current,
+      interviewDeadline: value.deadline,
+      interviewDeadlineReceivedAt: value.receivedAt,
+    }));
   }
 
   function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -403,7 +372,7 @@ export function AddApplicationModal({
         ? trimOptional(form.interviewDeadline)
         : undefined,
       interviewDeadlineEntryMode: isInterviewing
-        ? form.interviewDeadlineEntryMode
+        ? "exact"
         : undefined,
       interviewDeadlineReceivedAt: isInterviewing
         ? trimOptional(form.interviewDeadlineReceivedAt)
@@ -706,47 +675,12 @@ export function AddApplicationModal({
                   <span>This assessment is proctored</span>
                 </label>
 
-                <Field label="Deadline Timing">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateInterviewDeadlineEntryMode(
-                        event.target.value as DeadlineEntryMode,
-                      )
-                    }
-                    value={form.interviewDeadlineEntryMode}
-                  >
-                    <option value="exact">Exact date/time</option>
-                    <option value="1_day">1 day after received</option>
-                    <option value="2_days">2 days after received</option>
-                    <option value="3_days">3 days after received</option>
-                    <option value="72_hours">72 hours after received</option>
-                  </select>
-                </Field>
-
-                {form.interviewDeadlineEntryMode !== "exact" ? (
-                  <Field label="Received Date/Time">
-                    <input
-                      className="field-control"
-                      onChange={(event) =>
-                        updateInterviewDeadlineReceivedAt(event.target.value)
-                      }
-                      type="datetime-local"
-                      value={form.interviewDeadlineReceivedAt}
-                    />
-                  </Field>
-                ) : null}
-
-                <Field label="Interview Deadline">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewDeadline", event.target.value)
-                    }
-                    type="datetime-local"
-                    value={form.interviewDeadline}
-                  />
-                </Field>
+                <InterviewDeadlineFields
+                  breakpoint="md"
+                  deadline={form.interviewDeadline}
+                  onChange={updateInterviewDeadlineFields}
+                  receivedAt={form.interviewDeadlineReceivedAt}
+                />
               </section>
             ) : null}
 
@@ -1138,14 +1072,6 @@ function isFormDirty(
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function toDateTimeLocal(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function Field({

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../types/application";
 import {
   buildInterviewRecord,
+  calculateDeadlineFromDuration,
   calculateInterviewDeadline,
   createInterviewRecord,
   getNextInterviewRound,
@@ -511,6 +512,39 @@ describe("calculateInterviewDeadline", () => {
         deadline: undefined,
         deadlineEntryMode: "exact",
       }),
+    ).toBeUndefined();
+  });
+});
+
+describe("calculateDeadlineFromDuration", () => {
+  it("adds a custom number of hours", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        36,
+        "hours",
+      ),
+    ).toBe("2026-10-02T20:00:00.000Z");
+  });
+
+  it("treats custom days as 24-hour periods", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        5,
+        "days",
+      ),
+    ).toBe("2026-10-06T08:00:00.000Z");
+  });
+
+  it.each([
+    ["", 24],
+    ["not-a-date", 24],
+    ["2026-10-01T08:00:00.000Z", 0],
+    ["2026-10-01T08:00:00.000Z", Number.NaN],
+  ])("rejects invalid duration input", (receivedAt, amount) => {
+    expect(
+      calculateDeadlineFromDuration(receivedAt, amount, "hours"),
     ).toBeUndefined();
   });
 });
