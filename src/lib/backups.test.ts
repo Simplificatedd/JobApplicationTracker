@@ -409,6 +409,32 @@ describe("parseBackupFile", () => {
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
   });
 
+  it("accepts canonical stage types", async () => {
+    const snapshot = createSnapshot({
+      applications: [
+        createApplication({
+          interviewMode: "video",
+          interviewType: "behavioral-interview",
+        }),
+      ],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: "app-1",
+          type: "online-assessment",
+          mode: "take-home",
+          platform: "CodeSignal",
+          proctored: true,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
   it("rejects application contact counts that disagree with contact records", async () => {
     const snapshot = createSnapshot({
       applications: [createApplication({ contactsCount: 1 })],

@@ -1,9 +1,11 @@
 import { createId } from "./domain";
 import type {
   Application,
+  CanonicalInterviewType,
   DeadlineEntryMode,
   Interview,
   InterviewInput,
+  InterviewType,
   InterviewUpdate,
 } from "../types/application";
 
@@ -31,17 +33,22 @@ export function buildInterviewRecord(
         application.id,
         application.interviewRound,
       );
+  const classification = normalizeInterviewClassification({
+    mode: application.interviewMode ?? "unknown",
+    platform: application.interviewPlatform,
+    type: application.interviewType ?? "unknown",
+  });
 
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
-    type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "unknown",
+    type: classification.type,
+    mode: classification.mode,
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
-    platform: application.interviewPlatform,
+    platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
     deadlineEntryMode:
@@ -100,6 +107,40 @@ export function getNextInterviewRound(interviews: Interview[]) {
 
 export function isValidInterviewRound(round: number | undefined) {
   return round === undefined || (Number.isInteger(round) && round > 0);
+}
+
+export function normalizeInterviewType(
+  type: InterviewType,
+): CanonicalInterviewType {
+  if (type === "technical") return "technical-interview";
+  if (type === "recruiter") return "recruiter-screen";
+  if (type === "face-to-face") return "other";
+  if (type === "HireVue" || type === "HackerRank") {
+    return "online-assessment";
+  }
+
+  return type;
+}
+
+export function normalizeInterviewClassification(
+  classification: Pick<Interview, "mode" | "platform" | "type">,
+) {
+  const legacyType = classification.type;
+  let type: Interview["type"] = normalizeInterviewType(legacyType);
+  let mode = classification.mode;
+  let platform = classification.platform;
+
+  if (legacyType === "face-to-face") {
+    mode = mode === "unknown" ? "onsite" : mode;
+  } else if (legacyType === "HireVue" || legacyType === "HackerRank") {
+    platform ||= legacyType;
+  }
+
+  if (type === "unknown" && mode === "take-home") {
+    type = "take-home-assignment";
+  }
+
+  return { mode, platform, type };
 }
 
 export function isAssessmentStage(
@@ -170,8 +211,22 @@ export function reconcileCanonicalInterviews(
   interviews: Interview[],
   now = new Date(),
 ): InterviewReconciliation {
-  const nextInterviews = [...interviews];
-  const interviewWrites: Interview[] = [];
+  const interviewWritesById = new Map<string, Interview>();
+  const nextInterviews = interviews.map((interview) => {
+    const classification = normalizeInterviewClassification(interview);
+
+    if (
+      classification.type === interview.type &&
+      classification.mode === interview.mode &&
+      classification.platform === interview.platform
+    ) {
+      return interview;
+    }
+
+    const normalizedInterview = { ...interview, ...classification };
+    interviewWritesById.set(normalizedInterview.id, normalizedInterview);
+    return normalizedInterview;
+  });
   const applicationWrites: Application[] = [];
   const nextApplications = applications.map((application) => {
     let applicationInterviews = nextInterviews.filter(
@@ -201,7 +256,7 @@ export function reconcileCanonicalInterviews(
       );
 
       nextInterviews[interviewIndex] = migratedInterview;
-      interviewWrites.push(migratedInterview);
+      interviewWritesById.set(migratedInterview.id, migratedInterview);
       applicationInterviews = applicationInterviews.map((interview) =>
         interview.id === migratedInterview.id ? migratedInterview : interview,
       );
@@ -215,7 +270,7 @@ export function reconcileCanonicalInterviews(
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
-      interviewWrites.push(migratedInterview);
+      interviewWritesById.set(migratedInterview.id, migratedInterview);
       applicationInterviews = [...applicationInterviews, migratedInterview];
     }
 
@@ -241,7 +296,7 @@ export function reconcileCanonicalInterviews(
   return {
     applicationWrites,
     applications: nextApplications,
-    interviewWrites,
+    interviewWrites: Array.from(interviewWritesById.values()),
     interviews: nextInterviews,
   };
 }
@@ -303,17 +358,22 @@ function interviewFromApplicationProjection(
   const legacyDeadline = hasInterviewDetailProjection(application)
     ? application.deadline
     : undefined;
+  const classification = normalizeInterviewClassification({
+    mode: application.interviewMode ?? "unknown",
+    platform: application.interviewPlatform,
+    type: application.interviewType ?? "unknown",
+  });
 
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
-    type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "unknown",
+    type: classification.type,
+    mode: classification.mode,
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
-    platform: application.interviewPlatform,
+    platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline ?? legacyDeadline,
     deadlineEntryMode:

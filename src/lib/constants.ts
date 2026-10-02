@@ -16,11 +16,12 @@ export const INTERVIEW_TYPE_OPTIONS: ReadonlyArray<{
   value: InterviewType;
 }> = [
   { label: "Not specified", value: "unknown" },
-  { label: "Technical interview", value: "technical" },
-  { label: "Recruiter screen", value: "recruiter" },
-  { label: "In-person interview", value: "face-to-face" },
-  { label: "HireVue assessment", value: "HireVue" },
-  { label: "HackerRank assessment", value: "HackerRank" },
+  { label: "Recruiter screen", value: "recruiter-screen" },
+  { label: "Hiring manager interview", value: "hiring-manager-interview" },
+  { label: "Technical interview", value: "technical-interview" },
+  { label: "Behavioral interview", value: "behavioral-interview" },
+  { label: "Take-home assignment", value: "take-home-assignment" },
+  { label: "Online assessment", value: "online-assessment" },
   { label: "Other", value: "other" },
 ];
 
@@ -32,7 +33,7 @@ export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
   { label: "Video call", value: "video" },
   { label: "Phone call", value: "phone" },
   { label: "On-site", value: "onsite" },
-  { label: "Asynchronous / take-home", value: "take-home" },
+  { label: "Asynchronous", value: "take-home" },
   { label: "Other", value: "other" },
 ];
 

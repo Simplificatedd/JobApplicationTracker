@@ -90,6 +90,13 @@ describe("application company and location filters", () => {
       normalizeApplicationFilters({ location: "Tokyo" }).company,
     ).toBe("");
   });
+
+  it("normalizes a remembered legacy stage-type filter", () => {
+    expect(
+      normalizeApplicationFilters({ interviewType: "HackerRank" })
+        .interviewType,
+    ).toBe("online-assessment");
+  });
 });
 
 describe("default application sorting", () => {

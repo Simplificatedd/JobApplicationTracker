@@ -8,6 +8,8 @@ import {
   getNextInterviewRound,
   isAssessmentStage,
   isValidInterviewRound,
+  normalizeInterviewClassification,
+  normalizeInterviewType,
   reconcileCanonicalInterviews,
   selectCurrentInterview,
   updateInterviewRecord,
@@ -24,7 +26,7 @@ const application: Application = {
   jobType: "internship",
   followUpNeeded: false,
   interviewRound: 1,
-  interviewType: "technical",
+  interviewType: "technical-interview",
   interviewMode: "video",
   interviewProctored: false,
   deadlineEntryMode: "exact",
@@ -38,7 +40,7 @@ const firstRound: Interview = {
   id: "interview-1",
   applicationId: application.id,
   round: 1,
-  type: "technical",
+  type: "technical-interview",
   mode: "video",
   proctored: false,
   notes: "Strong first round",
@@ -267,7 +269,7 @@ describe("reconcileCanonicalInterviews", () => {
       ...firstRound,
       id: "interview-2",
       round: 2,
-      type: "face-to-face",
+      type: "hiring-manager-interview",
       mode: "onsite",
       location: "Main office",
       updatedAt: "2026-09-21T00:00:00.000Z",
@@ -288,7 +290,7 @@ describe("reconcileCanonicalInterviews", () => {
       interviewLocation: "Main office",
       interviewMode: "onsite",
       interviewRound: 2,
-      interviewType: "face-to-face",
+      interviewType: "hiring-manager-interview",
       updatedAt: staleApplication.updatedAt,
     });
     expect(result.applicationWrites).toEqual([result.applications[0]]);
@@ -301,7 +303,7 @@ describe("reconcileCanonicalInterviews", () => {
       id: "interview-2",
       dateTime: "2026-09-24T10:00",
       round: 2,
-      type: "face-to-face",
+      type: "hiring-manager-interview",
       mode: "onsite",
       updatedAt: "2026-09-21T00:00:00.000Z",
     };
@@ -476,6 +478,96 @@ describe("interview record mutations", () => {
     expect(isValidInterviewRound(0)).toBe(false);
     expect(isValidInterviewRound(-1)).toBe(false);
     expect(isValidInterviewRound(1.5)).toBe(false);
+  });
+});
+
+describe("normalizeInterviewClassification", () => {
+  it.each([
+    ["technical", "technical-interview"],
+    ["recruiter", "recruiter-screen"],
+    ["face-to-face", "other"],
+    ["HireVue", "online-assessment"],
+    ["HackerRank", "online-assessment"],
+  ] as const)("normalizes the legacy %s filter value", (type, expected) => {
+    expect(normalizeInterviewType(type)).toBe(expected);
+  });
+
+  it.each([
+    ["technical", "technical-interview"],
+    ["recruiter", "recruiter-screen"],
+  ] as const)("maps the legacy %s stage", (type, expected) => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "video",
+        type,
+      }),
+    ).toMatchObject({ mode: "video", type: expected });
+  });
+
+  it("moves a legacy provider type into the provider field", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        type: "HackerRank",
+      }),
+    ).toEqual({
+      mode: "unknown",
+      platform: "HackerRank",
+      type: "online-assessment",
+    });
+  });
+
+  it("preserves an explicit provider while normalizing its legacy type", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        platform: "ModernHire",
+        type: "HireVue",
+      }),
+    ).toEqual({
+      mode: "unknown",
+      platform: "ModernHire",
+      type: "online-assessment",
+    });
+  });
+
+  it("moves legacy face-to-face semantics into the format", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        type: "face-to-face",
+      }),
+    ).toEqual({ mode: "onsite", platform: undefined, type: "other" });
+  });
+
+  it("infers a take-home assignment when no stage was specified", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "take-home",
+        type: "unknown",
+      }),
+    ).toEqual({
+      mode: "take-home",
+      platform: undefined,
+      type: "take-home-assignment",
+    });
+  });
+
+  it("persists normalized legacy interview data during reconciliation", () => {
+    const result = reconcileCanonicalInterviews(
+      [application],
+      [{ ...firstRound, platform: undefined, type: "HackerRank" }],
+    );
+
+    expect(result.interviews[0]).toMatchObject({
+      platform: "HackerRank",
+      type: "online-assessment",
+    });
+    expect(result.interviewWrites).toEqual([result.interviews[0]]);
+    expect(result.applications[0]).toMatchObject({
+      interviewPlatform: "HackerRank",
+      interviewType: "online-assessment",
+    });
   });
 });
 
