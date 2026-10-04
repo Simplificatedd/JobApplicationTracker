@@ -168,6 +168,7 @@ export function InterviewsSection({
           error={error}
           isNew={editingId === "new"}
           isSaving={isSaving}
+          key={editingId}
           onCancel={cancelEditing}
           onChange={setDraft}
           onSave={() => void saveInterview()}
