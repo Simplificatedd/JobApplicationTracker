@@ -465,7 +465,7 @@ function hasExplicitInterviewProjection(application: Application) {
 }
 
 function getInterviewTimes(interview: Interview) {
-  return [interview.dateTime, interview.deadline]
+  return [interview.dateTime, calculateInterviewDeadline(interview)]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter((value) => !Number.isNaN(value));
 }

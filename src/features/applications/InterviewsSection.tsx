@@ -249,7 +249,10 @@ function InterviewCard({
       </div>
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <InterviewDetail label="Scheduled" value={formatOptionalDateTime(interview.dateTime)} />
-        <InterviewDetail label="Deadline" value={formatOptionalDateTime(interview.deadline)} />
+        <InterviewDetail
+          label="Deadline"
+          value={formatOptionalDateTime(calculateInterviewDeadline(interview))}
+        />
         <InterviewDetail label="Location or address" value={interview.location} />
         <InterviewDetail label="Platform or provider" value={interview.platform} />
         {shouldShowProctored(interview.type, interview.proctored) ? (
@@ -563,7 +566,7 @@ function sortInterviewHistory(interviews: Interview[]) {
 }
 
 function getSortTime(interview: Interview, now: number) {
-  const times = [interview.dateTime, interview.deadline]
+  const times = [interview.dateTime, calculateInterviewDeadline(interview)]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter((value) => !Number.isNaN(value));
   const upcoming = times.filter((value) => value >= now);

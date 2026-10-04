@@ -507,6 +507,23 @@ describe("selectCurrentInterview", () => {
       ),
     ).toBe(assessment);
   });
+
+  it("uses a calculated relative deadline when no deadline is stored", () => {
+    const assessment = {
+      ...firstRound,
+      deadlineEntryMode: "2_days" as const,
+      deadlineReceivedAt: "2026-09-30T12:00:00.000Z",
+      id: "assessment-1",
+      round: 2,
+    };
+
+    expect(
+      selectCurrentInterview(
+        [firstRound, assessment],
+        new Date("2026-10-01T00:00:00.000Z"),
+      ),
+    ).toBe(assessment);
+  });
 });
 
 describe("interview record mutations", () => {
