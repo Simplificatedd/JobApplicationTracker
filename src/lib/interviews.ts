@@ -129,7 +129,7 @@ export function normalizeInterviewClassification(
   classification: Pick<Interview, "mode" | "platform" | "type">,
 ) {
   const legacyType = classification.type;
-  let type: Interview["type"] = normalizeInterviewType(legacyType);
+  const type: Interview["type"] = normalizeInterviewType(legacyType);
   let mode = classification.mode;
   let platform = classification.platform;
 
@@ -137,10 +137,6 @@ export function normalizeInterviewClassification(
     mode = mode === "unknown" ? "onsite" : mode;
   } else if (legacyType === "HireVue" || legacyType === "HackerRank") {
     platform ||= legacyType;
-  }
-
-  if ((type === "unknown" || type === "other") && mode === "take-home") {
-    type = "take-home-assignment";
   }
 
   return { mode, platform, type };

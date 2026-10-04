@@ -134,6 +134,23 @@ describe("buildInterviewRecord", () => {
       ),
     ).toBeUndefined();
   });
+
+  it.each(["unknown", "other"] as const)(
+    "preserves the canonical %s stage type with an asynchronous format",
+    (type) => {
+      expect(
+        buildInterviewRecord(
+          {
+            ...application,
+            interviewMode: "take-home",
+            interviewType: type,
+          },
+          [],
+          "2026-09-21T00:00:00.000Z",
+        ),
+      ).toMatchObject({ mode: "take-home", type });
+    },
+  );
 });
 
 describe("reconcileCanonicalInterviews", () => {
@@ -480,6 +497,23 @@ describe("interview record mutations", () => {
     expect(isValidInterviewRound(-1)).toBe(false);
     expect(isValidInterviewRound(1.5)).toBe(false);
   });
+
+  it.each(["unknown", "other"] as const)(
+    "preserves the canonical %s stage type when adding an asynchronous stage",
+    (type) => {
+      expect(
+        createInterviewRecord(
+          {
+            applicationId: application.id,
+            mode: "take-home",
+            proctored: false,
+            type,
+          },
+          application.createdAt,
+        ),
+      ).toMatchObject({ mode: "take-home", type });
+    },
+  );
 });
 
 describe("normalizeInterviewClassification", () => {
@@ -541,18 +575,40 @@ describe("normalizeInterviewClassification", () => {
     ).toEqual({ mode: "onsite", platform: undefined, type: "other" });
   });
 
-  it("infers a take-home assignment when no stage was specified", () => {
-    expect(
-      normalizeInterviewClassification({
+  it.each(["unknown", "other"] as const)(
+    "does not infer a stage type from an asynchronous format for %s",
+    (type) => {
+      expect(
+        normalizeInterviewClassification({
+          mode: "take-home",
+          type,
+        }),
+      ).toEqual({
         mode: "take-home",
-        type: "unknown",
-      }),
-    ).toEqual({
-      mode: "take-home",
-      platform: undefined,
-      type: "take-home-assignment",
-    });
-  });
+        platform: undefined,
+        type,
+      });
+    },
+  );
+
+  it.each(["unknown", "other"] as const)(
+    "does not rewrite a canonical %s stage during reconciliation",
+    (type) => {
+      const canonicalStage = {
+        ...firstRound,
+        mode: "take-home" as const,
+        type,
+      };
+      const result = reconcileCanonicalInterviews(
+        [{ ...application, interviewMode: "take-home", interviewType: type }],
+        [canonicalStage],
+      );
+
+      expect(result.interviewWrites).toEqual([]);
+      expect(result.interviews[0]).toBe(canonicalStage);
+      expect(result.applications[0].interviewType).toBe(type);
+    },
+  );
 
   it("persists normalized legacy interview data during reconciliation", () => {
     const result = reconcileCanonicalInterviews(
