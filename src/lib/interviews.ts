@@ -41,6 +41,8 @@ export function buildInterviewRecord(
     platform: application.interviewPlatform,
     type: application.interviewType ?? "unknown",
   });
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
     id: existing?.id ?? createId("interview"),
@@ -54,12 +56,12 @@ export function buildInterviewRecord(
     platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ??
-      existing?.deadlineReceivedAt ??
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt ?? existing?.deadlineReceivedAt,
+      deadlineEntryMode,
       application.createdAt,
+    ),
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -382,6 +384,8 @@ function interviewFromApplicationProjection(
     platform: application.interviewPlatform,
     type: application.interviewType ?? "unknown",
   });
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
     id: existing?.id ?? createId("interview"),
@@ -395,10 +399,12 @@ function interviewFromApplicationProjection(
     platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline ?? legacyDeadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ?? application.createdAt,
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt,
+      deadlineEntryMode,
+      application.createdAt,
+    ),
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,
@@ -409,14 +415,31 @@ function withLegacyApplicationDeadline(
   interview: Interview,
   application: Application,
 ): Interview {
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
+
   return {
     ...interview,
     deadline: application.deadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ?? application.createdAt,
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt ?? interview.deadlineReceivedAt,
+      deadlineEntryMode,
+      application.createdAt,
+    ),
   };
+}
+
+function resolveDeadlineReceivedAt(
+  receivedAt: string | undefined,
+  entryMode: DeadlineEntryMode | undefined,
+  legacyFallback: string,
+) {
+  if (receivedAt || (entryMode && entryMode !== "exact")) {
+    return receivedAt ?? legacyFallback;
+  }
+
+  return undefined;
 }
 
 function hasInterviewDetailProjection(application: Application) {

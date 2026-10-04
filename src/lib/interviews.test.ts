@@ -107,6 +107,42 @@ describe("buildInterviewRecord", () => {
     ).toMatchObject({ applicationId: application.id, dateTime: undefined });
   });
 
+  it("does not infer a received time for a new exact deadline", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          interviewDeadline: "2026-09-23T17:00",
+          interviewDeadlineEntryMode: "exact",
+          interviewDeadlineReceivedAt: undefined,
+        },
+        [],
+        "2026-09-21T00:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "exact",
+      deadlineReceivedAt: undefined,
+    });
+  });
+
+  it("retains the creation-time fallback for a legacy relative deadline", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          interviewDeadlineEntryMode: "2_days",
+          interviewDeadlineReceivedAt: undefined,
+        },
+        [],
+        "2026-09-21T00:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: application.createdAt,
+    });
+  });
+
   it("uses interview-specific deadline timing metadata", () => {
     expect(
       buildInterviewRecord(
@@ -182,9 +218,30 @@ describe("reconcileCanonicalInterviews", () => {
     expect(result.interviews[0]).toMatchObject({
       applicationId: application.id,
       dateTime: "2026-09-22T10:00",
+      deadlineReceivedAt: undefined,
       location: "Career centre",
       round: 1,
     });
+  });
+
+  it("does not infer a received time while migrating an exact deadline", () => {
+    const exactDeadlineApplication = {
+      ...application,
+      deadlineEntryMode: "exact" as const,
+      interviewDateTime: "2026-09-22T10:00",
+      interviewDeadline: "2026-09-23T17:00",
+    };
+    const result = reconcileCanonicalInterviews(
+      [exactDeadlineApplication],
+      [],
+    );
+
+    expect(result.interviews[0]).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "exact",
+      deadlineReceivedAt: undefined,
+    });
+    expect(result.applications[0].interviewDeadlineReceivedAt).toBeUndefined();
   });
 
   it("moves an unambiguous legacy application deadline to a new interview", () => {
