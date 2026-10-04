@@ -329,7 +329,7 @@ function NotificationItem({
         ) : null}
         {notification.type === "deadline" ? (
           <SmallActionButton
-            label="Change assessment deadline"
+            label="Change stage deadline"
             onClick={() =>
               changeDate(
                 notification,
