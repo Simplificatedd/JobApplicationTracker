@@ -15,24 +15,43 @@ export const INTERVIEW_TYPE_OPTIONS: ReadonlyArray<{
   label: string;
   value: InterviewType;
 }> = [
-  { label: "Unknown", value: "unknown" },
-  { label: "Technical", value: "technical" },
-  { label: "Recruiter", value: "recruiter" },
-  { label: "Face-to-face", value: "face-to-face" },
-  { label: "HireVue", value: "HireVue" },
-  { label: "HackerRank", value: "HackerRank" },
+  { label: "Not specified", value: "unknown" },
+  { label: "Recruiter screen", value: "recruiter-screen" },
+  { label: "Hiring manager", value: "hiring-manager-interview" },
+  { label: "Technical", value: "technical-interview" },
+  { label: "Behavioral", value: "behavioral-interview" },
+  { label: "Take-home assignment", value: "take-home-assignment" },
+  { label: "Online assessment", value: "online-assessment" },
   { label: "Other", value: "other" },
 ];
+
+export function getInterviewTypeLabel(value?: InterviewType) {
+  if (!value) return undefined;
+
+  const option = INTERVIEW_TYPE_OPTIONS.find(
+    (candidate) => candidate.value === value,
+  );
+
+  if (option) return option.label;
+  if (value === "technical") return "Technical";
+  if (value === "recruiter") return "Recruiter screen";
+  if (value === "face-to-face") return "In-person";
+  if (value === "HireVue" || value === "HackerRank") {
+    return "Online assessment";
+  }
+
+  return value;
+}
 
 export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
   label: string;
   value: InterviewMode;
 }> = [
-  { label: "Unknown", value: "unknown" },
-  { label: "Online / video call", value: "video" },
-  { label: "Phone", value: "phone" },
-  { label: "Onsite", value: "onsite" },
-  { label: "Take-home / assessment", value: "take-home" },
+  { label: "Not specified", value: "unknown" },
+  { label: "Video call", value: "video" },
+  { label: "Phone call", value: "phone" },
+  { label: "On-site", value: "onsite" },
+  { label: "Asynchronous", value: "take-home" },
   { label: "Other", value: "other" },
 ];
 

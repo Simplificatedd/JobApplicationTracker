@@ -34,7 +34,7 @@ interface NotificationBellProps {
 
 const groupLabels: Record<NotificationGroup, string> = {
   followups: "Follow-ups",
-  interviews: "Interviews",
+  interviews: "Interviews & assessments",
   offers: "Offers",
   other: "Other",
 };
@@ -135,7 +135,8 @@ export function NotificationBell({
                 No reminders right now
               </p>
               <p className="mt-1 text-sm text-muted">
-                Follow-ups, interviews, and offer deadlines will appear here.
+                Follow-ups, interviews, assessments, and offer deadlines will
+                appear here.
               </p>
             </div>
           ) : grouped ? (
@@ -312,7 +313,7 @@ function NotificationItem({
         ) : null}
         {notification.type === "interview" ? (
           <SmallActionButton
-            label="Change interview date and time"
+            label="Change scheduled date and time"
             onClick={() =>
               changeDate(
                 notification,
@@ -328,7 +329,7 @@ function NotificationItem({
         ) : null}
         {notification.type === "deadline" ? (
           <SmallActionButton
-            label="Change assessment deadline"
+            label="Change stage deadline"
             onClick={() =>
               changeDate(
                 notification,
@@ -463,7 +464,6 @@ function changeDate(
   if (notification.interviewId) {
     onUpdateInterview(notification.interviewId, {
       deadline: trimmedValue,
-      proctored: true,
     });
   }
 }

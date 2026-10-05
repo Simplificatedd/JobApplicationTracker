@@ -15,14 +15,24 @@ export type JobType =
   | "contract"
   | "other";
 
-export type InterviewType =
+export type CanonicalInterviewType =
+  | "recruiter-screen"
+  | "hiring-manager-interview"
+  | "technical-interview"
+  | "behavioral-interview"
+  | "take-home-assignment"
+  | "online-assessment"
+  | "other"
+  | "unknown";
+
+export type LegacyInterviewType =
   | "technical"
   | "recruiter"
   | "face-to-face"
   | "HireVue"
-  | "HackerRank"
-  | "other"
-  | "unknown";
+  | "HackerRank";
+
+export type InterviewType = CanonicalInterviewType | LegacyInterviewType;
 
 export type InterviewMode =
   | "phone"

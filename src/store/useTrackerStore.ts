@@ -695,7 +695,7 @@ export function useTrackerStore(): TrackerStore {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
         return failure(
-          "Interview round must be a positive whole number or left blank.",
+          "Round must be a positive whole number or left blank.",
         );
       }
 
@@ -772,7 +772,7 @@ export function useTrackerStore(): TrackerStore {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
         return failure(
-          "Interview round must be a positive whole number or left blank.",
+          "Round must be a positive whole number or left blank.",
         );
       }
 
@@ -1695,7 +1695,7 @@ const INTERVIEW_STATUS_LOCKED_STATUSES = new Set([
 ]);
 
 function formatInterviewActivityLabel(interview: Interview) {
-  return interview.round ? `interview ${interview.round}` : "interview";
+  return interview.round ? `stage ${interview.round}` : "stage";
 }
 
 function withContactCounts(
@@ -1742,7 +1742,7 @@ function buildApplicationUpdateActivities(
 
   if (hasInterviewChange(input)) {
     activities.push(
-      createActivity(next.id, "updated", "Updated interview details.", createdAt),
+      createActivity(next.id, "updated", "Updated stage details.", createdAt),
     );
   }
 

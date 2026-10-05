@@ -11,7 +11,10 @@ import {
   APPLICATION_SOURCES,
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
-import { suggestInterviewDeadline } from "../../lib/interviews";
+import {
+  isAssessmentStage,
+  shouldShowProctored,
+} from "../../lib/interviews";
 import {
   type FollowUpRequirement,
   normalizeFollowUpPromptDays,
@@ -34,7 +37,6 @@ import type {
   ApplicationStatus,
   Application,
   CoverLetterMetadata,
-  DeadlineEntryMode,
   JobType,
   Priority,
   ResumeMetadata,
@@ -44,6 +46,7 @@ import {
   FollowUpAutoResetControls,
   FollowUpScheduleControls,
 } from "./FollowUpControls";
+import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface AddApplicationModalProps {
   applications: Application[];
@@ -85,7 +88,6 @@ interface AddApplicationFormState {
   interviewPlatform: string;
   interviewProctored: boolean;
   interviewDeadline: string;
-  interviewDeadlineEntryMode: DeadlineEntryMode;
   interviewDeadlineReceivedAt: string;
   offerDeadline: string;
   priority: Priority;
@@ -127,7 +129,6 @@ function createInitialFormState(): AddApplicationFormState {
     interviewPlatform: "",
     interviewProctored: false,
     interviewDeadline: "",
-    interviewDeadlineEntryMode: "exact",
     interviewDeadlineReceivedAt: "",
     offerDeadline: "",
     priority: "medium",
@@ -249,43 +250,32 @@ export function AddApplicationModal({
     setForm(nextForm);
   }
 
-  function updateInterviewDeadlineEntryMode(value: DeadlineEntryMode) {
-    setForm((current) => {
-      const receivedAt =
-        current.interviewDeadlineReceivedAt || toDateTimeLocal(new Date());
-      const suggestedDeadline = suggestInterviewDeadline(value, receivedAt);
-
-      return {
-        ...current,
-        interviewDeadline:
-          suggestedDeadline !== undefined
-            ? toDateTimeLocal(new Date(suggestedDeadline))
-            : current.interviewDeadline,
-        interviewDeadlineEntryMode: value,
-        interviewDeadlineReceivedAt:
-          value === "exact"
-            ? current.interviewDeadlineReceivedAt
-            : receivedAt,
-      };
-    });
+  function updateInterviewDeadlineFields(value: {
+    deadline: string;
+    receivedAt: string;
+  }) {
+    setForm((current) => ({
+      ...current,
+      interviewDeadline: value.deadline,
+      interviewDeadlineReceivedAt: value.receivedAt,
+    }));
   }
 
-  function updateInterviewDeadlineReceivedAt(value: string) {
-    setForm((current) => {
-      const suggestedDeadline = suggestInterviewDeadline(
-        current.interviewDeadlineEntryMode,
-        value,
-      );
+  function updateInterviewType(value: AddApplicationFormState["interviewType"]) {
+    setForm((current) => ({
+      ...current,
+      interviewProctored: isAssessmentStage(value ?? "unknown")
+        ? current.interviewProctored
+        : false,
+      interviewType: value,
+    }));
+  }
 
-      return {
-        ...current,
-        interviewDeadline:
-          suggestedDeadline !== undefined
-            ? toDateTimeLocal(new Date(suggestedDeadline))
-            : current.interviewDeadline,
-        interviewDeadlineReceivedAt: value,
-      };
-    });
+  function updateInterviewMode(value: AddApplicationFormState["interviewMode"]) {
+    setForm((current) => ({
+      ...current,
+      interviewMode: value,
+    }));
   }
 
   function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -360,7 +350,7 @@ export function AddApplicationModal({
       !skipRoundWarning &&
       roundValidation.warnings.length > 0 &&
       !window.confirm(
-        `${roundValidation.warnings.join("\n")}\n\nSave this interview round anyway?`,
+        `${roundValidation.warnings.join("\n")}\n\nSave this round anyway?`,
       )
     ) {
       return;
@@ -403,7 +393,7 @@ export function AddApplicationModal({
         ? trimOptional(form.interviewDeadline)
         : undefined,
       interviewDeadlineEntryMode: isInterviewing
-        ? form.interviewDeadlineEntryMode
+        ? "exact"
         : undefined,
       interviewDeadlineReceivedAt: isInterviewing
         ? trimOptional(form.interviewDeadlineReceivedAt)
@@ -582,10 +572,10 @@ export function AddApplicationModal({
                   className="text-sm font-semibold text-foreground md:col-span-2"
                   id="initial-interview-details-heading"
                 >
-                  Interview details
+                  Interview or assessment details
                 </h3>
 
-                <Field label="Interview Round">
+                <Field label="Round number">
                   <input
                     aria-describedby={
                       interviewRoundError ? "interview-round-error" : undefined
@@ -610,7 +600,7 @@ export function AddApplicationModal({
                   ) : null}
                 </Field>
 
-                <Field label="Interview Date/Time">
+                <Field label="Scheduled date/time">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -621,12 +611,11 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Interview Type">
+                <Field label="Stage type">
                   <select
                     className="field-control"
                     onChange={(event) =>
-                      updateForm(
-                        "interviewType",
+                      updateInterviewType(
                         event.target
                           .value as AddApplicationFormState["interviewType"],
                       )
@@ -641,12 +630,11 @@ export function AddApplicationModal({
                   </select>
                 </Field>
 
-                <Field label="Interview Mode">
+                <Field label="Format">
                   <select
                     className="field-control"
                     onChange={(event) =>
-                      updateForm(
-                        "interviewMode",
+                      updateInterviewMode(
                         event.target
                           .value as AddApplicationFormState["interviewMode"],
                       )
@@ -661,7 +649,7 @@ export function AddApplicationModal({
                   </select>
                 </Field>
 
-                <Field label="Interview Location">
+                <Field label="Location or address">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -672,7 +660,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Meeting URL">
+                <Field label="Link">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -683,7 +671,7 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <Field label="Interview Platform">
+                <Field label="Platform or provider">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -694,59 +682,29 @@ export function AddApplicationModal({
                   />
                 </Field>
 
-                <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
-                  <input
-                    checked={form.interviewProctored}
-                    className="h-4 w-4 rounded border-border text-primary"
-                    onChange={(event) =>
-                      updateForm("interviewProctored", event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span>Proctored assessment</span>
-                </label>
-
-                <Field label="Deadline Timing">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateInterviewDeadlineEntryMode(
-                        event.target.value as DeadlineEntryMode,
-                      )
-                    }
-                    value={form.interviewDeadlineEntryMode}
-                  >
-                    <option value="exact">Exact date/time</option>
-                    <option value="1_day">1 day after received</option>
-                    <option value="2_days">2 days after received</option>
-                    <option value="3_days">3 days after received</option>
-                    <option value="72_hours">72 hours after received</option>
-                  </select>
-                </Field>
-
-                {form.interviewDeadlineEntryMode !== "exact" ? (
-                  <Field label="Received Date/Time">
+                {shouldShowProctored(
+                  form.interviewType ?? "unknown",
+                  form.interviewProctored,
+                ) ? (
+                  <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
                     <input
-                      className="field-control"
+                      checked={form.interviewProctored}
+                      className="h-4 w-4 rounded border-border text-primary"
                       onChange={(event) =>
-                        updateInterviewDeadlineReceivedAt(event.target.value)
+                        updateForm("interviewProctored", event.target.checked)
                       }
-                      type="datetime-local"
-                      value={form.interviewDeadlineReceivedAt}
+                      type="checkbox"
                     />
-                  </Field>
+                    <span>This assessment is proctored</span>
+                  </label>
                 ) : null}
 
-                <Field label="Interview Deadline">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewDeadline", event.target.value)
-                    }
-                    type="datetime-local"
-                    value={form.interviewDeadline}
-                  />
-                </Field>
+                <InterviewDeadlineFields
+                  breakpoint="md"
+                  deadline={form.interviewDeadline}
+                  onChange={updateInterviewDeadlineFields}
+                  receivedAt={form.interviewDeadlineReceivedAt}
+                />
               </section>
             ) : null}
 
@@ -1138,14 +1096,6 @@ function isFormDirty(
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function toDateTimeLocal(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function Field({

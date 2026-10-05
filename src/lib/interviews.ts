@@ -1,9 +1,11 @@
 import { createId } from "./domain";
 import type {
   Application,
+  CanonicalInterviewType,
   DeadlineEntryMode,
   Interview,
   InterviewInput,
+  InterviewType,
   InterviewUpdate,
 } from "../types/application";
 
@@ -13,6 +15,9 @@ export interface InterviewReconciliation {
   interviewWrites: Interview[];
   interviews: Interview[];
 }
+
+export const MAX_DEADLINE_DURATION_DAYS = 3650;
+export const MAX_DEADLINE_DURATION_HOURS = MAX_DEADLINE_DURATION_DAYS * 24;
 
 export function buildInterviewRecord(
   application: Application,
@@ -31,25 +36,32 @@ export function buildInterviewRecord(
         application.id,
         application.interviewRound,
       );
+  const classification = normalizeInterviewClassification({
+    mode: application.interviewMode ?? "unknown",
+    platform: application.interviewPlatform,
+    type: application.interviewType ?? "unknown",
+  });
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
-    type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "unknown",
+    type: classification.type,
+    mode: classification.mode,
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
-    platform: application.interviewPlatform,
+    platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ??
-      existing?.deadlineReceivedAt ??
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt ?? existing?.deadlineReceivedAt,
+      deadlineEntryMode,
       application.createdAt,
+    ),
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -102,6 +114,54 @@ export function isValidInterviewRound(round: number | undefined) {
   return round === undefined || (Number.isInteger(round) && round > 0);
 }
 
+export function normalizeInterviewType(
+  type: InterviewType,
+): CanonicalInterviewType {
+  if (type === "technical") return "technical-interview";
+  if (type === "recruiter") return "recruiter-screen";
+  if (type === "face-to-face") return "other";
+  if (type === "HireVue" || type === "HackerRank") {
+    return "online-assessment";
+  }
+
+  return type;
+}
+
+export function normalizeInterviewClassification(
+  classification: Pick<Interview, "mode" | "platform" | "type">,
+) {
+  const legacyType = classification.type;
+  const type: Interview["type"] = normalizeInterviewType(legacyType);
+  let mode = classification.mode;
+  let platform = classification.platform;
+
+  if (legacyType === "face-to-face") {
+    mode = mode === "unknown" ? "onsite" : mode;
+  } else if (legacyType === "HireVue" || legacyType === "HackerRank") {
+    platform ||= legacyType;
+  }
+
+  return { mode, platform, type };
+}
+
+export function isAssessmentStage(
+  type: Interview["type"],
+) {
+  const normalizedType = normalizeInterviewType(type);
+
+  return (
+    normalizedType === "take-home-assignment" ||
+    normalizedType === "online-assessment"
+  );
+}
+
+export function shouldShowProctored(
+  type: Interview["type"],
+  proctored: boolean,
+) {
+  return proctored || isAssessmentStage(type);
+}
+
 export function calculateInterviewDeadline(interview: Interview) {
   if (interview.deadline) {
     return interview.deadline;
@@ -121,12 +181,6 @@ export function suggestInterviewDeadline(
     return undefined;
   }
 
-  const receivedDate = new Date(receivedAt);
-
-  if (Number.isNaN(receivedDate.getTime())) {
-    return undefined;
-  }
-
   const hoursByMode = {
     "1_day": 24,
     "2_days": 48,
@@ -134,9 +188,43 @@ export function suggestInterviewDeadline(
     "72_hours": 72,
   } satisfies Record<Exclude<DeadlineEntryMode, "exact">, number>;
 
-  return new Date(
-    receivedDate.getTime() + hoursByMode[entryMode] * 60 * 60 * 1000,
-  ).toISOString();
+  return calculateDeadlineFromDuration(
+    receivedAt,
+    hoursByMode[entryMode],
+    "hours",
+  );
+}
+
+export function calculateDeadlineFromDuration(
+  receivedAt: string,
+  amount: number,
+  unit: "hours" | "days",
+) {
+  const receivedDate = new Date(receivedAt);
+
+  if (
+    !receivedAt ||
+    Number.isNaN(receivedDate.getTime()) ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return undefined;
+  }
+
+  const hours = unit === "days" ? amount * 24 : amount;
+  const deadlineTimestamp = receivedDate.getTime() + hours * 60 * 60 * 1000;
+  const deadlineDate = new Date(deadlineTimestamp);
+
+  if (
+    !Number.isFinite(hours) ||
+    hours > MAX_DEADLINE_DURATION_HOURS ||
+    !Number.isFinite(deadlineTimestamp) ||
+    Number.isNaN(deadlineDate.getTime())
+  ) {
+    return undefined;
+  }
+
+  return deadlineDate.toISOString();
 }
 
 export function reconcileCanonicalInterviews(
@@ -144,8 +232,22 @@ export function reconcileCanonicalInterviews(
   interviews: Interview[],
   now = new Date(),
 ): InterviewReconciliation {
-  const nextInterviews = [...interviews];
-  const interviewWrites: Interview[] = [];
+  const interviewWritesById = new Map<string, Interview>();
+  const nextInterviews = interviews.map((interview) => {
+    const classification = normalizeInterviewClassification(interview);
+
+    if (
+      classification.type === interview.type &&
+      classification.mode === interview.mode &&
+      classification.platform === interview.platform
+    ) {
+      return interview;
+    }
+
+    const normalizedInterview = { ...interview, ...classification };
+    interviewWritesById.set(normalizedInterview.id, normalizedInterview);
+    return normalizedInterview;
+  });
   const applicationWrites: Application[] = [];
   const nextApplications = applications.map((application) => {
     let applicationInterviews = nextInterviews.filter(
@@ -175,7 +277,7 @@ export function reconcileCanonicalInterviews(
       );
 
       nextInterviews[interviewIndex] = migratedInterview;
-      interviewWrites.push(migratedInterview);
+      interviewWritesById.set(migratedInterview.id, migratedInterview);
       applicationInterviews = applicationInterviews.map((interview) =>
         interview.id === migratedInterview.id ? migratedInterview : interview,
       );
@@ -189,7 +291,7 @@ export function reconcileCanonicalInterviews(
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
-      interviewWrites.push(migratedInterview);
+      interviewWritesById.set(migratedInterview.id, migratedInterview);
       applicationInterviews = [...applicationInterviews, migratedInterview];
     }
 
@@ -215,7 +317,7 @@ export function reconcileCanonicalInterviews(
   return {
     applicationWrites,
     applications: nextApplications,
-    interviewWrites,
+    interviewWrites: Array.from(interviewWritesById.values()),
     interviews: nextInterviews,
   };
 }
@@ -277,23 +379,32 @@ function interviewFromApplicationProjection(
   const legacyDeadline = hasInterviewDetailProjection(application)
     ? application.deadline
     : undefined;
+  const classification = normalizeInterviewClassification({
+    mode: application.interviewMode ?? "unknown",
+    platform: application.interviewPlatform,
+    type: application.interviewType ?? "unknown",
+  });
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,
-    type: application.interviewType ?? "unknown",
-    mode: application.interviewMode ?? "unknown",
+    type: classification.type,
+    mode: classification.mode,
     location: application.interviewLocation,
     meetingUrl: application.interviewMeetingUrl,
-    platform: application.interviewPlatform,
+    platform: classification.platform,
     proctored: application.interviewProctored,
     deadline: application.interviewDeadline ?? legacyDeadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ?? application.createdAt,
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt,
+      deadlineEntryMode,
+      application.createdAt,
+    ),
     notes: existing?.notes,
     createdAt: existing?.createdAt ?? application.updatedAt,
     updatedAt: application.updatedAt,
@@ -304,14 +415,31 @@ function withLegacyApplicationDeadline(
   interview: Interview,
   application: Application,
 ): Interview {
+  const deadlineEntryMode =
+    application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
+
   return {
     ...interview,
     deadline: application.deadline,
-    deadlineEntryMode:
-      application.interviewDeadlineEntryMode ?? application.deadlineEntryMode,
-    deadlineReceivedAt:
-      application.interviewDeadlineReceivedAt ?? application.createdAt,
+    deadlineEntryMode,
+    deadlineReceivedAt: resolveDeadlineReceivedAt(
+      application.interviewDeadlineReceivedAt ?? interview.deadlineReceivedAt,
+      deadlineEntryMode,
+      application.createdAt,
+    ),
   };
+}
+
+function resolveDeadlineReceivedAt(
+  receivedAt: string | undefined,
+  entryMode: DeadlineEntryMode | undefined,
+  legacyFallback: string,
+) {
+  if (receivedAt || (entryMode && entryMode !== "exact")) {
+    return receivedAt ?? legacyFallback;
+  }
+
+  return undefined;
 }
 
 function hasInterviewDetailProjection(application: Application) {
@@ -337,7 +465,7 @@ function hasExplicitInterviewProjection(application: Application) {
 }
 
 function getInterviewTimes(interview: Interview) {
-  return [interview.dateTime, interview.deadline]
+  return [interview.dateTime, calculateInterviewDeadline(interview)]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter((value) => !Number.isNaN(value));
 }

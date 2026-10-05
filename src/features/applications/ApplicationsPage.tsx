@@ -270,7 +270,11 @@ export function ApplicationsPage({
           value={String(attentionCount)}
           tone="warning"
         />
-        <SummaryMetric label="Interviews" value={String(interviewCount)} tone="info" />
+        <SummaryMetric
+          label="Interviews & assessments"
+          value={String(interviewCount)}
+          tone="info"
+        />
       </section>
 
       <ApplicationsToolbar

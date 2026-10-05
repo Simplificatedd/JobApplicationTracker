@@ -548,13 +548,19 @@ function isApplication(value: unknown): value is Application {
     isOptionalNonNegativeInteger(value.followUpPromptDays) &&
     isOptionalNonNegativeInteger(value.interviewRound) &&
     isOptionalOneOf(value.interviewType, [
+      "recruiter-screen",
+      "hiring-manager-interview",
+      "technical-interview",
+      "behavioral-interview",
+      "take-home-assignment",
+      "online-assessment",
+      "other",
+      "unknown",
       "technical",
       "recruiter",
       "face-to-face",
       "HireVue",
       "HackerRank",
-      "other",
-      "unknown",
     ]) &&
     isOptionalOneOf(value.interviewMode, [
       "phone",
@@ -653,13 +659,19 @@ function isInterview(value: unknown): value is Interview {
     isNonBlankString(value.id) &&
     isNonBlankString(value.applicationId) &&
     isOneOf(value.type, [
+      "recruiter-screen",
+      "hiring-manager-interview",
+      "technical-interview",
+      "behavioral-interview",
+      "take-home-assignment",
+      "online-assessment",
+      "other",
+      "unknown",
       "technical",
       "recruiter",
       "face-to-face",
       "HireVue",
       "HackerRank",
-      "other",
-      "unknown",
     ]) &&
     isOneOf(value.mode, [
       "phone",

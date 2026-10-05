@@ -8,6 +8,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import { normalizeInterviewType } from "../../lib/interviews";
 import { deriveApplicationNotifications } from "../../lib/reminders";
 
 export type FollowUpFilter = "" | "needed" | "optional";
@@ -357,6 +358,9 @@ export function normalizeApplicationFilters(
   return {
     ...DEFAULT_APPLICATION_FILTERS,
     ...filters,
+    interviewType: filters?.interviewType
+      ? normalizeInterviewType(filters.interviewType)
+      : "",
   };
 }
 

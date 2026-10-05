@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
-import { APPLICATION_STATUSES } from "../../lib/constants";
+import {
+  APPLICATION_STATUSES,
+  getInterviewTypeLabel,
+} from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import {
   formatDate,
@@ -539,7 +542,7 @@ function ReadOnlyDetails({
           }
         />
         <DetailRow
-          label="Interview"
+          label="Current stage"
           value={formatInterviewSummary(application)}
         />
         <ResumeDetail
@@ -1159,7 +1162,7 @@ function formatInterviewSummary(application: Application) {
     application.interviewDateTime
       ? formatDateTime(application.interviewDateTime)
       : undefined,
-    application.interviewType,
+    getInterviewTypeLabel(application.interviewType),
   ].filter(Boolean);
 
   return details.length > 0 ? details.join(" / ") : "Not scheduled";

@@ -29,7 +29,7 @@ const chartOptions = [
   { id: "followUpLoad", label: "Follow-up load" },
   { id: "activityCalendar", label: "Activity calendar" },
   { id: "statusChangesOverTime", label: "Status changes over time" },
-  { id: "interviewsOverTime", label: "Interviews over time" },
+  { id: "interviewsOverTime", label: "Interviews & assessments over time" },
   { id: "outcomes", label: "Offers and rejections" },
   { id: "applicationPaths", label: "Application paths" },
 ];
@@ -191,7 +191,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
             <BarChart
-              title="Interviews over time"
+              title="Interviews & assessments over time"
               data={deriveInterviewsOverTime(
                 scopedInterviews,
                 analyticsSettings.defaultTimeGrouping,

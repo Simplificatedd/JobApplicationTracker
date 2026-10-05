@@ -353,9 +353,9 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
   followUp: "Follow-up date and whether the follow-up is needed.",
   followUpPromptDays:
     "Whether handling a follow-up schedules another one, and after how many days.",
-  interviewDateTime: "Scheduled interview date and time.",
-  interviewRound: "Current interview round for this application.",
-  interviewType: "Interview format, such as technical or face-to-face.",
+  interviewDateTime: "Scheduled date and time for the current stage.",
+  interviewRound: "Current round number for this application.",
+  interviewType: "Current stage type.",
   jobDescription: "Saved description or notes from the job posting.",
   jobTitle: "Role title; clicking it opens the application details.",
   jobType: "Role category such as internship, full-time, or contract.",
@@ -435,7 +435,7 @@ function InterviewDateFilter({
   return (
     <FilterSelect
       icon={CalendarDays}
-      label="Interview date"
+      label="Scheduled stage"
       onChange={(value) =>
         onFilterChange?.({
           interview: value as ApplicationFilters["interview"],
@@ -443,7 +443,7 @@ function InterviewDateFilter({
       }
       value={currentFilters.interview}
     >
-      <option value="">Interview date</option>
+      <option value="">Scheduled stage</option>
       <option value="scheduled">Scheduled</option>
       <option value="unscheduled">Not scheduled</option>
     </FilterSelect>
@@ -618,7 +618,7 @@ function MoreFiltersModal({
 
           <FilterSelect
             icon={SlidersHorizontal}
-            label="Interview round"
+            label="Round"
             onChange={(value) =>
               onFilterChange?.({
                 interviewRound: value as ApplicationFilters["interviewRound"],
@@ -626,7 +626,7 @@ function MoreFiltersModal({
             }
             value={currentFilters.interviewRound}
           >
-            <option value="">Interview round</option>
+            <option value="">Round</option>
             <option value="1">Round 1</option>
             <option value="2">Round 2</option>
             <option value="3_plus">Round 3+</option>
@@ -634,7 +634,7 @@ function MoreFiltersModal({
 
           <FilterSelect
             icon={SlidersHorizontal}
-            label="Interview type"
+            label="Stage type"
             onChange={(value) =>
               onFilterChange?.({
                 interviewType: value as InterviewType | "",
@@ -642,7 +642,7 @@ function MoreFiltersModal({
             }
             value={currentFilters.interviewType}
           >
-            <option value="">Interview type</option>
+            <option value="">Stage type</option>
             {INTERVIEW_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

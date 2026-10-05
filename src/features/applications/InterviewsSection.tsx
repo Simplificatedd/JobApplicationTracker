@@ -1,19 +1,21 @@
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import {
+  getInterviewTypeLabel,
   INTERVIEW_MODE_OPTIONS,
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
 import { formatDateTime } from "../../lib/format";
 import {
+  calculateInterviewDeadline,
   getNextInterviewRound,
-  suggestInterviewDeadline,
+  isAssessmentStage,
+  shouldShowProctored,
 } from "../../lib/interviews";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { MutationResult } from "../../store/useTrackerStore";
 import type {
   Application,
-  DeadlineEntryMode,
   Interview,
   InterviewInput,
   InterviewMode,
@@ -21,6 +23,7 @@ import type {
   InterviewUpdate,
 } from "../../types/application";
 import { validateInterviewRound } from "./applicationForm";
+import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface InterviewsSectionProps {
   application: Application;
@@ -36,7 +39,6 @@ interface InterviewsSectionProps {
 interface InterviewDraft {
   dateTime: string;
   deadline: string;
-  deadlineEntryMode: DeadlineEntryMode;
   deadlineReceivedAt: string;
   location: string;
   meetingUrl: string;
@@ -103,7 +105,7 @@ export function InterviewsSection({
     if (
       roundValidation.warnings.length > 0 &&
       !window.confirm(
-        `${roundValidation.warnings.join("\n")}\n\nSave this interview round anyway?`,
+        `${roundValidation.warnings.join("\n")}\n\nSave this round anyway?`,
       )
     ) {
       return;
@@ -127,9 +129,7 @@ export function InterviewsSection({
   }
 
   async function deleteInterview(interview: Interview) {
-    const label = interview.round
-      ? `interview ${interview.round}`
-      : "this interview";
+    const label = interview.round ? `round ${interview.round}` : "this stage";
 
     if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
 
@@ -143,9 +143,11 @@ export function InterviewsSection({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Interviews</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Interviews &amp; assessments
+          </h3>
           <p className="mt-1 text-sm text-muted">
-            Track each interview round and assessment separately.
+            Track each interview or assessment separately.
           </p>
         </div>
         {!application.archivedAt && editingId === null ? (
@@ -155,7 +157,7 @@ export function InterviewsSection({
             type="button"
           >
             <Plus aria-hidden="true" size={16} />
-            Add interview
+            Add stage
           </button>
         ) : null}
       </div>
@@ -166,6 +168,7 @@ export function InterviewsSection({
           error={error}
           isNew={editingId === "new"}
           isSaving={isSaving}
+          key={editingId}
           onCancel={cancelEditing}
           onChange={setDraft}
           onSave={() => void saveInterview()}
@@ -181,7 +184,7 @@ export function InterviewsSection({
       <div className="mt-3 grid gap-3">
         {sortedInterviews.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted">
-            No interviews added yet.
+            No stages added yet.
           </p>
         ) : (
           sortedInterviews.map((interview) => (
@@ -217,17 +220,17 @@ function InterviewCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-foreground">
-            {interview.round ? `Round ${interview.round}` : "Interview"}
+            {interview.round ? `Round ${interview.round}` : "Stage"}
           </h4>
           <p className="mt-1 text-sm text-muted">
-            {getOptionLabel(INTERVIEW_TYPE_OPTIONS, interview.type)} /{" "}
+            {getInterviewTypeLabel(interview.type)} /{" "}
             {getOptionLabel(INTERVIEW_MODE_OPTIONS, interview.mode)}
           </p>
         </div>
         {!application.archivedAt ? (
           <div className="flex shrink-0 gap-1">
             <button
-              aria-label="Edit interview"
+              aria-label="Edit stage"
               className="icon-button"
               onClick={onEdit}
               type="button"
@@ -235,7 +238,7 @@ function InterviewCard({
               <Pencil aria-hidden="true" size={16} />
             </button>
             <button
-              aria-label="Delete interview"
+              aria-label="Delete stage"
               className="icon-button text-destructive"
               onClick={onDelete}
               type="button"
@@ -247,13 +250,21 @@ function InterviewCard({
       </div>
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <InterviewDetail label="Scheduled" value={formatOptionalDateTime(interview.dateTime)} />
-        <InterviewDetail label="Deadline" value={formatOptionalDateTime(interview.deadline)} />
-        <InterviewDetail label="Location" value={interview.location} />
-        <InterviewDetail label="Platform" value={interview.platform} />
-        <InterviewDetail label="Proctored" value={interview.proctored ? "Yes" : "No"} />
+        <InterviewDetail
+          label="Deadline"
+          value={formatOptionalDateTime(calculateInterviewDeadline(interview))}
+        />
+        <InterviewDetail label="Location or address" value={interview.location} />
+        <InterviewDetail label="Platform or provider" value={interview.platform} />
+        {shouldShowProctored(interview.type, interview.proctored) ? (
+          <InterviewDetail
+            label="Proctored"
+            value={interview.proctored ? "Yes" : "No"}
+          />
+        ) : null}
         {safeMeetingUrl ? (
           <div>
-            <p className="text-xs font-semibold uppercase text-muted">Meeting</p>
+            <p className="text-xs font-semibold uppercase text-muted">Link</p>
             <a
               className="mt-1 inline-flex items-center gap-1 font-medium text-primary hover:text-blue-700"
               href={safeMeetingUrl}
@@ -264,7 +275,7 @@ function InterviewCard({
             </a>
           </div>
         ) : (
-          <InterviewDetail label="Meeting" />
+          <InterviewDetail label="Link" />
         )}
       </div>
       {interview.notes ? (
@@ -309,35 +320,26 @@ function InterviewForm({
     onChange({ ...draft, [key]: value });
   }
 
-  function updateDeadlineEntryMode(value: DeadlineEntryMode) {
-    const receivedAt =
-      draft.deadlineReceivedAt || toDateTimeLocal(new Date().toISOString());
-    const suggestedDeadline = suggestInterviewDeadline(value, receivedAt);
-
+  function updateStageType(value: InterviewType) {
     onChange({
       ...draft,
-      deadline:
-        suggestedDeadline !== undefined
-          ? toDateTimeLocal(suggestedDeadline)
-          : draft.deadline,
-      deadlineEntryMode: value,
-      deadlineReceivedAt: value === "exact" ? draft.deadlineReceivedAt : receivedAt,
+      proctored: isAssessmentStage(value) ? draft.proctored : false,
+      type: value,
     });
   }
 
-  function updateDeadlineReceivedAt(value: string) {
-    const suggestedDeadline = suggestInterviewDeadline(
-      draft.deadlineEntryMode,
-      value,
-    );
+  function updateFormat(value: InterviewMode) {
+    onChange({ ...draft, mode: value });
+  }
 
+  function updateDeadlineFields(value: {
+    deadline: string;
+    receivedAt: string;
+  }) {
     onChange({
       ...draft,
-      deadline:
-        suggestedDeadline !== undefined
-          ? toDateTimeLocal(suggestedDeadline)
-          : draft.deadline,
-      deadlineReceivedAt: value,
+      deadline: value.deadline,
+      deadlineReceivedAt: value.receivedAt,
     });
   }
 
@@ -345,10 +347,10 @@ function InterviewForm({
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-foreground">
-          {isNew ? "Add interview" : "Edit interview"}
+          {isNew ? "Add stage" : "Edit stage"}
         </h4>
         <button
-          aria-label="Cancel interview editing"
+          aria-label="Cancel stage editing"
           className="icon-button"
           disabled={isSaving}
           onClick={onCancel}
@@ -358,7 +360,7 @@ function InterviewForm({
         </button>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <FormField label="Interview round">
+        <FormField label="Round number">
           <input
             className="field-control"
             min="1"
@@ -368,10 +370,12 @@ function InterviewForm({
             value={draft.round}
           />
         </FormField>
-        <FormField label="Interview type">
+        <FormField label="Stage type">
           <select
             className="field-control"
-            onChange={(event) => update("type", event.target.value as InterviewType)}
+            onChange={(event) =>
+              updateStageType(event.target.value as InterviewType)
+            }
             value={draft.type}
           >
             {INTERVIEW_TYPE_OPTIONS.map((option) => (
@@ -380,12 +384,14 @@ function InterviewForm({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted">The category or stage of the interview.</p>
+          <p className="mt-1 text-xs text-muted">What this step involves.</p>
         </FormField>
-        <FormField label="Interview mode">
+        <FormField label="Format">
           <select
             className="field-control"
-            onChange={(event) => update("mode", event.target.value as InterviewMode)}
+            onChange={(event) =>
+              updateFormat(event.target.value as InterviewMode)
+            }
             value={draft.mode}
           >
             {INTERVIEW_MODE_OPTIONS.map((option) => (
@@ -394,9 +400,9 @@ function InterviewForm({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted">How the interview is conducted.</p>
+          <p className="mt-1 text-xs text-muted">How this step takes place.</p>
         </FormField>
-        <FormField label="Interview date/time">
+        <FormField label="Scheduled date/time">
           <input
             className="field-control"
             onChange={(event) => update("dateTime", event.target.value)}
@@ -404,7 +410,7 @@ function InterviewForm({
             value={draft.dateTime}
           />
         </FormField>
-        <FormField label="Location">
+        <FormField label="Location or address">
           <input
             className="field-control"
             onChange={(event) => update("location", event.target.value)}
@@ -412,7 +418,7 @@ function InterviewForm({
             value={draft.location}
           />
         </FormField>
-        <FormField label="Meeting URL">
+        <FormField label="Link">
           <input
             className="field-control"
             onChange={(event) => update("meetingUrl", event.target.value)}
@@ -420,7 +426,7 @@ function InterviewForm({
             value={draft.meetingUrl}
           />
         </FormField>
-        <FormField label="Platform">
+        <FormField label="Platform or provider">
           <input
             className="field-control"
             onChange={(event) => update("platform", event.target.value)}
@@ -429,51 +435,23 @@ function InterviewForm({
             value={draft.platform}
           />
         </FormField>
-        <FormField label="Deadline timing">
-          <select
-            className="field-control"
-            onChange={(event) =>
-              updateDeadlineEntryMode(
-                event.target.value as DeadlineEntryMode,
-              )
-            }
-            value={draft.deadlineEntryMode}
-          >
-            <option value="exact">Exact date/time</option>
-            <option value="1_day">1 day after received</option>
-            <option value="2_days">2 days after received</option>
-            <option value="3_days">3 days after received</option>
-            <option value="72_hours">72 hours after received</option>
-          </select>
-        </FormField>
-        {draft.deadlineEntryMode !== "exact" ? (
-          <FormField label="Received date/time">
+        <InterviewDeadlineFields
+          deadline={draft.deadline}
+          onChange={updateDeadlineFields}
+          receivedAt={draft.deadlineReceivedAt}
+        />
+        {shouldShowProctored(draft.type, draft.proctored) ? (
+          <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground sm:col-span-2">
             <input
-              className="field-control"
-              onChange={(event) => updateDeadlineReceivedAt(event.target.value)}
-              type="datetime-local"
-              value={draft.deadlineReceivedAt}
+              checked={draft.proctored}
+              className="h-4 w-4 rounded border-border text-primary"
+              onChange={(event) => update("proctored", event.target.checked)}
+              type="checkbox"
             />
-          </FormField>
+            <span>This assessment is proctored</span>
+          </label>
         ) : null}
-        <FormField label="Interview deadline">
-          <input
-            className="field-control"
-            onChange={(event) => update("deadline", event.target.value)}
-            type="datetime-local"
-            value={draft.deadline}
-          />
-        </FormField>
-        <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground sm:col-span-2">
-          <input
-            checked={draft.proctored}
-            className="h-4 w-4 rounded border-border text-primary"
-            onChange={(event) => update("proctored", event.target.checked)}
-            type="checkbox"
-          />
-          <span>Proctored assessment</span>
-        </label>
-        <FormField className="sm:col-span-2" label="Interview notes">
+        <FormField className="sm:col-span-2" label="Notes">
           <textarea
             className="field-control min-h-24 resize-y"
             onChange={(event) => update("notes", event.target.value)}
@@ -501,7 +479,11 @@ function InterviewForm({
           onClick={onSave}
           type="button"
         >
-          {isSaving ? "Saving…" : isNew ? "Add interview" : "Save interview"}
+          {isSaving
+            ? "Saving…"
+            : isNew
+              ? "Add stage"
+              : "Save stage"}
         </button>
       </div>
     </div>
@@ -530,8 +512,9 @@ function FormField({
 function createDraft(interview?: Interview, suggestedRound?: number): InterviewDraft {
   return {
     dateTime: toDateTimeLocal(interview?.dateTime),
-    deadline: toDateTimeLocal(interview?.deadline),
-    deadlineEntryMode: interview?.deadlineEntryMode ?? "exact",
+    deadline: toDateTimeLocal(
+      interview ? calculateInterviewDeadline(interview) : undefined,
+    ),
     deadlineReceivedAt: toDateTimeLocal(interview?.deadlineReceivedAt),
     location: interview?.location ?? "",
     meetingUrl: interview?.meetingUrl ?? "",
@@ -551,7 +534,7 @@ function toInterviewUpdate(
   return {
     dateTime: trimOptional(draft.dateTime),
     deadline: trimOptional(draft.deadline),
-    deadlineEntryMode: draft.deadlineEntryMode,
+    deadlineEntryMode: "exact",
     deadlineReceivedAt: trimOptional(draft.deadlineReceivedAt),
     location: trimOptional(draft.location),
     meetingUrl: trimOptional(draft.meetingUrl),
@@ -584,7 +567,7 @@ function sortInterviewHistory(interviews: Interview[]) {
 }
 
 function getSortTime(interview: Interview, now: number) {
-  const times = [interview.dateTime, interview.deadline]
+  const times = [interview.dateTime, calculateInterviewDeadline(interview)]
     .map((value) => (value ? new Date(value).getTime() : Number.NaN))
     .filter((value) => !Number.isNaN(value));
   const upcoming = times.filter((value) => value >= now);

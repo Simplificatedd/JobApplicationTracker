@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../types/application";
 import {
   buildInterviewRecord,
+  calculateDeadlineFromDuration,
   calculateInterviewDeadline,
   createInterviewRecord,
   getNextInterviewRound,
+  isAssessmentStage,
   isValidInterviewRound,
+  normalizeInterviewClassification,
+  normalizeInterviewType,
   reconcileCanonicalInterviews,
   selectCurrentInterview,
+  shouldShowProctored,
   updateInterviewRecord,
   upsertInterviewHistory,
 } from "./interviews";
@@ -22,7 +27,7 @@ const application: Application = {
   jobType: "internship",
   followUpNeeded: false,
   interviewRound: 1,
-  interviewType: "technical",
+  interviewType: "technical-interview",
   interviewMode: "video",
   interviewProctored: false,
   deadlineEntryMode: "exact",
@@ -36,7 +41,7 @@ const firstRound: Interview = {
   id: "interview-1",
   applicationId: application.id,
   round: 1,
-  type: "technical",
+  type: "technical-interview",
   mode: "video",
   proctored: false,
   notes: "Strong first round",
@@ -102,6 +107,42 @@ describe("buildInterviewRecord", () => {
     ).toMatchObject({ applicationId: application.id, dateTime: undefined });
   });
 
+  it("does not infer a received time for a new exact deadline", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          interviewDeadline: "2026-09-23T17:00",
+          interviewDeadlineEntryMode: "exact",
+          interviewDeadlineReceivedAt: undefined,
+        },
+        [],
+        "2026-09-21T00:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "exact",
+      deadlineReceivedAt: undefined,
+    });
+  });
+
+  it("retains the creation-time fallback for a legacy relative deadline", () => {
+    expect(
+      buildInterviewRecord(
+        {
+          ...application,
+          interviewDeadlineEntryMode: "2_days",
+          interviewDeadlineReceivedAt: undefined,
+        },
+        [],
+        "2026-09-21T00:00:00.000Z",
+      ),
+    ).toMatchObject({
+      deadlineEntryMode: "2_days",
+      deadlineReceivedAt: application.createdAt,
+    });
+  });
+
   it("uses interview-specific deadline timing metadata", () => {
     expect(
       buildInterviewRecord(
@@ -129,6 +170,23 @@ describe("buildInterviewRecord", () => {
       ),
     ).toBeUndefined();
   });
+
+  it.each(["unknown", "other"] as const)(
+    "preserves the canonical %s stage type with an asynchronous format",
+    (type) => {
+      expect(
+        buildInterviewRecord(
+          {
+            ...application,
+            interviewMode: "take-home",
+            interviewType: type,
+          },
+          [],
+          "2026-09-21T00:00:00.000Z",
+        ),
+      ).toMatchObject({ mode: "take-home", type });
+    },
+  );
 });
 
 describe("reconcileCanonicalInterviews", () => {
@@ -160,9 +218,30 @@ describe("reconcileCanonicalInterviews", () => {
     expect(result.interviews[0]).toMatchObject({
       applicationId: application.id,
       dateTime: "2026-09-22T10:00",
+      deadlineReceivedAt: undefined,
       location: "Career centre",
       round: 1,
     });
+  });
+
+  it("does not infer a received time while migrating an exact deadline", () => {
+    const exactDeadlineApplication = {
+      ...application,
+      deadlineEntryMode: "exact" as const,
+      interviewDateTime: "2026-09-22T10:00",
+      interviewDeadline: "2026-09-23T17:00",
+    };
+    const result = reconcileCanonicalInterviews(
+      [exactDeadlineApplication],
+      [],
+    );
+
+    expect(result.interviews[0]).toMatchObject({
+      deadline: "2026-09-23T17:00",
+      deadlineEntryMode: "exact",
+      deadlineReceivedAt: undefined,
+    });
+    expect(result.applications[0].interviewDeadlineReceivedAt).toBeUndefined();
   });
 
   it("moves an unambiguous legacy application deadline to a new interview", () => {
@@ -265,7 +344,7 @@ describe("reconcileCanonicalInterviews", () => {
       ...firstRound,
       id: "interview-2",
       round: 2,
-      type: "face-to-face",
+      type: "hiring-manager-interview",
       mode: "onsite",
       location: "Main office",
       updatedAt: "2026-09-21T00:00:00.000Z",
@@ -286,7 +365,7 @@ describe("reconcileCanonicalInterviews", () => {
       interviewLocation: "Main office",
       interviewMode: "onsite",
       interviewRound: 2,
-      interviewType: "face-to-face",
+      interviewType: "hiring-manager-interview",
       updatedAt: staleApplication.updatedAt,
     });
     expect(result.applicationWrites).toEqual([result.applications[0]]);
@@ -299,7 +378,7 @@ describe("reconcileCanonicalInterviews", () => {
       id: "interview-2",
       dateTime: "2026-09-24T10:00",
       round: 2,
-      type: "face-to-face",
+      type: "hiring-manager-interview",
       mode: "onsite",
       updatedAt: "2026-09-21T00:00:00.000Z",
     };
@@ -428,6 +507,23 @@ describe("selectCurrentInterview", () => {
       ),
     ).toBe(assessment);
   });
+
+  it("uses a calculated relative deadline when no deadline is stored", () => {
+    const assessment = {
+      ...firstRound,
+      deadlineEntryMode: "2_days" as const,
+      deadlineReceivedAt: "2026-09-30T12:00:00.000Z",
+      id: "assessment-1",
+      round: 2,
+    };
+
+    expect(
+      selectCurrentInterview(
+        [firstRound, assessment],
+        new Date("2026-10-01T00:00:00.000Z"),
+      ),
+    ).toBe(assessment);
+  });
 });
 
 describe("interview record mutations", () => {
@@ -475,6 +571,135 @@ describe("interview record mutations", () => {
     expect(isValidInterviewRound(-1)).toBe(false);
     expect(isValidInterviewRound(1.5)).toBe(false);
   });
+
+  it.each(["unknown", "other"] as const)(
+    "preserves the canonical %s stage type when adding an asynchronous stage",
+    (type) => {
+      expect(
+        createInterviewRecord(
+          {
+            applicationId: application.id,
+            mode: "take-home",
+            proctored: false,
+            type,
+          },
+          application.createdAt,
+        ),
+      ).toMatchObject({ mode: "take-home", type });
+    },
+  );
+});
+
+describe("normalizeInterviewClassification", () => {
+  it.each([
+    ["technical", "technical-interview"],
+    ["recruiter", "recruiter-screen"],
+    ["face-to-face", "other"],
+    ["HireVue", "online-assessment"],
+    ["HackerRank", "online-assessment"],
+  ] as const)("normalizes the legacy %s filter value", (type, expected) => {
+    expect(normalizeInterviewType(type)).toBe(expected);
+  });
+
+  it.each([
+    ["technical", "technical-interview"],
+    ["recruiter", "recruiter-screen"],
+  ] as const)("maps the legacy %s stage", (type, expected) => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "video",
+        type,
+      }),
+    ).toMatchObject({ mode: "video", type: expected });
+  });
+
+  it("moves a legacy provider type into the provider field", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        type: "HackerRank",
+      }),
+    ).toEqual({
+      mode: "unknown",
+      platform: "HackerRank",
+      type: "online-assessment",
+    });
+  });
+
+  it("preserves an explicit provider while normalizing its legacy type", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        platform: "ModernHire",
+        type: "HireVue",
+      }),
+    ).toEqual({
+      mode: "unknown",
+      platform: "ModernHire",
+      type: "online-assessment",
+    });
+  });
+
+  it("moves legacy face-to-face semantics into the format", () => {
+    expect(
+      normalizeInterviewClassification({
+        mode: "unknown",
+        type: "face-to-face",
+      }),
+    ).toEqual({ mode: "onsite", platform: undefined, type: "other" });
+  });
+
+  it.each(["unknown", "other"] as const)(
+    "does not infer a stage type from an asynchronous format for %s",
+    (type) => {
+      expect(
+        normalizeInterviewClassification({
+          mode: "take-home",
+          type,
+        }),
+      ).toEqual({
+        mode: "take-home",
+        platform: undefined,
+        type,
+      });
+    },
+  );
+
+  it.each(["unknown", "other"] as const)(
+    "does not rewrite a canonical %s stage during reconciliation",
+    (type) => {
+      const canonicalStage = {
+        ...firstRound,
+        mode: "take-home" as const,
+        type,
+      };
+      const result = reconcileCanonicalInterviews(
+        [{ ...application, interviewMode: "take-home", interviewType: type }],
+        [canonicalStage],
+      );
+
+      expect(result.interviewWrites).toEqual([]);
+      expect(result.interviews[0]).toBe(canonicalStage);
+      expect(result.applications[0].interviewType).toBe(type);
+    },
+  );
+
+  it("persists normalized legacy interview data during reconciliation", () => {
+    const result = reconcileCanonicalInterviews(
+      [application],
+      [{ ...firstRound, platform: undefined, type: "HackerRank" }],
+    );
+
+    expect(result.interviews[0]).toMatchObject({
+      platform: "HackerRank",
+      type: "online-assessment",
+    });
+    expect(result.interviewWrites).toEqual([result.interviews[0]]);
+    expect(result.applications[0]).toMatchObject({
+      interviewPlatform: "HackerRank",
+      interviewType: "online-assessment",
+    });
+  });
 });
 
 describe("calculateInterviewDeadline", () => {
@@ -511,6 +736,83 @@ describe("calculateInterviewDeadline", () => {
         deadline: undefined,
         deadlineEntryMode: "exact",
       }),
+    ).toBeUndefined();
+  });
+});
+
+describe("isAssessmentStage", () => {
+  it.each([
+    "take-home-assignment",
+    "online-assessment",
+    "HireVue",
+    "HackerRank",
+  ] as const)("recognizes %s as an assessment", (type) => {
+    expect(isAssessmentStage(type)).toBe(true);
+  });
+
+  it("does not classify a live interview as an assessment", () => {
+    expect(isAssessmentStage("technical-interview")).toBe(false);
+  });
+
+  it("keeps a stored proctored value visible for a live stage", () => {
+    expect(shouldShowProctored("technical-interview", true)).toBe(true);
+  });
+
+  it("hides an empty proctored value for a live stage", () => {
+    expect(shouldShowProctored("technical-interview", false)).toBe(false);
+  });
+});
+
+describe("calculateDeadlineFromDuration", () => {
+  it("adds a custom number of hours", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        36,
+        "hours",
+      ),
+    ).toBe("2026-10-02T20:00:00.000Z");
+  });
+
+  it("treats custom days as 24-hour periods", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        5,
+        "days",
+      ),
+    ).toBe("2026-10-06T08:00:00.000Z");
+  });
+
+  it.each([
+    ["", 24],
+    ["not-a-date", 24],
+    ["2026-10-01T08:00:00.000Z", 0],
+    ["2026-10-01T08:00:00.000Z", -1],
+    ["2026-10-01T08:00:00.000Z", Number.NaN],
+  ])("rejects invalid duration input", (receivedAt, amount) => {
+    expect(
+      calculateDeadlineFromDuration(receivedAt, amount, "hours"),
+    ).toBeUndefined();
+  });
+
+  it("rejects a finite duration that exceeds the supported range", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "2026-10-01T08:00:00.000Z",
+        Number.MAX_VALUE,
+        "hours",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects a result outside JavaScript's valid date range", () => {
+    expect(
+      calculateDeadlineFromDuration(
+        "+275760-09-12T00:00:00.000Z",
+        48,
+        "hours",
+      ),
     ).toBeUndefined();
   });
 });

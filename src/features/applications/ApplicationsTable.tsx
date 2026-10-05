@@ -25,6 +25,7 @@ import {
   StatusQuickEditCell,
 } from "./TableCells";
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import { getInterviewTypeLabel } from "../../lib/constants";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
@@ -212,7 +213,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "interviewRound",
     key: "interviewRound",
-    label: "Interview Round",
+    label: "Round",
     minWidth: 92,
     width: 150,
   },
@@ -220,7 +221,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "interviewDateTime",
     key: "interviewDateTime",
-    label: "Interview Date/Time",
+    label: "Scheduled Date/Time",
     minWidth: 104,
     width: 190,
   },
@@ -228,7 +229,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     canHide: true,
     id: "interviewType",
     key: "interviewType",
-    label: "Interview Type",
+    label: "Stage Type",
     minWidth: 88,
     width: 145,
   },
@@ -1058,7 +1059,7 @@ function ApplicationColumnCell({
   }
 
   if (columnId === "interviewType") {
-    return <TextCell value={formatOption(application.interviewType)} />;
+    return <TextCell value={getInterviewTypeLabel(application.interviewType)} />;
   }
 
   if (columnId === "priority") {
