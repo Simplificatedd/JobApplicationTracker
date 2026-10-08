@@ -4,6 +4,7 @@ import type { NotificationState, UserSettings } from "../types/settings";
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [
   "Awaiting Response",
+  "Online Assessment",
   "Interviewing",
   "Offered",
   "Accepted",

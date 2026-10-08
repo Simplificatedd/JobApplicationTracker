@@ -2,12 +2,17 @@ import {
   DEFAULT_USER_SETTINGS,
   normalizeApplicationStatus,
 } from "../lib/domain";
+import {
+  getNextAssessmentNumber,
+  migrateStageSnapshot,
+} from "../lib/assessments";
 import { normalizeStatusActivities } from "../lib/statusHistory";
 import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
   Application,
+  Assessment,
   ApplicationContact,
   CoverLetterMetadata,
   Interview,
@@ -40,7 +45,26 @@ export function applyStorageMutation(
   return {
     ...snapshot,
     activities: upsertRecords(snapshot.activities, mutation.activities),
-    applications: upsertRecords(snapshot.applications, mutation.applications),
+    applications: upsertRecords(
+      snapshot.applications,
+      mutation.applications?.map((write) => {
+        if (
+          !mutation.assessments?.length &&
+          !mutation.deleteAssessmentIds?.length
+        )
+          return write;
+        // Assessment actions update activity timestamps, never overwrite a concurrently
+        // changed application status, archive state, or other application metadata.
+        const current = snapshot.applications.find(
+          (item) => item.id === write.id,
+        );
+        if (!current)
+          throw new Error(
+            "The assessment’s application no longer exists. Refresh the tracker.",
+          );
+        return { ...current, updatedAt: write.updatedAt };
+      }),
+    ),
     contacts: removeRecords(
       upsertRecords(snapshot.contacts, mutation.contacts),
       mutation.deleteContactIds,
@@ -48,6 +72,10 @@ export function applyStorageMutation(
     coverLetters: removeRecords(
       upsertRecords(snapshot.coverLetters ?? [], mutation.coverLetters),
       mutation.deleteCoverLetterIds,
+    ),
+    assessments: removeRecords(
+      mergeAssessmentWrites(snapshot.assessments ?? [], mutation.assessments),
+      mutation.deleteAssessmentIds,
     ),
     interviews: removeRecords(
       upsertRecords(snapshot.interviews, mutation.interviews),
@@ -58,6 +86,28 @@ export function applyStorageMutation(
       mutation.deleteResumeIds,
     ),
   };
+}
+
+function mergeAssessmentWrites(
+  records: Assessment[],
+  writes?: readonly Assessment[],
+) {
+  const merged = [...records];
+  for (const write of writes ?? []) {
+    const index = merged.findIndex((item) => item.id === write.id);
+    if (index >= 0) {
+      merged[index] = { ...write, number: merged[index].number };
+    } else {
+      const peers = merged.filter(
+        (item) => item.applicationId === write.applicationId,
+      );
+      const number = peers.some((item) => item.number === write.number)
+        ? getNextAssessmentNumber(peers)
+        : write.number;
+      merged.push({ ...write, number });
+    }
+  }
+  return merged;
 }
 
 function upsertRecords<T extends { id: string }>(
@@ -122,12 +172,36 @@ export function createCloudStorageAdapter({
   }
 
   async function initializeNow() {
-    const localSnapshot = await cache.initialize();
+    const localSnapshot = normalizeSnapshot(await cache.initialize());
     account = await api.getSession();
     const remoteState = await api.getState();
 
     if (remoteState) {
-      cloudState = normalizeCloudState(remoteState);
+      let current = remoteState;
+      cloudState = normalizeCloudState(current);
+      // Persist the entire migration atomically under the existing revision guard.
+      for (
+        let attempt = 0;
+        JSON.stringify(cloudState.snapshot) !==
+        JSON.stringify(current.snapshot);
+        attempt += 1
+      ) {
+        try {
+          cloudState = normalizeCloudState(
+            await api.saveState(cloudState.snapshot, cloudState.revision),
+          );
+          break;
+        } catch (error) {
+          if (
+            !(error instanceof CloudRevisionConflictError) ||
+            !error.current ||
+            attempt >= MAX_CONFLICT_RETRIES - 1
+          )
+            throw error;
+          current = error.current;
+          cloudState = normalizeCloudState(current);
+        }
+      }
       await refreshCache(cloudState.snapshot);
       return cloudState.snapshot;
     }
@@ -182,7 +256,9 @@ export function createCloudStorageAdapter({
       let current = await ensureInitialized();
 
       for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
-        const nextSnapshot = update(structuredClone(current.snapshot));
+        const nextSnapshot = normalizeSnapshot(
+          update(structuredClone(current.snapshot)),
+        );
 
         try {
           const saved = normalizeCloudState(
@@ -285,7 +361,12 @@ export function createCloudStorageAdapter({
       applications: current.applications.filter(
         (application) => application.id !== id,
       ),
-      contacts: current.contacts.filter((contact) => contact.applicationId !== id),
+      contacts: current.contacts.filter(
+        (contact) => contact.applicationId !== id,
+      ),
+      assessments: (current.assessments ?? []).filter(
+        (item) => item.applicationId !== id,
+      ),
       interviews: current.interviews.filter(
         (interview) => interview.applicationId !== id,
       ),
@@ -333,6 +414,13 @@ export function createCloudStorageAdapter({
         (activity) => activity.applicationId !== applicationId,
       ),
     }));
+  }
+
+  async function listAssessments(applicationId?: string) {
+    const assessments = (await snapshot()).assessments ?? [];
+    return applicationId
+      ? assessments.filter((item) => item.applicationId === applicationId)
+      : assessments;
   }
 
   async function listInterviews(applicationId?: string) {
@@ -528,6 +616,7 @@ export function createCloudStorageAdapter({
     listActivities,
     appendActivity,
     deleteActivitiesForApplication,
+    listAssessments,
     listInterviews,
     saveInterview,
     deleteInterview,
@@ -572,12 +661,14 @@ function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
 }
 
 function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
-  const hasLegacyOfferSemantics =
-    (snapshot.dataVersion ?? 1) < TRACKER_DATA_VERSION;
-  const defaultFollowUpPromptDays =
-    snapshot.settings.defaultFollowUpPromptDays;
+  if ((snapshot.dataVersion ?? 1) > TRACKER_DATA_VERSION)
+    throw new Error(
+      "This workspace uses a newer data format. Update the tracker before opening it.",
+    );
+  const hasLegacyOfferSemantics = (snapshot.dataVersion ?? 1) < 2;
+  const defaultFollowUpPromptDays = snapshot.settings.defaultFollowUpPromptDays;
 
-  return {
+  return migrateStageSnapshot({
     ...snapshot,
     activities: normalizeStatusActivities(
       snapshot.activities,
@@ -599,5 +690,5 @@ function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
       };
     }),
     coverLetters: snapshot.coverLetters ?? [],
-  };
+  });
 }

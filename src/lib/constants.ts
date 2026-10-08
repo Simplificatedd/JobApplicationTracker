@@ -20,13 +20,14 @@ export const INTERVIEW_TYPE_OPTIONS: ReadonlyArray<{
   { label: "Hiring manager", value: "hiring-manager-interview" },
   { label: "Technical", value: "technical-interview" },
   { label: "Behavioral", value: "behavioral-interview" },
-  { label: "Take-home assignment", value: "take-home-assignment" },
-  { label: "Online assessment", value: "online-assessment" },
   { label: "Other", value: "other" },
 ];
 
 export function getInterviewTypeLabel(value?: InterviewType) {
   if (!value) return undefined;
+
+  if (value === "online-assessment") return "Online assessment";
+  if (value === "take-home-assignment") return "Take-home assignment";
 
   const option = INTERVIEW_TYPE_OPTIONS.find(
     (candidate) => candidate.value === value,
@@ -37,7 +38,7 @@ export function getInterviewTypeLabel(value?: InterviewType) {
   if (value === "recruiter") return "Recruiter screen";
   if (value === "face-to-face") return "In-person";
   if (value === "HireVue" || value === "HackerRank") {
-    return "Online assessment";
+    return value;
   }
 
   return value;
@@ -58,6 +59,7 @@ export const INTERVIEW_MODE_OPTIONS: ReadonlyArray<{
 export const STATUS_TONE: Record<
   ApplicationStatus,
   | "awaiting"
+  | "assessment"
   | "interviewing"
   | "offered"
   | "accepted"
@@ -65,6 +67,7 @@ export const STATUS_TONE: Record<
   | "withdrawn"
 > = {
   "Awaiting Response": "awaiting",
+  "Online Assessment": "assessment",
   Interviewing: "interviewing",
   Offered: "offered",
   Accepted: "accepted",

@@ -23,6 +23,7 @@ describe("getInterviewTypeLabel", () => {
 
   it("keeps legacy stage values readable during migration", () => {
     expect(getInterviewTypeLabel("face-to-face")).toBe("In-person");
-    expect(getInterviewTypeLabel("HackerRank")).toBe("Online assessment");
+    // Provider-only legacy types are ambiguous and must not be relabelled as assessments.
+    expect(getInterviewTypeLabel("HackerRank")).toBe("HackerRank");
   });
 });

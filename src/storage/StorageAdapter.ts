@@ -1,6 +1,7 @@
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
+  Assessment,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -10,7 +11,7 @@ import type {
 import type { NotificationState, UserSettings } from "../types/settings";
 import type { TablePreferences } from "../types/tablePreferences";
 
-export const TRACKER_DATA_VERSION = 2;
+export const TRACKER_DATA_VERSION = 3;
 
 export interface StorageSnapshot {
   dataVersion?: number;
@@ -20,6 +21,8 @@ export interface StorageSnapshot {
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   interviews: Interview[];
+  // Optional only for reading pre-assessment snapshots. Writers always include this array.
+  assessments?: Assessment[];
   notificationState: NotificationState;
   resumes: ResumeMetadata[];
   settings: UserSettings;
@@ -37,6 +40,8 @@ export interface StorageMutation {
   contacts?: readonly ApplicationContact[];
   coverLetters?: readonly CoverLetterMetadata[];
   interviews?: readonly Interview[];
+  assessments?: readonly Assessment[];
+  deleteAssessmentIds?: readonly string[];
   resumes?: readonly ResumeMetadata[];
   resumeFiles?: readonly ResumeBlobRecord[];
   deleteContactIds?: readonly string[];
@@ -67,6 +72,8 @@ export interface StorageAdapter {
   listActivities(applicationId?: string): Promise<Activity[]>;
   appendActivity(activity: Activity): Promise<void>;
   deleteActivitiesForApplication(applicationId: string): Promise<void>;
+
+  listAssessments(applicationId?: string): Promise<Assessment[]>;
 
   listInterviews(applicationId?: string): Promise<Interview[]>;
   saveInterview(interview: Interview): Promise<void>;

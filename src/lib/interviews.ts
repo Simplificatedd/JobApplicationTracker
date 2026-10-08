@@ -107,7 +107,9 @@ export function updateInterviewRecord(
 }
 
 export function getNextInterviewRound(interviews: Interview[]) {
-  return Math.max(0, ...interviews.map((interview) => interview.round ?? 0)) + 1;
+  return (
+    Math.max(0, ...interviews.map((interview) => interview.round ?? 0)) + 1
+  );
 }
 
 export function isValidInterviewRound(round: number | undefined) {
@@ -263,6 +265,7 @@ export function reconcileCanonicalInterviews(
       (applicationInterviews.length === 1 ? applicationInterviews[0] : undefined);
 
     if (
+      !application.stageMigrationVersion &&
       legacyDeadlineTarget &&
       !legacyDeadlineTarget.deadline &&
       !application.interviewDeadline &&
@@ -287,7 +290,11 @@ export function reconcileCanonicalInterviews(
           : projectedInterview;
     }
 
-    if (!projectedInterview && hasExplicitInterviewProjection(application)) {
+    if (
+      !application.stageMigrationVersion &&
+      !projectedInterview &&
+      hasExplicitInterviewProjection(application)
+    ) {
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
@@ -388,7 +395,9 @@ function interviewFromApplicationProjection(
     application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
-    id: existing?.id ?? createId("interview"),
+    id:
+      existing?.id ??
+      `legacy-interview:${application.id}:${application.interviewRound ?? "stage"}`,
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,

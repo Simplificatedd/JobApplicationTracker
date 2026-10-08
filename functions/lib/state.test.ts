@@ -93,11 +93,22 @@ class FakeD1Statement {
       return { meta: { changes: 1 } };
     }
 
-    const [ownerEmail, snapshotJson, updatedAt, ownerId, baseRevision] =
-      this.values;
+    const [
+      ownerEmail,
+      snapshotJson,
+      updatedAt,
+      ownerId,
+      baseRevision,
+      incomingVersion,
+    ] = this.values;
     const current = this.rows.get(String(ownerId));
 
-    if (!current || current.revision !== baseRevision) {
+    if (
+      !current ||
+      current.revision !== baseRevision ||
+      (JSON.parse(current.snapshot_json).dataVersion ?? 1) >
+        Number(incomingVersion)
+    ) {
       return { meta: { changes: 0 } };
     }
 
@@ -120,6 +131,61 @@ class FakeD1Database {
 }
 
 describe("cloud state", () => {
+  it("rejects downgraded writes so older clients cannot overwrite migrated assessment data", async () => {
+    const database = new FakeD1Database() as unknown as D1Database;
+    const user = { email: "one@example.edu", id: "user-1" };
+    const migrated = {
+      ...snapshot(),
+      dataVersion: 3,
+      assessments: [],
+      applications: snapshot().applications.map((app) => ({
+        ...app,
+        status: "Online Assessment" as const,
+      })),
+    };
+    await saveCloudState(database, user, {
+      baseRevision: null,
+      snapshot: migrated,
+    });
+    await expect(
+      saveCloudState(database, user, {
+        baseRevision: 1,
+        snapshot: { ...snapshot(), dataVersion: 2 },
+      }),
+    ).rejects.toThrow("newer data format");
+    expect((await getCloudState(database, user.id))?.snapshot).toEqual(
+      migrated,
+    );
+    await expect(
+      saveCloudState(database, user, { baseRevision: 1, snapshot: migrated }),
+    ).resolves.toMatchObject({ revision: 2 });
+  });
+  it("requires an assessments array for the new data version and rejects malformed arrays", () => {
+    expect(() =>
+      parseSaveStateRequest(
+        JSON.stringify({
+          baseRevision: null,
+          snapshot: { ...snapshot(), dataVersion: 3 },
+        }),
+      ),
+    ).toThrow("invalid shape");
+    expect(() =>
+      parseSaveStateRequest(
+        JSON.stringify({
+          baseRevision: null,
+          snapshot: { ...snapshot(), assessments: {} },
+        }),
+      ),
+    ).toThrow("invalid shape");
+    expect(
+      parseSaveStateRequest(
+        JSON.stringify({
+          baseRevision: null,
+          snapshot: { ...snapshot(), dataVersion: 3, assessments: [] },
+        }),
+      ).snapshot.assessments,
+    ).toEqual([]);
+  });
   it("rejects writes beyond the account snapshot budget", () => {
     expect(() =>
       requireAvailableSnapshotQuota(MAX_TOTAL_SNAPSHOT_BYTES, 1),
