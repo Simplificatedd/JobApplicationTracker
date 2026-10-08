@@ -11,12 +11,18 @@ import {
   type ApplicationOutcomePath,
 } from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
-import type { Activity, Application, Interview } from "../../types/application";
+import type {
+  Activity,
+  Application,
+  Assessment,
+  Interview,
+} from "../../types/application";
 import type { UserSettings } from "../../types/settings";
 
 interface AnalyticsPageProps {
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
+  assessments: Assessment[];
   applications: Application[];
   interviews: Interview[];
   onUpdateAnalyticsSettings: (settings: Partial<AnalyticsSettings>) => void;
@@ -29,7 +35,8 @@ const chartOptions = [
   { id: "followUpLoad", label: "Follow-up load" },
   { id: "activityCalendar", label: "Activity calendar" },
   { id: "statusChangesOverTime", label: "Status changes over time" },
-  { id: "interviewsOverTime", label: "Interviews & assessments over time" },
+  { id: "interviewsOverTime", label: "Interviews over time" },
+  { id: "assessmentsOverTime", label: "Assessment invitations over time" },
   { id: "outcomes", label: "Offers and rejections" },
   { id: "applicationPaths", label: "Application paths" },
 ];
@@ -37,6 +44,7 @@ const chartOptions = [
 export function AnalyticsPage({
   activities,
   analyticsSettings,
+  assessments,
   applications,
   interviews,
   onUpdateAnalyticsSettings,
@@ -53,6 +61,9 @@ export function AnalyticsPage({
   );
   const scopedInterviews = interviews.filter((interview) =>
     scopedApplicationIds.has(interview.applicationId),
+  );
+  const scopedAssessments = assessments.filter((item) =>
+    scopedApplicationIds.has(item.applicationId),
   );
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
   const hasData =
@@ -191,9 +202,18 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
             <BarChart
-              title="Interviews & assessments over time"
+              title="Interviews over time"
               data={deriveInterviewsOverTime(
                 scopedInterviews,
+                analyticsSettings.defaultTimeGrouping,
+              )}
+            />
+          ) : null}
+          {visibleCharts.has("assessmentsOverTime") ? (
+            <BarChart
+              title="Assessment invitations over time"
+              data={deriveAssessmentsOverTime(
+                scopedAssessments,
                 analyticsSettings.defaultTimeGrouping,
               )}
             />
@@ -205,6 +225,7 @@ export function AnalyticsPage({
                 scopedApplications,
                 scopedActivities,
                 scopedInterviews,
+                scopedAssessments,
               )}
             />
           ) : null}
@@ -215,6 +236,7 @@ export function AnalyticsPage({
                 scopedApplications,
                 scopedActivities,
                 scopedInterviews,
+                scopedAssessments,
               )}
             />
           ) : null}
@@ -222,6 +244,7 @@ export function AnalyticsPage({
             <ActivityCalendar
               activities={scopedActivities}
               applications={scopedApplications}
+              assessments={scopedAssessments}
               interviews={scopedInterviews}
             />
           ) : null}
@@ -266,6 +289,7 @@ function BarChart({ data, title }: { data: ChartDatum[]; title: string }) {
 }
 
 function ActivityCalendar({
+  assessments,
   activities,
   applications,
   interviews,
@@ -273,8 +297,14 @@ function ActivityCalendar({
   activities: Activity[];
   applications: Application[];
   interviews: Interview[];
+  assessments: Assessment[];
 }) {
-  const days = deriveActivityCalendarDays(applications, activities, interviews);
+  const days = deriveActivityCalendarDays(
+    applications,
+    activities,
+    interviews,
+    assessments,
+  );
 
   return (
     <article className="surface-panel rounded-lg p-4 xl:col-span-2">
@@ -302,7 +332,13 @@ function ActivityCalendar({
   );
 }
 
-function LegendItem({ className, label }: { className: string; label: string }) {
+function LegendItem({
+  className,
+  label,
+}: {
+  className: string;
+  label: string;
+}) {
   return (
     <span className="inline-flex items-center gap-2">
       <span className={`h-3 w-3 rounded-sm ${className}`} />
@@ -388,13 +424,31 @@ export function deriveInterviewsOverTime(
   );
 }
 
+export function deriveAssessmentsOverTime(
+  assessments: Assessment[],
+  grouping: AnalyticsSettings["defaultTimeGrouping"],
+) {
+  return toChartData(
+    groupDates(
+      assessments.map((item) => item.receivedAt || item.createdAt),
+      grouping,
+    ),
+  );
+}
+
 export function deriveOutcomes(
   applications: Application[],
   activities: Activity[],
   interviews: Interview[],
+  assessments: Assessment[] = [],
 ) {
   const outcomePaths = applications.map((application) =>
-    classifyApplicationOutcomePath(application, activities, interviews),
+    classifyApplicationOutcomePath(
+      application,
+      activities,
+      interviews,
+      assessments,
+    ),
   );
   const offerPaths: ApplicationOutcomePath[] = [
     "accepted",
@@ -403,6 +457,7 @@ export function deriveOutcomes(
   ];
   const rejectionPaths: ApplicationOutcomePath[] = [
     "offered_rejected",
+    "assessment_rejected",
     "interviewed_rejected",
     "rejected_without_interview",
   ];
@@ -432,6 +487,8 @@ const APPLICATION_OUTCOME_PATH_ORDER: ApplicationOutcomePath[] = [
   "accepted",
   "offer_pending",
   "offered_rejected",
+  "online_assessment",
+  "assessment_rejected",
   "interviewing",
   "interviewed_rejected",
   "rejected_without_interview",
@@ -443,6 +500,7 @@ export function deriveApplicationPaths(
   applications: Application[],
   activities: Activity[],
   interviews: Interview[],
+  assessments: Assessment[] = [],
 ) {
   const counts = new Map<ApplicationOutcomePath, number>();
 
@@ -451,6 +509,7 @@ export function deriveApplicationPaths(
       application,
       activities,
       interviews,
+      assessments,
     );
 
     counts.set(outcomePath, (counts.get(outcomePath) ?? 0) + 1);
@@ -466,9 +525,18 @@ export function deriveActivityCalendarDays(
   applications: Application[],
   activities: Activity[],
   interviews: Interview[],
+  assessments: Assessment[] = [],
 ) {
+  const assessmentEventDate = (item: Assessment) =>
+    item.submittedAt ||
+    item.scheduledStart ||
+    item.receivedAt ||
+    item.createdAt;
   const dateValues = [
-    ...applications.map((application) => application.dateApplied || application.createdAt),
+    ...assessments.map(assessmentEventDate),
+    ...applications.map(
+      (application) => application.dateApplied || application.createdAt,
+    ),
     ...activities.map((activity) => activity.createdAt),
     ...interviews
       .map((interview) => interview.dateTime)
@@ -514,7 +582,11 @@ export function deriveActivityCalendarDays(
       dayActivities,
       dayInterviews,
     );
+    const assessmentEvents = assessments.filter(
+      (item) => toDateKey(assessmentEventDate(item)) === key,
+    ).length;
     const summaryParts = [
+      countLabel(assessmentEvents, "assessment event", "assessment events"),
       countLabel(eventCounts.applications, "job applied", "jobs applied"),
       countLabel(
         eventCounts.interviews,
@@ -526,6 +598,7 @@ export function deriveActivityCalendarDays(
       countLabel(eventCounts.statusChanges, "major status change"),
     ].filter(Boolean);
     const primaryActivityCount =
+      assessmentEvents +
       eventCounts.applications +
       eventCounts.interviews +
       eventCounts.offers +

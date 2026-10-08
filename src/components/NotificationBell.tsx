@@ -20,7 +20,7 @@ import {
   type ReminderNotification,
 } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
-import type { InterviewUpdate } from "../types/application";
+import type { AssessmentUpdate, InterviewUpdate } from "../types/application";
 
 interface NotificationBellProps {
   grouped: boolean;
@@ -30,11 +30,13 @@ interface NotificationBellProps {
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void;
 }
 
 const groupLabels: Record<NotificationGroup, string> = {
   followups: "Follow-ups",
-  interviews: "Interviews & assessments",
+  interviews: "Interviews",
+  assessments: "Assessments",
   offers: "Offers",
   other: "Other",
 };
@@ -47,6 +49,7 @@ export function NotificationBell({
   onOpenApplication,
   onUpdateApplication,
   onUpdateInterview,
+  onUpdateAssessment,
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -148,6 +151,7 @@ export function NotificationBell({
                 onOpenApplication(id);
               }}
               onUpdateApplication={onUpdateApplication}
+              onUpdateAssessment={onUpdateAssessment}
               onUpdateInterview={onUpdateInterview}
             />
           ) : (
@@ -162,6 +166,7 @@ export function NotificationBell({
                     onOpenApplication(id);
                   }}
                   onUpdateApplication={onUpdateApplication}
+                  onUpdateAssessment={onUpdateAssessment}
                   onUpdateInterview={onUpdateInterview}
                 />
               ))}
@@ -179,16 +184,19 @@ function GroupedNotifications({
   onOpenApplication,
   onUpdateApplication,
   onUpdateInterview,
+  onUpdateAssessment,
 }: {
   notifications: ReminderNotification[];
   onDismiss: (id: string) => void;
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void;
 }) {
   const groups: NotificationGroup[] = [
     "followups",
     "interviews",
+    "assessments",
     "offers",
     "other",
   ];
@@ -217,6 +225,7 @@ function GroupedNotifications({
                   onDismiss={onDismiss}
                   onOpenApplication={onOpenApplication}
                   onUpdateApplication={onUpdateApplication}
+                  onUpdateAssessment={onUpdateAssessment}
                   onUpdateInterview={onUpdateInterview}
                 />
               ))}
@@ -234,12 +243,14 @@ function NotificationItem({
   onOpenApplication,
   onUpdateApplication,
   onUpdateInterview,
+  onUpdateAssessment,
 }: {
   notification: ReminderNotification;
   onDismiss: (id: string) => void;
   onOpenApplication: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void;
 }) {
   const dueText =
     notification.type === "follow_up"
@@ -343,6 +354,52 @@ function NotificationItem({
             Deadline
           </SmallActionButton>
         ) : null}
+        {(notification.type === "assessment_deadline" ||
+          notification.type === "assessment_start") &&
+        notification.assessmentId ? (
+          <>
+            <SmallActionButton
+              label="Mark assessment submitted"
+              onClick={() =>
+                onUpdateAssessment(notification.assessmentId!, {
+                  progress: "submitted",
+                  submittedAt: new Date().toISOString(),
+                })
+              }
+            >
+              Submitted
+            </SmallActionButton>
+            <SmallActionButton
+              label={
+                notification.type === "assessment_start"
+                  ? "Edit scheduled assessment start"
+                  : "Edit assessment deadline"
+              }
+              onClick={() => {
+                const value = window.prompt(
+                  notification.type === "assessment_start"
+                    ? "Set scheduled assessment start (YYYY-MM-DDTHH:mm)"
+                    : "Set assessment deadline (YYYY-MM-DDTHH:mm)",
+                  notification.dueAt ?? "",
+                );
+                if (value === null) return;
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) {
+                  window.alert("Enter a valid date and time.");
+                  return;
+                }
+                onUpdateAssessment(
+                  notification.assessmentId!,
+                  notification.type === "assessment_start"
+                    ? { scheduledStart: date.toISOString() }
+                    : { deadline: date.toISOString() },
+                );
+              }}
+            >
+              {notification.type === "assessment_start" ? "Time" : "Deadline"}
+            </SmallActionButton>
+          </>
+        ) : null}
         {notification.type === "offer_deadline" ? (
           <>
             <SmallActionButton
@@ -413,8 +470,8 @@ function changeDate(
         : "Set the optional follow-up date (YYYY-MM-DD), or leave blank for No Follow-Up"
       : "Set date/time (YYYY-MM-DDTHH:mm)",
     isFollowUp
-      ? notification.application.followUpDate ?? ""
-      : notification.dueAt ?? "",
+      ? (notification.application.followUpDate ?? "")
+      : (notification.dueAt ?? ""),
   );
 
   if (nextValue === null) {

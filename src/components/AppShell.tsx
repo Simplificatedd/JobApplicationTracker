@@ -21,7 +21,7 @@ import { APP_NAME } from "../lib/constants";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
-import type { InterviewUpdate } from "../types/application";
+import type { AssessmentUpdate, InterviewUpdate } from "../types/application";
 
 export type ViewKey =
   | "applications"
@@ -45,6 +45,7 @@ interface AppShellProps {
   onOpenApplicationFromNotification: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void;
   onViewChange: (view: ViewKey) => void;
 }
 
@@ -89,6 +90,7 @@ export function AppShell({
   onOpenApplicationFromNotification,
   onUpdateApplication,
   onUpdateInterview,
+  onUpdateAssessment,
   onViewChange,
 }: AppShellProps) {
   const [isNavigationHidden, setIsNavigationHidden] = useState(false);
@@ -189,6 +191,7 @@ export function AppShell({
               onMarkNotificationsOpened={onMarkNotificationsOpened}
               onOpenApplicationFromNotification={onOpenApplicationFromNotification}
               onUpdateApplication={onUpdateApplication}
+              onUpdateAssessment={onUpdateAssessment}
               onUpdateInterview={onUpdateInterview}
             />
             <NavigationButtons
@@ -248,6 +251,7 @@ export function AppShell({
                 onMarkNotificationsOpened={onMarkNotificationsOpened}
                 onOpenApplicationFromNotification={onOpenApplicationFromNotification}
                 onUpdateApplication={onUpdateApplication}
+                onUpdateAssessment={onUpdateAssessment}
                 onUpdateInterview={onUpdateInterview}
               />
             </div>
@@ -278,6 +282,7 @@ export function AppShell({
                       onMarkOpened={onMarkNotificationsOpened}
                       onOpenApplication={onOpenApplicationFromNotification}
                       onUpdateApplication={onUpdateApplication}
+                      onUpdateAssessment={onUpdateAssessment}
                       onUpdateInterview={onUpdateInterview}
                     />
                   </div>
@@ -330,6 +335,7 @@ function MobileNotificationSlot({
   onOpenApplicationFromNotification,
   onUpdateApplication,
   onUpdateInterview,
+  onUpdateAssessment,
 }: {
   enableNotificationBell: boolean;
   groupedNotifications: boolean;
@@ -339,6 +345,7 @@ function MobileNotificationSlot({
   onOpenApplicationFromNotification: (id: string) => void;
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void;
   onUpdateInterview: (id: string, input: InterviewUpdate) => void;
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void;
 }) {
   if (!enableNotificationBell) {
     return null;
@@ -353,6 +360,7 @@ function MobileNotificationSlot({
         onMarkOpened={onMarkNotificationsOpened}
         onOpenApplication={onOpenApplicationFromNotification}
         onUpdateApplication={onUpdateApplication}
+        onUpdateAssessment={onUpdateAssessment}
         onUpdateInterview={onUpdateInterview}
       />
     </div>

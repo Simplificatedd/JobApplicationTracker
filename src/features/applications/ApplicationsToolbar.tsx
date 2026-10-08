@@ -18,6 +18,7 @@ import {
 } from "react";
 import {
   APPLICATION_STATUSES,
+  getInterviewTypeLabel,
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
@@ -643,6 +644,14 @@ function MoreFiltersModal({
             value={currentFilters.interviewType}
           >
             <option value="">Stage type</option>
+            {currentFilters.interviewType &&
+            !INTERVIEW_TYPE_OPTIONS.some(
+              (option) => option.value === currentFilters.interviewType,
+            ) ? (
+              <option value={currentFilters.interviewType}>
+                {getInterviewTypeLabel(currentFilters.interviewType)}
+              </option>
+            ) : null}
             {INTERVIEW_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

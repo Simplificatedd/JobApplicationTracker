@@ -563,6 +563,12 @@ export function AddApplicationModal({
               </Field>
             ) : null}
 
+            {form.status === "Online Assessment" ? (
+              <p className="text-sm text-muted md:col-span-2">
+                Add individual assessments in the job’s Assessments section
+                after saving.
+              </p>
+            ) : null}
             {form.status === "Interviewing" ? (
               <section
                 aria-labelledby="initial-interview-details-heading"
@@ -1052,8 +1058,12 @@ function DuplicateApplicationDialog({
           Possible duplicate application
         </h3>
         <p className="mt-2 text-sm leading-6 text-muted">
-          This matches {match.application.jobTitle} at {match.application.company || "an unnamed company"} by {match.matchedBy}.
-          {match.application.archivedAt ? " The existing entry is archived." : ""}
+          This matches {match.application.jobTitle} at{" "}
+          {match.application.company || "an unnamed company"} by{" "}
+          {match.matchedBy}.
+          {match.application.archivedAt
+            ? " The existing entry is archived."
+            : ""}
         </p>
         <p className="mt-2 text-sm text-foreground">
           Do you want to save another entry anyway?

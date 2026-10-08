@@ -95,7 +95,7 @@ describe("application company and location filters", () => {
     expect(
       normalizeApplicationFilters({ interviewType: "HackerRank" })
         .interviewType,
-    ).toBe("online-assessment");
+    ).toBe("");
   });
 });
 

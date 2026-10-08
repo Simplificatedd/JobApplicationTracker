@@ -22,12 +22,14 @@ export function App() {
       deriveReminderNotifications({
         applications: tracker.applications,
         interviews: tracker.interviews,
+        assessments: tracker.assessments,
         notificationState: tracker.notificationState,
         settings: tracker.settings,
       }),
     [
       tracker.applications,
       tracker.interviews,
+      tracker.assessments,
       tracker.notificationState,
       tracker.settings,
     ],
@@ -65,6 +67,7 @@ export function App() {
         setOpenApplicationId(id);
       }}
       onUpdateApplication={tracker.updateApplication}
+      onUpdateAssessment={tracker.updateAssessment}
       onUpdateInterview={tracker.updateInterview}
       onViewChange={setCurrentView}
     >
@@ -155,6 +158,8 @@ function renderView(
       <ApplicationsPage
         activities={tracker.activities}
         addContact={tracker.addContact}
+        assessmentActions={tracker}
+        assessments={tracker.assessments}
         addInterview={tracker.addInterview}
         applications={tracker.applications}
         interviews={tracker.interviews}
@@ -190,6 +195,7 @@ function renderView(
     return (
       <AnalyticsPage
         activities={tracker.activities}
+        assessments={tracker.assessments}
         analyticsSettings={tracker.analyticsSettings}
         applications={tracker.applications}
         interviews={tracker.interviews}

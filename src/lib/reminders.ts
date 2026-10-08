@@ -1,4 +1,4 @@
-import type { Application, Interview } from "../types/application";
+import type { Application, Assessment, Interview } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 import { calculateInterviewDeadline } from "./interviews";
 
@@ -7,9 +7,12 @@ export type NotificationType =
   | "follow_up"
   | "interview"
   | "deadline"
+  | "assessment_start"
+  | "assessment_deadline"
   | "offer_deadline"
   | "flagged";
-export type NotificationGroup = "followups" | "interviews" | "offers" | "other";
+export type NotificationGroup =
+  "followups" | "interviews" | "assessments" | "offers" | "other";
 
 export interface ReminderNotification {
   application: Application;
@@ -19,6 +22,7 @@ export interface ReminderNotification {
   group: NotificationGroup;
   id: string;
   interviewId?: string;
+  assessmentId?: string;
   severity: ReminderSeverity;
   sortAt: number;
   title: string;
@@ -63,6 +67,7 @@ export function classifyReminderSeverity(
 export function deriveReminderNotifications({
   applications,
   interviews,
+  assessments,
   notificationState,
   settings,
   includeArchived = false,
@@ -70,6 +75,7 @@ export function deriveReminderNotifications({
 }: {
   applications: Application[];
   interviews?: Interview[];
+  assessments?: Assessment[];
   includeArchived?: boolean;
   notificationState: NotificationState;
   now?: Date;
@@ -86,6 +92,7 @@ export function deriveReminderNotifications({
         interviews?.filter(
           (interview) => interview.applicationId === application.id,
         ),
+        assessments?.filter((item) => item.applicationId === application.id),
       ),
     )
     .filter((notification) => !dismissedIds.has(notification.id));
@@ -96,11 +103,13 @@ export function deriveReminderNotifications({
 export function deriveNeedsAttentionApplicationIds({
   applications,
   interviews,
+  assessments,
   settings,
   now = new Date(),
 }: {
   applications: Application[];
   interviews?: Interview[];
+  assessments?: Assessment[];
   now?: Date;
   settings: UserSettings;
 }) {
@@ -115,6 +124,7 @@ export function deriveNeedsAttentionApplicationIds({
           interviews?.filter(
             (interview) => interview.applicationId === application.id,
           ),
+          assessments?.filter((item) => item.applicationId === application.id),
         ),
       )
       .map((notification) => notification.applicationId),
@@ -126,6 +136,7 @@ export function deriveApplicationNotifications(
   settings: UserSettings,
   now = new Date(),
   interviews?: Interview[],
+  assessments: Assessment[] = [],
 ): ReminderNotification[] {
   if (
     application.archivedAt ||
@@ -135,10 +146,18 @@ export function deriveApplicationNotifications(
   }
 
   if (application.status === "Offered") {
-    return deriveOfferDeadlineNotification(application, settings, now);
+    return [
+      ...deriveOfferDeadlineNotification(application, settings, now),
+      ...deriveAssessmentNotifications(application, assessments, settings, now),
+    ];
   }
 
-  const notifications: ReminderNotification[] = [];
+  const notifications: ReminderNotification[] = deriveAssessmentNotifications(
+    application,
+    assessments,
+    settings,
+    now,
+  );
   const followUpDueDate = calculateFollowUpDueDate(application);
 
   if (followUpDueDate) {
@@ -237,6 +256,87 @@ export function deriveApplicationNotifications(
   });
 
   return notifications;
+}
+
+export function deriveAssessmentNotifications(
+  application: Application,
+  assessments: Assessment[],
+  settings: UserSettings,
+  now = new Date(),
+): ReminderNotification[] {
+  if (application.archivedAt || FINAL_STATUSES.has(application.status))
+    return [];
+  return assessments
+    .filter(
+      (item) =>
+        item.applicationId === application.id &&
+        item.progress !== "submitted" &&
+        item.progress !== "cancelled",
+    )
+    .flatMap((assessment): ReminderNotification[] => {
+      const events: ReminderNotification[] = [];
+      const title = `Assessment ${assessment.number}${assessment.name ? ` · ${assessment.name}` : ""}`;
+      const base = {
+        application,
+        applicationId: application.id,
+        assessmentId: assessment.id,
+        group: "assessments" as const,
+      };
+      const start = parseDate(assessment.scheduledStart);
+      if (
+        start &&
+        assessment.scheduledStart &&
+        start >= now &&
+        settings.includeUpcomingInterviewsInAttention
+      ) {
+        const severity = classifyReminderSeverity(
+          start,
+          settings.dueSoonDays,
+          now,
+        );
+        events.push({
+          ...base,
+          id: buildNotificationId(
+            application.id,
+            assessment.legacyInterview ? "interview" : "assessment_start",
+            assessment.id,
+          ),
+          type: "assessment_start",
+          dueAt: assessment.scheduledStart,
+          severity,
+          sortAt: start.getTime(),
+          title: `${title} scheduled for ${application.jobTitle}`,
+          body: [application.company, severityLabel(severity)]
+            .filter(Boolean)
+            .join(" / "),
+        });
+      }
+      const dueDate = parseDate(assessment.deadline);
+      if (dueDate && assessment.deadline) {
+        const severity =
+          dueDate < now
+            ? "overdue"
+            : classifyReminderSeverity(dueDate, settings.dueSoonDays, now);
+        events.push({
+          ...base,
+          // Keep the legacy deadline identity so previously dismissed reminders stay dismissed.
+          id: buildNotificationId(
+            application.id,
+            assessment.legacyInterview ? "deadline" : "assessment_deadline",
+            assessment.id,
+          ),
+          type: "assessment_deadline",
+          severity,
+          dueAt: assessment.deadline,
+          sortAt: dueDate.getTime(),
+          title: `${title} deadline for ${application.jobTitle}`,
+          body: [application.company, severityLabel(severity)]
+            .filter(Boolean)
+            .join(" / "),
+        });
+      }
+      return events;
+    });
 }
 
 function deriveOfferDeadlineNotification(
