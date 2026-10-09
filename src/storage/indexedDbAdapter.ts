@@ -25,7 +25,7 @@ import type {
   StorageMutation,
   StorageSnapshot,
 } from "./StorageAdapter";
-import { migrateStageSnapshot } from "../lib/assessments";
+import { applyAssessmentUpdates, migrateStageSnapshot } from "../lib/assessments";
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
@@ -129,8 +129,26 @@ export function createIndexedDbStorageAdapter(
 
     const database = await getDatabase();
     const transaction = database.transaction(storeNames, "readwrite");
+    const done = transactionDone(transaction);
 
     try {
+      let assessmentWrites = mutation.assessments;
+      if (mutation.assessmentUpdates?.length) {
+        const current = await requestToPromise<Assessment[]>(
+          transaction.objectStore("assessments").getAll(),
+        );
+        const records = new Map(current.map((item) => [item.id, item]));
+        for (const write of mutation.assessments ?? [])
+          records.set(write.id, write);
+        const changedIds = new Set([
+          ...(mutation.assessments ?? []).map((item) => item.id),
+          ...mutation.assessmentUpdates.map((item) => item.id),
+        ]);
+        assessmentWrites = applyAssessmentUpdates(
+          [...records.values()],
+          mutation.assessmentUpdates,
+        ).filter((item) => changedIds.has(item.id));
+      }
       putMutationRecords(transaction, "activities", mutation.activities);
       putMutationRecords(transaction, "applications", mutation.applications);
       putMutationRecords(transaction, "contacts", mutation.contacts);
@@ -140,7 +158,7 @@ export function createIndexedDbStorageAdapter(
         mutation.coverLetters,
       );
       putMutationRecords(transaction, "interviews", mutation.interviews);
-      putMutationRecords(transaction, "assessments", mutation.assessments);
+      putMutationRecords(transaction, "assessments", assessmentWrites);
       deleteMutationRecords(
         transaction,
         "assessments",
@@ -175,10 +193,11 @@ export function createIndexedDbStorageAdapter(
       );
     } catch (error) {
       transaction.abort();
+      await done.catch(() => undefined);
       throw error;
     }
 
-    await transactionDone(transaction);
+    await done;
   }
 
   function putMutationRecords<T>(
@@ -1164,7 +1183,11 @@ function getMutationStoreNames(mutation: StorageMutation): StoreName[] {
   ) {
     storeNames.add("coverLetterMetadata");
   }
-  if (mutation.assessments?.length || mutation.deleteAssessmentIds?.length)
+  if (
+    mutation.assessments?.length ||
+    mutation.assessmentUpdates?.length ||
+    mutation.deleteAssessmentIds?.length
+  )
     storeNames.add("assessments");
   if (mutation.interviews?.length || mutation.deleteInterviewIds?.length) {
     storeNames.add("interviews");

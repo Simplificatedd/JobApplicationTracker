@@ -5,7 +5,7 @@ import type {
   AssessmentUpdate,
   Interview,
 } from "../types/application";
-import type { StorageSnapshot } from "../storage/StorageAdapter";
+import type { AssessmentPatch, StorageSnapshot } from "../storage/StorageAdapter";
 import { createId } from "./domain";
 import {
   applyInterviewProjection,
@@ -75,8 +75,49 @@ export function updateAssessment(
     id: assessment.id,
     applicationId: assessment.applicationId,
     number: assessment.number,
+    createdAt: assessment.createdAt,
     updatedAt: timestamp,
   };
+}
+
+export function applyAssessmentUpdates(
+  assessments: Assessment[],
+  updates: readonly AssessmentPatch[] = [],
+) {
+  if (updates.length === 0) return assessments;
+  const records = new Map(assessments.map((item) => [item.id, item]));
+  for (const patch of updates) {
+    const current = records.get(patch.id);
+    if (!current)
+      throw new Error(
+        "Assessment was removed in another session. Refresh the tracker before editing.",
+      );
+    records.set(
+      patch.id,
+      updateAssessment(current, patch.changes, patch.updatedAt),
+    );
+  }
+  return [...records.values()];
+}
+
+// Compare serialized source data, including unknown extensions. Object key order and
+// omitted undefined fields must not make an unchanged exported/imported source divergent.
+export function assertEquivalentInterviewSource(
+  interview: Interview,
+  preservedSource?: Interview,
+) {
+  const serialize = (value: Interview) =>
+    JSON.stringify(value, (_key, item: unknown) =>
+      item && typeof item === "object" && !Array.isArray(item)
+        ? Object.fromEntries(
+            Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
+          )
+        : item,
+    );
+  if (!preservedSource || serialize(interview) !== serialize(preservedSource))
+    throw new Error(
+      `Interview ${interview.round ? `round ${interview.round}` : interview.id} has different details from its converted assessment. No changes were saved. Refresh the tracker, or reconcile both source records in the backup before importing.`,
+    );
 }
 export function submittedAssessmentUpdate(timestamp: string): AssessmentUpdate {
   return { progress: "submitted", submittedAt: timestamp };
@@ -152,6 +193,14 @@ export function migrateStageSnapshot(
 ): StorageSnapshot {
   const existingAssessments = snapshot.assessments ?? [];
   const convertedIds = new Set(existingAssessments.map((item) => item.id));
+  const assessmentsById = new Map(
+    existingAssessments.map((item) => [item.id, item]),
+  );
+  for (const interview of snapshot.interviews) {
+    const converted = assessmentsById.get(interview.id);
+    if (converted)
+      assertEquivalentInterviewSource(interview, converted.legacyInterview);
+  }
   const originalById = new Map(
     snapshot.interviews.map((item) => [item.id, item]),
   );

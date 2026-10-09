@@ -3,6 +3,8 @@ import {
   normalizeApplicationStatus,
 } from "../lib/domain";
 import {
+  applyAssessmentUpdates,
+  assertEquivalentInterviewSource,
   getNextAssessmentNumber,
   migrateStageSnapshot,
 } from "../lib/assessments";
@@ -42,6 +44,31 @@ export function applyStorageMutation(
   snapshot: StorageSnapshot,
   mutation: StorageMutation,
 ): StorageSnapshot {
+  // A conversion must still refer to the source the user actually saw. Guard both
+  // race directions before deleting the interview or overwriting an existing assessment.
+  const repeatedConversions = new Set<string>();
+  for (const write of mutation.assessments ?? []) {
+    if (
+      !write.legacyInterview ||
+      !mutation.deleteInterviewIds?.includes(write.id)
+    )
+      continue;
+    const source = snapshot.interviews.find((item) => item.id === write.id);
+    if (source) {
+      assertEquivalentInterviewSource(source, write.legacyInterview);
+    } else {
+      const existing = snapshot.assessments?.find((item) => item.id === write.id);
+      if (!existing)
+        throw new Error(
+          "Interview was removed in another session. Refresh the tracker before converting.",
+        );
+      assertEquivalentInterviewSource(
+        write.legacyInterview,
+        existing.legacyInterview,
+      );
+      repeatedConversions.add(write.id);
+    }
+  }
   return {
     ...snapshot,
     activities: upsertRecords(snapshot.activities, mutation.activities),
@@ -50,6 +77,7 @@ export function applyStorageMutation(
       mutation.applications?.map((write) => {
         if (
           !mutation.assessments?.length &&
+          !mutation.assessmentUpdates?.length &&
           !mutation.deleteAssessmentIds?.length
         )
           return write;
@@ -74,7 +102,15 @@ export function applyStorageMutation(
       mutation.deleteCoverLetterIds,
     ),
     assessments: removeRecords(
-      mergeAssessmentWrites(snapshot.assessments ?? [], mutation.assessments),
+      applyAssessmentUpdates(
+        mergeAssessmentWrites(
+          snapshot.assessments ?? [],
+          mutation.assessments?.filter(
+            (item) => !repeatedConversions.has(item.id),
+          ),
+        ),
+        mutation.assessmentUpdates,
+      ),
       mutation.deleteAssessmentIds,
     ),
     interviews: removeRecords(

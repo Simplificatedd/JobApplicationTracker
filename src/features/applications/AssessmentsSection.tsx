@@ -16,6 +16,7 @@ import type {
   Application,
   Assessment,
   AssessmentInput,
+  AssessmentUpdate,
 } from "../../types/application";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
@@ -32,6 +33,7 @@ export function AssessmentsSection({
 }: AssessmentSectionProps) {
   const [draft, setDraft] = useState<AssessmentInput | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [original, setOriginal] = useState<Assessment | undefined>();
   const [fixedTime, setFixedTime] = useState(false);
   const [deadlineOnly, setDeadlineOnly] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,6 +41,7 @@ export function AssessmentsSection({
 
   function edit(assessment?: Assessment, onlyDeadline = false) {
     setEditingId(assessment?.id ?? null);
+    setOriginal(assessment);
     setDeadlineOnly(onlyDeadline);
     setError("");
     setFixedTime(Boolean(assessment?.scheduledStart));
@@ -80,10 +83,7 @@ export function AssessmentsSection({
 
   async function save() {
     if (!draft || busy) return;
-    const input = assessmentDraftToInput(
-      draft,
-      assessments.find((item) => item.id === editingId),
-    );
+    const input = assessmentDraftToInput(draft, original);
     const validation = validateAssessment(input);
     if (validation) {
       setError(validation);
@@ -91,7 +91,10 @@ export function AssessmentsSection({
     }
     setBusy(true);
     const result = editingId
-      ? await assessmentActions.updateAssessment(editingId, input)
+      ? await assessmentActions.updateAssessment(
+          editingId,
+          assessmentDraftToUpdate(draft, original!),
+        )
       : await assessmentActions.addAssessment(input);
     setBusy(false);
     if (!result.ok) {
@@ -592,4 +595,23 @@ export function assessmentDraftToInput(
     score: draft.score?.trim() || undefined,
     notes: draft.notes?.trim() || undefined,
   };
+}
+
+export function assessmentDraftToUpdate(
+  draft: AssessmentInput,
+  original: Assessment,
+): AssessmentUpdate {
+  const input = assessmentDraftToInput(draft, original);
+  const initial = assessmentDraftToInput({
+    ...original,
+    receivedAt: toLocal(original.receivedAt),
+    deadline: toLocal(original.deadline),
+    scheduledStart: toLocal(original.scheduledStart),
+    submittedAt: toLocal(original.submittedAt),
+  }, original);
+  return Object.fromEntries(
+    Object.entries(input).filter(([key, value]) =>
+      key !== "applicationId" && value !== initial[key as keyof AssessmentInput],
+    ),
+  ) as AssessmentUpdate;
 }

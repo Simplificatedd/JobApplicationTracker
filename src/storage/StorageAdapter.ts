@@ -2,6 +2,7 @@ import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
   Assessment,
+  AssessmentUpdate,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -41,6 +42,8 @@ export interface StorageMutation {
   coverLetters?: readonly CoverLetterMetadata[];
   interviews?: readonly Interview[];
   assessments?: readonly Assessment[];
+  // Retain edit intent so a revision retry patches the latest record, not a stale copy.
+  assessmentUpdates?: readonly AssessmentPatch[];
   deleteAssessmentIds?: readonly string[];
   resumes?: readonly ResumeMetadata[];
   resumeFiles?: readonly ResumeBlobRecord[];
@@ -49,6 +52,12 @@ export interface StorageMutation {
   deleteInterviewIds?: readonly string[];
   deleteResumeIds?: readonly string[];
   deleteResumeFileKeys?: readonly string[];
+}
+
+export interface AssessmentPatch {
+  id: string;
+  changes: AssessmentUpdate;
+  updatedAt: string;
 }
 
 export interface StorageAdapter {

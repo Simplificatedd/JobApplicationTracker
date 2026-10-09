@@ -60,7 +60,6 @@ import {
   assessmentFromInterview,
   createAssessment,
   getNextAssessmentNumber,
-  updateAssessment as updateAssessmentRecord,
   validateAssessment,
   type AssessmentActions,
 } from "../lib/assessments";
@@ -748,9 +747,8 @@ export function useTrackerStore(): TrackerStore {
       if (!application || application.archivedAt)
         return failure("Active application could not be found.");
       const timestamp = createTimestamp();
-      const updated = updateAssessmentRecord(assessment, input, timestamp);
       const result = await commitMutation({
-        assessments: [updated],
+        assessmentUpdates: [{ id, changes: input, updatedAt: timestamp }],
         applications: [{ ...application, updatedAt: timestamp }],
         activities: [
           createActivity(
@@ -762,8 +760,11 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      await refreshStages();
-      return success(updated);
+      const saved = await refreshStages();
+      const updated = saved.assessments?.find((item) => item.id === id);
+      return updated
+        ? success(updated)
+        : failure("Assessment could not be found after saving. Refresh the tracker.");
     });
   }
 

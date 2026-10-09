@@ -1,7 +1,6 @@
 import { createId } from "./domain";
 import type {
   Application,
-  CanonicalInterviewType,
   DeadlineEntryMode,
   Interview,
   InterviewInput,
@@ -45,6 +44,7 @@ export function buildInterviewRecord(
     application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
+    ...existing,
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
@@ -118,14 +118,10 @@ export function isValidInterviewRound(round: number | undefined) {
 
 export function normalizeInterviewType(
   type: InterviewType,
-): CanonicalInterviewType {
+): InterviewType {
   if (type === "technical") return "technical-interview";
   if (type === "recruiter") return "recruiter-screen";
   if (type === "face-to-face") return "other";
-  if (type === "HireVue" || type === "HackerRank") {
-    return "online-assessment";
-  }
-
   return type;
 }
 
