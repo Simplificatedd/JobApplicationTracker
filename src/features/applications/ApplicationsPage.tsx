@@ -31,6 +31,7 @@ import type {
 } from "../../store/useTrackerStore";
 import type {
   Activity,
+  Assessment,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -42,7 +43,11 @@ import type {
 import type { UserSettings } from "../../types/settings";
 import type { TablePreferences } from "../../types/tablePreferences";
 
+import type { AssessmentActions } from "../../lib/assessments";
+
 interface ApplicationsPageProps {
+  assessments: Assessment[];
+  assessmentActions: AssessmentActions;
   activities: Activity[];
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
   addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
@@ -84,6 +89,8 @@ interface ApplicationsPageProps {
 }
 
 export function ApplicationsPage({
+  assessments,
+  assessmentActions,
   activities,
   addContact,
   addInterview,
@@ -175,6 +182,7 @@ export function ApplicationsPage({
           interviews.filter(
             (interview) => interview.applicationId === application.id,
           ),
+          assessments.filter((item) => item.applicationId === application.id),
         ),
       )
     : filteredApplications;
@@ -188,6 +196,7 @@ export function ApplicationsPage({
         interviews.filter(
           (interview) => interview.applicationId === application.id,
         ),
+        assessments.filter((item) => item.applicationId === application.id),
       ).length > 0,
   ).length;
   const baseApplicationIds = new Set(
@@ -195,6 +204,9 @@ export function ApplicationsPage({
   );
   const interviewCount = interviews.filter((interview) =>
     baseApplicationIds.has(interview.applicationId),
+  ).length;
+  const assessmentCount = assessments.filter((item) =>
+    baseApplicationIds.has(item.applicationId),
   ).length;
   const selectedApplication = useMemo(
     () =>
@@ -260,7 +272,7 @@ export function ApplicationsPage({
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryMetric
           label={viewMode === "archive" ? "Archived" : "Active"}
           value={String(baseApplications.length)}
@@ -271,8 +283,13 @@ export function ApplicationsPage({
           tone="warning"
         />
         <SummaryMetric
-          label="Interviews & assessments"
+          label="Interviews"
           value={String(interviewCount)}
+          tone="info"
+        />
+        <SummaryMetric
+          label="Assessments"
+          value={String(assessmentCount)}
           tone="info"
         />
       </section>
@@ -369,6 +386,10 @@ export function ApplicationsPage({
           coverLetters={coverLetters}
           contacts={contacts.filter(
             (contact) => contact.applicationId === selectedApplication.id,
+          )}
+          assessmentActions={assessmentActions}
+          assessments={assessments.filter(
+            (item) => item.applicationId === selectedApplication.id,
           )}
           interviews={interviews.filter(
             (interview) => interview.applicationId === selectedApplication.id,

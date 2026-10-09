@@ -4,6 +4,7 @@ import {
 } from "../storage/StorageAdapter";
 import type {
   Activity,
+  Assessment,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -12,9 +13,15 @@ import type {
 } from "../types/application";
 import { normalizeApplicationStatus } from "./domain";
 import { migrateLegacyFollowUpSchedule } from "./followUps";
+import {
+  ASSESSMENT_TYPES,
+  ASSESSMENT_PROGRESS,
+  ASSESSMENT_RESULTS,
+  migrateStageSnapshot,
+} from "./assessments";
 import { normalizeStatusActivities } from "./statusHistory";
 
-export const BACKUP_SCHEMA_VERSION = 2;
+export const BACKUP_SCHEMA_VERSION = 3;
 const LEGACY_BACKUP_SCHEMA_VERSION = 1;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_BACKUP_RECORDS_PER_COLLECTION = 50_000;
@@ -31,6 +38,7 @@ export interface TrackerBackup {
   resumeFiles: ResumeFileBackup[];
   schemaVersion:
     | typeof LEGACY_BACKUP_SCHEMA_VERSION
+    | 2
     | typeof BACKUP_SCHEMA_VERSION;
   snapshot: StorageSnapshot;
 }
@@ -42,6 +50,7 @@ export interface BackupImportPreview {
   coverLetterFiles: number;
   coverLetters: number;
   interviews: number;
+  assessments: number;
   resumeFiles: number;
   resumes: number;
 }
@@ -60,7 +69,7 @@ export async function createBackupFile({
     exportedAt: new Date().toISOString(),
     resumeFiles,
     schemaVersion: BACKUP_SCHEMA_VERSION,
-    snapshot,
+    snapshot: { ...snapshot, assessments: snapshot.assessments ?? [] },
   };
 
   return new Blob([JSON.stringify(backup, null, 2)], {
@@ -124,7 +133,7 @@ export async function parseBackupFile(file: File) {
   return {
     ...backup,
     schemaVersion: BACKUP_SCHEMA_VERSION,
-    snapshot: {
+    snapshot: migrateStageSnapshot({
       ...backup.snapshot,
       activities: normalizeStatusActivities(
         backup.snapshot.activities,
@@ -145,7 +154,7 @@ export async function parseBackupFile(file: File) {
               : normalizeApplicationStatus(application.status),
         };
       }),
-    },
+    }),
   } satisfies TrackerBackup;
 }
 
@@ -159,6 +168,7 @@ export function getBackupImportPreview(
     coverLetterFiles: backup.coverLetterFiles.length,
     coverLetters: backup.snapshot.coverLetters.length,
     interviews: backup.snapshot.interviews.length,
+    assessments: (backup.snapshot.assessments ?? []).length,
     resumeFiles: backup.resumeFiles.length,
     resumes: backup.snapshot.resumes.length,
   };
@@ -194,11 +204,11 @@ export function createApplicationsCsv({
     application.jobType,
     application.applicationUrl,
     application.resumeId
-      ? resumeById.get(application.resumeId)?.displayName ?? "Missing resume"
+      ? (resumeById.get(application.resumeId)?.displayName ?? "Missing resume")
       : "",
     application.coverLetterId
-      ? coverLetterById.get(application.coverLetterId)?.displayName ??
-        "Missing cover letter"
+      ? (coverLetterById.get(application.coverLetterId)?.displayName ??
+        "Missing cover letter")
       : application.coverLetterVersion,
     application.notes,
   ]);
@@ -234,6 +244,7 @@ function getBackupValidationError(value: unknown) {
 
   if (
     value.schemaVersion !== LEGACY_BACKUP_SCHEMA_VERSION &&
+    value.schemaVersion !== 2 &&
     value.schemaVersion !== BACKUP_SCHEMA_VERSION
   ) {
     return "This backup file uses an unsupported schema version.";
@@ -262,6 +273,7 @@ function getBackupValidationError(value: unknown) {
   }
 
   value.snapshot.coverLetters ??= [];
+  value.snapshot.assessments ??= [];
 
   if (!isStorageSnapshot(value.snapshot)) {
     return "This backup file is missing required tracker data.";
@@ -287,6 +299,7 @@ function getBackupValidationError(value: unknown) {
     !hasUniqueIds(value.snapshot.applications) ||
     !hasUniqueIds(value.snapshot.contacts) ||
     !hasUniqueIds(value.snapshot.interviews) ||
+    !hasUniqueIds(value.snapshot.assessments ?? []) ||
     !hasUniqueIds(value.snapshot.resumes) ||
     !hasUniqueIds(value.snapshot.coverLetters)
   ) {
@@ -407,6 +420,24 @@ function getBackupValidationError(value: unknown) {
     }
   }
 
+  const assessmentNumbers = new Set<string>();
+  for (const assessment of value.snapshot.assessments ?? []) {
+    if (!isAssessment(assessment))
+      return "This backup file contains invalid assessment data.";
+    if (!applicationIds.has(assessment.applicationId))
+      return "This backup file links assessment data to a missing application.";
+    const key = `${assessment.applicationId}:${assessment.number}`;
+    if (assessmentNumbers.has(key))
+      return "This backup file contains duplicate assessment numbers.";
+    assessmentNumbers.add(key);
+    if (
+      assessment.legacyInterview &&
+      (assessment.legacyInterview.id !== assessment.id ||
+        assessment.legacyInterview.applicationId !== assessment.applicationId)
+    )
+      return "This backup file contains inconsistent converted assessment identity.";
+  }
+
   const resumeFileStorageKeys = new Set<string>();
 
   for (const resumeFile of value.resumeFiles) {
@@ -500,6 +531,7 @@ function isStorageSnapshot(value: unknown): value is StorageSnapshot {
     Array.isArray(value.contacts) &&
     Array.isArray(value.coverLetters) &&
     Array.isArray(value.interviews) &&
+    Array.isArray(value.assessments) &&
     isRecord(value.notificationState) &&
     Array.isArray(value.resumes) &&
     isRecord(value.settings) &&
@@ -520,6 +552,7 @@ function isApplication(value: unknown): value is Application {
     isOneOf(value.status, [
       "Just Applied",
       "Awaiting Response",
+      "Online Assessment",
       "Interviewing",
       "Offered",
       "Accepted",
@@ -609,6 +642,7 @@ function isApplication(value: unknown): value is Application {
 function isActivity(value: unknown): value is Activity {
   const statuses = [
     "Awaiting Response",
+    "Online Assessment",
     "Interviewing",
     "Offered",
     "Accepted",
@@ -648,6 +682,38 @@ function isApplicationContact(value: unknown): value is ApplicationContact {
     isOptionalString(value.phone) &&
     isOptionalString(value.linkedInUrl) &&
     isOptionalString(value.notes) &&
+    isTimestamp(value.createdAt) &&
+    isTimestamp(value.updatedAt)
+  );
+}
+
+function isAssessment(value: unknown): value is Assessment {
+  return (
+    isRecord(value) &&
+    isNonBlankString(value.id) &&
+    isNonBlankString(value.applicationId) &&
+    Number.isInteger(value.number) &&
+    (value.number as number) > 0 &&
+    isOneOf(value.type, ASSESSMENT_TYPES) &&
+    isOneOf(value.progress, ASSESSMENT_PROGRESS) &&
+    isOneOf(value.result, ASSESSMENT_RESULTS) &&
+    isOneOf(value.proctored, ["yes", "no", "unknown"]) &&
+    [value.name, value.platform, value.link, value.score, value.notes].every(
+      isOptionalString,
+    ) &&
+    [
+      value.receivedAt,
+      value.deadline,
+      value.scheduledStart,
+      value.submittedAt,
+    ].every(isOptionalDateTime) &&
+    (value.timeLimitMinutes === undefined ||
+      (typeof value.timeLimitMinutes === "number" &&
+        Number.isFinite(value.timeLimitMinutes) &&
+        value.timeLimitMinutes > 0)) &&
+    isOptionalNonNegativeInteger(value.originalInterviewRound) &&
+    (value.legacyInterview === undefined ||
+      isInterview(value.legacyInterview)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );
@@ -817,6 +883,7 @@ function hasAllowedCollectionSizes(snapshot: StorageSnapshot) {
     snapshot.contacts,
     snapshot.coverLetters,
     snapshot.interviews,
+    snapshot.assessments ?? [],
     snapshot.resumes,
   ].every((collection) => collection.length <= MAX_BACKUP_RECORDS_PER_COLLECTION);
 }
@@ -860,7 +927,9 @@ function isNonBlankString(value: unknown): value is string {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
 function isOptionalString(value: unknown): value is string | undefined {

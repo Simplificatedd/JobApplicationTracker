@@ -1,5 +1,6 @@
 import type {
   Application,
+  Assessment,
   ApplicationStatus,
   Interview,
   InterviewType,
@@ -358,9 +359,11 @@ export function normalizeApplicationFilters(
   return {
     ...DEFAULT_APPLICATION_FILTERS,
     ...filters,
-    interviewType: filters?.interviewType
-      ? normalizeInterviewType(filters.interviewType)
-      : "",
+    interviewType:
+      filters?.interviewType &&
+      normalizeInterviewType(filters.interviewType) !== "online-assessment"
+        ? normalizeInterviewType(filters.interviewType)
+        : "",
   };
 }
 
@@ -389,13 +392,17 @@ export function isNeedsAttention(
   settings: UserSettings,
   now = new Date(),
   interviews?: Interview[],
+  assessments?: Assessment[],
 ) {
-  return deriveApplicationNotifications(
-    application,
-    settings,
-    now,
-    interviews,
-  ).length > 0;
+  return (
+    deriveApplicationNotifications(
+      application,
+      settings,
+      now,
+      interviews,
+      assessments,
+    ).length > 0
+  );
 }
 
 export function sortApplications(
@@ -438,7 +445,7 @@ function getSortValue(application: Application, column: SortColumn) {
 
   if (column === "followUpPromptDays") {
     return application.followUpAutoResetEnabled
-      ? application.followUpPromptDays ?? 7
+      ? (application.followUpPromptDays ?? 7)
       : 0;
   }
 

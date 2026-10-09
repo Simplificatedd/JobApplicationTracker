@@ -16,6 +16,7 @@ import { getSafeHttpUrl } from "../../lib/urls";
 import type { MutationResult } from "../../store/useTrackerStore";
 import type {
   Application,
+  Assessment,
   Interview,
   InterviewInput,
   InterviewMode,
@@ -26,6 +27,7 @@ import { validateInterviewRound } from "./applicationForm";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface InterviewsSectionProps {
+  onConvert: (id: string) => Promise<MutationResult<Assessment>>;
   application: Application;
   interviews: Interview[];
   onAdd: (input: InterviewInput) => Promise<MutationResult<Interview>>;
@@ -53,6 +55,7 @@ interface InterviewDraft {
 type InterviewDetailsInput = Omit<InterviewInput, "applicationId">;
 
 export function InterviewsSection({
+  onConvert,
   application,
   interviews,
   onAdd,
@@ -143,11 +146,9 @@ export function InterviewsSection({
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">
-            Interviews &amp; assessments
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground">Interviews</h3>
           <p className="mt-1 text-sm text-muted">
-            Track each interview or assessment separately.
+            Track each interview round separately.
           </p>
         </div>
         {!application.archivedAt && editingId === null ? (
@@ -157,7 +158,7 @@ export function InterviewsSection({
             type="button"
           >
             <Plus aria-hidden="true" size={16} />
-            Add stage
+            Add interview
           </button>
         ) : null}
       </div>
@@ -184,7 +185,7 @@ export function InterviewsSection({
       <div className="mt-3 grid gap-3">
         {sortedInterviews.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted">
-            No stages added yet.
+            No interviews added yet.
           </p>
         ) : (
           sortedInterviews.map((interview) => (
@@ -192,6 +193,16 @@ export function InterviewsSection({
               application={application}
               interview={interview}
               key={interview.id}
+              onConvert={async () => {
+                if (
+                  !window.confirm(
+                    `Convert ${interview.round ? `Round ${interview.round}` : "this interview"} to an assessment? The original details will be preserved.`,
+                  )
+                )
+                  return;
+                const result = await onConvert(interview.id);
+                if (!result.ok) setError(result.error);
+              }}
               onDelete={() => void deleteInterview(interview)}
               onEdit={() => startEditing(interview)}
             />
@@ -203,6 +214,7 @@ export function InterviewsSection({
 }
 
 function InterviewCard({
+  onConvert,
   application,
   interview,
   onDelete,
@@ -210,6 +222,7 @@ function InterviewCard({
 }: {
   application: Application;
   interview: Interview;
+  onConvert: () => Promise<void>;
   onDelete: () => void;
   onEdit: () => void;
 }) {
@@ -230,7 +243,7 @@ function InterviewCard({
         {!application.archivedAt ? (
           <div className="flex shrink-0 gap-1">
             <button
-              aria-label="Edit stage"
+              aria-label="Edit interview"
               className="icon-button"
               onClick={onEdit}
               type="button"
@@ -238,7 +251,7 @@ function InterviewCard({
               <Pencil aria-hidden="true" size={16} />
             </button>
             <button
-              aria-label="Delete stage"
+              aria-label="Delete interview"
               className="icon-button text-destructive"
               onClick={onDelete}
               type="button"
@@ -278,6 +291,15 @@ function InterviewCard({
           <InterviewDetail label="Link" />
         )}
       </div>
+      {!application.archivedAt ? (
+        <button
+          className="mt-3 min-h-8 rounded-md border border-border px-2 text-xs font-semibold"
+          onClick={() => void onConvert()}
+          type="button"
+        >
+          Convert to assessment
+        </button>
+      ) : null}
       {interview.notes ? (
         <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">
           {interview.notes}
@@ -347,7 +369,7 @@ function InterviewForm({
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-foreground">
-          {isNew ? "Add stage" : "Edit stage"}
+          {isNew ? "Add interview" : "Edit interview"}
         </h4>
         <button
           aria-label="Cancel stage editing"
@@ -370,7 +392,7 @@ function InterviewForm({
             value={draft.round}
           />
         </FormField>
-        <FormField label="Stage type">
+        <FormField label="Interview type">
           <select
             className="field-control"
             onChange={(event) =>
@@ -378,6 +400,13 @@ function InterviewForm({
             }
             value={draft.type}
           >
+            {!INTERVIEW_TYPE_OPTIONS.some(
+              (option) => option.value === draft.type,
+            ) ? (
+              <option value={draft.type}>
+                {getInterviewTypeLabel(draft.type)}
+              </option>
+            ) : null}
             {INTERVIEW_TYPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -479,11 +508,7 @@ function InterviewForm({
           onClick={onSave}
           type="button"
         >
-          {isSaving
-            ? "Saving…"
-            : isNew
-              ? "Add stage"
-              : "Save stage"}
+          {isSaving ? "Saving…" : isNew ? "Add interview" : "Save stage"}
         </button>
       </div>
     </div>
@@ -561,8 +586,10 @@ function sortInterviewHistory(interviews: Interview[]) {
         : leftTime.time - rightTime.time;
     }
 
-    return (right.round ?? 0) - (left.round ?? 0) ||
-      right.updatedAt.localeCompare(left.updatedAt);
+    return (
+      (right.round ?? 0) - (left.round ?? 0) ||
+      right.updatedAt.localeCompare(left.updatedAt)
+    );
   });
 }
 

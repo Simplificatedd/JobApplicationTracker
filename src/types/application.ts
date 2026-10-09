@@ -1,5 +1,6 @@
 export type ApplicationStatus =
   | "Awaiting Response"
+  | "Online Assessment"
   | "Interviewing"
   | "Offered"
   | "Accepted"
@@ -86,6 +87,8 @@ export interface Application {
   followUpDate?: string;
   followUpAutoResetEnabled?: boolean;
   followUpPromptDays?: number;
+  // Prevent legacy projections from recreating converted/deleted stages.
+  stageMigrationVersion?: 1;
   // Denormalized current-interview projection. Interview records are canonical.
   interviewRound?: number;
   interviewDateTime?: string;
@@ -173,3 +176,58 @@ export interface ApplicationContact {
 
 export type ResumeFile = ResumeMetadata;
 export type JobApplication = Application;
+
+export type AssessmentType =
+  | "unknown"
+  | "coding"
+  | "numerical-reasoning"
+  | "verbal-reasoning"
+  | "logical-reasoning"
+  | "situational-judgement"
+  | "personality"
+  | "recorded-video"
+  | "take-home-assignment"
+  | "other";
+export type AssessmentProgress =
+  | "unknown"
+  | "not-started"
+  | "in-progress"
+  | "submitted"
+  | "expired"
+  | "cancelled";
+export type AssessmentResult =
+  "unknown" | "pending" | "passed" | "failed" | "not-disclosed";
+export interface Assessment {
+  id: string;
+  applicationId: string;
+  number: number;
+  name?: string;
+  type: AssessmentType;
+  platform?: string;
+  link?: string;
+  receivedAt?: string;
+  deadline?: string;
+  timeLimitMinutes?: number;
+  scheduledStart?: string;
+  proctored: "yes" | "no" | "unknown";
+  progress: AssessmentProgress;
+  submittedAt?: string;
+  result: AssessmentResult;
+  score?: string;
+  notes?: string;
+  originalInterviewRound?: number;
+  // Complete source preserves legacy format/location/classification and unknown extensions.
+  legacyInterview?: Interview;
+  createdAt: string;
+  updatedAt: string;
+}
+export type AssessmentInput = Omit<
+  Assessment,
+  | "id"
+  | "number"
+  | "createdAt"
+  | "updatedAt"
+  | "legacyInterview"
+  | "originalInterviewRound"
+>;
+export type AssessmentUpdate = Partial<Omit<AssessmentInput, "applicationId">>;

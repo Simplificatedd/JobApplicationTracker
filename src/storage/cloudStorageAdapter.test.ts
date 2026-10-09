@@ -308,7 +308,8 @@ describe("cloud storage adapter", () => {
     await adapter.commitMutation({ applications: [application] });
 
     expect(api.state).toMatchObject({
-      revision: 3,
+      // Migration is persisted at revision 3, then the rebased domain write at 4.
+      revision: 4,
       snapshot: {
         applications: expect.arrayContaining([
           expect.objectContaining({ id: "other-app" }),
@@ -316,5 +317,121 @@ describe("cloud storage adapter", () => {
         ]),
       },
     });
+  });
+});
+
+describe("assessment cloud migration and conflicts", () => {
+  const assessmentInterview = {
+    id: "legacy-assessment",
+    applicationId: application.id,
+    round: 2,
+    type: "online-assessment" as const,
+    mode: "video" as const,
+    proctored: false,
+    deadline: "2026-10-20T00:00:00.000Z",
+    notes: "Keep me",
+    createdAt: application.createdAt,
+    updatedAt: application.updatedAt,
+  };
+  it("persists migration at startup and does not duplicate on a second client startup", async () => {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: {
+        ...createSnapshot([
+          {
+            ...application,
+            status: "Interviewing",
+            interviewRound: 2,
+            interviewType: "online-assessment",
+          },
+        ]),
+        dataVersion: 2,
+        interviews: [assessmentInterview],
+      },
+      updatedAt: application.updatedAt,
+    };
+    const first = await createCloudStorageAdapter({
+      api,
+      cache: createCache("assessment-start-1"),
+    }).initialize();
+    expect(api.state?.snapshot.interviews).toEqual([]);
+    expect(api.state?.snapshot.assessments).toMatchObject([
+      { id: assessmentInterview.id, originalInterviewRound: 2 },
+    ]);
+    const revision = api.state?.revision;
+    const second = await createCloudStorageAdapter({
+      api,
+      cache: createCache("assessment-start-2"),
+    }).initialize();
+    expect(second).toEqual(first);
+    expect(api.state?.revision).toBe(revision);
+  });
+  it("rebases competing assessments with unique numbers and preserves concurrent application status", async () => {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: { ...createSnapshot([application]), dataVersion: 2 },
+      updatedAt: application.updatedAt,
+    };
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("assessment-number-conflict"),
+    });
+    const initialized = await adapter.initialize();
+    const first = {
+      id: "one",
+      applicationId: application.id,
+      number: 1,
+      type: "coding" as const,
+      proctored: "unknown" as const,
+      progress: "not-started" as const,
+      result: "pending" as const,
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+    };
+    api.conflictState = {
+      revision: (api.state?.revision ?? 1) + 1,
+      snapshot: {
+        ...initialized,
+        applications: [
+          {
+            ...initialized.applications[0],
+            status: "Accepted",
+            company: "Edited elsewhere",
+          },
+        ],
+        assessments: [first],
+      },
+      updatedAt: application.updatedAt,
+    };
+    await adapter.commitMutation({
+      assessments: [{ ...first, id: "two" }],
+      applications: [initialized.applications[0]],
+    });
+    expect(
+      (await adapter.listAssessments()).map((item) => [item.id, item.number]),
+    ).toEqual([
+      ["one", 1],
+      ["two", 2],
+    ]);
+    expect(await adapter.getApplication(application.id)).toMatchObject({
+      status: "Accepted",
+      company: "Edited elsewhere",
+    });
+  });
+  it("refuses future data formats before saving or refreshing the cache", async () => {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: { ...createSnapshot([application]), dataVersion: 999 },
+      updatedAt: application.updatedAt,
+    };
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("future-assessment-data"),
+    });
+    await expect(adapter.initialize()).rejects.toThrow("newer data format");
+    expect(api.state.revision).toBe(1);
   });
 });

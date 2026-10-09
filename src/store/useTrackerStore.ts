@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
+  Assessment,
+  AssessmentInput,
+  AssessmentUpdate,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -49,11 +52,17 @@ import {
   createInterviewRecord,
   isValidInterviewRound,
   isUpcomingInterview,
-  reconcileCanonicalInterviews,
   selectCurrentInterview,
   updateInterviewRecord,
   upsertInterviewHistory,
 } from "../lib/interviews";
+import {
+  assessmentFromInterview,
+  createAssessment,
+  getNextAssessmentNumber,
+  validateAssessment,
+  type AssessmentActions,
+} from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
 import type {
@@ -97,10 +106,10 @@ export interface PendingResumeUpload {
 export type PendingCoverLetterUpload = PendingResumeUpload;
 
 export type MutationResult<Value = void> =
-  | { ok: true; value: Value }
-  | { error: string; ok: false };
+  { ok: true; value: Value } | { error: string; ok: false };
 
-export interface TrackerStore {
+export interface TrackerStore extends AssessmentActions {
+  assessments: Assessment[];
   activities: Activity[];
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
@@ -186,7 +195,10 @@ export function useTrackerStore(): TrackerStore {
   const [applications, setApplications] = useState<Application[]>([]);
   const [contacts, setContacts] = useState<ApplicationContact[]>([]);
   const [coverLetters, setCoverLetters] = useState<CoverLetterMetadata[]>([]);
-  const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(null);
+  const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(
+    null,
+  );
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isStorageLoading, setIsStorageLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
@@ -221,36 +233,15 @@ export function useTrackerStore(): TrackerStore {
           return;
         }
 
-        const interviewReconciliation = reconcileCanonicalInterviews(
-          snapshot.applications,
-          snapshot.interviews,
-        );
-
-        if (
-          interviewReconciliation.applicationWrites.length > 0 ||
-          interviewReconciliation.interviewWrites.length > 0
-        ) {
-          await cloudStorageAdapter.commitMutation({
-            applications: interviewReconciliation.applicationWrites,
-            interviews: interviewReconciliation.interviewWrites,
-          });
-        }
-
-        if (!isActive) {
-          return;
-        }
-
         setActivities(sortActivities(snapshot.activities));
         setAnalyticsSettings(snapshot.analyticsSettings);
         setApplications(
-          withContactCounts(
-            interviewReconciliation.applications,
-            snapshot.contacts,
-          ),
+          withContactCounts(snapshot.applications, snapshot.contacts),
         );
         setContacts(snapshot.contacts);
         setCoverLetters(sortResumes(snapshot.coverLetters));
-        setInterviews(interviewReconciliation.interviews);
+        setInterviews(snapshot.interviews);
+        setAssessments(snapshot.assessments ?? []);
         setNotificationState(snapshot.notificationState);
         setResumes(snapshot.resumes);
         setSettings(normalizeUserSettings(snapshot.settings));
@@ -364,6 +355,7 @@ export function useTrackerStore(): TrackerStore {
       coverLetterId:
         coverLetterUpload?.coverLetter.id ?? input.coverLetterId,
       status: input.status || DEFAULT_APPLICATION_STATUS,
+      stageMigrationVersion: 1,
       contactsCount: 0,
       createdAt,
       updatedAt: createdAt,
@@ -689,6 +681,182 @@ export function useTrackerStore(): TrackerStore {
     });
   }
 
+  async function refreshStages() {
+    const snapshot = await cloudStorageAdapter.exportSnapshot();
+    setApplications(
+      withContactCounts(snapshot.applications, snapshot.contacts),
+    );
+    setInterviews(snapshot.interviews);
+    setAssessments(snapshot.assessments ?? []);
+    setActivities(sortActivities(snapshot.activities));
+    return snapshot;
+  }
+
+  async function addAssessment(
+    input: AssessmentInput,
+  ): Promise<MutationResult<Assessment>> {
+    return runApplicationMutation(async () => {
+      const error = validateAssessment(input);
+      if (error) return failure(error);
+      const application = await cloudStorageAdapter.getApplication(
+        input.applicationId,
+      );
+      if (!application || application.archivedAt)
+        return failure("Active application could not be found.");
+      const timestamp = createTimestamp();
+      const assessment = createAssessment(
+        input,
+        await cloudStorageAdapter.listAssessments(input.applicationId),
+        timestamp,
+      );
+      const result = await commitMutation({
+        assessments: [assessment],
+        applications: [{ ...application, updatedAt: timestamp }],
+        activities: [
+          createActivity(
+            application.id,
+            "updated",
+            `Added assessment ${assessment.number}.`,
+            timestamp,
+          ),
+        ],
+      });
+      if (!result.ok) return result;
+      const saved = await refreshStages();
+      return success(
+        saved.assessments?.find((item) => item.id === assessment.id) ??
+          assessment,
+      );
+    });
+  }
+
+  async function updateAssessment(
+    id: string,
+    input: AssessmentUpdate,
+  ): Promise<MutationResult<Assessment>> {
+    return runApplicationMutation(async () => {
+      const error = validateAssessment(input);
+      if (error) return failure(error);
+      const assessment = (await cloudStorageAdapter.listAssessments()).find(
+        (item) => item.id === id,
+      );
+      if (!assessment) return failure("Assessment could not be found.");
+      const application = await cloudStorageAdapter.getApplication(
+        assessment.applicationId,
+      );
+      if (!application || application.archivedAt)
+        return failure("Active application could not be found.");
+      const timestamp = createTimestamp();
+      const result = await commitMutation({
+        assessmentUpdates: [{ id, changes: input, updatedAt: timestamp }],
+        applications: [{ ...application, updatedAt: timestamp }],
+        activities: [
+          createActivity(
+            application.id,
+            "updated",
+            `Updated assessment ${assessment.number}.`,
+            timestamp,
+          ),
+        ],
+      });
+      if (!result.ok) return result;
+      const saved = await refreshStages();
+      const updated = saved.assessments?.find((item) => item.id === id);
+      return updated
+        ? success(updated)
+        : failure("Assessment could not be found after saving. Refresh the tracker.");
+    });
+  }
+
+  async function deleteAssessment(id: string): Promise<MutationResult> {
+    return runApplicationMutation(async () => {
+      const assessment = (await cloudStorageAdapter.listAssessments()).find(
+        (item) => item.id === id,
+      );
+      if (!assessment) return failure("Assessment could not be found.");
+      const application = await cloudStorageAdapter.getApplication(
+        assessment.applicationId,
+      );
+      if (!application || application.archivedAt)
+        return failure("Active application could not be found.");
+      const timestamp = createTimestamp();
+      const result = await commitMutation({
+        deleteAssessmentIds: [id],
+        applications: [{ ...application, updatedAt: timestamp }],
+        activities: [
+          createActivity(
+            application.id,
+            "updated",
+            `Deleted assessment ${assessment.number}.`,
+            timestamp,
+          ),
+        ],
+      });
+      if (!result.ok) return result;
+      await refreshStages();
+      return success();
+    });
+  }
+
+  async function convertInterviewToAssessment(
+    id: string,
+  ): Promise<MutationResult<Assessment>> {
+    return runApplicationMutation(async () => {
+      const snapshot = await cloudStorageAdapter.exportSnapshot();
+      const interview = snapshot.interviews.find((item) => item.id === id);
+      if (!interview) {
+        const existing = (snapshot.assessments ?? []).find(
+          (item) => item.id === id,
+        );
+        return existing
+          ? success(existing)
+          : failure("Interview could not be found.");
+      }
+      const application = snapshot.applications.find(
+        (item) => item.id === interview.applicationId,
+      );
+      if (!application || application.archivedAt)
+        return failure("Active application could not be found.");
+      const assessment = assessmentFromInterview(
+        interview,
+        getNextAssessmentNumber(
+          (snapshot.assessments ?? []).filter(
+            (item) => item.applicationId === application.id,
+          ),
+        ),
+      );
+      const remaining = snapshot.interviews.filter(
+        (item) => item.applicationId === application.id && item.id !== id,
+      );
+      const timestamp = createTimestamp();
+      const projected = applyInterviewProjection(
+        application,
+        selectCurrentInterview(remaining),
+      );
+      const result = await commitMutation({
+        assessments: [assessment],
+        deleteInterviewIds: [id],
+        applications: [
+          { ...projected, stageMigrationVersion: 1, updatedAt: timestamp },
+        ],
+        activities: [
+          createActivity(
+            application.id,
+            "updated",
+            `Converted ${formatInterviewActivityLabel(interview)} to assessment ${assessment.number}.`,
+            timestamp,
+          ),
+        ],
+      });
+      if (!result.ok) return result;
+      const saved = await refreshStages();
+      return success(
+        saved.assessments?.find((item) => item.id === assessment.id) ??
+          assessment,
+      );
+    });
+  }
+
   async function addInterview(
     input: InterviewInput,
   ): Promise<MutationResult<Interview>> {
@@ -939,6 +1107,9 @@ export function useTrackerStore(): TrackerStore {
 
       setApplications((current) =>
         current.filter((application) => application.id !== id),
+      );
+      setAssessments((current) =>
+        current.filter((item) => item.applicationId !== id),
       );
       setContacts((current) =>
         current.filter((contact) => contact.applicationId !== id),
@@ -1420,14 +1591,9 @@ export function useTrackerStore(): TrackerStore {
       backup.snapshot.applications,
       backup.snapshot.contacts,
     );
-    const interviewReconciliation = reconcileCanonicalInterviews(
-      applications,
-      backup.snapshot.interviews,
-    );
     const snapshot = {
       ...backup.snapshot,
-      applications: interviewReconciliation.applications,
-      interviews: interviewReconciliation.interviews,
+      applications,
       settings: normalizeUserSettings(backup.snapshot.settings),
     };
     const resumeFiles: ResumeBlobRecord[] = [
@@ -1448,6 +1614,7 @@ export function useTrackerStore(): TrackerStore {
     setContacts(snapshot.contacts);
     setCoverLetters(sortResumes(snapshot.coverLetters));
     setInterviews(snapshot.interviews);
+    setAssessments(snapshot.assessments ?? []);
     setNotificationState(snapshot.notificationState);
     setResumes(sortResumes(snapshot.resumes));
     setSettings(snapshot.settings);
@@ -1610,6 +1777,11 @@ export function useTrackerStore(): TrackerStore {
   }
 
   return {
+    assessments,
+    addAssessment,
+    updateAssessment,
+    deleteAssessment,
+    convertInterviewToAssessment,
     activities,
     analyticsSettings,
     applications,

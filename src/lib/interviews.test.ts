@@ -595,8 +595,8 @@ describe("normalizeInterviewClassification", () => {
     ["technical", "technical-interview"],
     ["recruiter", "recruiter-screen"],
     ["face-to-face", "other"],
-    ["HireVue", "online-assessment"],
-    ["HackerRank", "online-assessment"],
+    ["HireVue", "HireVue"],
+    ["HackerRank", "HackerRank"],
   ] as const)("normalizes the legacy %s filter value", (type, expected) => {
     expect(normalizeInterviewType(type)).toBe(expected);
   });
@@ -613,7 +613,7 @@ describe("normalizeInterviewClassification", () => {
     ).toMatchObject({ mode: "video", type: expected });
   });
 
-  it("moves a legacy provider type into the provider field", () => {
+  it("retains a legacy provider classification while populating the provider field", () => {
     expect(
       normalizeInterviewClassification({
         mode: "unknown",
@@ -622,7 +622,7 @@ describe("normalizeInterviewClassification", () => {
     ).toEqual({
       mode: "unknown",
       platform: "HackerRank",
-      type: "online-assessment",
+      type: "HackerRank",
     });
   });
 
@@ -636,7 +636,7 @@ describe("normalizeInterviewClassification", () => {
     ).toEqual({
       mode: "unknown",
       platform: "ModernHire",
-      type: "online-assessment",
+      type: "HireVue",
     });
   });
 
@@ -692,12 +692,12 @@ describe("normalizeInterviewClassification", () => {
 
     expect(result.interviews[0]).toMatchObject({
       platform: "HackerRank",
-      type: "online-assessment",
+      type: "HackerRank",
     });
     expect(result.interviewWrites).toEqual([result.interviews[0]]);
     expect(result.applications[0]).toMatchObject({
       interviewPlatform: "HackerRank",
-      interviewType: "online-assessment",
+      interviewType: "HackerRank",
     });
   });
 });
@@ -744,10 +744,12 @@ describe("isAssessmentStage", () => {
   it.each([
     "take-home-assignment",
     "online-assessment",
-    "HireVue",
-    "HackerRank",
   ] as const)("recognizes %s as an assessment", (type) => {
     expect(isAssessmentStage(type)).toBe(true);
+  });
+
+  it.each(["HireVue", "HackerRank"] as const)("does not infer assessment eligibility from %s", (type) => {
+    expect(isAssessmentStage(type)).toBe(false);
   });
 
   it("does not classify a live interview as an assessment", () => {

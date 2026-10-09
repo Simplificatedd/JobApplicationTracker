@@ -46,6 +46,10 @@ function isStorageSnapshot(value: unknown): value is StorageSnapshot {
     Array.isArray(value.contacts) &&
     Array.isArray(value.coverLetters) &&
     Array.isArray(value.interviews) &&
+    (value.assessments === undefined || Array.isArray(value.assessments)) &&
+    (typeof value.dataVersion !== "number" ||
+      value.dataVersion < 3 ||
+      Array.isArray(value.assessments)) &&
     Array.isArray(value.resumes) &&
     isRecord(value.analyticsSettings) &&
     isRecord(value.notificationState) &&
@@ -152,7 +156,8 @@ export async function saveCloudState(
       .prepare(
         `UPDATE tracker_state
          SET owner_email = ?, revision = revision + 1, snapshot_json = ?, updated_at = ?
-         WHERE owner_id = ? AND revision = ?`,
+         WHERE owner_id = ? AND revision = ?
+           AND COALESCE(json_extract(snapshot_json, '$.dataVersion'), 1) <= ?`,
       )
       .bind(
         user.email,
@@ -160,6 +165,7 @@ export async function saveCloudState(
         timestamp,
         user.id,
         input.baseRevision,
+        input.snapshot.dataVersion ?? 1,
       )
       .run();
 
@@ -173,6 +179,15 @@ export async function saveCloudState(
   }
 
   const current = await getCloudState(database, user.id);
+  if (
+    current &&
+    (current.snapshot.dataVersion ?? 1) > (input.snapshot.dataVersion ?? 1)
+  ) {
+    throw new HttpError(
+      409,
+      "This workspace uses a newer data format. Refresh or update the tracker before saving.",
+    );
+  }
   throw new CloudConflictError(current);
 }
 

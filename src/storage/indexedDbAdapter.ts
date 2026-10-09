@@ -10,6 +10,7 @@ import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
+  Assessment,
   Application,
   ApplicationContact,
   CoverLetterMetadata,
@@ -24,10 +25,11 @@ import type {
   StorageMutation,
   StorageSnapshot,
 } from "./StorageAdapter";
+import { applyAssessmentUpdates, migrateStageSnapshot } from "../lib/assessments";
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 
 export const TRACKER_DB_NAME = "job-application-tracker";
-export const TRACKER_DB_VERSION = 6;
+export const TRACKER_DB_VERSION = 7;
 
 type StoreName =
   | "activities"
@@ -35,6 +37,7 @@ type StoreName =
   | "applications"
   | "contacts"
   | "coverLetterMetadata"
+  | "assessments"
   | "interviews"
   | "notificationState"
   | "resumeMetadata"
@@ -97,7 +100,24 @@ export function createIndexedDbStorageAdapter(
       await seedInitialData(database);
     }
 
-    return exportSnapshot();
+    const snapshot = await exportSnapshot();
+    const migrated = migrateStageSnapshot(snapshot);
+    if (JSON.stringify(snapshot) !== JSON.stringify(migrated)) {
+      await commitMutation({
+        applications: migrated.applications,
+        interviews: migrated.interviews,
+        assessments: migrated.assessments,
+        deleteInterviewIds: snapshot.interviews
+          .filter(
+            (item) =>
+              !migrated.interviews.some(
+                (candidate) => candidate.id === item.id,
+              ),
+          )
+          .map((item) => item.id),
+      });
+    }
+    return migrated;
   }
 
   async function commitMutation(mutation: StorageMutation) {
@@ -109,8 +129,26 @@ export function createIndexedDbStorageAdapter(
 
     const database = await getDatabase();
     const transaction = database.transaction(storeNames, "readwrite");
+    const done = transactionDone(transaction);
 
     try {
+      let assessmentWrites = mutation.assessments;
+      if (mutation.assessmentUpdates?.length) {
+        const current = await requestToPromise<Assessment[]>(
+          transaction.objectStore("assessments").getAll(),
+        );
+        const records = new Map(current.map((item) => [item.id, item]));
+        for (const write of mutation.assessments ?? [])
+          records.set(write.id, write);
+        const changedIds = new Set([
+          ...(mutation.assessments ?? []).map((item) => item.id),
+          ...mutation.assessmentUpdates.map((item) => item.id),
+        ]);
+        assessmentWrites = applyAssessmentUpdates(
+          [...records.values()],
+          mutation.assessmentUpdates,
+        ).filter((item) => changedIds.has(item.id));
+      }
       putMutationRecords(transaction, "activities", mutation.activities);
       putMutationRecords(transaction, "applications", mutation.applications);
       putMutationRecords(transaction, "contacts", mutation.contacts);
@@ -120,6 +158,12 @@ export function createIndexedDbStorageAdapter(
         mutation.coverLetters,
       );
       putMutationRecords(transaction, "interviews", mutation.interviews);
+      putMutationRecords(transaction, "assessments", assessmentWrites);
+      deleteMutationRecords(
+        transaction,
+        "assessments",
+        mutation.deleteAssessmentIds,
+      );
       putMutationRecords(transaction, "resumeMetadata", mutation.resumes);
       putMutationRecords(transaction, "resumeFiles", mutation.resumeFiles);
       deleteMutationRecords(
@@ -149,10 +193,11 @@ export function createIndexedDbStorageAdapter(
       );
     } catch (error) {
       transaction.abort();
+      await done.catch(() => undefined);
       throw error;
     }
 
-    await transactionDone(transaction);
+    await done;
   }
 
   function putMutationRecords<T>(
@@ -232,6 +277,7 @@ export function createIndexedDbStorageAdapter(
         "applications",
         "contacts",
         "interviews",
+        "assessments",
         "notificationState",
       ],
       "readwrite",
@@ -241,6 +287,7 @@ export function createIndexedDbStorageAdapter(
     deleteByApplicationId(transaction.objectStore("contacts"), id);
     deleteByApplicationId(transaction.objectStore("activities"), id);
     deleteByApplicationId(transaction.objectStore("interviews"), id);
+    deleteByApplicationId(transaction.objectStore("assessments"), id);
     deleteByApplicationId(transaction.objectStore("notificationState"), id);
 
     await transactionDone(transaction);
@@ -296,6 +343,14 @@ export function createIndexedDbStorageAdapter(
     await deleteRecordsByApplicationId(
       await getDatabase(),
       "activities",
+      applicationId,
+    );
+  }
+
+  async function listAssessments(applicationId?: string) {
+    return getMaybeByApplicationId<Assessment>(
+      await getDatabase(),
+      "assessments",
       applicationId,
     );
   }
@@ -512,6 +567,7 @@ export function createIndexedDbStorageAdapter(
       contacts: await listContacts(),
       coverLetters: await listCoverLetterMetadata(),
       interviews: await listInterviews(),
+      assessments: await listAssessments(),
       notificationState: await getNotificationState(),
       resumes: await listResumeMetadata(),
       settings: await getSettings(),
@@ -532,6 +588,7 @@ export function createIndexedDbStorageAdapter(
         "contacts",
         "coverLetterMetadata",
         "interviews",
+        "assessments",
         "notificationState",
         "resumeMetadata",
         "resumeFiles",
@@ -552,6 +609,7 @@ export function createIndexedDbStorageAdapter(
       snapshot.coverLetters ?? [],
     );
     putMany(transaction.objectStore("interviews"), snapshot.interviews);
+    putMany(transaction.objectStore("assessments"), snapshot.assessments ?? []);
     putMany(transaction.objectStore("resumeMetadata"), snapshot.resumes);
     putMany(transaction.objectStore("resumeFiles"), resumeFiles);
 
@@ -604,6 +662,7 @@ export function createIndexedDbStorageAdapter(
     listActivities,
     appendActivity,
     deleteActivitiesForApplication,
+    listAssessments,
     listInterviews,
     saveInterview,
     deleteInterview,
@@ -703,6 +762,11 @@ function upgradeDatabase(
     store.createIndex("createdAt", "createdAt", { unique: false });
   }
 
+  if (!database.objectStoreNames.contains("assessments")) {
+    const store = database.createObjectStore("assessments", { keyPath: "id" });
+    store.createIndex("applicationId", "applicationId", { unique: false });
+  }
+
   if (!database.objectStoreNames.contains("interviews")) {
     const store = database.createObjectStore("interviews", { keyPath: "id" });
     store.createIndex("applicationId", "applicationId", { unique: false });
@@ -773,8 +837,7 @@ function migrateLegacyFollowUpSchedules(
 
   settingsRequest.onsuccess = () => {
     const settingsRecord = settingsRequest.result as
-      | StoredValue<UserSettings>
-      | undefined;
+      StoredValue<UserSettings> | undefined;
     const defaultPromptDays =
       settingsRecord?.value.defaultFollowUpPromptDays ??
       DEFAULT_USER_SETTINGS.defaultFollowUpPromptDays;
@@ -1120,6 +1183,12 @@ function getMutationStoreNames(mutation: StorageMutation): StoreName[] {
   ) {
     storeNames.add("coverLetterMetadata");
   }
+  if (
+    mutation.assessments?.length ||
+    mutation.assessmentUpdates?.length ||
+    mutation.deleteAssessmentIds?.length
+  )
+    storeNames.add("assessments");
   if (mutation.interviews?.length || mutation.deleteInterviewIds?.length) {
     storeNames.add("interviews");
   }

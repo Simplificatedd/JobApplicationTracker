@@ -53,13 +53,17 @@ import type {
   WorkMode,
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
+import {
+  AssessmentsSection,
+  type AssessmentSectionProps,
+} from "./AssessmentsSection";
 import { InterviewsSection } from "./InterviewsSection";
 import {
   FollowUpAutoResetControls,
   FollowUpScheduleControls,
 } from "./FollowUpControls";
 
-interface ApplicationDetailPanelProps {
+interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
@@ -94,6 +98,8 @@ interface ApplicationDetailPanelProps {
 }
 
 export function ApplicationDetailPanel({
+  assessments,
+  assessmentActions,
   activities,
   application,
   contacts,
@@ -372,6 +378,8 @@ export function ApplicationDetailPanel({
               contacts={contacts}
               coverLetter={coverLetter}
               coverLetterActionError={coverLetterActionError}
+              assessments={assessments}
+              assessmentActions={assessmentActions}
               interviews={interviews}
               onAddInterview={onAddInterview}
               onDeleteInterview={onDeleteInterview}
@@ -402,6 +410,8 @@ export function ApplicationDetailPanel({
 }
 
 function ReadOnlyDetails({
+  assessments,
+  assessmentActions,
   activities,
   application,
   contacts,
@@ -447,7 +457,7 @@ function ReadOnlyDetails({
   resumeActionError: string;
   workingResumeId: string | null;
   workingCoverLetterId: string | null;
-}) {
+} & AssessmentSectionProps) {
   const safeApplicationUrl = getSafeHttpUrl(application.applicationUrl);
   function changeFollowUpDate() {
     const nextDate = window.prompt(
@@ -542,7 +552,7 @@ function ReadOnlyDetails({
           }
         />
         <DetailRow
-          label="Current stage"
+          label="Current interview"
           value={formatInterviewSummary(application)}
         />
         <ResumeDetail
@@ -604,7 +614,13 @@ function ReadOnlyDetails({
       <TextBlock label="Job description" value={application.jobDescription} />
       <TextBlock label="Notes" value={application.notes} />
 
+      <AssessmentsSection
+        application={application}
+        assessments={assessments}
+        assessmentActions={assessmentActions}
+      />
       <InterviewsSection
+        onConvert={assessmentActions.convertInterviewToAssessment}
         application={application}
         interviews={interviews}
         onAdd={onAddInterview}
@@ -979,11 +995,11 @@ function EditForm({
           error={followUpAutoResetError}
           onEnabledChange={(value) => {
             onFollowUpAutoResetChange();
-            updateDraft("followUpAutoResetEnabled", value)
+            updateDraft("followUpAutoResetEnabled", value);
           }}
           onPromptDaysChange={(value) => {
             onFollowUpAutoResetChange();
-            updateDraft("followUpPromptDays", value)
+            updateDraft("followUpPromptDays", value);
           }}
           promptDays={draft.followUpPromptDays}
         />
@@ -1014,11 +1030,7 @@ function DateField({
 }: {
   draft: ApplicationDraft;
   label: string;
-  name:
-    | "dateApplied"
-    | "roleStartDate"
-    | "roleEndDate"
-    | "followUpDate";
+  name: "dateApplied" | "roleStartDate" | "roleEndDate" | "followUpDate";
   setDraft: React.Dispatch<React.SetStateAction<ApplicationDraft>>;
 }) {
   return (

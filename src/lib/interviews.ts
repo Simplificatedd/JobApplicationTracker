@@ -1,7 +1,6 @@
 import { createId } from "./domain";
 import type {
   Application,
-  CanonicalInterviewType,
   DeadlineEntryMode,
   Interview,
   InterviewInput,
@@ -45,6 +44,7 @@ export function buildInterviewRecord(
     application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
+    ...existing,
     id: existing?.id ?? createId("interview"),
     applicationId: application.id,
     dateTime: application.interviewDateTime,
@@ -107,7 +107,9 @@ export function updateInterviewRecord(
 }
 
 export function getNextInterviewRound(interviews: Interview[]) {
-  return Math.max(0, ...interviews.map((interview) => interview.round ?? 0)) + 1;
+  return (
+    Math.max(0, ...interviews.map((interview) => interview.round ?? 0)) + 1
+  );
 }
 
 export function isValidInterviewRound(round: number | undefined) {
@@ -116,14 +118,10 @@ export function isValidInterviewRound(round: number | undefined) {
 
 export function normalizeInterviewType(
   type: InterviewType,
-): CanonicalInterviewType {
+): InterviewType {
   if (type === "technical") return "technical-interview";
   if (type === "recruiter") return "recruiter-screen";
   if (type === "face-to-face") return "other";
-  if (type === "HireVue" || type === "HackerRank") {
-    return "online-assessment";
-  }
-
   return type;
 }
 
@@ -263,6 +261,7 @@ export function reconcileCanonicalInterviews(
       (applicationInterviews.length === 1 ? applicationInterviews[0] : undefined);
 
     if (
+      !application.stageMigrationVersion &&
       legacyDeadlineTarget &&
       !legacyDeadlineTarget.deadline &&
       !application.interviewDeadline &&
@@ -287,7 +286,11 @@ export function reconcileCanonicalInterviews(
           : projectedInterview;
     }
 
-    if (!projectedInterview && hasExplicitInterviewProjection(application)) {
+    if (
+      !application.stageMigrationVersion &&
+      !projectedInterview &&
+      hasExplicitInterviewProjection(application)
+    ) {
       const migratedInterview = interviewFromApplicationProjection(application);
 
       nextInterviews.push(migratedInterview);
@@ -388,7 +391,9 @@ function interviewFromApplicationProjection(
     application.interviewDeadlineEntryMode ?? application.deadlineEntryMode;
 
   return {
-    id: existing?.id ?? createId("interview"),
+    id:
+      existing?.id ??
+      `legacy-interview:${application.id}:${application.interviewRound ?? "stage"}`,
     applicationId: application.id,
     dateTime: application.interviewDateTime,
     round: application.interviewRound,

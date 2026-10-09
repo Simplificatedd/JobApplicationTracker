@@ -219,9 +219,10 @@ export function SettingsPage({
                 <PreviewCount label="Contacts" value={backupPreview.contacts} />
                 <PreviewCount label="Activities" value={backupPreview.activities} />
                 <PreviewCount
-                  label="Interviews & assessments"
+                  label="Interviews"
                   value={backupPreview.interviews}
                 />
+                <PreviewCount label="Assessments" value={backupPreview.assessments} />
                 <PreviewCount label="Resumes" value={backupPreview.resumes} />
                 <PreviewCount label="Files" value={backupPreview.resumeFiles} />
                 <PreviewCount

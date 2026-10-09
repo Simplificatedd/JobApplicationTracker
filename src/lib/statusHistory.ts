@@ -2,6 +2,7 @@ import type {
   Activity,
   Application,
   ApplicationStatus,
+  Assessment,
   Interview,
 } from "../types/application";
 
@@ -9,6 +10,7 @@ const STATUS_CHANGE_PREFIX = "Status changed to ";
 const LEGACY_STATUS_MAP: Record<string, ApplicationStatus> = {
   "Just Applied": "Awaiting Response",
   "Awaiting Response": "Awaiting Response",
+  "Online Assessment": "Online Assessment",
   Interviewing: "Interviewing",
   Offered: "Accepted",
   Accepted: "Accepted",
@@ -23,6 +25,8 @@ export type ApplicationOutcomePath =
   | "rejected_without_interview"
   | "withdrawn"
   | "offer_pending"
+  | "online_assessment"
+  | "assessment_rejected"
   | "interviewing"
   | "awaiting_response";
 
@@ -36,6 +40,8 @@ export const APPLICATION_OUTCOME_PATH_LABELS: Record<
   rejected_without_interview: "Rejected before interview",
   withdrawn: "Withdrawn",
   offer_pending: "Offer pending",
+  online_assessment: "Online assessment",
+  assessment_rejected: "Assessed → Rejected",
   interviewing: "Interviewing",
   awaiting_response: "Awaiting response",
 };
@@ -78,6 +84,7 @@ export function deriveApplicationStatusPath(
   application: Application,
   activities: Activity[],
   interviews: Interview[] = [],
+  assessments: Assessment[] = [],
 ) {
   const relevantActivities = normalizeStatusActivities(
     activities.filter(
@@ -126,6 +133,21 @@ export function deriveApplicationStatusPath(
     });
   }
 
+  const firstAssessment = assessments
+    .filter((item) => item.applicationId === application.id)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  if (
+    firstAssessment &&
+    !statusEvents.some((event) => event.statusTo === "Online Assessment")
+  ) {
+    statusEvents.push({
+      createdAt: firstAssessment.createdAt,
+      order: 1,
+      statusFrom: undefined,
+      statusTo: "Online Assessment",
+    });
+  }
+
   statusEvents.push({
     createdAt: application.updatedAt,
     order: 3,
@@ -156,12 +178,28 @@ export function classifyApplicationOutcomePath(
   application: Application,
   activities: Activity[],
   interviews: Interview[] = [],
+  assessments: Assessment[] = [],
 ): ApplicationOutcomePath {
-  const path = deriveApplicationStatusPath(application, activities, interviews);
+  const path = deriveApplicationStatusPath(
+    application,
+    activities,
+    interviews,
+    assessments,
+  );
   const reachedOffer = path.includes("Offered");
+  const applicationAssessments = assessments.filter(
+    (item) => item.applicationId === application.id,
+  );
+  const hasMigratedAssessments = applicationAssessments.some(
+    (item) => item.legacyInterview,
+  );
   const reachedInterview =
-    path.includes("Interviewing") ||
-    interviews.some((interview) => interview.applicationId === application.id);
+    interviews.some(
+      (interview) => interview.applicationId === application.id,
+    ) ||
+    (path.includes("Interviewing") && !hasMigratedAssessments);
+  const reachedAssessment =
+    path.includes("Online Assessment") || applicationAssessments.length > 0;
 
   if (application.status === "Accepted") {
     return "accepted";
@@ -174,7 +212,9 @@ export function classifyApplicationOutcomePath(
 
     return reachedInterview
       ? "interviewed_rejected"
-      : "rejected_without_interview";
+      : reachedAssessment
+        ? "assessment_rejected"
+        : "rejected_without_interview";
   }
 
   if (application.status === "Withdrawn") {
@@ -185,6 +225,7 @@ export function classifyApplicationOutcomePath(
     return "offer_pending";
   }
 
+  if (application.status === "Online Assessment") return "online_assessment";
   return application.status === "Interviewing"
     ? "interviewing"
     : "awaiting_response";
