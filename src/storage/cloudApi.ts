@@ -136,10 +136,19 @@ export function createCloudApiClient(
       });
 
       if (response.status === 409) {
-        const body = (await response.json()) as {
-          current?: CloudStateEnvelope | null;
-        };
-        throw new CloudRevisionConflictError(body.current ?? null);
+        const body: unknown = await response.json().catch(() => null);
+        if (body && typeof body === "object" && "current" in body) {
+          const current = body.current;
+          if (current === null || isCloudStateEnvelope(current)) {
+            throw new CloudRevisionConflictError(current);
+          }
+        }
+        const message =
+          body && typeof body === "object" && "error" in body &&
+          typeof body.error === "string" && body.error.trim()
+            ? body.error
+            : "Cloud storage request failed (409). Refresh the tracker and try again.";
+        throw new CloudApiError(message, 409);
       }
 
       await requireSuccess(response);
@@ -177,6 +186,17 @@ export function createCloudApiClient(
 
 function delay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function isCloudStateEnvelope(value: unknown): value is CloudStateEnvelope {
+  return Boolean(
+    value && typeof value === "object" &&
+    "revision" in value && Number.isInteger(value.revision) &&
+    typeof value.revision === "number" && value.revision >= 0 &&
+    "snapshot" in value && value.snapshot &&
+    typeof value.snapshot === "object" && !Array.isArray(value.snapshot) &&
+    "updatedAt" in value && typeof value.updatedAt === "string",
+  );
 }
 
 export const cloudApiClient = createCloudApiClient();
