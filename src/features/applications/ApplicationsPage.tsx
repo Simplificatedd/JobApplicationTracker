@@ -167,7 +167,11 @@ export function ApplicationsPage({
     baseApplications,
     "location",
   );
-  const searchedApplications = searchApplications(baseApplications, searchQuery);
+  // Search relevance takes priority; the selected column orders equal matches.
+  const searchedApplications = searchApplications(
+    sortApplications(baseApplications, sort),
+    searchQuery,
+  );
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
     filters,
@@ -186,7 +190,7 @@ export function ApplicationsPage({
         ),
       )
     : filteredApplications;
-  const visibleApplications = sortApplications(focusedApplications, sort);
+  const visibleApplications = focusedApplications;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
