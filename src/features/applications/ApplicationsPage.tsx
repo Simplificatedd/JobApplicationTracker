@@ -167,7 +167,11 @@ export function ApplicationsPage({
     baseApplications,
     "location",
   );
-  const searchedApplications = searchApplications(baseApplications, searchQuery);
+  // Search relevance takes priority; the selected column orders equal matches.
+  const searchedApplications = searchApplications(
+    sortApplications(baseApplications, sort),
+    searchQuery,
+  );
   const filteredApplications = applyApplicationFilters(
     searchedApplications,
     filters,
@@ -186,7 +190,7 @@ export function ApplicationsPage({
         ),
       )
     : filteredApplications;
-  const visibleApplications = sortApplications(focusedApplications, sort);
+  const visibleApplications = focusedApplications;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -333,14 +337,14 @@ export function ApplicationsPage({
         coverLetters={coverLetters}
         columnWidths={columnWidths}
         emptyBody={
-          searchQuery
+          searchQuery.trim()
             ? "No applications match that title or description."
             : viewMode === "archive"
               ? "Archived applications will appear here."
               : "New entries will appear here once they are added."
         }
         emptyTitle={
-          searchQuery
+          searchQuery.trim()
             ? "No matching applications"
             : viewMode === "archive"
               ? "No archived applications"
