@@ -235,7 +235,8 @@ export function classifyApplicationOutcomePath(
 
 // A status transition after a preserved source's last update is independent evidence,
 // unless it overlaps another converted source. Earlier/ambiguous legacy history stays
-// conservative; inferred path events and rejection.statusFrom are not new interviews.
+// conservative; message-only history, inferred path events and rejection.statusFrom
+// cannot establish a new interview independently.
 function hasLaterInterviewStatus(
   applicationId: string,
   activities: Activity[],
@@ -250,10 +251,10 @@ function hasLaterInterviewStatus(
   )) {
     return false;
   }
-  return normalizeStatusActivities(activities).some((event) => {
+  return activities.some((event) => {
     if (
       event.applicationId !== applicationId || event.type !== "status_changed" ||
-      event.statusTo !== "Interviewing" || event.statusFrom === "Interviewing"
+      event.statusTo !== "Interviewing" || !event.statusFrom || event.statusFrom === "Interviewing"
     ) {
       return false;
     }

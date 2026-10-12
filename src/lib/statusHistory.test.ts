@@ -178,6 +178,7 @@ describe("classifyApplicationOutcomePath", () => {
     { ...laterInterview, createdAt: migratedSource.updatedAt },
     { ...laterInterview, type: "created" as const },
     { ...laterInterview, statusFrom: "Interviewing" as const },
+    { ...laterInterview, statusFrom: undefined },
     { ...laterInterview, statusTo: "Rejected" as const, statusFrom: "Interviewing" as const },
     { ...laterInterview, applicationId: "another-application" },
     { ...laterInterview, createdAt: "invalid" },
@@ -185,9 +186,9 @@ describe("classifyApplicationOutcomePath", () => {
     expect(classifyApplicationOutcomePath(application, [event], [], [migrated])).toBe("assessment_rejected");
   });
 
-  it("uses explicit message-only transitions but never inferred path events", () => {
+  it("does not infer an independent interview from message-only or synthesized path events", () => {
     expect(classifyApplicationOutcomePath(application, [], [], [migrated])).toBe("assessment_rejected");
-    expect(classifyApplicationOutcomePath(application, [{ ...laterInterview, statusFrom: undefined, statusTo: undefined }], [], [migrated])).toBe("interviewed_rejected");
+    expect(classifyApplicationOutcomePath(application, [{ ...laterInterview, statusFrom: undefined, statusTo: undefined }], [], [migrated])).toBe("assessment_rejected");
   });
 
   it("does not let a later assessment hide an independent earlier interview transition", () => {
