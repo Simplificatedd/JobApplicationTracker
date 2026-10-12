@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
 import type { Application } from "../../types/application";
+import type { TablePreferences } from "../../types/tablePreferences";
 import { ApplicationsPage } from "./ApplicationsPage";
 import {
   DEFAULT_APPLICATION_FILTERS,
@@ -30,6 +31,14 @@ const descriptionMatch: Application = {
   jobTitle: "Platform Intern",
   jobDescription: "Support the software team.",
   updatedAt: "2026-09-02T00:00:00.000Z",
+};
+const tablePreferences: TablePreferences = {
+  columnWidths: {},
+  filters: DEFAULT_APPLICATION_FILTERS,
+  needsAttentionOnly: false,
+  searchQuery: "software",
+  sort: DEFAULT_SORT_STATE,
+  visibleApplicationColumns: DEFAULT_USER_SETTINGS.visibleApplicationColumns,
 };
 
 function renderPage(
@@ -62,15 +71,7 @@ function renderPage(
       restoreApplication={vi.fn()}
       resumes={[]}
       settings={DEFAULT_USER_SETTINGS}
-      tablePreferences={{
-        columnWidths: {},
-        filters: DEFAULT_APPLICATION_FILTERS,
-        needsAttentionOnly: false,
-        searchQuery: query,
-        sort: DEFAULT_SORT_STATE,
-        visibleApplicationColumns:
-          DEFAULT_USER_SETTINGS.visibleApplicationColumns,
-      }}
+      tablePreferences={{ ...tablePreferences, searchQuery: query }}
       resetTablePreferences={vi.fn()}
       updateContact={vi.fn()}
       updateInterview={vi.fn()}
@@ -118,4 +119,64 @@ describe("application search results in the table", () => {
     expect(html).not.toContain(descriptionMatch.jobTitle);
     expect(renderPage("accounting")).toContain("No matching applications");
   });
+
+  it.each(["active", "archive"] as const)(
+    "searches only applications in the %s view",
+    (viewMode) => {
+      const archived = {
+        ...titleMatch,
+        jobTitle: "Archived Software Engineer",
+        archivedAt: "2026-09-03T00:00:00.000Z",
+      };
+      const html = renderPage("software", {
+        applications: [archived, descriptionMatch],
+        viewMode,
+      });
+      expect(html.includes(archived.jobTitle)).toBe(viewMode === "archive");
+      expect(html.includes(descriptionMatch.jobTitle)).toBe(viewMode === "active");
+    },
+  );
+
+  it("composes search with status filters", () => {
+    const html = renderPage("software", {
+      applications: [{ ...titleMatch, status: "Rejected" }, descriptionMatch],
+      tablePreferences: {
+        ...tablePreferences,
+        filters: { ...DEFAULT_APPLICATION_FILTERS, status: "Awaiting Response" },
+      },
+    });
+    expect(html).toContain(descriptionMatch.jobTitle);
+    expect(html).not.toContain(titleMatch.jobTitle);
+  });
+
+  it("composes search with needs-attention focus", () => {
+    const html = renderPage("software", {
+      applications: [
+        titleMatch,
+        { ...descriptionMatch, followUpNeeded: true, followUpDate: "2020-01-01" },
+      ],
+      tablePreferences: { ...tablePreferences, needsAttentionOnly: true },
+    });
+    expect(html).toContain(descriptionMatch.jobTitle);
+    expect(html).not.toContain(titleMatch.jobTitle);
+  });
+
+  it("ignores saved searches when remembering table state is disabled", () => {
+    const html = renderPage("accounting", {
+      settings: { ...DEFAULT_USER_SETTINGS, rememberTableState: false },
+    });
+    expect(html).toContain(titleMatch.jobTitle);
+    expect(html).toContain(descriptionMatch.jobTitle);
+  });
+
+  it.each(["active", "archive"] as const)(
+    "treats whitespace as an empty search in the %s empty state",
+    (viewMode) => {
+      const html = renderPage("   ", { applications: [], viewMode });
+      expect(html).toContain(
+        viewMode === "archive" ? "No archived applications" : "No applications yet",
+      );
+      expect(html).not.toContain("No matching applications");
+    },
+  );
 });
