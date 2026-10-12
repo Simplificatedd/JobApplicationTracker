@@ -100,14 +100,40 @@ export function applyAssessmentUpdates(
   return [...records.values()];
 }
 
-// Compare serialized source data, including unknown extensions. Object key order and
-// omitted undefined fields must not make an unchanged exported/imported source divergent.
+// Compare known semantic aliases on copies; unknown extensions remain strictly compared.
+function comparableInterviewSource(source: Interview): Interview {
+  const copy = {
+    ...source,
+    type: source.type === "technical" ? "technical-interview" as const
+      : source.type === "recruiter" ? "recruiter-screen" as const : source.type,
+    deadlineEntryMode: source.deadlineEntryMode === "72_hours"
+      ? "3_days" as const : source.deadlineEntryMode ?? "exact" as const,
+  };
+  for (const key of ["dateTime", "deadline", "deadlineReceivedAt", "createdAt", "updatedAt"] as const) {
+    const value = source[key];
+    // Local date-times have no portable instant. Do not infer a timezone or repair invalid dates.
+    if (!value || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(value)) {
+      continue;
+    }
+    const day = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    const time = Date.parse(value);
+    if (
+      Number.isFinite(day.getTime()) && Number.isFinite(time) &&
+      day.toISOString().slice(0, 10) === value.slice(0, 10)
+    ) {
+      copy[key] = new Date(time).toISOString();
+    }
+  }
+  return copy;
+}
+
+// Key order and omitted undefined fields must not make an unchanged source divergent.
 export function assertEquivalentInterviewSource(
   interview: Interview,
   preservedSource?: Interview,
 ) {
   const serialize = (value: Interview) =>
-    JSON.stringify(value, (_key, item: unknown) =>
+    JSON.stringify(comparableInterviewSource(value), (_key, item: unknown) =>
       item && typeof item === "object" && !Array.isArray(item)
         ? Object.fromEntries(
             Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
