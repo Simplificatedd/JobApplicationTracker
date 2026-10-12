@@ -117,6 +117,13 @@ export function createIndexedDbStorageAdapter(
           .map((item) => item.id),
       });
     }
+    if (meta && meta.schemaVersion < database.version) {
+      try {
+        await repairStorageMeta(database);
+      } catch {
+        // Diagnostic metadata must not prevent loading successfully migrated data.
+      }
+    }
     return migrated;
   }
 
@@ -965,6 +972,22 @@ async function seedInitialData(database: IDBDatabase) {
     value: DEFAULT_ANALYTICS_SETTINGS,
   });
 
+  await transactionDone(transaction);
+}
+
+async function repairStorageMeta(database: IDBDatabase) {
+  const transaction = database.transaction("settings", "readwrite");
+  const store = transaction.objectStore("settings");
+  const request = store.get(STORAGE_META_KEY);
+  request.onsuccess = () => {
+    const record = request.result as StoredValue<StorageMeta> | undefined;
+    if (record && record.value.schemaVersion < database.version) {
+      store.put({
+        ...record,
+        value: { ...record.value, schemaVersion: database.version },
+      });
+    }
+  };
   await transactionDone(transaction);
 }
 

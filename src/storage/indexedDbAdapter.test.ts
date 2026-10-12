@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { IDBFactory } from "fake-indexeddb";
+import { describe, expect, it, vi } from "vitest";
+import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
+import { TRACKER_DB_VERSION } from "./indexedDbAdapter";
 import { DEFAULT_USER_SETTINGS } from "../lib/domain";
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 import type {
@@ -87,6 +88,57 @@ const coverLetter: CoverLetterMetadata = {
 };
 
 describe("indexedDbStorageAdapter", () => {
+  it.each([4, TRACKER_DB_VERSION])(
+    "repairs stale metadata in database version %s without changing the seed time",
+    async (version) => {
+      const indexedDb = new IDBFactory();
+      const databaseName = `stale-metadata-${version}`;
+      await seedVersionFourApplication(indexedDb, databaseName, application);
+      if (version === TRACKER_DB_VERSION) {
+        await createTestStorageAdapter({ databaseName, indexedDb }).initialize();
+        await accessStorageMeta(indexedDb, databaseName, 4);
+      }
+      const first = createTestStorageAdapter({ databaseName, indexedDb });
+      const second = createTestStorageAdapter({ databaseName, indexedDb });
+      await Promise.all([first.initialize(), second.initialize()]);
+
+      await expect(accessStorageMeta(indexedDb, databaseName)).resolves.toEqual({
+        schemaVersion: TRACKER_DB_VERSION,
+        seededAt: timestamp,
+        diagnosticExtension: "preserve",
+      });
+      await expect(first.getSettings()).resolves.toEqual(DEFAULT_USER_SETTINGS);
+      expect((await first.listApplications())[0].company).toBe(application.company);
+    },
+  );
+
+  it("loads data if an optional metadata repair is aborted", async () => {
+    const indexedDb = new IDBFactory();
+    const databaseName = "aborted-metadata-repair";
+    await seedVersionFourApplication(indexedDb, databaseName, application);
+    const put = IDBObjectStore.prototype.put;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+      this: IDBObjectStore, value: unknown, key?: IDBValidKey,
+    ) {
+      if (this.name === "settings" && (value as { key?: string }).key === "storageMeta") {
+        this.transaction.abort();
+        return {} as IDBRequest<IDBValidKey>;
+      }
+      return put.call(this, value, key);
+    });
+    try {
+      const adapter = createTestStorageAdapter({ databaseName, indexedDb });
+      await expect(adapter.initialize()).resolves.toMatchObject({
+        applications: [{ id: application.id }],
+      });
+      await expect(accessStorageMeta(indexedDb, databaseName)).resolves.toMatchObject({
+        schemaVersion: 4, seededAt: timestamp,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("creates an isolated empty database with default settings", async () => {
     const adapter = createTestStorageAdapter();
 
@@ -465,10 +517,36 @@ function seedVersionFourApplication(
       });
 
       store.put(record);
+      const settings = request.result.createObjectStore("settings", { keyPath: "key" });
+      settings.put({ key: "userSettings", value: DEFAULT_USER_SETTINGS });
+      settings.put({
+        key: "storageMeta",
+        value: { schemaVersion: 4, seededAt: timestamp, diagnosticExtension: "preserve" },
+      });
     };
     request.onsuccess = () => {
       request.result.close();
       resolve();
+    };
+  });
+}
+
+function accessStorageMeta(indexedDb: IDBFactory, databaseName: string, schemaVersion?: number) {
+  return new Promise<unknown>((resolve, reject) => {
+    const request = indexedDb.open(databaseName);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction("settings", schemaVersion === undefined ? "readonly" : "readwrite");
+      const store = transaction.objectStore("settings");
+      const read = store.get("storageMeta");
+      read.onsuccess = () => {
+        if (schemaVersion !== undefined) {
+          store.put({ ...read.result, value: { ...read.result.value, schemaVersion } });
+        }
+      };
+      transaction.oncomplete = () => { database.close(); resolve(read.result.value); };
+      transaction.onabort = () => { database.close(); reject(transaction.error); };
     };
   });
 }
