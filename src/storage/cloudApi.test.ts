@@ -28,6 +28,10 @@ describe("cloud API client", () => {
     { error: "This workspace uses a newer data format. Refresh or update the tracker before saving." },
     { current: { revision: 4 }, error: "Invalid conflict response." },
     { current: [], error: "Invalid conflict response." },
+    { current: { revision: 4, snapshot: {}, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 4, snapshot: { ...snapshot, settings: null }, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 4, snapshot: { ...snapshot, applications: null }, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 0, snapshot, updatedAt: "2026-10-13T00:00:00Z" } },
     {},
     null,
     "invalid response",
@@ -72,6 +76,22 @@ describe("cloud API client", () => {
     const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
     expect(error).toBeInstanceOf(CloudRevisionConflictError);
     expect(error).toMatchObject({ current: null, status: 409 });
+  });
+
+  it("accepts legacy conflict snapshots and preserves unknown extensions", async () => {
+    const current = {
+      revision: 4,
+      snapshot: { ...snapshot, coverLetters: undefined, assessments: undefined, extension: { keep: true } },
+      updatedAt: "2026-10-13T00:00:00Z",
+      extension: "keep",
+    };
+    const client = createCloudApiClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ current }, { status: 409 })),
+      retryDelays: [],
+    });
+    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(CloudRevisionConflictError);
+    expect(error).toMatchObject({ current: JSON.parse(JSON.stringify(current)) });
   });
 
   it("retries transient failures", async () => {

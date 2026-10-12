@@ -189,14 +189,28 @@ function delay(milliseconds: number) {
 }
 
 function isCloudStateEnvelope(value: unknown): value is CloudStateEnvelope {
-  return Boolean(
-    value && typeof value === "object" &&
-    "revision" in value && Number.isInteger(value.revision) &&
-    typeof value.revision === "number" && value.revision >= 0 &&
-    "snapshot" in value && value.snapshot &&
-    typeof value.snapshot === "object" && !Array.isArray(value.snapshot) &&
-    "updatedAt" in value && typeof value.updatedAt === "string",
+  if (
+    !isRecord(value) || !Number.isInteger(value.revision) ||
+    typeof value.revision !== "number" || value.revision < 1 ||
+    typeof value.updatedAt !== "string" || !isRecord(value.snapshot)
+  ) return false;
+  const snapshot = value.snapshot;
+  return (
+    ["activities", "applications", "contacts", "interviews", "resumes"].every(
+      (key) => Array.isArray(snapshot[key]),
+    ) &&
+    ["settings", "notificationState", "analyticsSettings"].every(
+      (key) => isRecord(snapshot[key]),
+    ) &&
+    ["coverLetters", "assessments"].every(
+      (key) => snapshot[key] === undefined || Array.isArray(snapshot[key]),
+    ) &&
+    (snapshot.tablePreferences == null || isRecord(snapshot.tablePreferences))
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 export const cloudApiClient = createCloudApiClient();
