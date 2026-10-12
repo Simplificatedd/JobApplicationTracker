@@ -116,4 +116,22 @@ describe("fuzzyScore", () => {
     expect(fuzzyScore("Software Engineer", "software accounting")).toBe(0);
     expect(fuzzyScore("Software Engineer", "!!!")).toBe(0);
   });
+
+  it.each([
+    ["C# Developer", "C++ developer"],
+    ["C Developer", "C# developer"],
+    ["Internet Developer", ".NET developer"],
+    ["NodeXjs Developer", "Node.js developer"],
+  ])("preserves technology punctuation in %s when searching %s", (value, query) => {
+    expect(fuzzyScore(value, query)).toBe(0);
+  });
+
+  it.each(["C++", "C#", ".NET", "Node.js"])(
+    "finds %s keywords in a different order and with extra whitespace",
+    (technology) => {
+      expect(
+        fuzzyScore(`Developer using ${technology}.`, `${technology}   developer`),
+      ).toBeGreaterThan(0);
+    },
+  );
 });

@@ -62,8 +62,11 @@ export function fuzzyScore(value: string, query: string) {
     return 100 + normalizedQuery.length / normalizedValue.length;
   }
 
-  const words = normalizedValue.match(/[\p{L}\p{N}]+/gu) ?? [];
-  const keywords = normalizedQuery.match(/[\p{L}\p{N}]+/gu) ?? [];
+  // Preserve technology names such as C++, C#, .NET, and Node.js while
+  // excluding sentence punctuation from the end of a word.
+  const wordPattern = /[.#]*[\p{L}\p{N}]+(?:\.[\p{L}\p{N}]+)*[+#]*/gu;
+  const words = normalizedValue.match(wordPattern) ?? [];
+  const keywords = normalizedQuery.match(wordPattern) ?? [];
   if (keywords.length === 0) {
     return 0;
   }
@@ -86,6 +89,10 @@ export function fuzzyScore(value: string, query: string) {
 function fuzzyWordScore(value: string, query: string) {
   if (value.includes(query)) {
     return 100 + query.length / value.length;
+  }
+
+  if (/[.+#]/u.test(query)) {
+    return 0;
   }
 
   // Keep abbreviations such as "swe", but require longer fuzzy queries to
