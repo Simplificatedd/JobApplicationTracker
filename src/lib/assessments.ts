@@ -128,7 +128,7 @@ function comparableInterviewSource(source: Interview): Interview {
 }
 
 // Key order and omitted undefined fields must not make an unchanged source divergent.
-export function assertEquivalentInterviewSource(
+function equivalentInterviewSources(
   interview: Interview,
   preservedSource?: Interview,
 ) {
@@ -140,10 +140,51 @@ export function assertEquivalentInterviewSource(
           )
         : item,
     );
-  if (!preservedSource || serialize(interview) !== serialize(preservedSource))
+  return Boolean(preservedSource && serialize(interview) === serialize(preservedSource));
+}
+
+export function assertEquivalentInterviewSource(interview: Interview, preservedSource?: Interview) {
+  if (!equivalentInterviewSources(interview, preservedSource))
     throw new Error(
       `Interview ${interview.round ? `round ${interview.round}` : interview.id} has different details from its converted assessment. No changes were saved. Refresh the tracker, or reconcile both source records in the backup before importing.`,
     );
+}
+
+function migrationSourceWithDeadline(
+  source: Interview,
+  converted: Assessment,
+  snapshot: StorageSnapshot,
+  now: Date,
+) {
+  const application = snapshot.applications.find((item) => item.id === source.applicationId);
+  if (
+    equivalentInterviewSources(source, converted.legacyInterview) ||
+    source.type !== "online-assessment" || source.deadline !== undefined ||
+    !converted.legacyInterview?.deadline || converted.originalInterviewRound !== source.round ||
+    !application?.deadline || application.interviewDeadline
+  ) {
+    return source;
+  }
+
+  // Replay the existing legacy deadline rule on copies. Include other preserved sources
+  // so a partial snapshot cannot turn ambiguous ownership into a sole-stage fallback.
+  const sources = new Map<string, Interview>();
+  for (const assessment of snapshot.assessments ?? []) {
+    if (assessment.legacyInterview) sources.set(assessment.id, assessment.legacyInterview);
+  }
+  for (const interview of snapshot.interviews) sources.set(interview.id, interview);
+  const enriched = reconcileCanonicalInterviews(
+    [{ ...application, stageMigrationVersion: undefined }],
+    [...sources.values()],
+    now,
+  ).interviews.find((item) => item.id === source.id) ?? source;
+  return {
+    ...source,
+    deadline: enriched.deadline,
+    // Existing values are user information, even when the legacy rule would replace them.
+    deadlineEntryMode: source.deadlineEntryMode ?? enriched.deadlineEntryMode,
+    deadlineReceivedAt: source.deadlineReceivedAt ?? enriched.deadlineReceivedAt,
+  };
 }
 export function submittedAssessmentUpdate(timestamp: string): AssessmentUpdate {
   return { progress: "submitted", submittedAt: timestamp };
@@ -225,7 +266,10 @@ export function migrateStageSnapshot(
   for (const interview of snapshot.interviews) {
     const converted = assessmentsById.get(interview.id);
     if (converted)
-      assertEquivalentInterviewSource(interview, converted.legacyInterview);
+      assertEquivalentInterviewSource(
+        migrationSourceWithDeadline(interview, converted, snapshot, now),
+        converted.legacyInterview,
+      );
   }
   const originalById = new Map(
     snapshot.interviews.map((item) => [item.id, item]),

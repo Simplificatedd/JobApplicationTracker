@@ -46,6 +46,10 @@ export function applyStorageMutation(
 ): StorageSnapshot {
   // A conversion must still refer to the source the user actually saw. Guard both
   // race directions before deleting the interview or overwriting an existing assessment.
+  for (const write of mutation.interviews ?? []) {
+    const converted = snapshot.assessments?.find((item) => item.id === write.id);
+    if (converted) assertEquivalentInterviewSource(write, converted.legacyInterview);
+  }
   const repeatedConversions = new Set<string>();
   for (const write of mutation.assessments ?? []) {
     if (
