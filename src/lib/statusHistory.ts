@@ -190,14 +190,16 @@ export function classifyApplicationOutcomePath(
   const applicationAssessments = assessments.filter(
     (item) => item.applicationId === application.id,
   );
-  const hasMigratedAssessments = applicationAssessments.some(
-    (item) => item.legacyInterview,
+  const migratedSources = applicationAssessments.flatMap(
+    (item) => item.legacyInterview ? [item.legacyInterview] : [],
   );
   const reachedInterview =
     interviews.some(
       (interview) => interview.applicationId === application.id,
     ) ||
-    (path.includes("Interviewing") && !hasMigratedAssessments);
+    (migratedSources.length === 0
+      ? path.includes("Interviewing")
+      : hasLaterInterviewStatus(application.id, activities, migratedSources));
   const reachedAssessment =
     path.includes("Online Assessment") || applicationAssessments.length > 0;
 
@@ -229,6 +231,38 @@ export function classifyApplicationOutcomePath(
   return application.status === "Interviewing"
     ? "interviewing"
     : "awaiting_response";
+}
+
+// A status transition after a preserved source's last update is independent evidence,
+// unless it overlaps another converted source. Earlier/ambiguous legacy history stays
+// conservative; message-only history, inferred path events and rejection.statusFrom
+// cannot establish a new interview independently.
+function hasLaterInterviewStatus(
+  applicationId: string,
+  activities: Activity[],
+  sources: Interview[],
+) {
+  const windows = sources.map((source) => ({
+    start: Date.parse(source.createdAt),
+    end: Date.parse(source.updatedAt),
+  }));
+  if (windows.some(({ start, end }) =>
+    !Number.isFinite(start) || !Number.isFinite(end) || end < start,
+  )) {
+    return false;
+  }
+  return activities.some((event) => {
+    if (
+      event.applicationId !== applicationId || event.type !== "status_changed" ||
+      event.statusTo !== "Interviewing" || !event.statusFrom || event.statusFrom === "Interviewing"
+    ) {
+      return false;
+    }
+    const time = Date.parse(event.createdAt);
+    return Number.isFinite(time) &&
+      windows.some(({ end }) => time > end) &&
+      windows.every(({ start, end }) => time < start || time > end);
+  });
 }
 
 function statusFromLegacyMessage(message: string) {

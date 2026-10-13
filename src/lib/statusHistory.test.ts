@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Activity, Application, Interview } from "../types/application";
+import { assessmentFromInterview } from "./assessments";
 import {
   classifyApplicationOutcomePath,
   deriveApplicationStatusPath,
@@ -145,6 +146,64 @@ describe("deriveApplicationStatusPath", () => {
 });
 
 describe("classifyApplicationOutcomePath", () => {
+  const migratedSource: Interview = {
+    id: "legacy-assessment", applicationId: application.id,
+    type: "online-assessment", mode: "unknown", proctored: false,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-02T00:00:00.000Z",
+  };
+  const migrated = assessmentFromInterview(migratedSource, 1);
+  const laterInterview: Activity = {
+    ...activity, statusFrom: "Online Assessment", statusTo: "Interviewing",
+    createdAt: "2026-10-03T00:00:00.000Z",
+  };
+
+  it.each(["Online Assessment", "Awaiting Response", "Rejected"] as const)(
+    "preserves a later explicit interview transition from %s without a retained interview",
+    (statusFrom) => {
+      const events: Activity[] = [
+        { ...activity, statusTo: "Interviewing", createdAt: migratedSource.createdAt },
+        { ...laterInterview, statusFrom },
+        { ...activity, id: "rejected", statusFrom: "Interviewing", statusTo: "Rejected", createdAt: application.updatedAt },
+      ];
+      const canonical = { ...migratedSource, id: "real-interview", type: "technical" as const };
+      expect(classifyApplicationOutcomePath(application, events, [canonical], [migrated])).toBe("interviewed_rejected");
+      // Deleting the canonical interview retains the status-only classification.
+      expect(classifyApplicationOutcomePath(application, events, [], [migrated])).toBe("interviewed_rejected");
+    },
+  );
+
+  it.each([
+    { ...laterInterview, createdAt: migratedSource.createdAt },
+    { ...laterInterview, createdAt: migratedSource.updatedAt },
+    { ...laterInterview, type: "created" as const },
+    { ...laterInterview, statusFrom: "Interviewing" as const },
+    { ...laterInterview, statusFrom: undefined },
+    { ...laterInterview, statusTo: "Rejected" as const, statusFrom: "Interviewing" as const },
+    { ...laterInterview, applicationId: "another-application" },
+    { ...laterInterview, createdAt: "invalid" },
+  ])("does not fabricate an interview from assessment-only or ambiguous history: %j", (event) => {
+    expect(classifyApplicationOutcomePath(application, [event], [], [migrated])).toBe("assessment_rejected");
+  });
+
+  it("does not infer an independent interview from message-only or synthesized path events", () => {
+    expect(classifyApplicationOutcomePath(application, [], [], [migrated])).toBe("assessment_rejected");
+    expect(classifyApplicationOutcomePath(application, [{ ...laterInterview, statusFrom: undefined, statusTo: undefined }], [], [migrated])).toBe("assessment_rejected");
+  });
+
+  it("does not let a later assessment hide an independent earlier interview transition", () => {
+    const laterSource = { ...migratedSource, id: "later-assessment", createdAt: "2026-10-04T00:00:00.000Z", updatedAt: "2026-10-05T00:00:00.000Z" };
+    expect(classifyApplicationOutcomePath(application, [laterInterview], [], [migrated, assessmentFromInterview(laterSource, 2)])).toBe("interviewed_rejected");
+    const overlapping = { ...laterSource, createdAt: laterInterview.createdAt };
+    expect(classifyApplicationOutcomePath(application, [laterInterview], [], [migrated, assessmentFromInterview(overlapping, 2)])).toBe("assessment_rejected");
+  });
+
+  it("keeps canonical interview evidence when source dates are ambiguous", () => {
+    const invalid = assessmentFromInterview({ ...migratedSource, updatedAt: "invalid" }, 1);
+    expect(classifyApplicationOutcomePath(application, [laterInterview], [], [invalid])).toBe("assessment_rejected");
+    expect(classifyApplicationOutcomePath(application, [], [migratedSource], [invalid])).toBe("interviewed_rejected");
+  });
+
   it("distinguishes offered then rejected from a direct rejection", () => {
     const activities: Activity[] = [
       {
