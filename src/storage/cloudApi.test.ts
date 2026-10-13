@@ -24,6 +24,76 @@ const snapshot = {
 };
 
 describe("cloud API client", () => {
+  it.each([
+    { error: "This workspace uses a newer data format. Refresh or update the tracker before saving." },
+    { current: { revision: 4 }, error: "Invalid conflict response." },
+    { current: [], error: "Invalid conflict response." },
+    { current: { revision: 4, snapshot: {}, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 4, snapshot: { ...snapshot, settings: null }, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 4, snapshot: { ...snapshot, applications: null }, updatedAt: "2026-10-13T00:00:00Z" } },
+    { current: { revision: 0, snapshot, updatedAt: "2026-10-13T00:00:00Z" } },
+    {},
+    null,
+    "invalid response",
+  ])("keeps non-revision conflicts out of retry handling: %j", async (body) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(body, { status: 409 }),
+    );
+    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
+    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+
+    expect(error).toBeInstanceOf(CloudApiError);
+    expect(error).not.toBeInstanceOf(CloudRevisionConflictError);
+    expect(error).toMatchObject({
+      status: 409,
+      message: body && typeof body === "object" && "error" in body
+        ? body.error
+        : "Cloud storage request failed (409). Refresh the tracker and try again.",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("provides a useful fallback for non-JSON conflict responses", async () => {
+    const client = createCloudApiClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("<html>Conflict</html>", { status: 409 }),
+      ),
+      retryDelays: [],
+    });
+    await expect(client.saveState(snapshot, 3)).rejects.toMatchObject({
+      status: 409,
+      message: "Cloud storage request failed (409). Refresh the tracker and try again.",
+    });
+  });
+
+  it("preserves an explicit null revision-conflict state", async () => {
+    const client = createCloudApiClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({ current: null }, { status: 409 }),
+      ),
+      retryDelays: [],
+    });
+    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(CloudRevisionConflictError);
+    expect(error).toMatchObject({ current: null, status: 409 });
+  });
+
+  it("accepts legacy conflict snapshots and preserves unknown extensions", async () => {
+    const current = {
+      revision: 4,
+      snapshot: { ...snapshot, coverLetters: undefined, assessments: undefined, extension: { keep: true } },
+      updatedAt: "2026-10-13T00:00:00Z",
+      extension: "keep",
+    };
+    const client = createCloudApiClient({
+      fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ current }, { status: 409 })),
+      retryDelays: [],
+    });
+    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(CloudRevisionConflictError);
+    expect(error).toMatchObject({ current: JSON.parse(JSON.stringify(current)) });
+  });
+
   it("retries transient failures", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
