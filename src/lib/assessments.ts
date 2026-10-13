@@ -100,24 +100,91 @@ export function applyAssessmentUpdates(
   return [...records.values()];
 }
 
-// Compare serialized source data, including unknown extensions. Object key order and
-// omitted undefined fields must not make an unchanged exported/imported source divergent.
-export function assertEquivalentInterviewSource(
+// Compare known semantic aliases on copies; unknown extensions remain strictly compared.
+function comparableInterviewSource(source: Interview): Interview {
+  const copy = {
+    ...source,
+    type: source.type === "technical" ? "technical-interview" as const
+      : source.type === "recruiter" ? "recruiter-screen" as const : source.type,
+    deadlineEntryMode: source.deadlineEntryMode === "72_hours"
+      ? "3_days" as const : source.deadlineEntryMode ?? "exact" as const,
+  };
+  for (const key of ["dateTime", "deadline", "deadlineReceivedAt", "createdAt", "updatedAt"] as const) {
+    const value = source[key];
+    // Local date-times have no portable instant. Do not infer a timezone or repair invalid dates.
+    if (!value || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(value)) {
+      continue;
+    }
+    const day = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    const time = Date.parse(value);
+    if (
+      Number.isFinite(day.getTime()) && Number.isFinite(time) &&
+      day.toISOString().slice(0, 10) === value.slice(0, 10)
+    ) {
+      copy[key] = new Date(time).toISOString();
+    }
+  }
+  return copy;
+}
+
+// Key order and omitted undefined fields must not make an unchanged source divergent.
+function equivalentInterviewSources(
   interview: Interview,
   preservedSource?: Interview,
 ) {
   const serialize = (value: Interview) =>
-    JSON.stringify(value, (_key, item: unknown) =>
+    JSON.stringify(comparableInterviewSource(value), (_key, item: unknown) =>
       item && typeof item === "object" && !Array.isArray(item)
         ? Object.fromEntries(
             Object.entries(item).sort(([a], [b]) => a.localeCompare(b)),
           )
         : item,
     );
-  if (!preservedSource || serialize(interview) !== serialize(preservedSource))
+  return Boolean(preservedSource && serialize(interview) === serialize(preservedSource));
+}
+
+export function assertEquivalentInterviewSource(interview: Interview, preservedSource?: Interview) {
+  if (!equivalentInterviewSources(interview, preservedSource))
     throw new Error(
       `Interview ${interview.round ? `round ${interview.round}` : interview.id} has different details from its converted assessment. No changes were saved. Refresh the tracker, or reconcile both source records in the backup before importing.`,
     );
+}
+
+function migrationSourceWithDeadline(
+  source: Interview,
+  converted: Assessment,
+  snapshot: StorageSnapshot,
+  now: Date,
+) {
+  const application = snapshot.applications.find((item) => item.id === source.applicationId);
+  if (
+    equivalentInterviewSources(source, converted.legacyInterview) ||
+    source.type !== "online-assessment" || source.deadline !== undefined ||
+    !converted.legacyInterview?.deadline || converted.originalInterviewRound !== source.round ||
+    !application?.deadline || application.interviewDeadline
+  ) {
+    return source;
+  }
+
+  // Replay the existing legacy deadline rule on copies. Include other preserved sources
+  // so a partial snapshot cannot turn ambiguous ownership into a sole-stage fallback.
+  const sources = new Map<string, Interview>();
+  for (const assessment of snapshot.assessments ?? []) {
+    if (assessment.legacyInterview) sources.set(assessment.id, assessment.legacyInterview);
+  }
+  for (const interview of snapshot.interviews) sources.set(interview.id, interview);
+  const enriched = reconcileCanonicalInterviews(
+    [{ ...application, stageMigrationVersion: undefined }],
+    [...sources.values()],
+    now,
+  ).interviews.find((item) => item.id === source.id) ?? source;
+  return {
+    ...source,
+    deadline: enriched.deadline,
+    // Existing values are user information, even when the legacy rule would replace them.
+    deadlineEntryMode: source.deadlineEntryMode ?? enriched.deadlineEntryMode,
+    deadlineReceivedAt: source.deadlineReceivedAt ?? enriched.deadlineReceivedAt,
+  };
 }
 export function submittedAssessmentUpdate(timestamp: string): AssessmentUpdate {
   return { progress: "submitted", submittedAt: timestamp };
@@ -199,7 +266,10 @@ export function migrateStageSnapshot(
   for (const interview of snapshot.interviews) {
     const converted = assessmentsById.get(interview.id);
     if (converted)
-      assertEquivalentInterviewSource(interview, converted.legacyInterview);
+      assertEquivalentInterviewSource(
+        migrationSourceWithDeadline(interview, converted, snapshot, now),
+        converted.legacyInterview,
+      );
   }
   const originalById = new Map(
     snapshot.interviews.map((item) => [item.id, item]),
