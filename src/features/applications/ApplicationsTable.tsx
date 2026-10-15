@@ -607,10 +607,15 @@ export function ApplicationsTable({
                         className={getHeaderClassName(column.id)}
                         key={column.id}
                         scope="col"
+                        title={column.label}
                       >
                         {column.key ? (
                           <button
-                            className="flex w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden text-center hover:text-foreground"
+                            className={`flex w-full min-w-0 items-center gap-1.5 overflow-hidden hover:text-foreground ${
+                              isUtilityColumn(column.id)
+                                ? "justify-center text-center"
+                                : "justify-start text-left"
+                            }`}
                             onClick={() =>
                               onSortChange(column.key as SortColumn)
                             }
@@ -806,10 +811,15 @@ function SortIcon({
 
 function getHeaderClassName(columnId: ApplicationColumnId) {
   return [
-    "sticky top-0 overflow-hidden border-b border-border bg-slate-50 px-2.5 py-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted",
+    "sticky top-0 overflow-hidden border-b border-border bg-slate-50 px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted",
+    isUtilityColumn(columnId) ? "text-center" : "text-left",
     isPinnedColumn(columnId) ? "z-20" : "z-10",
     getPinnedColumnClassName(columnId),
   ].join(" ");
+}
+
+function isUtilityColumn(columnId: ApplicationColumnId) {
+  return columnId === "actions" || columnId === "contacts";
 }
 
 function isPinnedColumn(columnId: ApplicationColumnId) {
@@ -930,7 +940,7 @@ function getResizeHandle(
 
 function getCellClassName(columnId: ApplicationColumnId) {
   const isActions = columnId === "actions";
-  const isUtilityCell = isActions || columnId === "contacts";
+  const isUtilityCell = isUtilityColumn(columnId);
 
   return [
     "border-b border-border bg-surface py-4 align-top transition-colors group-hover:bg-slate-50",
@@ -944,7 +954,7 @@ function getCellClassName(columnId: ApplicationColumnId) {
 }
 
 function getCellContentClassName(columnId: ApplicationColumnId) {
-  const isUtilityCell = columnId === "actions" || columnId === "contacts";
+  const isUtilityCell = isUtilityColumn(columnId);
 
   return [
     "min-w-0 max-w-full",
