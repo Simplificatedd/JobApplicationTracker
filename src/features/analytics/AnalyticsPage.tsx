@@ -388,7 +388,7 @@ function SegmentedControl<Value extends string>({
       {options.map((option) => (
         <button
           aria-checked={option.value === value}
-          className={`h-full rounded-md px-3 text-sm font-medium transition ${
+          className={`h-full whitespace-nowrap rounded-md px-2.5 text-sm font-medium transition sm:px-3 ${
             option.value === value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"

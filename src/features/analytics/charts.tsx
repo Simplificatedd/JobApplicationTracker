@@ -140,7 +140,7 @@ export function HorizontalBarChart({
         return (
           <li
             aria-label={`${item.label}: ${item.value} (${share}%)`}
-            className={`grid grid-cols-[minmax(6.5rem,11rem)_1fr_4.5rem] items-center gap-3 rounded-md px-1 py-0.5 outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`grid grid-cols-[minmax(5.5rem,8rem)_1fr_2rem] items-center gap-3 sm:grid-cols-[minmax(6.5rem,11rem)_1fr_4.5rem] rounded-md px-1 py-0.5 outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
               isDimmed ? "opacity-45" : "opacity-100"
             }`}
             key={item.label}
@@ -167,7 +167,7 @@ export function HorizontalBarChart({
             <span className="text-right text-sm tabular-nums">
               <span className="font-semibold text-foreground">{item.value}</span>
               <span
-                className={`ml-1.5 text-xs text-muted transition-opacity ${
+                className={`ml-1.5 hidden text-xs text-muted transition-opacity sm:inline ${
                   isActive ? "opacity-100" : "opacity-0"
                 }`}
               >
