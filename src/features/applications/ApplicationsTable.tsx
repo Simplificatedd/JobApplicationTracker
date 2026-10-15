@@ -888,7 +888,7 @@ function ApplicationRow({
   return (
     <tr
       aria-label={`Open details for ${application.jobTitle}`}
-      className="group cursor-pointer align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="group cursor-pointer align-top focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       onClick={openFromRowClick}
       onKeyDown={openFromRowKeyDown}
       role="button"
@@ -993,7 +993,7 @@ function ApplicationColumnCell({
 }) {
   if (columnId === "jobTitle") {
     return (
-      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground">
+      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground underline-offset-2 group-hover:text-primary group-hover:underline">
         {application.jobTitle}
       </span>
     );
