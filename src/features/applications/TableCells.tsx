@@ -347,18 +347,40 @@ export function StatusQuickEditCell({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftStatus, setDraftStatus] = useState(application.status);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function startEditing() {
     setDraftStatus(application.status);
     setIsEditing(true);
   }
 
-  if (isEditing) {
-    return (
-      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+  return (
+    <>
+      <button
+        aria-expanded={isEditing}
+        aria-haspopup="dialog"
+        aria-label="Quick edit status"
+        className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+        onClick={startEditing}
+        ref={triggerRef}
+        type="button"
+      >
+        <StatusBadge status={application.status} />
+        <Pencil
+          aria-hidden="true"
+          className="shrink-0 text-muted"
+          size={14}
+        />
+      </button>
+      <AnchoredQuickEdit
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="Edit status"
+        triggerRef={triggerRef}
+      >
         <select
           aria-label="Application status"
-          className="field-control h-9 w-full min-w-0 text-xs"
+          className="field-control h-9 w-full min-w-0 text-sm"
           onChange={(event) =>
             setDraftStatus(event.target.value as ApplicationStatus)
           }
@@ -378,24 +400,8 @@ export function StatusQuickEditCell({
             setIsEditing(false);
           }}
         />
-      </QuickEditContainer>
-    );
-  }
-
-  return (
-    <button
-      aria-label="Quick edit status"
-      className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
-      onClick={startEditing}
-      type="button"
-    >
-      <StatusBadge status={application.status} />
-      <Pencil
-        aria-hidden="true"
-        className="shrink-0 text-muted"
-        size={14}
-      />
-    </button>
+      </AnchoredQuickEdit>
+    </>
   );
 }
 
