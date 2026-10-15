@@ -456,6 +456,11 @@ function nextSort(
     };
   }
 
+  // A third click on the same header returns to the default ordering.
+  if (current.column === column) {
+    return DEFAULT_SORT_STATE;
+  }
+
   return {
     column,
     direction: "descending",
