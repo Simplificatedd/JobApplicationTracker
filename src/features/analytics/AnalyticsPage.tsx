@@ -1,4 +1,5 @@
-import { BarChart3, CalendarDays, Settings2 } from "lucide-react";
+import { BarChart3, Settings2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { APPLICATION_STATUSES, STATUS_TONE } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -353,31 +354,184 @@ function ActivityCalendar({
     interviews,
     assessments,
   );
+  const activeDays = days.filter((day) => day.tone !== "none").length;
 
   return (
-    <article className="surface-panel rounded-lg p-4 xl:col-span-2">
-      <div className="flex items-center gap-2">
-        <CalendarDays aria-hidden="true" className="text-muted" size={18} />
-        <h3 className="text-sm font-semibold text-foreground">Activity calendar</h3>
+    <ChartCard
+      className="xl:col-span-2"
+      description={`${activeDays} active ${activeDays === 1 ? "day" : "days"}`}
+      title="Activity calendar"
+    >
+      <ActivityHeatmap days={days} />
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
+        <LegendItem className={HEATMAP_TONE_CLASS.none} label="No activity" />
+        <LegendItem className={HEATMAP_TONE_CLASS.activity} label="Any activity" />
+        <LegendItem className={HEATMAP_TONE_CLASS.rejection} label="Rejection-only" />
       </div>
-      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(0.75rem,1fr))] gap-1">
-        {days.map((day) => (
-          <button
-            aria-label={day.summary}
-            className={`h-3 rounded-sm ${day.colorClass}`}
-            key={day.date}
-            title={day.summary}
-            type="button"
-          />
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-muted">
-        <LegendItem className="bg-slate-200" label="No activity" />
-        <LegendItem className="bg-success" label="Any activity" />
-        <LegendItem className="bg-destructive" label="Rejection-only" />
-      </div>
-    </article>
+    </ChartCard>
   );
+}
+
+type CalendarDay = ReturnType<typeof deriveActivityCalendarDays>[number];
+
+const HEATMAP_TONE_CLASS: Record<CalendarDay["tone"], string> = {
+  none: "bg-slate-100",
+  activity: "bg-emerald-500",
+  rejection: "bg-red-400",
+};
+
+const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
+
+function ActivityHeatmap({ days }: { days: CalendarDay[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeDay, setActiveDay] = useState<{
+    day: CalendarDay;
+    left: number;
+    top: number;
+  } | null>(null);
+  const weeks = groupDaysIntoWeeks(days);
+  const monthLabels = getMonthLabels(weeks);
+
+  useEffect(() => {
+    const scroller = scrollRef.current;
+
+    if (scroller) {
+      scroller.scrollLeft = scroller.scrollWidth;
+    }
+  }, [weeks.length]);
+
+  function showDay(day: CalendarDay, target: HTMLElement) {
+    const scroller = scrollRef.current;
+
+    if (!scroller) {
+      return;
+    }
+
+    const cell = target.getBoundingClientRect();
+    const container = scroller.parentElement?.getBoundingClientRect();
+
+    setActiveDay({
+      day,
+      left: cell.left - (container?.left ?? 0) + cell.width / 2,
+      top: cell.top - (container?.top ?? 0),
+    });
+  }
+
+  return (
+    <div className="relative">
+      <div className="overflow-x-auto pb-1" ref={scrollRef}>
+        <div className="inline-flex gap-[3px]">
+          <div className="mr-1 grid grid-rows-[14px_repeat(7,13px)] gap-[3px] text-[10px] leading-[13px] text-muted">
+            <span />
+            {WEEKDAY_LABELS.map((label, index) => (
+              <span key={index}>{label}</span>
+            ))}
+          </div>
+          {weeks.map((week, weekIndex) => (
+            <div className="grid grid-rows-[14px_repeat(7,13px)] gap-[3px]" key={weekIndex}>
+              <span className="whitespace-nowrap text-[10px] leading-[14px] text-muted">
+                {monthLabels[weekIndex]}
+              </span>
+              {week.map((day, dayIndex) =>
+                day ? (
+                  <button
+                    aria-label={`${formatCalendarDate(day.date)}. ${day.summary}`}
+                    className={`h-[13px] w-[13px] rounded-[3px] transition hover:ring-2 hover:ring-foreground/30 focus-visible:ring-2 focus-visible:ring-primary ${HEATMAP_TONE_CLASS[day.tone]}`}
+                    key={day.date}
+                    onBlur={() => setActiveDay(null)}
+                    onFocus={(event) => showDay(day, event.currentTarget)}
+                    onPointerEnter={(event) => showDay(day, event.currentTarget)}
+                    onPointerLeave={() => setActiveDay(null)}
+                    type="button"
+                  />
+                ) : (
+                  <span key={`empty-${dayIndex}`} />
+                ),
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {activeDay ? (
+        <div
+          className="pointer-events-none absolute z-10 max-w-72 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-popover"
+          style={{ left: activeDay.left, top: activeDay.top - 6 }}
+        >
+          <p className="font-semibold text-foreground">
+            {formatCalendarDate(activeDay.day.date)}
+          </p>
+          <p className="mt-0.5 text-muted">
+            {activeDay.day.summary.replace(/^On this date: /, "")}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Columns are Sunday-first weeks; leading and trailing slots stay empty.
+function groupDaysIntoWeeks(days: CalendarDay[]) {
+  const weeks: Array<Array<CalendarDay | null>> = [];
+  let currentWeek: Array<CalendarDay | null> = [];
+
+  days.forEach((day, index) => {
+    const weekday = new Date(`${day.date}T00:00:00.000Z`).getUTCDay();
+
+    if (index === 0) {
+      currentWeek = Array.from({ length: weekday }, () => null);
+    } else if (weekday === 0) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+
+    currentWeek.push(day);
+  });
+
+  if (currentWeek.length > 0) {
+    weeks.push([
+      ...currentWeek,
+      ...Array.from({ length: 7 - currentWeek.length }, () => null),
+    ]);
+  }
+
+  return weeks;
+}
+
+// Labels the first week of each month. When two labels would crowd each other
+// (for example a partial first month), the later month keeps its label.
+function getMonthLabels(weeks: Array<Array<CalendarDay | null>>) {
+  const labels = weeks.map(() => "");
+  let lastLabelIndex = -Infinity;
+
+  weeks.forEach((week, weekIndex) => {
+    const firstDay = week.find((day) => day !== null);
+    const previousDay = weeks[weekIndex - 1]?.find((day) => day !== null);
+
+    if (!firstDay || firstDay.date.slice(0, 7) === previousDay?.date.slice(0, 7)) {
+      return;
+    }
+
+    if (weekIndex - lastLabelIndex < 3) {
+      labels[lastLabelIndex] = "";
+    }
+
+    labels[weekIndex] = new Date(
+      `${firstDay.date}T00:00:00.000Z`,
+    ).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+    lastLabelIndex = weekIndex;
+  });
+
+  return labels;
+}
+
+function formatCalendarDate(date: string) {
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    weekday: "short",
+    year: "numeric",
+  });
 }
 
 function LegendItem({
@@ -389,7 +543,7 @@ function LegendItem({
 }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className={`h-3 w-3 rounded-sm ${className}`} />
+      <span className={`h-3 w-3 rounded-[3px] ${className}`} />
       {label}
     </span>
   );
@@ -652,12 +806,12 @@ export function deriveActivityCalendarDays(
       primaryActivityCount === eventCounts.rejections;
 
     days.push({
-      colorClass: !hasAnyActivity
-        ? "bg-slate-200 hover:bg-slate-300"
-        : hasOnlyRejections
-          ? "bg-destructive hover:opacity-80"
-          : "bg-success hover:opacity-80",
       date: key,
+      tone: !hasAnyActivity
+        ? ("none" as const)
+        : hasOnlyRejections
+          ? ("rejection" as const)
+          : ("activity" as const),
       summary: hasAnyActivity
         ? `On this date: ${summaryParts.join("; ")}.`
         : `On this date: no activity.`,
