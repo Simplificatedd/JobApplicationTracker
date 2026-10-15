@@ -1,5 +1,5 @@
 import { BarChart3, Settings2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { APPLICATION_STATUSES, STATUS_TONE } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -72,7 +72,12 @@ export function AnalyticsPage({
   const scopedAssessments = assessments.filter((item) =>
     scopedApplicationIds.has(item.applicationId),
   );
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
+  const visibleChartCount = chartOptions.filter((chart) =>
+    visibleCharts.has(chart.id),
+  ).length;
   const hasData =
     scopedApplications.length > 0 ||
     scopedActivities.length > 0 ||
@@ -106,23 +111,16 @@ export function AnalyticsPage({
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <select
-              aria-label="Analytics time grouping"
-              className="field-control h-10 w-auto min-w-32"
-              onChange={(event) =>
-                onUpdateAnalyticsSettings({
-                  defaultTimeGrouping: event.target
-                    .value as AnalyticsSettings["defaultTimeGrouping"],
-                })
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              label="Analytics time grouping"
+              onChange={(value) =>
+                onUpdateAnalyticsSettings({ defaultTimeGrouping: value })
               }
+              options={TIME_GROUPING_OPTIONS}
               value={analyticsSettings.defaultTimeGrouping}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-            <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground">
+            />
+            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50">
               <input
                 checked={analyticsSettings.includeArchived}
                 className="h-4 w-4 rounded border-border text-primary"
@@ -135,33 +133,61 @@ export function AnalyticsPage({
               />
               Include archived
             </label>
+            <button
+              aria-controls={customizePanelId}
+              aria-expanded={isCustomizing}
+              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                isCustomizing
+                  ? "border-primary bg-blue-50 text-primary"
+                  : "border-border text-foreground hover:bg-slate-50"
+              }`}
+              onClick={() => setIsCustomizing((current) => !current)}
+              type="button"
+            >
+              <Settings2 aria-hidden="true" size={16} />
+              Customize
+              <span className="rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-muted">
+                {visibleChartCount}/{chartOptions.length}
+              </span>
+            </button>
           </div>
         </div>
-      </section>
+        {isCustomizing ? (
+          <div
+            className="mt-4 border-t border-border pt-4"
+            id={customizePanelId}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+              Analytics settings
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {chartOptions.map((chart) => {
+                const isVisible = visibleCharts.has(chart.id);
 
-      <section className="surface-panel rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <Settings2 aria-hidden="true" className="text-muted" size={18} />
-          <h3 className="text-sm font-semibold uppercase text-muted">
-            Analytics settings
-          </h3>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {chartOptions.map((chart) => (
-            <label
-              className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
-              key={chart.id}
-            >
-              <span className="min-w-0 break-words">{chart.label}</span>
-              <input
-                checked={visibleCharts.has(chart.id)}
-                className="h-4 w-4 shrink-0 rounded border-border text-primary"
-                onChange={(event) => toggleChart(chart.id, event.target.checked)}
-                type="checkbox"
-              />
-            </label>
-          ))}
-        </div>
+                return (
+                  <label
+                    className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      isVisible
+                        ? "border-primary/40 bg-blue-50 text-foreground"
+                        : "border-border bg-surface text-muted hover:text-foreground"
+                    }`}
+                    key={chart.id}
+                  >
+                    <input
+                      checked={isVisible}
+                      className="h-4 w-4 shrink-0 rounded border-border text-primary"
+                      onChange={(event) =>
+                        toggleChart(chart.id, event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span className="min-w-0 break-words">{chart.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {!hasData ? (
@@ -263,6 +289,52 @@ export function AnalyticsPage({
           ) : null}
         </section>
       )}
+    </div>
+  );
+}
+
+const TIME_GROUPING_OPTIONS: ReadonlyArray<{
+  label: string;
+  value: AnalyticsSettings["defaultTimeGrouping"];
+}> = [
+  { label: "Daily", value: "daily" },
+  { label: "Weekly", value: "weekly" },
+  { label: "Monthly", value: "monthly" },
+];
+
+function SegmentedControl<Value extends string>({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: Value) => void;
+  options: ReadonlyArray<{ label: string; value: Value }>;
+  value: Value;
+}) {
+  return (
+    <div
+      aria-label={label}
+      className="inline-flex h-9 items-center rounded-lg border border-border bg-background p-0.5"
+      role="radiogroup"
+    >
+      {options.map((option) => (
+        <button
+          aria-checked={option.value === value}
+          className={`h-full rounded-md px-3 text-sm font-medium transition ${
+            option.value === value
+              ? "bg-surface text-foreground shadow-sm"
+              : "text-muted hover:text-foreground"
+          }`}
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          role="radio"
+          type="button"
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }
