@@ -23,8 +23,13 @@ import {
   ChartCard,
   type ChartDatum,
   HorizontalBarChart,
+  StatTile,
 } from "./charts";
-import { formatPeriod, TimeSeriesChart } from "./TimeSeriesChart";
+import {
+  fillPeriods,
+  formatPeriod,
+  TimeSeriesChart,
+} from "./TimeSeriesChart";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -214,6 +219,16 @@ export function AnalyticsPage({
         ) : null}
       </section>
 
+      {hasData ? (
+        <KeyMetrics
+          activities={scopedActivities}
+          applications={rangedApplications}
+          assessments={scopedAssessments}
+          dateRange={dateRange}
+          interviews={scopedInterviews}
+        />
+      ) : null}
+
       {!hasData ? (
         <section className="surface-panel rounded-lg px-6 py-12 text-center">
           <p className="text-base font-semibold text-foreground">
@@ -387,6 +402,78 @@ function SegmentedControl<Value extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+function KeyMetrics({
+  activities,
+  applications,
+  assessments,
+  dateRange,
+  interviews,
+}: {
+  activities: Activity[];
+  applications: Application[];
+  assessments: Assessment[];
+  dateRange: DateRange;
+  interviews: Interview[];
+}) {
+  const countWithStatus = (...statuses: Application["status"][]) =>
+    applications.filter((application) => statuses.includes(application.status))
+      .length;
+  const withdrawn = countWithStatus("Withdrawn");
+  const awaiting = countWithStatus("Awaiting Response");
+  const responseBase = applications.length - withdrawn;
+  const responded = responseBase - awaiting;
+  const [offers, accepted] = deriveOutcomes(
+    applications,
+    activities,
+    interviews,
+    assessments,
+  );
+  const weeklyApplications = fillPeriods(
+    deriveApplicationsOverTime(applications, "weekly"),
+    "weekly",
+  ).map((item) => item.value);
+  const rangeLabel =
+    DATE_RANGE_OPTIONS.find((option) => option.value === dateRange)?.label ??
+    "All time";
+
+  return (
+    <section
+      aria-label="Key metrics"
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
+      <StatTile
+        detail={dateRange === "all" ? "All time" : `Applied in the last ${rangeLabel.toLowerCase()}`}
+        label="Applications"
+        sparkline={weeklyApplications}
+        value={String(applications.length)}
+      />
+      <StatTile
+        detail="Online assessments and interviews"
+        label="In progress"
+        value={String(countWithStatus("Online Assessment", "Interviewing"))}
+      />
+      <StatTile
+        detail={`${accepted.value} accepted`}
+        label="Offers received"
+        value={String(offers.value)}
+      />
+      <StatTile
+        detail={
+          responseBase > 0
+            ? `${responded} of ${responseBase} heard back`
+            : "No applications yet"
+        }
+        label="Response rate"
+        value={
+          responseBase > 0
+            ? `${Math.round((responded / responseBase) * 100)}%`
+            : "–"
+        }
+      />
+    </section>
   );
 }
 

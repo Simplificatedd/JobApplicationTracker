@@ -180,3 +180,58 @@ export function HorizontalBarChart({
     </ul>
   );
 }
+
+export function StatTile({
+  detail,
+  label,
+  sparkline,
+  value,
+}: {
+  detail: string;
+  label: string;
+  sparkline?: number[];
+  value: string;
+}) {
+  return (
+    <div className="surface-panel flex min-w-0 items-end justify-between gap-3 rounded-lg px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-muted">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+          {value}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-muted">{detail}</p>
+      </div>
+      {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} /> : null}
+    </div>
+  );
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  const width = 88;
+  const height = 32;
+  const max = Math.max(1, ...values);
+  const points = values
+    .map(
+      (value, index) =>
+        `${(index / (values.length - 1)) * width},${height - 2 - (value / max) * (height - 4)}`,
+    )
+    .join(" ");
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="shrink-0 overflow-visible"
+      height={height}
+      width={width}
+    >
+      <polyline
+        fill="none"
+        points={points}
+        stroke="var(--color-primary)"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+      />
+    </svg>
+  );
+}
