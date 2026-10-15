@@ -23,6 +23,7 @@ import {
   type ChartDatum,
   HorizontalBarChart,
 } from "./charts";
+import { formatPeriod, TimeSeriesChart } from "./TimeSeriesChart";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -174,7 +175,8 @@ export function AnalyticsPage({
       ) : (
         <section className="grid gap-4 xl:grid-cols-2">
           {visibleCharts.has("applicationsOverTime") ? (
-            <CategoryChart
+            <TimeChart
+              grouping={analyticsSettings.defaultTimeGrouping}
               title="Applications over time"
               data={deriveApplicationsOverTime(
                 scopedApplications,
@@ -197,7 +199,8 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("statusChangesOverTime") ? (
-            <CategoryChart
+            <TimeChart
+              grouping={analyticsSettings.defaultTimeGrouping}
               title="Status changes over time"
               data={deriveActivityOverTime(
                 scopedActivities.filter(
@@ -208,7 +211,8 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
-            <CategoryChart
+            <TimeChart
+              grouping={analyticsSettings.defaultTimeGrouping}
               title="Interviews over time"
               data={deriveInterviewsOverTime(
                 scopedInterviews,
@@ -217,7 +221,8 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("assessmentsOverTime") ? (
-            <CategoryChart
+            <TimeChart
+              grouping={analyticsSettings.defaultTimeGrouping}
               title="Assessment invitations over time"
               data={deriveAssessmentsOverTime(
                 scopedAssessments,
@@ -276,6 +281,34 @@ function CategoryChart({
       title={title}
     >
       <HorizontalBarChart barClassName={barClassName} data={data} />
+    </ChartCard>
+  );
+}
+
+function TimeChart({
+  data,
+  grouping,
+  title,
+}: {
+  data: ChartDatum[];
+  grouping: AnalyticsSettings["defaultTimeGrouping"];
+  title: string;
+}) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  return (
+    <ChartCard
+      description={`${total} total`}
+      table={{
+        columns: ["Period", "Count"],
+        rows: data.map((item) => ({
+          label: formatPeriod(item.label, grouping, false),
+          value: item.value,
+        })),
+      }}
+      title={title}
+    >
+      <TimeSeriesChart data={data} grouping={grouping} seriesLabel={title} />
     </ChartCard>
   );
 }
