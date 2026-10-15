@@ -573,11 +573,11 @@ export function ApplicationsTable({
             </div>
           ) : null}
           <div
-            className="hidden min-w-0 overflow-x-auto xl:block"
+            className="hidden max-h-[calc(100vh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
             ref={tableViewportRef}
           >
             <table
-              className="table-fixed border-collapse text-left"
+              className="table-fixed border-separate border-spacing-0 text-left"
               style={{ width: `${tableWidth}px` }}
             >
               <colgroup>
@@ -588,7 +588,7 @@ export function ApplicationsTable({
                   />
                 ))}
               </colgroup>
-              <thead className="border-b border-border bg-slate-50">
+              <thead>
                 <tr>
                   {visibleColumns.map((column, columnIndex) => {
                     const resizeHandle = getResizeHandle(
@@ -604,7 +604,7 @@ export function ApplicationsTable({
                             ? sort.direction
                             : undefined
                         }
-                        className={getHeaderClassName()}
+                        className={getHeaderClassName(column.id)}
                         key={column.id}
                         scope="col"
                       >
@@ -680,7 +680,7 @@ export function ApplicationsTable({
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-surface">
+              <tbody className="bg-surface">
                 {applications.map((application) => (
                   <ApplicationRow
                     application={application}
@@ -804,8 +804,29 @@ function SortIcon({
   return <ArrowUpDown aria-hidden="true" className="shrink-0" size={14} />;
 }
 
-function getHeaderClassName() {
-  return "relative overflow-hidden px-2.5 py-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted";
+function getHeaderClassName(columnId: ApplicationColumnId) {
+  return [
+    "sticky top-0 overflow-hidden border-b border-border bg-slate-50 px-2.5 py-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted",
+    isPinnedColumn(columnId) ? "z-20" : "z-10",
+    getPinnedColumnClassName(columnId),
+  ].join(" ");
+}
+
+function isPinnedColumn(columnId: ApplicationColumnId) {
+  return columnId === "jobTitle" || columnId === "actions";
+}
+
+// Job title and actions stay visible while the table scrolls horizontally.
+function getPinnedColumnClassName(columnId: ApplicationColumnId) {
+  if (columnId === "jobTitle") {
+    return "sticky left-0 shadow-[inset_-1px_0_0_var(--color-border)]";
+  }
+
+  if (columnId === "actions") {
+    return "sticky right-0 shadow-[inset_1px_0_0_var(--color-border)]";
+  }
+
+  return "";
 }
 
 function ApplicationRow({
@@ -857,7 +878,7 @@ function ApplicationRow({
   return (
     <tr
       aria-label={`Open details for ${application.jobTitle}`}
-      className="table-row-hover cursor-pointer align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="group cursor-pointer align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       onClick={openFromRowClick}
       onKeyDown={openFromRowKeyDown}
       role="button"
@@ -912,9 +933,11 @@ function getCellClassName(columnId: ApplicationColumnId) {
   const isUtilityCell = isActions || columnId === "contacts";
 
   return [
-    "py-4 align-top",
+    "border-b border-border bg-surface py-4 align-top transition-colors group-hover:bg-slate-50",
     isUtilityCell ? "px-1" : "overflow-hidden px-2.5",
     isActions ? "overflow-visible" : "",
+    isPinnedColumn(columnId) ? "z-[5]" : "",
+    getPinnedColumnClassName(columnId),
   ]
     .filter(Boolean)
     .join(" ");
