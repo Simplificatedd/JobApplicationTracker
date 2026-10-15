@@ -279,18 +279,54 @@ export function InterviewCell({
   const [draftDateTime, setDraftDateTime] = useState(
     application.interviewDateTime?.slice(0, 16) ?? "",
   );
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function startEditing() {
     setDraftDateTime(application.interviewDateTime?.slice(0, 16) ?? "");
     setIsEditing(true);
   }
 
-  if (isEditing) {
-    return (
-      <QuickEditContainer onCancel={() => setIsEditing(false)}>
+  return (
+    <>
+      <button
+        aria-expanded={isEditing}
+        aria-haspopup="dialog"
+        aria-label="Quick edit scheduled date and time"
+        className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
+        onClick={startEditing}
+        ref={triggerRef}
+        type="button"
+      >
+        <CalendarClock
+          aria-hidden="true"
+          className="mt-0.5 shrink-0 text-muted"
+          size={16}
+        />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">
+            {formatDateTime(application.interviewDateTime)}
+          </p>
+          {application.interviewType ? (
+            <p className="mt-1 truncate text-xs text-muted">
+              {getInterviewTypeLabel(application.interviewType)}
+            </p>
+          ) : null}
+        </div>
+        <Pencil
+          aria-hidden="true"
+          className="ml-auto mt-0.5 shrink-0 text-muted"
+          size={14}
+        />
+      </button>
+      <AnchoredQuickEdit
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="Edit scheduled date and time"
+        triggerRef={triggerRef}
+      >
         <input
           aria-label="Scheduled date and time"
-          className="field-control h-9 w-full min-w-0 text-xs"
+          className="field-control h-9 w-full min-w-0 text-sm"
           onChange={(event) => setDraftDateTime(event.target.value)}
           type="datetime-local"
           value={draftDateTime}
@@ -303,38 +339,8 @@ export function InterviewCell({
             setIsEditing(false);
           }}
         />
-      </QuickEditContainer>
-    );
-  }
-
-  return (
-    <button
-      aria-label="Quick edit scheduled date and time"
-      className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
-      onClick={startEditing}
-      type="button"
-    >
-      <CalendarClock
-        aria-hidden="true"
-        className="mt-0.5 shrink-0 text-muted"
-        size={16}
-      />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground">
-          {formatDateTime(application.interviewDateTime)}
-        </p>
-        {application.interviewType ? (
-          <p className="mt-1 truncate text-xs text-muted">
-            {getInterviewTypeLabel(application.interviewType)}
-          </p>
-        ) : null}
-      </div>
-      <Pencil
-        aria-hidden="true"
-        className="ml-auto mt-0.5 shrink-0 text-muted"
-        size={14}
-      />
-    </button>
+      </AnchoredQuickEdit>
+    </>
   );
 }
 
@@ -496,29 +502,6 @@ function AnchoredQuickEdit({
       {children}
     </div>,
     document.body,
-  );
-}
-
-function QuickEditContainer({
-  children,
-  onCancel,
-}: {
-  children: ReactNode;
-  onCancel: () => void;
-}) {
-  return (
-    <div
-      className="space-y-2"
-      onClick={(event) => event.stopPropagation()}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onCancel();
-        }
-      }}
-    >
-      {children}
-    </div>
   );
 }
 
