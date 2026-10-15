@@ -72,6 +72,24 @@ export function AnalyticsPage({
   const scopedAssessments = assessments.filter((item) =>
     scopedApplicationIds.has(item.applicationId),
   );
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  // The date range is view-only state. Timeline charts filter each record by
+  // its own date; outcome classification still sees the full record history.
+  const rangeStart = getRangeStart(dateRange);
+  const isInRange = (value?: string) =>
+    !rangeStart || (Boolean(value) && new Date(value as string) >= rangeStart);
+  const rangedApplications = scopedApplications.filter((application) =>
+    isInRange(application.dateApplied || application.createdAt),
+  );
+  const rangedActivities = scopedActivities.filter((activity) =>
+    isInRange(activity.createdAt),
+  );
+  const rangedInterviews = scopedInterviews.filter((interview) =>
+    isInRange(interview.dateTime),
+  );
+  const rangedAssessments = scopedAssessments.filter((item) =>
+    isInRange(item.receivedAt || item.createdAt),
+  );
   const [isCustomizing, setIsCustomizing] = useState(false);
   const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
@@ -112,6 +130,12 @@ export function AnalyticsPage({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              label="Analytics date range"
+              onChange={setDateRange}
+              options={DATE_RANGE_OPTIONS}
+              value={dateRange}
+            />
             <SegmentedControl
               label="Analytics time grouping"
               onChange={(value) =>
@@ -206,7 +230,7 @@ export function AnalyticsPage({
               grouping={analyticsSettings.defaultTimeGrouping}
               title="Applications over time"
               data={deriveApplicationsOverTime(
-                scopedApplications,
+                rangedApplications,
                 analyticsSettings.defaultTimeGrouping,
               )}
             />
@@ -215,12 +239,13 @@ export function AnalyticsPage({
             <CategoryChart
               barClassName={getStatusBarClass}
               title="Pipeline by status"
-              data={derivePipelineByStatus(scopedApplications)}
+              data={derivePipelineByStatus(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("followUpLoad") ? (
             <CategoryChart
               barClassName={(_, index) => FOLLOW_UP_BAR_CLASSES[index] ?? "bg-primary"}
+              description="Current follow-ups; not limited by date range"
               title="Follow-up load"
               data={deriveFollowUpLoad(scopedApplications, userSettings)}
             />
@@ -230,7 +255,7 @@ export function AnalyticsPage({
               grouping={analyticsSettings.defaultTimeGrouping}
               title="Status changes over time"
               data={deriveActivityOverTime(
-                scopedActivities.filter(
+                rangedActivities.filter(
                   (activity) => activity.type === "status_changed",
                 ),
                 analyticsSettings.defaultTimeGrouping,
@@ -242,7 +267,7 @@ export function AnalyticsPage({
               grouping={analyticsSettings.defaultTimeGrouping}
               title="Interviews over time"
               data={deriveInterviewsOverTime(
-                scopedInterviews,
+                rangedInterviews,
                 analyticsSettings.defaultTimeGrouping,
               )}
             />
@@ -252,7 +277,7 @@ export function AnalyticsPage({
               grouping={analyticsSettings.defaultTimeGrouping}
               title="Assessment invitations over time"
               data={deriveAssessmentsOverTime(
-                scopedAssessments,
+                rangedAssessments,
                 analyticsSettings.defaultTimeGrouping,
               )}
             />
@@ -261,7 +286,7 @@ export function AnalyticsPage({
             <CategoryChart
               title="Offers and rejections"
               data={deriveOutcomes(
-                scopedApplications,
+                rangedApplications,
                 scopedActivities,
                 scopedInterviews,
                 scopedAssessments,
@@ -272,7 +297,7 @@ export function AnalyticsPage({
             <CategoryChart
               title="Application paths"
               data={deriveApplicationPaths(
-                scopedApplications,
+                rangedApplications,
                 scopedActivities,
                 scopedInterviews,
                 scopedAssessments,
@@ -281,16 +306,42 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("activityCalendar") ? (
             <ActivityCalendar
-              activities={scopedActivities}
-              applications={scopedApplications}
-              assessments={scopedAssessments}
-              interviews={scopedInterviews}
+              activities={rangedActivities}
+              applications={rangedApplications}
+              assessments={rangedAssessments}
+              interviews={rangedInterviews}
             />
           ) : null}
         </section>
       )}
     </div>
   );
+}
+
+type DateRange = "all" | "30d" | "90d" | "12m";
+
+const DATE_RANGE_OPTIONS: ReadonlyArray<{ label: string; value: DateRange }> = [
+  { label: "All time", value: "all" },
+  { label: "30 days", value: "30d" },
+  { label: "90 days", value: "90d" },
+  { label: "12 months", value: "12m" },
+];
+
+function getRangeStart(range: DateRange) {
+  if (range === "all") {
+    return null;
+  }
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  if (range === "12m") {
+    start.setFullYear(start.getFullYear() - 1);
+  } else {
+    start.setDate(start.getDate() - (range === "30d" ? 30 : 90));
+  }
+
+  return start;
 }
 
 const TIME_GROUPING_OPTIONS: ReadonlyArray<{
@@ -342,14 +393,17 @@ function SegmentedControl<Value extends string>({
 function CategoryChart({
   barClassName,
   data,
+  description,
   title,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
   data: ChartDatum[];
+  description?: string;
   title: string;
 }) {
   return (
     <ChartCard
+      description={description}
       table={{ columns: ["Category", "Count"], rows: data }}
       title={title}
     >
