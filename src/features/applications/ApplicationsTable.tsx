@@ -312,7 +312,7 @@ export const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
 export function ApplicationsTable({
   applications,
   coverLetters,
-  columnWidths,
+  columnWidths: savedColumnWidths,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
@@ -332,6 +332,10 @@ export function ApplicationsTable({
   workingResumeId,
 }: ApplicationsTableProps) {
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
+  // Widths shown while dragging; they are saved once the pointer is released.
+  const [draftColumnWidths, setDraftColumnWidths] =
+    useState<ApplicationColumnWidths | null>(null);
+  const columnWidths = draftColumnWidths ?? savedColumnWidths;
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
   const coverLetterById = new Map(
@@ -420,13 +424,26 @@ export function ApplicationsTable({
     event.stopPropagation();
 
     const startX = event.clientX;
-    const startWidth = columnWidths[column.id];
+    const startWidths = columnWidths;
+    let latestWidths: ApplicationColumnWidths | null = null;
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      resizeColumn(column, startWidth + pointerEvent.clientX - startX);
+      latestWidths = {
+        ...startWidths,
+        [column.id]: clampColumnWidth(
+          column,
+          startWidths[column.id] + pointerEvent.clientX - startX,
+        ),
+      };
+      setDraftColumnWidths(latestWidths);
     }
 
     function stopColumnResize() {
+      if (latestWidths) {
+        onColumnWidthsChange(latestWidths);
+      }
+
+      setDraftColumnWidths(null);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       document.removeEventListener("pointermove", handlePointerMove);
