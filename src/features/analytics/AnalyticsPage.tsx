@@ -1,5 +1,5 @@
 import { BarChart3, CalendarDays, Settings2 } from "lucide-react";
-import { APPLICATION_STATUSES } from "../../lib/constants";
+import { APPLICATION_STATUSES, STATUS_TONE } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
   classifyReminderSeverity,
@@ -18,6 +18,11 @@ import type {
   Interview,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import {
+  ChartCard,
+  type ChartDatum,
+  HorizontalBarChart,
+} from "./charts";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -169,7 +174,7 @@ export function AnalyticsPage({
       ) : (
         <section className="grid gap-4 xl:grid-cols-2">
           {visibleCharts.has("applicationsOverTime") ? (
-            <BarChart
+            <CategoryChart
               title="Applications over time"
               data={deriveApplicationsOverTime(
                 scopedApplications,
@@ -178,19 +183,21 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("statusPipeline") ? (
-            <BarChart
+            <CategoryChart
+              barClassName={getStatusBarClass}
               title="Pipeline by status"
               data={derivePipelineByStatus(scopedApplications)}
             />
           ) : null}
           {visibleCharts.has("followUpLoad") ? (
-            <BarChart
+            <CategoryChart
+              barClassName={(_, index) => FOLLOW_UP_BAR_CLASSES[index] ?? "bg-primary"}
               title="Follow-up load"
               data={deriveFollowUpLoad(scopedApplications, userSettings)}
             />
           ) : null}
           {visibleCharts.has("statusChangesOverTime") ? (
-            <BarChart
+            <CategoryChart
               title="Status changes over time"
               data={deriveActivityOverTime(
                 scopedActivities.filter(
@@ -201,7 +208,7 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
-            <BarChart
+            <CategoryChart
               title="Interviews over time"
               data={deriveInterviewsOverTime(
                 scopedInterviews,
@@ -210,7 +217,7 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("assessmentsOverTime") ? (
-            <BarChart
+            <CategoryChart
               title="Assessment invitations over time"
               data={deriveAssessmentsOverTime(
                 scopedAssessments,
@@ -219,7 +226,7 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("outcomes") ? (
-            <BarChart
+            <CategoryChart
               title="Offers and rejections"
               data={deriveOutcomes(
                 scopedApplications,
@@ -230,7 +237,7 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
-            <BarChart
+            <CategoryChart
               title="Application paths"
               data={deriveApplicationPaths(
                 scopedApplications,
@@ -254,38 +261,46 @@ export function AnalyticsPage({
   );
 }
 
-function BarChart({ data, title }: { data: ChartDatum[]; title: string }) {
-  const maxValue = Math.max(1, ...data.map((item) => item.value));
-
+function CategoryChart({
+  barClassName,
+  data,
+  title,
+}: {
+  barClassName?: (datum: ChartDatum, index: number) => string;
+  data: ChartDatum[];
+  title: string;
+}) {
   return (
-    <article className="surface-panel rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {data.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
-          No data for this chart.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {data.map((item) => (
-            <div className="grid grid-cols-[minmax(7rem,12rem)_1fr_2rem] items-center gap-3" key={item.label}>
-              <p className="truncate text-sm font-medium text-foreground">
-                {item.label}
-              </p>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${Math.max(5, (item.value / maxValue) * 100)}%` }}
-                />
-              </div>
-              <p className="text-right text-sm font-semibold text-foreground">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </article>
+    <ChartCard
+      table={{ columns: ["Category", "Count"], rows: data }}
+      title={title}
+    >
+      <HorizontalBarChart barClassName={barClassName} data={data} />
+    </ChartCard>
   );
+}
+
+const STATUS_BAR_CLASS: Record<(typeof STATUS_TONE)[keyof typeof STATUS_TONE], string> = {
+  awaiting: "bg-amber-400",
+  assessment: "bg-teal-500",
+  interviewing: "bg-blue-500",
+  offered: "bg-violet-500",
+  accepted: "bg-emerald-500",
+  rejected: "bg-red-500",
+  withdrawn: "bg-slate-400",
+};
+
+// Follow-up load is ordered overdue, due today, due soon, upcoming.
+const FOLLOW_UP_BAR_CLASSES = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-amber-400",
+  "bg-sky-500",
+];
+
+function getStatusBarClass(datum: ChartDatum) {
+  const tone = STATUS_TONE[datum.label as keyof typeof STATUS_TONE];
+  return tone ? STATUS_BAR_CLASS[tone] : "bg-primary";
 }
 
 function ActivityCalendar({
@@ -345,11 +360,6 @@ function LegendItem({
       {label}
     </span>
   );
-}
-
-interface ChartDatum {
-  label: string;
-  value: number;
 }
 
 function deriveApplicationsOverTime(
