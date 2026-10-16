@@ -117,16 +117,22 @@ export function useHasMounted() {
 export function HorizontalBarChart({
   barClassName,
   data,
+  formatValue = String,
+  maxValue: fixedMaxValue,
+  showShare = true,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
   data: ChartDatum[];
+  formatValue?: (value: number) => string;
+  maxValue?: number;
+  showShare?: boolean;
 }) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const hasMounted = useHasMounted();
-  const maxValue = Math.max(1, ...data.map((item) => item.value));
+  const maxValue = fixedMaxValue ?? Math.max(1, ...data.map((item) => item.value));
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
-  if (data.length === 0 || total === 0) {
+  if (data.length === 0 || (showShare && total === 0)) {
     return <EmptyChart />;
   }
 
@@ -139,7 +145,7 @@ export function HorizontalBarChart({
 
         return (
           <li
-            aria-label={`${item.label}: ${item.value} (${share}%)`}
+            aria-label={`${item.label}: ${formatValue(item.value)}${showShare ? ` (${share}%)` : ""}`}
             className={`grid grid-cols-[minmax(5.5rem,8rem)_1fr_2rem] items-center gap-3 sm:grid-cols-[minmax(6.5rem,11rem)_1fr_4.5rem] rounded-md px-1 py-0.5 outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
               isDimmed ? "opacity-45" : "opacity-100"
             }`}
@@ -165,14 +171,18 @@ export function HorizontalBarChart({
               />
             </span>
             <span className="text-right text-sm tabular-nums">
-              <span className="font-semibold text-foreground">{item.value}</span>
-              <span
-                className={`ml-1.5 hidden text-xs text-muted transition-opacity sm:inline ${
-                  isActive ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                {share}%
+              <span className="font-semibold text-foreground">
+                {formatValue(item.value)}
               </span>
+              {showShare ? (
+                <span
+                  className={`ml-1.5 hidden text-xs text-muted transition-opacity sm:inline ${
+                    isActive ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {share}%
+                </span>
+              ) : null}
             </span>
           </li>
         );
