@@ -182,18 +182,20 @@ export function AppShell({
             className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
             style={sideNavigationStyle}
           >
-            <NavigationBrand />
-            <MobileNotificationSlot
-              enableNotificationBell={enableNotificationBell}
-              groupedNotifications={groupedNotifications}
-              notifications={notifications}
-              onDismissNotification={onDismissNotification}
-              onMarkNotificationsOpened={onMarkNotificationsOpened}
-              onOpenApplicationFromNotification={onOpenApplicationFromNotification}
-              onUpdateApplication={onUpdateApplication}
-              onUpdateAssessment={onUpdateAssessment}
-              onUpdateInterview={onUpdateInterview}
-            />
+            <div className="flex items-center justify-between gap-3 xl:block">
+              <NavigationBrand />
+              <MobileNotificationSlot
+                enableNotificationBell={enableNotificationBell}
+                groupedNotifications={groupedNotifications}
+                notifications={notifications}
+                onDismissNotification={onDismissNotification}
+                onMarkNotificationsOpened={onMarkNotificationsOpened}
+                onOpenApplicationFromNotification={onOpenApplicationFromNotification}
+                onUpdateApplication={onUpdateApplication}
+                onUpdateAssessment={onUpdateAssessment}
+                onUpdateInterview={onUpdateInterview}
+              />
+            </div>
             <NavigationButtons
               currentView={currentView}
               items={visibleNavigation}
@@ -313,7 +315,7 @@ export function AppShell({
 
 function NavigationBrand() {
   return (
-    <div className="flex items-center justify-between gap-3 pl-12 xl:block">
+    <div className="flex min-w-0 items-center justify-between gap-3 pl-12 xl:block">
       <div className="min-w-0">
         <p className="truncate text-lg font-semibold text-foreground">
           {APP_NAME}
