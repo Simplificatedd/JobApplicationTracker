@@ -95,6 +95,11 @@ export function App() {
           isOpen
           onClose={() => setIsAddOpen(false)}
           onCreate={tracker.createApplication}
+          quickLocation={
+            tracker.settings.enableQuickLocation
+              ? tracker.settings.quickLocation.trim() || undefined
+              : undefined
+          }
           resumes={tracker.resumes}
         />
       ) : null}
