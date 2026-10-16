@@ -30,6 +30,7 @@ import {
   formatPeriod,
   TimeSeriesChart,
 } from "./TimeSeriesChart";
+import { ColumnChart } from "./ColumnChart";
 import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import {
   deriveApplicationsBySource,
@@ -396,8 +397,10 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("timeToFirstResponse") ? (
-            <CategoryChart
+            <ColumnChartCard
+              colorFor={(_, index) => RESPONSE_TIME_COLORS[index] ?? "var(--chart-ramp-5)"}
               description="Days from applying to the first status change"
+              shortLabel={(label) => RESPONSE_TIME_SHORT_LABELS[label] ?? label}
               title="Time to first response"
               data={deriveTimeToFirstResponse(rangedApplications, scopedActivities)}
             />
@@ -431,8 +434,12 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("appliedByWeekday") ? (
-            <CategoryChart
-              description="Which days you tend to apply"
+            <ColumnChartCard
+              colorFor={(_, __, isMax) =>
+                isMax ? "var(--chart-1)" : WEEKDAY_MUTED_COLOR
+              }
+              description="Busiest day highlighted"
+              shortLabel={(label) => label.slice(0, 3)}
               title="Applications by weekday"
               data={deriveAppliedByWeekday(rangedApplications)}
             />
@@ -623,6 +630,49 @@ const JOB_TYPE_COLORS: Record<string, string> = {
   Contract: "var(--chart-4)",
   Other: "var(--chart-5)",
 };
+
+// Ordered response-time buckets use the validated light-to-dark blue ramp.
+const RESPONSE_TIME_COLORS = [
+  "var(--chart-ramp-1)",
+  "var(--chart-ramp-2)",
+  "var(--chart-ramp-3)",
+  "var(--chart-ramp-4)",
+  "var(--chart-ramp-5)",
+];
+
+const RESPONSE_TIME_SHORT_LABELS: Record<string, string> = {
+  "Within 1 week": "≤ 1 wk",
+  "1–2 weeks": "1–2 wk",
+  "2–4 weeks": "2–4 wk",
+  "1–2 months": "1–2 mo",
+  "Over 2 months": "2+ mo",
+};
+
+const WEEKDAY_MUTED_COLOR = "#b7d3f6";
+
+function ColumnChartCard({
+  colorFor,
+  data,
+  description,
+  shortLabel,
+  title,
+}: {
+  colorFor: (datum: ChartDatum, index: number, isMax: boolean) => string;
+  data: ChartDatum[];
+  description?: string;
+  shortLabel?: (label: string) => string;
+  title: string;
+}) {
+  return (
+    <ChartCard
+      description={description}
+      table={{ columns: ["Category", "Count"], rows: data }}
+      title={title}
+    >
+      <ColumnChart colorFor={colorFor} data={data} shortLabel={shortLabel} />
+    </ChartCard>
+  );
+}
 
 function DonutChartCard({
   colors,
