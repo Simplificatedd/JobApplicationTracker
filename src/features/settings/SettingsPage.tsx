@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
+import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
@@ -51,6 +52,10 @@ export function SettingsPage({
   // Remounts the file input so the same file can be chosen again after cancel.
   const [importInputKey, setImportInputKey] = useState(0);
   const activeSection = useActiveSection();
+  const visibleColumnCount = APPLICATION_TABLE_COLUMNS.filter(
+    (column) =>
+      !column.canHide || settings.visibleApplicationColumns.includes(column.id),
+  ).length;
 
   function clearBackupSelection() {
     setBackupFile(null);
@@ -379,10 +384,38 @@ export function SettingsPage({
             }
           />
           <div className="py-3">
-            <SettingLabel
-              description="Choose which columns appear in the applications table."
-              label="Visible columns"
-            />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <SettingLabel
+                description={`${visibleColumnCount} of ${APPLICATION_TABLE_COLUMNS.length} columns shown in the applications table.`}
+                label="Visible columns"
+              />
+              <div className="flex shrink-0 gap-2">
+                <button
+                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() =>
+                    onUpdateSettings({
+                      visibleApplicationColumns: APPLICATION_TABLE_COLUMNS.filter(
+                        (column) => column.canHide,
+                      ).map((column) => column.id),
+                    })
+                  }
+                  type="button"
+                >
+                  Show all
+                </button>
+                <button
+                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() =>
+                    onUpdateSettings({
+                      visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
+                    })
+                  }
+                  type="button"
+                >
+                  Defaults
+                </button>
+              </div>
+            </div>
             <div className="mt-2 grid gap-x-6 sm:grid-cols-2">
               {APPLICATION_TABLE_COLUMNS.map((column) => (
                 <ToggleField
