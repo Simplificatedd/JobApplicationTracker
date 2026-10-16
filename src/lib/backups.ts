@@ -845,7 +845,12 @@ function isUserSettings(value: unknown) {
     typeof value.enableGroupedNotifications === "boolean" &&
     typeof value.includeUpcomingInterviewsInAttention === "boolean" &&
     isNonNegativeInteger(value.dueSoonDays) &&
-    typeof value.betaAnalyticsEnabled === "boolean"
+    typeof value.betaAnalyticsEnabled === "boolean" &&
+    // Optional so backups exported before the quick location setting still import.
+    (value.enableQuickLocation === undefined ||
+      typeof value.enableQuickLocation === "boolean") &&
+    (value.quickLocation === undefined ||
+      typeof value.quickLocation === "string")
   );
 }
 

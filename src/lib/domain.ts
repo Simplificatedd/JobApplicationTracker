@@ -68,6 +68,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   includeUpcomingInterviewsInAttention: true,
   dueSoonDays: 3,
   betaAnalyticsEnabled: false,
+  enableQuickLocation: true,
+  quickLocation: "Singapore",
 };
 
 export function normalizeUserSettings(
