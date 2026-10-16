@@ -26,10 +26,10 @@ import {
   CategoryChart,
   ColumnChartCard,
   DonutChartCard,
-  FOLLOW_UP_BAR_CLASSES,
-  getOutcomeBarClass,
-  getPathBarClass,
-  getStatusBarClass,
+  getFollowUpColor,
+  getOutcomeColor,
+  getPathColor,
+  getStatusColor,
   RESPONSE_TIME_COLORS,
   RESPONSE_TIME_SHORT_LABELS,
   TimeChart,
@@ -351,10 +351,10 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("statusPipeline") ? (
             <CategoryChart
-              barClassName={getStatusBarClass}
+              colorFor={getStatusColor}
               summary={
                 <StackedShareBar
-                  classFor={getStatusBarClass}
+                  colorFor={getStatusColor}
                   data={derivePipelineByStatus(rangedApplications)}
                 />
               }
@@ -364,7 +364,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("followUpLoad") ? (
             <CategoryChart
-              barClassName={(_, index) => FOLLOW_UP_BAR_CLASSES[index] ?? "bg-primary"}
+              colorFor={getFollowUpColor}
               description="Current follow-ups; not limited by date range"
               title="Follow-up load"
               data={deriveFollowUpLoad(scopedApplications, userSettings)}
@@ -407,7 +407,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("outcomes") ? (
             <CategoryChart
-              barClassName={getOutcomeBarClass}
+              colorFor={getOutcomeColor}
               title="Offers and rejections"
               data={deriveOutcomes(
                 rangedApplications,
@@ -419,7 +419,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
             <CategoryChart
-              barClassName={getPathBarClass}
+              colorFor={getPathColor}
               title="Application paths"
               data={deriveApplicationPaths(
                 rangedApplications,

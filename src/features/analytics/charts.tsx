@@ -115,8 +115,8 @@ export function useHasMounted() {
 }
 
 export function HorizontalBarChart({
-  barClassName,
   color = "var(--color-primary)",
+  colorFor,
   data,
   formatValue = String,
   limit,
@@ -125,8 +125,8 @@ export function HorizontalBarChart({
   showShare = true,
   unit,
 }: {
-  barClassName?: (datum: ChartDatum, index: number) => string;
   color?: string;
+  colorFor?: (datum: ChartDatum, index: number) => string;
   data: ChartDatum[];
   formatValue?: (value: number) => string;
   // Shows only the first `limit` rows with a "Show all" toggle for the rest,
@@ -181,11 +181,9 @@ export function HorizontalBarChart({
               </span>
               <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <span
-                  className={`block h-full rounded-full transition-[width] duration-700 ease-out ${
-                    barClassName?.(item, index) ?? ""
-                  }`}
+                  className="block h-full rounded-full transition-[width] duration-700 ease-out"
                   style={{
-                    backgroundColor: barClassName ? undefined : color,
+                    backgroundColor: colorFor?.(item, index) ?? color,
                     width: hasMounted && item.value > 0
                       ? `${Math.max(2, (item.value / maxValue) * 100)}%`
                       : "0%",
@@ -288,10 +286,10 @@ function Sparkline({ values }: { values: number[] }) {
 
 // A single 100% bar showing how a whole splits across categories.
 export function StackedShareBar({
-  classFor,
+  colorFor,
   data,
 }: {
-  classFor: (datum: ChartDatum) => string;
+  colorFor: (datum: ChartDatum) => string;
   data: ChartDatum[];
 }) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -314,13 +312,18 @@ export function StackedShareBar({
         {segments.map((item) => (
           <span
             aria-label={`${item.label}: ${item.value}`}
-            className={`h-full transition-[flex-grow,opacity] duration-700 ease-out first:rounded-l-full last:rounded-r-full ${classFor(item)} ${
+            className={`h-full transition-[flex-grow,opacity] duration-700 ease-out first:rounded-l-full last:rounded-r-full ${
               activeLabel && activeLabel !== item.label ? "opacity-40" : ""
             }`}
             key={item.label}
             onPointerEnter={() => setActiveLabel(item.label)}
             role="img"
-            style={{ flexBasis: 0, flexGrow: hasMounted ? item.value : 0, minWidth: 3 }}
+            style={{
+              backgroundColor: colorFor(item),
+              flexBasis: 0,
+              flexGrow: hasMounted ? item.value : 0,
+              minWidth: 3,
+            }}
           />
         ))}
       </div>

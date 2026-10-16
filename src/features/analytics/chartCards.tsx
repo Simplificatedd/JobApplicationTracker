@@ -139,8 +139,8 @@ function describeTotal(
 }
 
 export function CategoryChart({
-  barClassName,
   color,
+  colorFor,
   data,
   description,
   formatValue,
@@ -153,8 +153,8 @@ export function CategoryChart({
   title,
   totalUnit,
 }: {
-  barClassName?: (datum: ChartDatum, index: number) => string;
   color?: string;
+  colorFor?: (datum: ChartDatum, index: number) => string;
   data: ChartDatum[];
   description?: string;
   formatValue?: (value: number) => string;
@@ -203,8 +203,8 @@ export function CategoryChart({
     >
       {summary}
       <HorizontalBarChart
-        barClassName={barClassName}
         color={color}
+        colorFor={colorFor}
         data={visibleData}
         formatValue={formatValue}
         limit={limit}
@@ -254,43 +254,36 @@ export function TimeChart({
   );
 }
 
-const STATUS_BAR_CLASS: Record<(typeof STATUS_TONE)[keyof typeof STATUS_TONE], string> = {
-  awaiting: "bg-amber-400",
-  assessment: "bg-teal-500",
-  interviewing: "bg-blue-500",
-  offered: "bg-violet-500",
-  accepted: "bg-emerald-500",
-  rejected: "bg-red-500",
-  withdrawn: "bg-slate-400",
+export const STATUS_COLORS: Record<(typeof STATUS_TONE)[keyof typeof STATUS_TONE], string> = {
+  awaiting: "#fbbf24",
+  assessment: "#14b8a6",
+  interviewing: "#3b82f6",
+  offered: "#8b5cf6",
+  accepted: "#10b981",
+  rejected: "#ef4444",
+  withdrawn: "#94a3b8",
 };
 
 // Follow-up load is ordered overdue, due today, due soon, upcoming.
-export const FOLLOW_UP_BAR_CLASSES = [
-  "bg-red-500",
-  "bg-orange-500",
-  "bg-amber-400",
-  "bg-sky-500",
-];
+const FOLLOW_UP_COLORS = ["#ef4444", "#f97316", "#fbbf24", "#0ea5e9"];
 
-// Outcome and path bars reuse the pipeline's status colors so the same
-// outcome reads the same everywhere on the page.
-const OUTCOME_BAR_CLASS: Record<string, string> = {
-  "Offers received": STATUS_BAR_CLASS.offered,
-  Accepted: STATUS_BAR_CLASS.accepted,
-  Rejected: STATUS_BAR_CLASS.rejected,
+const OUTCOME_COLORS: Record<string, string> = {
+  "Offers received": STATUS_COLORS.offered,
+  Accepted: STATUS_COLORS.accepted,
+  Rejected: STATUS_COLORS.rejected,
 };
 
-const PATH_BAR_CLASS: Record<ApplicationOutcomePath, string> = {
-  accepted: STATUS_BAR_CLASS.accepted,
-  offer_pending: STATUS_BAR_CLASS.offered,
-  offered_rejected: "bg-red-300",
-  online_assessment: STATUS_BAR_CLASS.assessment,
-  assessment_rejected: "bg-red-300",
-  interviewing: STATUS_BAR_CLASS.interviewing,
-  interviewed_rejected: "bg-red-400",
-  rejected_without_interview: STATUS_BAR_CLASS.rejected,
-  awaiting_response: STATUS_BAR_CLASS.awaiting,
-  withdrawn: STATUS_BAR_CLASS.withdrawn,
+const PATH_COLORS: Record<ApplicationOutcomePath, string> = {
+  accepted: STATUS_COLORS.accepted,
+  offer_pending: STATUS_COLORS.offered,
+  offered_rejected: "#fca5a5",
+  online_assessment: STATUS_COLORS.assessment,
+  assessment_rejected: "#fca5a5",
+  interviewing: STATUS_COLORS.interviewing,
+  interviewed_rejected: "#f87171",
+  rejected_without_interview: STATUS_COLORS.rejected,
+  awaiting_response: STATUS_COLORS.awaiting,
+  withdrawn: STATUS_COLORS.withdrawn,
 };
 
 const PATH_BY_LABEL = new Map(
@@ -300,16 +293,20 @@ const PATH_BY_LABEL = new Map(
   ]),
 );
 
-export function getOutcomeBarClass(datum: ChartDatum) {
-  return OUTCOME_BAR_CLASS[datum.label] ?? "bg-primary";
-}
-
-export function getPathBarClass(datum: ChartDatum) {
-  const path = PATH_BY_LABEL.get(datum.label);
-  return path ? PATH_BAR_CLASS[path] : "bg-primary";
-}
-
-export function getStatusBarClass(datum: ChartDatum) {
+export function getStatusColor(datum: ChartDatum) {
   const tone = STATUS_TONE[datum.label as keyof typeof STATUS_TONE];
-  return tone ? STATUS_BAR_CLASS[tone] : "bg-primary";
+  return tone ? STATUS_COLORS[tone] : "var(--color-primary)";
+}
+
+export function getFollowUpColor(_: ChartDatum, index: number) {
+  return FOLLOW_UP_COLORS[index] ?? "var(--color-primary)";
+}
+
+export function getOutcomeColor(datum: ChartDatum) {
+  return OUTCOME_COLORS[datum.label] ?? "var(--color-primary)";
+}
+
+export function getPathColor(datum: ChartDatum) {
+  const path = PATH_BY_LABEL.get(datum.label);
+  return path ? PATH_COLORS[path] : "var(--color-primary)";
 }
