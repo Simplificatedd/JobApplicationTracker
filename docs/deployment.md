@@ -248,7 +248,7 @@ For a Direct Upload project:
 
 The project name is not necessarily the same as the public hostname. For
 example, a project named `job-application-tracker` may use a hostname such as
-`job-application-tracker-cne.pages.dev`. Copy the value from the **Project
+`job-application-tracker-abc.pages.dev`. Copy the value from the **Project
 Name** column in `npx wrangler pages project list`, without `.pages.dev`.
 
 Forked repositories may initially have GitHub Actions disabled. If necessary,
