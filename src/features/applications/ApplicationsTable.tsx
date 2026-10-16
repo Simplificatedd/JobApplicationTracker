@@ -578,7 +578,7 @@ export function ApplicationsTable({
                             aria-orientation="vertical"
                             aria-valuemin={column.minWidth}
                             aria-valuenow={columnWidths[column.id]}
-                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
+                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
                             onDoubleClick={() =>
                               resizeColumn(column, column.width)
                             }
@@ -734,11 +734,11 @@ function isPinnedColumn(columnId: ApplicationColumnId) {
 // Job title and actions stay visible while the table scrolls horizontally.
 function getPinnedColumnClassName(columnId: ApplicationColumnId) {
   if (columnId === "jobTitle") {
-    return "sticky left-0 shadow-[inset_-1px_0_0_var(--color-border)]";
+    return "sticky left-0";
   }
 
   if (columnId === "actions") {
-    return "sticky right-0 shadow-[inset_1px_0_0_var(--color-border)]";
+    return "sticky right-0";
   }
 
   return "";
@@ -793,7 +793,7 @@ function ApplicationRow({
   return (
     <tr
       aria-label={`Open details for ${application.jobTitle}`}
-      className="group cursor-pointer align-top focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+      className="group cursor-pointer align-top [&:last-child>td]:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       onClick={openFromRowClick}
       onKeyDown={openFromRowKeyDown}
       role="button"
