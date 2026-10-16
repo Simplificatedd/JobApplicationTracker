@@ -124,6 +124,7 @@ export function HorizontalBarChart({
   overflowLabel = "more",
   showShare = true,
   unit,
+  variant = "bars",
 }: {
   color?: string;
   colorFor?: (datum: ChartDatum, index: number) => string;
@@ -138,6 +139,8 @@ export function HorizontalBarChart({
   showShare?: boolean;
   // Unit for counts in the overflow summary, e.g. "applications".
   unit?: string;
+  // "lollipop" draws a thin stem with a dot instead of a filled bar.
+  variant?: "bars" | "lollipop";
 }) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -179,17 +182,39 @@ export function HorizontalBarChart({
               <span className="truncate text-sm text-foreground" title={item.label}>
                 {item.label}
               </span>
-              <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <span
-                  className="block h-full rounded-full transition-[width] duration-700 ease-out"
-                  style={{
-                    backgroundColor: colorFor?.(item, index) ?? color,
-                    width: hasMounted && item.value > 0
-                      ? `${Math.max(2, (item.value / maxValue) * 100)}%`
-                      : "0%",
-                  }}
-                />
-              </span>
+              {variant === "lollipop" ? (
+                <span className="relative h-3">
+                  <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-200" />
+                  <span
+                    className="absolute left-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full transition-[width] duration-700 ease-out"
+                    style={{
+                      backgroundColor: colorFor?.(item, index) ?? color,
+                      width: hasMounted ? `${(item.value / maxValue) * 100}%` : "0%",
+                    }}
+                  />
+                  <span
+                    className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface transition-[left,width,height] duration-700 ease-out ${
+                      isActive ? "h-3.5 w-3.5" : "h-2.5 w-2.5"
+                    }`}
+                    style={{
+                      backgroundColor: colorFor?.(item, index) ?? color,
+                      left: hasMounted ? `${(item.value / maxValue) * 100}%` : "0%",
+                    }}
+                  />
+                </span>
+              ) : (
+                <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <span
+                    className="block h-full rounded-full transition-[width] duration-700 ease-out"
+                    style={{
+                      backgroundColor: colorFor?.(item, index) ?? color,
+                      width: hasMounted && item.value > 0
+                        ? `${Math.max(2, (item.value / maxValue) * 100)}%`
+                        : "0%",
+                    }}
+                  />
+                </span>
+              )}
               <span className="text-right text-sm tabular-nums">
                 <span className="font-semibold text-foreground">
                   {formatValue(item.value)}
