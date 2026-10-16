@@ -312,7 +312,7 @@ export const DEFAULT_COLUMN_WIDTHS = APPLICATION_TABLE_COLUMNS.reduce(
 export function ApplicationsTable({
   applications,
   coverLetters,
-  columnWidths,
+  columnWidths: savedColumnWidths,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
@@ -332,6 +332,10 @@ export function ApplicationsTable({
   workingResumeId,
 }: ApplicationsTableProps) {
   const [tableViewportWidth, setTableViewportWidth] = useState(0);
+  // Widths shown while dragging; they are saved once the pointer is released.
+  const [draftColumnWidths, setDraftColumnWidths] =
+    useState<ApplicationColumnWidths | null>(null);
+  const columnWidths = draftColumnWidths ?? savedColumnWidths;
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
   const coverLetterById = new Map(
@@ -386,63 +390,14 @@ export function ApplicationsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableViewportWidth, visibleColumnKey]);
 
-  function resizeColumnPair(
-    leftColumnId: ApplicationColumnId,
-    rightColumnId: ApplicationColumnId,
-    delta: number,
+  function resizeColumn(
+    column: (typeof APPLICATION_TABLE_COLUMNS)[number],
+    width: number,
   ) {
-    const leftColumn = APPLICATION_TABLE_COLUMNS.find(
-      (currentColumn) => currentColumn.id === leftColumnId,
-    );
-    const rightColumn = APPLICATION_TABLE_COLUMNS.find(
-      (currentColumn) => currentColumn.id === rightColumnId,
-    );
-
-    if (!leftColumn || !rightColumn) {
-      return;
-    }
-
-    updateColumnWidths((current) => {
-      const nextWidths = getColumnPairWidths({
-        delta,
-        leftColumn,
-        leftWidth: current[leftColumnId],
-        rightColumn,
-        rightWidth: current[rightColumnId],
-      });
-
-      return {
-        ...current,
-        [leftColumnId]: nextWidths.leftWidth,
-        [rightColumnId]: nextWidths.rightWidth,
-      };
-    });
-  }
-
-  function resetColumnPair(
-    leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
-    rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number],
-  ) {
-    updateColumnWidths((current) => {
-      const pairWidth = current[leftColumn.id] + current[rightColumn.id];
-      const defaultPairWidth = leftColumn.width + rightColumn.width;
-      const leftTargetWidth = Math.round(
-        (pairWidth * leftColumn.width) / defaultPairWidth,
-      );
-      const nextWidths = getColumnPairWidths({
-        delta: leftTargetWidth - current[leftColumn.id],
-        leftColumn,
-        leftWidth: current[leftColumn.id],
-        rightColumn,
-        rightWidth: current[rightColumn.id],
-      });
-
-      return {
-        ...current,
-        [leftColumn.id]: nextWidths.leftWidth,
-        [rightColumn.id]: nextWidths.rightWidth,
-      };
-    });
+    updateColumnWidths((current) => ({
+      ...current,
+      [column.id]: clampColumnWidth(column, width),
+    }));
   }
 
   function resetColumnWidths() {
@@ -462,47 +417,33 @@ export function ApplicationsTable({
   }
 
   function startColumnResize(
-    leftColumnId: ApplicationColumnId,
-    rightColumnId: ApplicationColumnId,
+    column: (typeof APPLICATION_TABLE_COLUMNS)[number],
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
     event.preventDefault();
     event.stopPropagation();
 
     const startX = event.clientX;
-    const startLeftWidth = columnWidths[leftColumnId];
-    const startRightWidth = columnWidths[rightColumnId];
-    const leftColumn = APPLICATION_TABLE_COLUMNS.find(
-      (currentColumn) => currentColumn.id === leftColumnId,
-    );
-    const rightColumn = APPLICATION_TABLE_COLUMNS.find(
-      (currentColumn) => currentColumn.id === rightColumnId,
-    );
-
-    if (!leftColumn || !rightColumn) {
-      return;
-    }
-
-    const leftColumnDef = leftColumn;
-    const rightColumnDef = rightColumn;
+    const startWidths = columnWidths;
+    let latestWidths: ApplicationColumnWidths | null = null;
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      const nextWidths = getColumnPairWidths({
-        delta: pointerEvent.clientX - startX,
-        leftColumn: leftColumnDef,
-        leftWidth: startLeftWidth,
-        rightColumn: rightColumnDef,
-        rightWidth: startRightWidth,
-      });
-
-      updateColumnWidths((current) => ({
-        ...current,
-        [leftColumnId]: nextWidths.leftWidth,
-        [rightColumnId]: nextWidths.rightWidth,
-      }));
+      latestWidths = {
+        ...startWidths,
+        [column.id]: clampColumnWidth(
+          column,
+          startWidths[column.id] + pointerEvent.clientX - startX,
+        ),
+      };
+      setDraftColumnWidths(latestWidths);
     }
 
     function stopColumnResize() {
+      if (latestWidths) {
+        onColumnWidthsChange(latestWidths);
+      }
+
+      setDraftColumnWidths(null);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       document.removeEventListener("pointermove", handlePointerMove);
@@ -573,11 +514,11 @@ export function ApplicationsTable({
             </div>
           ) : null}
           <div
-            className="hidden min-w-0 overflow-x-auto xl:block"
+            className="hidden max-h-[calc(100vh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
             ref={tableViewportRef}
           >
             <table
-              className="table-fixed border-collapse text-left"
+              className="table-fixed border-separate border-spacing-0 text-left"
               style={{ width: `${tableWidth}px` }}
             >
               <colgroup>
@@ -588,15 +529,9 @@ export function ApplicationsTable({
                   />
                 ))}
               </colgroup>
-              <thead className="border-b border-border bg-slate-50">
+              <thead>
                 <tr>
-                  {visibleColumns.map((column, columnIndex) => {
-                    const resizeHandle = getResizeHandle(
-                      visibleColumns,
-                      columnIndex,
-                      enableDraggableColumnWidths,
-                    );
-
+                  {visibleColumns.map((column) => {
                     return (
                       <th
                         aria-sort={
@@ -604,13 +539,18 @@ export function ApplicationsTable({
                             ? sort.direction
                             : undefined
                         }
-                        className={getHeaderClassName()}
+                        className={getHeaderClassName(column.id)}
                         key={column.id}
                         scope="col"
+                        title={column.label}
                       >
                         {column.key ? (
                           <button
-                            className="flex w-full min-w-0 items-center justify-center gap-1.5 overflow-hidden text-center hover:text-foreground"
+                            className={`flex w-full min-w-0 items-center gap-1.5 overflow-hidden hover:text-foreground ${
+                              isUtilityColumn(column.id)
+                                ? "justify-center text-center"
+                                : "justify-start text-left"
+                            }`}
                             onClick={() =>
                               onSortChange(column.key as SortColumn)
                             }
@@ -632,44 +572,33 @@ export function ApplicationsTable({
                             {column.label}
                           </span>
                         )}
-                        {resizeHandle ? (
+                        {enableDraggableColumnWidths ? (
                           <button
-                            aria-label={`Resize ${resizeHandle.leftColumn.label} and ${resizeHandle.rightColumn.label} columns`}
+                            aria-label={`Resize ${column.label} column`}
                             aria-orientation="vertical"
-                            aria-valuemin={resizeHandle.leftColumn.minWidth}
-                            aria-valuenow={
-                              columnWidths[resizeHandle.leftColumn.id]
-                            }
-                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
+                            aria-valuemin={column.minWidth}
+                            aria-valuenow={columnWidths[column.id]}
+                            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
                             onDoubleClick={() =>
-                              resetColumnPair(
-                                resizeHandle.leftColumn,
-                                resizeHandle.rightColumn,
-                              )
+                              resizeColumn(column, column.width)
                             }
                             onKeyDown={(event) => {
                               if (event.key === "ArrowLeft") {
-                                resizeColumnPair(
-                                  resizeHandle.leftColumn.id,
-                                  resizeHandle.rightColumn.id,
-                                  -16,
+                                resizeColumn(
+                                  column,
+                                  columnWidths[column.id] - 16,
                                 );
                               }
 
                               if (event.key === "ArrowRight") {
-                                resizeColumnPair(
-                                  resizeHandle.leftColumn.id,
-                                  resizeHandle.rightColumn.id,
-                                  16,
+                                resizeColumn(
+                                  column,
+                                  columnWidths[column.id] + 16,
                                 );
                               }
                             }}
                             onPointerDown={(event) =>
-                              startColumnResize(
-                                resizeHandle.leftColumn.id,
-                                resizeHandle.rightColumn.id,
-                                event,
-                              )
+                              startColumnResize(column, event)
                             }
                             role="separator"
                             type="button"
@@ -680,7 +609,7 @@ export function ApplicationsTable({
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-surface">
+              <tbody className="bg-surface">
                 {applications.map((application) => (
                   <ApplicationRow
                     application={application}
@@ -758,30 +687,11 @@ function stretchColumnWidthsToViewport(
   return stretchedWidths;
 }
 
-function getColumnPairWidths({
-  delta,
-  leftColumn,
-  leftWidth,
-  rightColumn,
-  rightWidth,
-}: {
-  delta: number;
-  leftColumn: (typeof APPLICATION_TABLE_COLUMNS)[number];
-  leftWidth: number;
-  rightColumn: (typeof APPLICATION_TABLE_COLUMNS)[number];
-  rightWidth: number;
-}) {
-  const minimumDelta = leftColumn.minWidth - leftWidth;
-  const maximumDelta = rightWidth - rightColumn.minWidth;
-  const clampedDelta = Math.max(
-    minimumDelta,
-    Math.min(maximumDelta, delta),
-  );
-
-  return {
-    leftWidth: leftWidth + clampedDelta,
-    rightWidth: rightWidth - clampedDelta,
-  };
+function clampColumnWidth(
+  column: (typeof APPLICATION_TABLE_COLUMNS)[number],
+  width: number,
+) {
+  return Math.max(column.minWidth, Math.round(width));
 }
 
 function SortIcon({
@@ -804,8 +714,34 @@ function SortIcon({
   return <ArrowUpDown aria-hidden="true" className="shrink-0" size={14} />;
 }
 
-function getHeaderClassName() {
-  return "relative overflow-hidden px-2.5 py-3 pr-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-muted";
+function getHeaderClassName(columnId: ApplicationColumnId) {
+  return [
+    "sticky top-0 overflow-hidden border-b border-border bg-slate-50 px-2.5 py-3 pr-4 text-xs font-semibold uppercase tracking-[0.08em] text-muted",
+    isUtilityColumn(columnId) ? "text-center" : "text-left",
+    isPinnedColumn(columnId) ? "z-20" : "z-10",
+    getPinnedColumnClassName(columnId),
+  ].join(" ");
+}
+
+function isUtilityColumn(columnId: ApplicationColumnId) {
+  return columnId === "actions" || columnId === "contacts";
+}
+
+function isPinnedColumn(columnId: ApplicationColumnId) {
+  return columnId === "jobTitle" || columnId === "actions";
+}
+
+// Job title and actions stay visible while the table scrolls horizontally.
+function getPinnedColumnClassName(columnId: ApplicationColumnId) {
+  if (columnId === "jobTitle") {
+    return "sticky left-0";
+  }
+
+  if (columnId === "actions") {
+    return "sticky right-0";
+  }
+
+  return "";
 }
 
 function ApplicationRow({
@@ -857,7 +793,7 @@ function ApplicationRow({
   return (
     <tr
       aria-label={`Open details for ${application.jobTitle}`}
-      className="table-row-hover cursor-pointer align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="group cursor-pointer align-top [&:last-child>td]:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       onClick={openFromRowClick}
       onKeyDown={openFromRowKeyDown}
       role="button"
@@ -889,39 +825,23 @@ function ApplicationRow({
   );
 }
 
-function getResizeHandle(
-  visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
-  columnIndex: number,
-  enableDraggableColumnWidths: boolean,
-) {
-  const leftColumn = visibleColumns[columnIndex];
-  const nextColumn = visibleColumns[columnIndex + 1];
-
-  if (!enableDraggableColumnWidths || !leftColumn || !nextColumn) {
-    return null;
-  }
-
-  return {
-    leftColumn,
-    rightColumn: nextColumn,
-  };
-}
-
 function getCellClassName(columnId: ApplicationColumnId) {
   const isActions = columnId === "actions";
-  const isUtilityCell = isActions || columnId === "contacts";
+  const isUtilityCell = isUtilityColumn(columnId);
 
   return [
-    "py-4 align-top",
+    "border-b border-border bg-surface py-4 align-top transition-colors group-hover:bg-slate-50",
     isUtilityCell ? "px-1" : "overflow-hidden px-2.5",
     isActions ? "overflow-visible" : "",
+    isPinnedColumn(columnId) ? "z-[5]" : "",
+    getPinnedColumnClassName(columnId),
   ]
     .filter(Boolean)
     .join(" ");
 }
 
 function getCellContentClassName(columnId: ApplicationColumnId) {
-  const isUtilityCell = columnId === "actions" || columnId === "contacts";
+  const isUtilityCell = isUtilityColumn(columnId);
 
   return [
     "min-w-0 max-w-full",
@@ -960,7 +880,7 @@ function ApplicationColumnCell({
 }) {
   if (columnId === "jobTitle") {
     return (
-      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground">
+      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground underline-offset-2 group-hover:text-primary group-hover:underline">
         {application.jobTitle}
       </span>
     );

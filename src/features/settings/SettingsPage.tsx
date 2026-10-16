@@ -1,16 +1,25 @@
 import {
+  Bell,
+  CircleCheck,
   Cloud,
   Download,
   FileDown,
   FileUp,
-  Info,
+  HardDriveDownload,
   LogOut,
+  type LucideIcon,
   RotateCcw,
-  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Table2,
+  TriangleAlert,
+  UserRound,
 } from "lucide-react";
-import { useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
+import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
@@ -41,6 +50,20 @@ export function SettingsPage({
   const [backupStatus, setBackupStatus] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
+  // Remounts the file input so the same file can be chosen again after cancel.
+  const [importInputKey, setImportInputKey] = useState(0);
+  const [activeSection, selectSection] = useActiveSection();
+  const visibleColumnCount = APPLICATION_TABLE_COLUMNS.filter(
+    (column) =>
+      !column.canHide || settings.visibleApplicationColumns.includes(column.id),
+  ).length;
+
+  function clearBackupSelection() {
+    setBackupFile(null);
+    setBackupPreview(null);
+    setBackupError("");
+    setImportInputKey((current) => current + 1);
+  }
 
   async function exportFullBackup() {
     setBackupError("");
@@ -105,6 +128,7 @@ export function SettingsPage({
       setBackupStatus("Backup restored.");
       setBackupFile(null);
       setBackupPreview(null);
+      setImportInputKey((current) => current + 1);
     } catch (error) {
       setBackupError(getErrorMessage(error));
     } finally {
@@ -121,142 +145,183 @@ export function SettingsPage({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="surface-panel rounded-lg px-4 py-4 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Settings aria-hidden="true" className="text-muted" size={22} />
-            <h2 className="text-lg font-semibold text-foreground">
-              Tracker preferences
-            </h2>
-          </div>
-          {isConfirmingReset ? (
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
-                onClick={() => {
-                  onResetSettings();
-                  setIsConfirmingReset(false);
-                }}
-                type="button"
-              >
-                <RotateCcw aria-hidden="true" size={16} />
-                Confirm reset
-              </button>
-              <button
-                className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-                onClick={() => setIsConfirmingReset(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-              onClick={() => setIsConfirmingReset(true)}
-              type="button"
-            >
-              <RotateCcw aria-hidden="true" size={16} />
-              Reset
-            </button>
-          )}
-        </div>
-      </section>
+    <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-6">
+      <SettingsNav activeSection={activeSection} onSelect={selectSection} />
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <SettingsGroup title="Cloud Storage">
-          <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm leading-6 text-foreground">
-            <div className="flex items-start gap-3">
-              <Cloud aria-hidden="true" className="mt-1 shrink-0 text-info" size={18} />
-              <div>
-                <p className="font-semibold">Cloud sync is active</p>
-                <p className="text-muted">
-                  D1 stores your tracker data and R2 stores resume and cover letter files. This
-                  browser keeps a local cache for faster loading.
+      <div className="min-w-0 space-y-5">
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 px-5 py-5 text-white shadow-sm sm:px-6">
+          <span
+            aria-hidden="true"
+            className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-16 right-24 h-32 w-32 rounded-full bg-white/10"
+          />
+          <div className="relative flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
+              <Sparkles aria-hidden="true" size={20} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold">Make the tracker work your way</h2>
+              <p className="mt-0.5 text-sm text-white/85">
+                Changes save automatically and sync to your signed-in devices.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <SettingsSection
+          description="Your signed-in cloud workspace."
+          icon={UserRound}
+          id="account"
+          title="Account and sync"
+        >
+          <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-base font-semibold text-white shadow-sm"
+              >
+                {(cloudAccountEmail?.[0] ?? "?").toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="break-all text-sm font-semibold text-foreground">
+                  {cloudAccountEmail ?? "Signed in"}
                 </p>
-                {cloudAccountEmail ? (
-                  <p className="mt-1 break-all text-muted">
-                    Signed in as {cloudAccountEmail}
-                  </p>
-                ) : null}
+                <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-success">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+                  Cloud sync is active
+                </p>
               </div>
             </div>
+            <a
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              href="/cdn-cgi/access/logout"
+            >
+              <LogOut aria-hidden="true" size={16} />
+              Sign out
+            </a>
           </div>
-          <a
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-            href="/cdn-cgi/access/logout"
-          >
-            <LogOut aria-hidden="true" size={16} />
-            Sign out
-          </a>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ActionButton onClick={exportFullBackup}>
-              <FileDown aria-hidden="true" size={16} />
-              Full backup
-            </ActionButton>
-            <ActionButton onClick={exportCsv}>
-              <Download aria-hidden="true" size={16} />
-              CSV export
-            </ActionButton>
+          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted">
+            <Cloud aria-hidden="true" className="mt-0.5 shrink-0 text-info" size={16} />
+            <p>
+              D1 stores your tracker data and R2 stores resume and cover letter
+              files. This browser keeps a local cache for faster loading.
+            </p>
           </div>
-          <label className="block rounded-lg border border-border bg-surface px-3 py-3">
+        </SettingsSection>
+
+        <SettingsSection
+          description="Download your data or restore it from a backup file."
+          icon={HardDriveDownload}
+          id="data"
+          title="Backup and export"
+        >
+          <div className="grid gap-3 py-4 sm:grid-cols-2">
+            <ExportTile
+              accent="bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
+              description="Everything, including files, as JSON. Use this to restore later."
+              icon={FileDown}
+              label="Full backup"
+              onClick={exportFullBackup}
+            />
+            <ExportTile
+              accent="bg-sky-50 text-sky-600 group-hover:bg-sky-100"
+              description="Applications as a spreadsheet-friendly CSV."
+              icon={Download}
+              label="CSV export"
+              onClick={exportCsv}
+            />
+          </div>
+          <div className="space-y-3 py-4">
             <SettingLabel
               description="Preview a tracker backup before replacing your cloud data."
               label="Import backup"
             />
-            <input
-              accept="application/json,.json"
-              className="field-control mt-3"
-              onChange={(event) => previewBackup(event.target.files?.[0])}
-              type="file"
-            />
-          </label>
-          {backupPreview ? (
-            <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm text-foreground">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <PreviewCount label="Applications" value={backupPreview.applications} />
-                <PreviewCount label="Contacts" value={backupPreview.contacts} />
-                <PreviewCount label="Activities" value={backupPreview.activities} />
-                <PreviewCount
-                  label="Interviews"
-                  value={backupPreview.interviews}
-                />
-                <PreviewCount label="Assessments" value={backupPreview.assessments} />
-                <PreviewCount label="Resumes" value={backupPreview.resumes} />
-                <PreviewCount label="Files" value={backupPreview.resumeFiles} />
-                <PreviewCount
-                  label="Cover letters"
-                  value={backupPreview.coverLetters}
-                />
-                <PreviewCount
-                  label="Cover letter files"
-                  value={backupPreview.coverLetterFiles}
-                />
+            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/50 focus-within:shadow-[var(--focus-ring)]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <FileUp aria-hidden="true" size={20} />
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                {backupFile ? backupFile.name : "Drop a backup file here or click to browse"}
+              </span>
+              <span className="text-xs text-muted">JSON backups exported from this tracker</span>
+              <input
+                accept="application/json,.json"
+                aria-label="Import backup"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                key={importInputKey}
+                onChange={(event) => previewBackup(event.target.files?.[0])}
+                type="file"
+              />
+            </label>
+            {backupPreview ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm text-foreground">
+                <p className="flex items-center gap-2 font-semibold text-amber-900">
+                  <TriangleAlert aria-hidden="true" size={16} />
+                  This backup will replace all of your cloud data
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <PreviewCount label="Applications" value={backupPreview.applications} />
+                  <PreviewCount label="Contacts" value={backupPreview.contacts} />
+                  <PreviewCount label="Activities" value={backupPreview.activities} />
+                  <PreviewCount label="Interviews" value={backupPreview.interviews} />
+                  <PreviewCount label="Assessments" value={backupPreview.assessments} />
+                  <PreviewCount label="Resumes" value={backupPreview.resumes} />
+                  <PreviewCount label="Files" value={backupPreview.resumeFiles} />
+                  <PreviewCount label="Cover letters" value={backupPreview.coverLetters} />
+                  <PreviewCount
+                    label="Cover letter files"
+                    value={backupPreview.coverLetterFiles}
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isImportingBackup}
+                    onClick={importBackup}
+                    type="button"
+                  >
+                    <FileUp aria-hidden="true" size={16} />
+                    Replace cloud data
+                  </button>
+                  <button
+                    className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    disabled={isImportingBackup}
+                    onClick={clearBackupSelection}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-              <button
-                className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isImportingBackup}
-                onClick={importBackup}
-                type="button"
+            ) : null}
+            {backupError ? (
+              <p
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-destructive"
+                role="alert"
               >
-                <FileUp aria-hidden="true" size={16} />
-                Replace cloud data
-              </button>
-            </div>
-          ) : null}
-          {backupError ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-destructive">
-              {backupError}
-            </p>
-          ) : backupStatus ? (
-            <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-info">
-              {backupStatus}
-            </p>
-          ) : null}
-        </SettingsGroup>
+                {backupError}
+              </p>
+            ) : backupStatus ? (
+              <p
+                className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-success"
+                role="status"
+              >
+                <CircleCheck aria-hidden="true" size={16} />
+                {backupStatus}
+              </p>
+            ) : null}
+          </div>
+        </SettingsSection>
 
-        <SettingsGroup title="General Preferences">
+        <SettingsSection
+          description="Layout and defaults for adding jobs."
+          icon={SlidersHorizontal}
+          id="general"
+          title="General"
+        >
           <ToggleButtonField
             checked={settings.navigationDisplayMode === "top"}
             description="Choose whether the main navigation sits on the left edge or across the top of the workspace."
@@ -289,9 +354,14 @@ export function SettingsPage({
             label="Add job opens as"
             value="Dialog"
           />
-        </SettingsGroup>
+        </SettingsSection>
 
-        <SettingsGroup title="Contacts And Safety">
+        <SettingsSection
+          description="How contacts open and what can be deleted."
+          icon={ShieldCheck}
+          id="contacts"
+          title="Contacts and safety"
+        >
           <ToggleButtonField
             checked={settings.contactsDisplayMode === "modal"}
             description="Choose whether contacts open beside the application list or centered over the page."
@@ -312,9 +382,14 @@ export function SettingsPage({
               onUpdateSettings({ enableDeleteActiveApplications: checked })
             }
           />
-        </SettingsGroup>
+        </SettingsSection>
 
-        <SettingsGroup title="Table Preferences">
+        <SettingsSection
+          description="What the applications table remembers and shows."
+          icon={Table2}
+          id="table"
+          title="Applications table"
+        >
           <ToggleField
             checked={settings.rememberTableState}
             description="Keeps your current search, filters, and sorting preferences during the session."
@@ -331,28 +406,67 @@ export function SettingsPage({
               onUpdateSettings({ enableDraggableColumnWidths: checked })
             }
           />
-          <div className="grid gap-2 sm:grid-cols-2">
-            {APPLICATION_TABLE_COLUMNS.map((column) => (
-              <ToggleField
-                checked={
-                  !column.canHide ||
-                  settings.visibleApplicationColumns.includes(column.id)
-                }
-                description={
-                  column.canHide
-                    ? `Show or hide the ${column.label.toLowerCase()} column in the applications table.`
-                    : `${column.label} stays visible so table actions remain reachable.`
-                }
-                disabled={!column.canHide}
-                key={column.id}
-                label={column.label}
-                onChange={(checked) => updateColumn(column.id, checked)}
+          <div className="py-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <SettingLabel
+                description={`${visibleColumnCount} of ${APPLICATION_TABLE_COLUMNS.length} columns shown in the applications table.`}
+                label="Visible columns"
               />
-            ))}
+              <div className="flex shrink-0 gap-2">
+                <button
+                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() =>
+                    onUpdateSettings({
+                      visibleApplicationColumns: APPLICATION_TABLE_COLUMNS.filter(
+                        (column) => column.canHide,
+                      ).map((column) => column.id),
+                    })
+                  }
+                  type="button"
+                >
+                  Show all
+                </button>
+                <button
+                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() =>
+                    onUpdateSettings({
+                      visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
+                    })
+                  }
+                  type="button"
+                >
+                  Defaults
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 grid gap-x-6 sm:grid-cols-2">
+              {APPLICATION_TABLE_COLUMNS.map((column) => (
+                <ToggleField
+                  checked={
+                    !column.canHide ||
+                    settings.visibleApplicationColumns.includes(column.id)
+                  }
+                  description={
+                    column.canHide
+                      ? ""
+                      : "Always shown so table actions remain reachable."
+                  }
+                  disabled={!column.canHide}
+                  key={column.id}
+                  label={column.label}
+                  onChange={(checked) => updateColumn(column.id, checked)}
+                />
+              ))}
+            </div>
           </div>
-        </SettingsGroup>
+        </SettingsSection>
 
-        <SettingsGroup title="Alerts And Labs">
+        <SettingsSection
+          description="Reminders, attention rules and experimental features."
+          icon={Bell}
+          id="alerts"
+          title="Notifications and labs"
+        >
           <ToggleField
             checked={settings.enableNotificationBell}
             description="Shows the notification button in the workspace header when reminders are available."
@@ -395,35 +509,330 @@ export function SettingsPage({
               onUpdateSettings({ betaAnalyticsEnabled: checked })
             }
           />
-        </SettingsGroup>
-      </section>
+        </SettingsSection>
+
+        <SettingsSection
+          description="Restore every preference on this page to its default."
+          icon={RotateCcw}
+          id="reset"
+          title="Reset preferences"
+        >
+          <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs leading-5 text-muted">
+              Your applications, contacts and files are not affected.
+            </p>
+            {isConfirmingReset ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                  onClick={() => {
+                    onResetSettings();
+                    setIsConfirmingReset(false);
+                  }}
+                  type="button"
+                >
+                  <RotateCcw aria-hidden="true" size={16} />
+                  Confirm reset
+                </button>
+                <button
+                  className="h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() => setIsConfirmingReset(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
+                onClick={() => setIsConfirmingReset(true)}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" size={16} />
+                Reset preferences
+              </button>
+            )}
+          </div>
+        </SettingsSection>
+      </div>
     </div>
   );
 }
 
-function ActionButton({
+const SETTINGS_SECTIONS = [
+  { id: "account", label: "Account", icon: UserRound },
+  { id: "data", label: "Backup and export", icon: HardDriveDownload },
+  { id: "general", label: "General", icon: SlidersHorizontal },
+  { id: "contacts", label: "Contacts and safety", icon: ShieldCheck },
+  { id: "table", label: "Applications table", icon: Table2 },
+  { id: "alerts", label: "Notifications and labs", icon: Bell },
+  { id: "reset", label: "Reset", icon: RotateCcw },
+] as const;
+
+type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+// Each section has its own accent so the page is easier to scan. Class names are
+// written out in full so Tailwind can find them.
+const SECTION_ACCENTS: Record<
+  SettingsSectionId,
+  {
+    // Classes for a selected segmented option inside the section.
+    choice: string;
+    navActive: string;
+    navIcon: string;
+    strip: string;
+    // Classes for a switch's "on" track inside the section.
+    switchOn: string;
+    tile: string;
+  }
+> = {
+  account: {
+    choice: "text-blue-700",
+    navActive: "bg-blue-50 text-blue-700",
+    navIcon: "text-blue-500",
+    strip: "bg-blue-500",
+    switchOn: "peer-checked:bg-blue-500",
+    tile: "bg-blue-50 text-blue-600",
+  },
+  data: {
+    choice: "text-emerald-700",
+    navActive: "bg-emerald-50 text-emerald-700",
+    navIcon: "text-emerald-500",
+    strip: "bg-emerald-500",
+    switchOn: "peer-checked:bg-emerald-500",
+    tile: "bg-emerald-50 text-emerald-600",
+  },
+  general: {
+    choice: "text-violet-700",
+    navActive: "bg-violet-50 text-violet-700",
+    navIcon: "text-violet-500",
+    strip: "bg-violet-500",
+    switchOn: "peer-checked:bg-violet-500",
+    tile: "bg-violet-50 text-violet-600",
+  },
+  contacts: {
+    choice: "text-amber-700",
+    navActive: "bg-amber-50 text-amber-700",
+    navIcon: "text-amber-500",
+    strip: "bg-amber-400",
+    switchOn: "peer-checked:bg-amber-500",
+    tile: "bg-amber-50 text-amber-600",
+  },
+  table: {
+    choice: "text-sky-700",
+    navActive: "bg-sky-50 text-sky-700",
+    navIcon: "text-sky-500",
+    strip: "bg-sky-500",
+    switchOn: "peer-checked:bg-sky-500",
+    tile: "bg-sky-50 text-sky-600",
+  },
+  alerts: {
+    choice: "text-rose-700",
+    navActive: "bg-rose-50 text-rose-700",
+    navIcon: "text-rose-500",
+    strip: "bg-rose-500",
+    switchOn: "peer-checked:bg-rose-500",
+    tile: "bg-rose-50 text-rose-600",
+  },
+  reset: {
+    choice: "text-red-700",
+    navActive: "bg-red-50 text-red-700",
+    navIcon: "text-red-500",
+    strip: "bg-red-500",
+    switchOn: "peer-checked:bg-red-500",
+    tile: "bg-red-50 text-red-600",
+  },
+};
+
+// Highlights the last section whose top has scrolled past the sticky page
+// header, or the final section once the page is scrolled to the bottom.
+const ACTIVE_SECTION_OFFSET = 140;
+
+function useActiveSection() {
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("account");
+  // After a nav click, keep the clicked section highlighted while the smooth
+  // scroll settles, even if it cannot reach the top of the page.
+  const pinnedUntilRef = useRef(0);
+
+  function selectSection(id: SettingsSectionId) {
+    pinnedUntilRef.current = Date.now() + 1000;
+    setActiveSection(id);
+  }
+
+  useEffect(() => {
+    function updateActiveSection() {
+      if (Date.now() < pinnedUntilRef.current) {
+        return;
+      }
+
+      const isAtBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2;
+      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
+
+      SETTINGS_SECTIONS.forEach((section) => {
+        const element = document.getElementById(`settings-${section.id}`);
+
+        if (element && element.getBoundingClientRect().top <= ACTIVE_SECTION_OFFSET) {
+          current = section.id;
+        }
+      });
+
+      setActiveSection(
+        isAtBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current,
+      );
+    }
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
+  }, []);
+
+  return [activeSection, selectSection] as const;
+}
+
+function SettingsNav({
+  activeSection,
+  onSelect,
+}: {
+  activeSection: SettingsSectionId;
+  onSelect: (id: SettingsSectionId) => void;
+}) {
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-28 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:pb-0"
+    >
+      {SETTINGS_SECTIONS.map((section) => {
+        const Icon = section.icon;
+        const isActive = activeSection === section.id;
+        const accent = SECTION_ACCENTS[section.id];
+
+        return (
+          <a
+            aria-current={isActive ? "true" : undefined}
+            className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+              isActive
+                ? `${accent.navActive} font-semibold`
+                : "text-muted hover:bg-slate-100 hover:text-foreground"
+            }`}
+            href={`#settings-${section.id}`}
+            key={section.id}
+            onClick={(event) => {
+              event.preventDefault();
+              onSelect(section.id);
+              document
+                .getElementById(`settings-${section.id}`)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            <Icon
+              aria-hidden="true"
+              className={isActive ? undefined : accent.navIcon}
+              size={16}
+            />
+            {section.label}
+          </a>
+        );
+      })}
+    </nav>
+  );
+}
+
+const SectionAccentContext = createContext<{ choice: string; switchOn: string }>({
+  choice: "text-foreground",
+  switchOn: "peer-checked:bg-primary",
+});
+
+function SettingsSection({
   children,
-  onClick,
+  description,
+  icon: Icon,
+  id,
+  title,
 }: {
   children: React.ReactNode;
+  description: string;
+  icon: LucideIcon;
+  id: SettingsSectionId;
+  title: string;
+}) {
+  const accent = SECTION_ACCENTS[id];
+
+  return (
+    <section
+      aria-labelledby={`settings-${id}-title`}
+      className={`surface-panel relative scroll-mt-28 overflow-hidden rounded-lg ${
+        id === "reset" ? "border-red-200" : ""
+      }`}
+      id={`settings-${id}`}
+    >
+      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${accent.strip}`} />
+      <header className="flex items-start gap-3 border-b border-border px-4 pb-3 pt-4 sm:px-5">
+        <span
+          aria-hidden="true"
+          className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accent.tile}`}
+        >
+          <Icon size={18} />
+        </span>
+        <div className="min-w-0">
+          <h3
+            className="text-base font-semibold text-foreground"
+            id={`settings-${id}-title`}
+          >
+            {title}
+          </h3>
+          <p className="text-xs text-muted">{description}</p>
+        </div>
+      </header>
+      <SectionAccentContext.Provider value={accent}>
+        <div className="divide-y divide-border px-4 sm:px-5">{children}</div>
+      </SectionAccentContext.Provider>
+    </section>
+  );
+}
+
+function ExportTile({
+  accent,
+  description,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  // Classes for the icon tile, including its hover state.
+  accent: string;
+  description: string;
+  icon: LucideIcon;
+  label: string;
   onClick: () => void;
 }) {
   return (
     <button
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      className="group flex items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
       onClick={onClick}
       type="button"
     >
-      {children}
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${accent}`}>
+        <Icon aria-hidden="true" size={16} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-foreground">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted">{description}</span>
+      </span>
     </button>
   );
 }
 
 function PreviewCount({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+    <div className="rounded-md bg-surface px-3 py-2">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
@@ -442,21 +851,6 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Backup action failed.";
 }
 
-function SettingsGroup({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <section className="surface-panel rounded-lg p-4">
-      <h3 className="text-sm font-semibold uppercase text-muted">{title}</h3>
-      <div className="mt-4 space-y-3">{children}</div>
-    </section>
-  );
-}
-
 function ToggleField({
   checked,
   description,
@@ -470,20 +864,33 @@ function ToggleField({
   label: string;
   onChange: (checked: boolean) => void;
 }) {
+  const accent = useContext(SectionAccentContext);
+
   return (
     <label
-      className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground ${
-        disabled ? "opacity-70" : ""
+      className={`flex items-start justify-between gap-4 py-3 ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
       }`}
     >
       <SettingLabel description={description} label={label} />
-      <input
-        checked={checked}
-        className="h-4 w-4 shrink-0 rounded border-border text-primary"
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        type="checkbox"
-      />
+      <span className="relative mt-0.5 inline-flex shrink-0">
+        <input
+          checked={checked}
+          className="peer sr-only"
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+          role="switch"
+          type="checkbox"
+        />
+        <span
+          aria-hidden="true"
+          className={`h-6 w-11 rounded-full bg-slate-300 transition peer-focus-visible:shadow-[var(--focus-ring)] ${accent.switchOn}`}
+        />
+        <span
+          aria-hidden="true"
+          className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"
+        />
+      </span>
     </label>
   );
 }
@@ -503,21 +910,40 @@ function ToggleButtonField({
   onChange: (checked: boolean) => void;
   onLabel: string;
 }) {
+  const accent = useContext(SectionAccentContext);
+
   return (
-    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
-      <button
-        aria-pressed={checked}
-        className={`h-8 w-full rounded-md px-3 text-sm font-semibold transition sm:w-auto sm:min-w-32 ${
-          checked
-            ? "bg-primary text-primary-foreground hover:bg-blue-700"
-            : "bg-slate-100 text-foreground hover:bg-slate-200"
-        }`}
-        onClick={() => onChange(!checked)}
-        type="button"
+      <div
+        aria-label={label.replace(/:$/, "")}
+        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5"
+        role="radiogroup"
       >
-        {checked ? onLabel : offLabel}
-      </button>
+        {[
+          { isOn: false, text: offLabel },
+          { isOn: true, text: onLabel },
+        ].map((option) => (
+          <button
+            aria-checked={checked === option.isOn}
+            className={`h-8 rounded-md px-3 text-sm font-medium transition ${
+              checked === option.isOn
+                ? `bg-surface font-semibold shadow-sm ${accent.choice}`
+                : "text-muted hover:text-foreground"
+            }`}
+            key={option.text}
+            onClick={() => {
+              if (checked !== option.isOn) {
+                onChange(option.isOn);
+              }
+            }}
+            role="radio"
+            type="button"
+          >
+            {option.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -532,14 +958,15 @@ function UnavailableSettingField({
   value: string;
 }) {
   return (
-    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
-      <SettingLabel description={description} label={label} />
-      <div className="flex items-center gap-2 sm:justify-end">
-        <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-foreground">
-          {value}
-        </span>
-        <span className="text-xs font-medium text-muted">Only mode available</span>
-      </div>
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <SettingLabel
+        badge="Coming soon"
+        description={description}
+        label={label}
+      />
+      <span className="inline-flex h-8 shrink-0 items-center self-start rounded-lg border border-dashed border-border px-3 text-sm font-medium text-muted">
+        {value}
+      </span>
     </div>
   );
 }
@@ -560,51 +987,50 @@ function NumberField({
   value: number;
 }) {
   return (
-    <label className="block rounded-lg border border-border bg-surface px-3 py-2">
+    <label className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
-      <input
-        className="field-control mt-2"
-        min={min}
-        onChange={(event) =>
-          onChange(Math.max(min, Number(event.target.value) || min))
-        }
-        type="number"
-        value={value}
-      />
-      {suffix ? (
-        <span className="mt-1 block text-xs font-medium text-muted">
-          {suffix}
-        </span>
-      ) : null}
+      <span className="inline-flex shrink-0 items-center gap-2 self-start">
+        <input
+          className="field-control h-9 w-20 text-right tabular-nums"
+          min={min}
+          onChange={(event) =>
+            onChange(Math.max(min, Number(event.target.value) || min))
+          }
+          type="number"
+          value={value}
+        />
+        {suffix ? (
+          <span className="text-sm text-muted">{suffix}</span>
+        ) : null}
+      </span>
     </label>
   );
 }
 
 function SettingLabel({
+  badge,
   description,
   label,
 }: {
+  badge?: string;
   description: string;
   label: string;
 }) {
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      <span className="min-w-0 break-words">{label}</span>
-      <InfoTooltip description={description} />
-    </span>
-  );
-}
-
-function InfoTooltip({ description }: { description: string }) {
-  return (
-    <span className="group relative inline-flex shrink-0">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-raised text-muted">
-        <Info aria-hidden="true" size={13} />
-        <span className="sr-only">Setting explanation</span>
+    <span className="min-w-0">
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+        {label.replace(/:$/, "")}
+        {badge ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
+            {badge}
+          </span>
+        ) : null}
       </span>
-      <span className="pointer-events-none absolute right-0 top-7 z-30 hidden w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-medium leading-5 text-white shadow-popover group-hover:block sm:left-1/2 sm:w-64 sm:-translate-x-1/2">
-        {description}
-      </span>
+      {description ? (
+        <span className="mt-0.5 block text-xs leading-5 text-muted">
+          {description}
+        </span>
+      ) : null}
     </span>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import {
   ApplicationsTable,
@@ -162,6 +162,8 @@ export function ApplicationsPage({
   );
   const baseApplications =
     viewMode === "archive" ? archivedApplications : activeApplications;
+  const viewLabel = viewMode === "archive" ? "Archived" : "Active";
+  const [countScope, setCountScope] = useState<"view" | "total">("view");
   const companyOptions = getApplicationFilterOptions(baseApplications, "company");
   const locationOptions = getApplicationFilterOptions(
     baseApplications,
@@ -278,8 +280,19 @@ export function ApplicationsPage({
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryMetric
-          label={viewMode === "archive" ? "Archived" : "Active"}
-          value={String(baseApplications.length)}
+          action={
+            <CountScopeToggle
+              onChange={setCountScope}
+              scope={countScope}
+              viewLabel={viewLabel}
+            />
+          }
+          label={countScope === "total" ? "Total applications" : viewLabel}
+          value={String(
+            countScope === "total"
+              ? applications.length
+              : baseApplications.length,
+          )}
         />
         <SummaryMetric
           label="Needs attention"
@@ -456,6 +469,11 @@ function nextSort(
     };
   }
 
+  // A third click on the same header returns to the default ordering.
+  if (current.column === column) {
+    return DEFAULT_SORT_STATE;
+  }
+
   return {
     column,
     direction: "descending",
@@ -463,10 +481,12 @@ function nextSort(
 }
 
 function SummaryMetric({
+  action,
   label,
   value,
   tone = "neutral",
 }: {
+  action?: ReactNode;
   label: string;
   value: string;
   tone?: "neutral" | "warning" | "info";
@@ -480,8 +500,50 @@ function SummaryMetric({
 
   return (
     <div className="surface-panel rounded-lg px-4 py-3">
-      <p className="text-sm font-medium text-muted">{label}</p>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className="truncate text-sm font-medium text-muted">{label}</p>
+        {action}
+      </div>
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function CountScopeToggle({
+  onChange,
+  scope,
+  viewLabel,
+}: {
+  onChange: (scope: "view" | "total") => void;
+  scope: "view" | "total";
+  viewLabel: string;
+}) {
+  const options = [
+    { value: "view", label: viewLabel },
+    { value: "total", label: "Total" },
+  ] as const;
+
+  return (
+    <div
+      aria-label="Application count scope"
+      className="inline-flex shrink-0 rounded-md border border-border bg-background p-0.5"
+      role="group"
+    >
+      {options.map((option) => (
+        <button
+          aria-pressed={scope === option.value}
+          className={`rounded px-2 py-0.5 text-xs font-semibold transition ${
+            scope === option.value
+              ? "bg-surface text-foreground shadow-sm"
+              : "text-muted hover:text-foreground"
+          }`}
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          type="button"
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }
