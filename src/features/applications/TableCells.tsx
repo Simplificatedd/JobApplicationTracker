@@ -107,7 +107,7 @@ export function FollowUpCell({
         aria-haspopup="dialog"
         aria-label="Quick edit follow-up"
         className="group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
-        onClick={startEditing}
+        onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
       >
@@ -223,7 +223,7 @@ export function FollowUpAutoResetCell({
         aria-haspopup="dialog"
         aria-label="Quick edit follow-up auto-reset"
         className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
-        onClick={startEditing}
+        onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
       >
@@ -293,7 +293,7 @@ export function InterviewCell({
         aria-haspopup="dialog"
         aria-label="Quick edit scheduled date and time"
         className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
-        onClick={startEditing}
+        onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
       >
@@ -367,7 +367,7 @@ export function StatusQuickEditCell({
         aria-haspopup="dialog"
         aria-label="Quick edit status"
         className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
-        onClick={startEditing}
+        onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
       >
