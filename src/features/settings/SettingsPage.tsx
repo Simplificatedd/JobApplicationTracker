@@ -344,6 +344,22 @@ export function SettingsPage({
             suffix="days"
             value={settings.defaultFollowUpPromptDays}
           />
+          <ToggleField
+            checked={settings.enableQuickLocation}
+            description="Shows a button beside the Location field in Add Job that fills in your quick location."
+            label="Quick location button"
+            onChange={(checked) =>
+              onUpdateSettings({ enableQuickLocation: checked })
+            }
+          />
+          <TextField
+            description="The location the quick location button fills in."
+            disabled={!settings.enableQuickLocation}
+            key={settings.quickLocation}
+            label="Quick location:"
+            onChange={(value) => onUpdateSettings({ quickLocation: value })}
+            value={settings.quickLocation}
+          />
           <UnavailableSettingField
             description="Add Job currently uses one complete form. A guided step-by-step mode is not available yet."
             label="Add job form"
@@ -1003,6 +1019,61 @@ function NumberField({
           <span className="text-sm text-muted">{suffix}</span>
         ) : null}
       </span>
+    </label>
+  );
+}
+
+function TextField({
+  description,
+  disabled = false,
+  label,
+  onChange,
+  value,
+}: {
+  description: string;
+  disabled?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  // Saves once editing finishes rather than on every keystroke; a blank entry
+  // keeps the saved value because the switch is how the button is turned off.
+  function commitDraft() {
+    const trimmed = draft.trim();
+
+    if (!trimmed) {
+      setDraft(value);
+      return;
+    }
+
+    if (trimmed !== value) {
+      onChange(trimmed);
+    }
+  }
+
+  return (
+    <label
+      className={`flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between ${
+        disabled ? "cursor-not-allowed opacity-60" : ""
+      }`}
+    >
+      <SettingLabel description={description} label={label} />
+      <input
+        className="field-control h-9 w-full shrink-0 self-start sm:w-48"
+        disabled={disabled}
+        maxLength={80}
+        onBlur={commitDraft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+        type="text"
+        value={draft}
+      />
     </label>
   );
 }
