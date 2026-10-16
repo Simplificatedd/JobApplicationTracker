@@ -845,6 +845,9 @@ export function AddApplicationModal({
             <Field label="Location">
               <div className="flex gap-2">
                 <input
+                  // The quick location button sits inside this label too, so
+                  // name the field explicitly rather than via the label text.
+                  aria-label="Location"
                   className="field-control min-w-0 flex-1"
                   onChange={(event) =>
                     updateForm("location", event.target.value)
