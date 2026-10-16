@@ -1,5 +1,5 @@
 import { BarChart3, Settings2 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { APPLICATION_STATUSES, STATUS_TONE } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -23,6 +23,7 @@ import {
   ChartCard,
   type ChartDatum,
   HorizontalBarChart,
+  StackedShareBar,
   StatTile,
 } from "./charts";
 import {
@@ -314,6 +315,12 @@ export function AnalyticsPage({
           {visibleCharts.has("statusPipeline") ? (
             <CategoryChart
               barClassName={getStatusBarClass}
+              summary={
+                <StackedShareBar
+                  classFor={getStatusBarClass}
+                  data={derivePipelineByStatus(rangedApplications)}
+                />
+              }
               title="Pipeline by status"
               data={derivePipelineByStatus(rangedApplications)}
             />
@@ -705,6 +712,7 @@ function CategoryChart({
   formatValue,
   maxValue,
   showShare,
+  summary,
   title,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
@@ -714,6 +722,7 @@ function CategoryChart({
   formatValue?: (value: number) => string;
   maxValue?: number;
   showShare?: boolean;
+  summary?: ReactNode;
   title: string;
 }) {
   return (
@@ -722,6 +731,7 @@ function CategoryChart({
       table={{ columns: ["Category", "Count"], rows: data }}
       title={title}
     >
+      {summary}
       <HorizontalBarChart
         barClassName={barClassName}
         color={color}

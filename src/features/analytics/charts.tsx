@@ -248,3 +248,50 @@ function Sparkline({ values }: { values: number[] }) {
     </svg>
   );
 }
+
+// A single 100% bar showing how a whole splits across categories.
+export function StackedShareBar({
+  classFor,
+  data,
+}: {
+  classFor: (datum: ChartDatum) => string;
+  data: ChartDatum[];
+}) {
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const hasMounted = useHasMounted();
+  const segments = data.filter((item) => item.value > 0);
+  const total = segments.reduce((sum, item) => sum + item.value, 0);
+
+  if (total === 0) {
+    return null;
+  }
+
+  const active = segments.find((item) => item.label === activeLabel);
+
+  return (
+    <div className="mb-4">
+      <div
+        className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full"
+        onPointerLeave={() => setActiveLabel(null)}
+      >
+        {segments.map((item) => (
+          <span
+            aria-label={`${item.label}: ${item.value}`}
+            className={`h-full transition-[flex-grow,opacity] duration-700 ease-out first:rounded-l-full last:rounded-r-full ${classFor(item)} ${
+              activeLabel && activeLabel !== item.label ? "opacity-40" : ""
+            }`}
+            key={item.label}
+            onPointerEnter={() => setActiveLabel(item.label)}
+            role="img"
+            style={{ flexBasis: 0, flexGrow: hasMounted ? item.value : 0, minWidth: 3 }}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 h-4 text-xs text-muted">
+        {active
+          ? `${active.label}: ${active.value} of ${total} (${Math.round((active.value / total) * 100)}%)`
+          : `${total} applications · hover the strip for a breakdown`}
+      </p>
+    </div>
+  );
+}
