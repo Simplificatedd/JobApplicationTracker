@@ -11,6 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Table2,
   TriangleAlert,
   UserRound,
@@ -148,9 +149,27 @@ export function SettingsPage({
       <SettingsNav activeSection={activeSection} />
 
       <div className="min-w-0 max-w-4xl space-y-5">
-        <p className="text-sm text-muted">
-          Changes save automatically and sync to your signed-in devices.
-        </p>
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 px-5 py-5 text-white shadow-sm sm:px-6">
+          <span
+            aria-hidden="true"
+            className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-16 right-24 h-32 w-32 rounded-full bg-white/10"
+          />
+          <div className="relative flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15">
+              <Sparkles aria-hidden="true" size={20} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold">Make the tracker work your way</h2>
+              <p className="mt-0.5 text-sm text-white/85">
+                Changes save automatically and sync to your signed-in devices.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <SettingsSection
           description="Your signed-in cloud workspace."
@@ -162,7 +181,7 @@ export function SettingsPage({
             <div className="flex min-w-0 items-center gap-3">
               <span
                 aria-hidden="true"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-base font-semibold text-primary"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-base font-semibold text-white shadow-sm"
               >
                 {(cloudAccountEmail?.[0] ?? "?").toUpperCase()}
               </span>
@@ -201,12 +220,14 @@ export function SettingsPage({
         >
           <div className="grid gap-3 py-4 sm:grid-cols-2">
             <ExportTile
+              accent="bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100"
               description="Everything, including files, as JSON. Use this to restore later."
               icon={FileDown}
               label="Full backup"
               onClick={exportFullBackup}
             />
             <ExportTile
+              accent="bg-sky-50 text-sky-600 group-hover:bg-sky-100"
               description="Applications as a spreadsheet-friendly CSV."
               icon={Download}
               label="CSV export"
@@ -218,8 +239,10 @@ export function SettingsPage({
               description="Preview a tracker backup before replacing your cloud data."
               label="Import backup"
             />
-            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-primary/50 hover:bg-blue-50/40 focus-within:shadow-[var(--focus-ring)]">
-              <FileUp aria-hidden="true" className="text-muted" size={20} />
+            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/50 focus-within:shadow-[var(--focus-ring)]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <FileUp aria-hidden="true" size={20} />
+              </span>
               <span className="text-sm font-medium text-foreground">
                 {backupFile ? backupFile.name : "Drop a backup file here or click to browse"}
               </span>
@@ -714,11 +737,14 @@ function SettingsSection({
 }
 
 function ExportTile({
+  accent,
   description,
   icon: Icon,
   label,
   onClick,
 }: {
+  // Classes for the icon tile, including its hover state.
+  accent: string;
   description: string;
   icon: LucideIcon;
   label: string;
@@ -726,11 +752,11 @@ function ExportTile({
 }) {
   return (
     <button
-      className="group flex items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left transition hover:border-primary/40 hover:bg-blue-50/40"
+      className="group flex items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm"
       onClick={onClick}
       type="button"
     >
-      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-foreground group-hover:bg-blue-100 group-hover:text-primary">
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${accent}`}>
         <Icon aria-hidden="true" size={16} />
       </span>
       <span className="min-w-0">
