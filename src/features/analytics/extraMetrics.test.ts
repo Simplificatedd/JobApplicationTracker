@@ -4,6 +4,7 @@ import {
   countTopValues,
   deriveAppliedByWeekday,
   deriveResponseRateBySource,
+  deriveStatusTransitions,
   deriveTimeToFirstResponse,
   deriveWorkModeMix,
   toCumulative,
@@ -126,5 +127,31 @@ describe("toCumulative", () => {
         { label: "c", value: 3 },
       ]).map((item) => item.value),
     ).toEqual([2, 2, 5]);
+  });
+});
+
+describe("deriveStatusTransitions", () => {
+  it("counts from-to pairs and ignores other activity", () => {
+    const change = (id: string, from: Activity["statusFrom"], to: Activity["statusTo"]): Activity => ({
+      id,
+      applicationId: id,
+      type: "status_changed",
+      message: "",
+      statusFrom: from,
+      statusTo: to,
+      createdAt: "2026-09-05T00:00:00.000Z",
+    });
+
+    expect(
+      deriveStatusTransitions([
+        change("1", "Awaiting Response", "Rejected"),
+        change("2", "Awaiting Response", "Rejected"),
+        change("3", "Awaiting Response", "Interviewing"),
+        { ...change("4", "Awaiting Response", "Rejected"), type: "updated" },
+      ]),
+    ).toEqual([
+      { from: "Awaiting Response", to: "Rejected", value: 2 },
+      { from: "Awaiting Response", to: "Interviewing", value: 1 },
+    ]);
   });
 });

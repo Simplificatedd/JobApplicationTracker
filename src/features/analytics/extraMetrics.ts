@@ -220,3 +220,37 @@ export function toCumulative(data: ChartDatum[]) {
     return { label: item.label, value: runningTotal };
   });
 }
+
+export interface StatusTransition {
+  from: Application["status"];
+  to: Application["status"];
+  value: number;
+}
+
+// Counts recorded status changes by from → to pair, largest first.
+export function deriveStatusTransitions(activities: Activity[]): StatusTransition[] {
+  const counts = new Map<string, StatusTransition>();
+
+  activities.forEach((activity) => {
+    if (
+      activity.type !== "status_changed" ||
+      !activity.statusFrom ||
+      !activity.statusTo ||
+      activity.statusFrom === activity.statusTo
+    ) {
+      return;
+    }
+
+    const key = `${activity.statusFrom}→${activity.statusTo}`;
+    const current = counts.get(key) ?? {
+      from: activity.statusFrom,
+      to: activity.statusTo,
+      value: 0,
+    };
+
+    current.value += 1;
+    counts.set(key, current);
+  });
+
+  return [...counts.values()].sort((left, right) => right.value - left.value);
+}
