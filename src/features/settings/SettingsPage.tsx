@@ -3,7 +3,6 @@ import {
   Download,
   FileDown,
   FileUp,
-  Info,
   LogOut,
   RotateCcw,
   Settings,
@@ -331,7 +330,7 @@ export function SettingsPage({
               onUpdateSettings({ enableDraggableColumnWidths: checked })
             }
           />
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-x-6 sm:grid-cols-2">
             {APPLICATION_TABLE_COLUMNS.map((column) => (
               <ToggleField
                 checked={
@@ -452,7 +451,7 @@ function SettingsGroup({
   return (
     <section className="surface-panel rounded-lg p-4">
       <h3 className="text-sm font-semibold uppercase text-muted">{title}</h3>
-      <div className="mt-4 space-y-3">{children}</div>
+      <div className="mt-2 divide-y divide-border">{children}</div>
     </section>
   );
 }
@@ -472,18 +471,29 @@ function ToggleField({
 }) {
   return (
     <label
-      className={`flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground ${
-        disabled ? "opacity-70" : ""
+      className={`flex items-start justify-between gap-4 py-3 ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
       }`}
     >
       <SettingLabel description={description} label={label} />
-      <input
-        checked={checked}
-        className="h-4 w-4 shrink-0 rounded border-border text-primary"
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        type="checkbox"
-      />
+      <span className="relative mt-0.5 inline-flex shrink-0">
+        <input
+          checked={checked}
+          className="peer sr-only"
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+          role="switch"
+          type="checkbox"
+        />
+        <span
+          aria-hidden="true"
+          className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-primary peer-focus-visible:shadow-[var(--focus-ring)]"
+        />
+        <span
+          aria-hidden="true"
+          className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"
+        />
+      </span>
     </label>
   );
 }
@@ -504,20 +514,37 @@ function ToggleButtonField({
   onLabel: string;
 }) {
   return (
-    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
-      <button
-        aria-pressed={checked}
-        className={`h-8 w-full rounded-md px-3 text-sm font-semibold transition sm:w-auto sm:min-w-32 ${
-          checked
-            ? "bg-primary text-primary-foreground hover:bg-blue-700"
-            : "bg-slate-100 text-foreground hover:bg-slate-200"
-        }`}
-        onClick={() => onChange(!checked)}
-        type="button"
+      <div
+        aria-label={label.replace(/:$/, "")}
+        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5"
+        role="radiogroup"
       >
-        {checked ? onLabel : offLabel}
-      </button>
+        {[
+          { isOn: false, text: offLabel },
+          { isOn: true, text: onLabel },
+        ].map((option) => (
+          <button
+            aria-checked={checked === option.isOn}
+            className={`h-8 rounded-md px-3 text-sm font-medium transition ${
+              checked === option.isOn
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-muted hover:text-foreground"
+            }`}
+            key={option.text}
+            onClick={() => {
+              if (checked !== option.isOn) {
+                onChange(option.isOn);
+              }
+            }}
+            role="radio"
+            type="button"
+          >
+            {option.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -532,14 +559,15 @@ function UnavailableSettingField({
   value: string;
 }) {
   return (
-    <div className="flex min-h-10 flex-col items-stretch justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground sm:flex-row sm:items-center">
-      <SettingLabel description={description} label={label} />
-      <div className="flex items-center gap-2 sm:justify-end">
-        <span className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-foreground">
-          {value}
-        </span>
-        <span className="text-xs font-medium text-muted">Only mode available</span>
-      </div>
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+      <SettingLabel
+        badge="Coming soon"
+        description={description}
+        label={label}
+      />
+      <span className="inline-flex h-8 shrink-0 items-center self-start rounded-lg border border-dashed border-border px-3 text-sm font-medium text-muted">
+        {value}
+      </span>
     </div>
   );
 }
@@ -560,49 +588,46 @@ function NumberField({
   value: number;
 }) {
   return (
-    <label className="block rounded-lg border border-border bg-surface px-3 py-2">
+    <label className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
-      <input
-        className="field-control mt-2"
-        min={min}
-        onChange={(event) =>
-          onChange(Math.max(min, Number(event.target.value) || min))
-        }
-        type="number"
-        value={value}
-      />
-      {suffix ? (
-        <span className="mt-1 block text-xs font-medium text-muted">
-          {suffix}
-        </span>
-      ) : null}
+      <span className="inline-flex shrink-0 items-center gap-2 self-start">
+        <input
+          className="field-control h-9 w-20 text-right tabular-nums"
+          min={min}
+          onChange={(event) =>
+            onChange(Math.max(min, Number(event.target.value) || min))
+          }
+          type="number"
+          value={value}
+        />
+        {suffix ? (
+          <span className="text-sm text-muted">{suffix}</span>
+        ) : null}
+      </span>
     </label>
   );
 }
 
 function SettingLabel({
+  badge,
   description,
   label,
 }: {
+  badge?: string;
   description: string;
   label: string;
 }) {
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      <span className="min-w-0 break-words">{label}</span>
-      <InfoTooltip description={description} />
-    </span>
-  );
-}
-
-function InfoTooltip({ description }: { description: string }) {
-  return (
-    <span className="group relative inline-flex shrink-0">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface-raised text-muted">
-        <Info aria-hidden="true" size={13} />
-        <span className="sr-only">Setting explanation</span>
+    <span className="min-w-0">
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+        {label.replace(/:$/, "")}
+        {badge ? (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
+            {badge}
+          </span>
+        ) : null}
       </span>
-      <span className="pointer-events-none absolute right-0 top-7 z-30 hidden w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-foreground px-3 py-2 text-xs font-medium leading-5 text-white shadow-popover group-hover:block sm:left-1/2 sm:w-64 sm:-translate-x-1/2">
+      <span className="mt-0.5 block text-xs leading-5 text-muted">
         {description}
       </span>
     </span>
