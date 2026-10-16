@@ -326,31 +326,86 @@ export function HorizontalBarChart({
 }
 
 export function StatTile({
+  accent = "var(--color-primary)",
   detail,
+  icon: Icon,
   label,
+  progress,
   sparkline,
   value,
 }: {
+  accent?: string;
   detail: string;
+  icon?: LucideIcon;
   label: string;
+  // 0–100; draws a small progress ring instead of a sparkline.
+  progress?: number;
   sparkline?: number[];
   value: string;
 }) {
   return (
-    <div className="surface-panel flex min-w-0 items-end justify-between gap-3 rounded-lg px-4 py-3">
+    <div className="surface-panel relative flex min-w-0 items-end justify-between gap-3 overflow-hidden rounded-lg px-4 py-3">
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-0.5"
+        style={{ backgroundColor: accent }}
+      />
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-muted">{label}</p>
+        <p className="flex items-center gap-2 truncate text-sm font-medium text-muted">
+          {Icon ? (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)`,
+                color: accent,
+              }}
+            >
+              <Icon size={14} />
+            </span>
+          ) : null}
+          {label}
+        </p>
         <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
           {value}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted">{detail}</p>
       </div>
-      {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} /> : null}
+      {progress !== undefined ? (
+        <ProgressRing color={accent} value={progress} />
+      ) : sparkline && sparkline.length > 1 ? (
+        <Sparkline color={accent} values={sparkline} />
+      ) : null}
     </div>
   );
 }
 
-function Sparkline({ values }: { values: number[] }) {
+function ProgressRing({ color, value }: { color: string; value: number }) {
+  const hasMounted = useHasMounted();
+  const size = 44;
+  const stroke = 5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  return (
+    <svg aria-hidden="true" className="-rotate-90 shrink-0" height={size} width={size}>
+      <circle cx={size / 2} cy={size / 2} fill="none" r={radius} stroke="#f1f5f9" strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        fill="none"
+        r={radius}
+        stroke={color}
+        strokeDasharray={`${hasMounted ? (Math.min(100, value) / 100) * circumference : 0} ${circumference}`}
+        strokeLinecap="round"
+        strokeWidth={stroke}
+        style={{ transition: "stroke-dasharray 900ms ease-out" }}
+      />
+    </svg>
+  );
+}
+
+function Sparkline({ color, values }: { color: string; values: number[] }) {
   const width = 88;
   const height = 32;
   const max = Math.max(1, ...values);
@@ -371,7 +426,7 @@ function Sparkline({ values }: { values: number[] }) {
       <polyline
         fill="none"
         points={points}
-        stroke="var(--color-primary)"
+        stroke={color}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}

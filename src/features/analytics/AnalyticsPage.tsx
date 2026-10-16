@@ -1,4 +1,11 @@
-import { BarChart3, Settings2 } from "lucide-react";
+import {
+  BarChart3,
+  Hourglass,
+  MessageCircleReply,
+  Send,
+  Settings2,
+  Trophy,
+} from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import {
@@ -669,17 +676,23 @@ function KeyMetrics({
     >
       <StatTile
         detail={dateRange === "all" ? "All time" : `Applied in the last ${rangeLabel.toLowerCase()}`}
+        accent="var(--chart-1)"
+        icon={Send}
         label="Applications"
         sparkline={weeklyApplications}
         value={String(applications.length)}
       />
       <StatTile
+        accent="var(--chart-2)"
         detail="Online assessments and interviews"
+        icon={Hourglass}
         label="In progress"
         value={String(countWithStatus("Online Assessment", "Interviewing"))}
       />
       <StatTile
+        accent="var(--chart-7)"
         detail={`${accepted.value} accepted`}
+        icon={Trophy}
         label="Offers received"
         value={String(offers.value)}
       />
@@ -689,7 +702,12 @@ function KeyMetrics({
             ? `${responded} of ${responseBase} heard back`
             : "No applications yet"
         }
+        accent="var(--chart-3)"
+        icon={MessageCircleReply}
         label="Response rate"
+        progress={
+          responseBase > 0 ? (responded / responseBase) * 100 : undefined
+        }
         value={
           responseBase > 0
             ? `${Math.round((responded / responseBase) * 100)}%`
