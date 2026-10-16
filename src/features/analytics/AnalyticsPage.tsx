@@ -31,6 +31,7 @@ import {
   formatPeriod,
   TimeSeriesChart,
 } from "./TimeSeriesChart";
+import { type ChartSeries, MultiSeriesChart } from "./MultiSeriesChart";
 import { ColumnChart } from "./ColumnChart";
 import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import {
@@ -63,6 +64,7 @@ const chartOptions: Array<{
   id: string;
   label: string;
 }> = [
+  { group: "Activity", id: "activityComparison", label: "Activity comparison" },
   { group: "Activity", id: "applicationsOverTime", label: "Applications over time" },
   { group: "Activity", id: "cumulativeApplications", label: "Cumulative applications" },
   { group: "Pipeline and outcomes", id: "statusPipeline", label: "Pipeline by status" },
@@ -284,6 +286,40 @@ export function AnalyticsPage({
         </section>
       ) : (
         <section className="grid gap-4 xl:grid-cols-2">
+          {visibleCharts.has("activityComparison") ? (
+            <ActivityComparisonCard
+              grouping={analyticsSettings.defaultTimeGrouping}
+              series={[
+                {
+                  color: "var(--chart-1)",
+                  data: deriveApplicationsOverTime(
+                    rangedApplications,
+                    analyticsSettings.defaultTimeGrouping,
+                  ),
+                  id: "applications",
+                  label: "Applications",
+                },
+                {
+                  color: "var(--chart-2)",
+                  data: deriveInterviewsOverTime(
+                    rangedInterviews,
+                    analyticsSettings.defaultTimeGrouping,
+                  ),
+                  id: "interviews",
+                  label: "Interviews",
+                },
+                {
+                  color: "var(--chart-3)",
+                  data: deriveAssessmentsOverTime(
+                    rangedAssessments,
+                    analyticsSettings.defaultTimeGrouping,
+                  ),
+                  id: "assessments",
+                  label: "Assessments",
+                },
+              ]}
+            />
+          ) : null}
           {visibleCharts.has("applicationsOverTime") ? (
             <TimeChart
               grouping={analyticsSettings.defaultTimeGrouping}
@@ -637,6 +673,31 @@ const JOB_TYPE_COLORS: Record<string, string> = {
   Contract: "var(--chart-4)",
   Other: "var(--chart-5)",
 };
+
+function ActivityComparisonCard({
+  grouping,
+  series,
+}: {
+  grouping: AnalyticsSettings["defaultTimeGrouping"];
+  series: ChartSeries[];
+}) {
+  return (
+    <ChartCard
+      className="xl:col-span-2"
+      description="Click a legend item to show or hide a line"
+      table={{
+        columns: ["Series", "Total"],
+        rows: series.map((item) => ({
+          label: item.label,
+          value: item.data.reduce((sum, point) => sum + point.value, 0),
+        })),
+      }}
+      title="Activity comparison"
+    >
+      <MultiSeriesChart grouping={grouping} series={series} />
+    </ChartCard>
+  );
+}
 
 // Ordered response-time buckets use the validated light-to-dark blue ramp.
 const RESPONSE_TIME_COLORS = [

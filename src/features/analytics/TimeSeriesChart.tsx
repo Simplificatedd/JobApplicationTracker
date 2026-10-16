@@ -330,7 +330,7 @@ export function formatPeriod(key: string, grouping: TimeGrouping, short: boolean
   return grouping === "weekly" && !short ? `Week of ${dayLabel}` : dayLabel;
 }
 
-function getNiceMax(value: number) {
+export function getNiceMax(value: number) {
   if (value <= 4) {
     return 4;
   }
@@ -341,11 +341,11 @@ function getNiceMax(value: number) {
   return nice * magnitude;
 }
 
-function formatTick(value: number) {
+export function formatTick(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function getXLabelIndexes(count: number, plotWidth: number) {
+export function getXLabelIndexes(count: number, plotWidth: number) {
   if (count <= 1) {
     return count === 1 ? [0] : [];
   }
