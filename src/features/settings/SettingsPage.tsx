@@ -493,7 +493,6 @@ export function SettingsPage({
           icon={RotateCcw}
           id="reset"
           title="Reset preferences"
-          tone="danger"
         >
           <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs leading-5 text-muted">
@@ -549,6 +548,56 @@ const SETTINGS_SECTIONS = [
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
+// Each section has its own accent so the page is easier to scan. Class names are
+// written out in full so Tailwind can find them.
+const SECTION_ACCENTS: Record<
+  SettingsSectionId,
+  { navActive: string; navIcon: string; strip: string; tile: string }
+> = {
+  account: {
+    navActive: "bg-blue-50 text-blue-700",
+    navIcon: "text-blue-500",
+    strip: "bg-blue-500",
+    tile: "bg-blue-50 text-blue-600",
+  },
+  data: {
+    navActive: "bg-emerald-50 text-emerald-700",
+    navIcon: "text-emerald-500",
+    strip: "bg-emerald-500",
+    tile: "bg-emerald-50 text-emerald-600",
+  },
+  general: {
+    navActive: "bg-violet-50 text-violet-700",
+    navIcon: "text-violet-500",
+    strip: "bg-violet-500",
+    tile: "bg-violet-50 text-violet-600",
+  },
+  contacts: {
+    navActive: "bg-amber-50 text-amber-700",
+    navIcon: "text-amber-500",
+    strip: "bg-amber-400",
+    tile: "bg-amber-50 text-amber-600",
+  },
+  table: {
+    navActive: "bg-sky-50 text-sky-700",
+    navIcon: "text-sky-500",
+    strip: "bg-sky-500",
+    tile: "bg-sky-50 text-sky-600",
+  },
+  alerts: {
+    navActive: "bg-rose-50 text-rose-700",
+    navIcon: "text-rose-500",
+    strip: "bg-rose-500",
+    tile: "bg-rose-50 text-rose-600",
+  },
+  reset: {
+    navActive: "bg-red-50 text-red-700",
+    navIcon: "text-red-500",
+    strip: "bg-red-500",
+    tile: "bg-red-50 text-red-600",
+  },
+};
+
 // Highlights the section currently nearest the top of the viewport.
 function useActiveSection() {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("account");
@@ -586,13 +635,14 @@ function SettingsNav({ activeSection }: { activeSection: SettingsSectionId }) {
       {SETTINGS_SECTIONS.map((section) => {
         const Icon = section.icon;
         const isActive = activeSection === section.id;
+        const accent = SECTION_ACCENTS[section.id];
 
         return (
           <a
             aria-current={isActive ? "true" : undefined}
             className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               isActive
-                ? "bg-blue-50 text-primary"
+                ? `${accent.navActive} font-semibold`
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
             }`}
             href={`#settings-${section.id}`}
@@ -604,7 +654,11 @@ function SettingsNav({ activeSection }: { activeSection: SettingsSectionId }) {
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           >
-            <Icon aria-hidden="true" size={16} />
+            <Icon
+              aria-hidden="true"
+              className={isActive ? undefined : accent.navIcon}
+              size={16}
+            />
             {section.label}
           </a>
         );
@@ -619,35 +673,34 @@ function SettingsSection({
   icon: Icon,
   id,
   title,
-  tone = "default",
 }: {
   children: React.ReactNode;
   description: string;
   icon: LucideIcon;
   id: SettingsSectionId;
   title: string;
-  tone?: "default" | "danger";
 }) {
+  const accent = SECTION_ACCENTS[id];
+
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className={`surface-panel scroll-mt-28 rounded-lg ${
-        tone === "danger" ? "border-red-200" : ""
+      className={`surface-panel relative scroll-mt-28 overflow-hidden rounded-lg ${
+        id === "reset" ? "border-red-200" : ""
       }`}
       id={`settings-${id}`}
     >
-      <header className="flex items-start gap-3 border-b border-border px-4 py-3 sm:px-5">
+      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${accent.strip}`} />
+      <header className="flex items-start gap-3 border-b border-border px-4 pb-3 pt-4 sm:px-5">
         <span
           aria-hidden="true"
-          className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-            tone === "danger" ? "bg-red-50 text-destructive" : "bg-blue-50 text-primary"
-          }`}
+          className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accent.tile}`}
         >
-          <Icon size={16} />
+          <Icon size={18} />
         </span>
         <div className="min-w-0">
           <h3
-            className="text-sm font-semibold text-foreground"
+            className="text-base font-semibold text-foreground"
             id={`settings-${id}-title`}
           >
             {title}
