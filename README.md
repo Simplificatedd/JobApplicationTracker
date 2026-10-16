@@ -61,8 +61,8 @@ your own Cloudflare account where only the people you allow can sign in.
 
 <table>
   <tr>
-    <td><img src="docs/images/analytics.png" alt="Analytics dashboard with metrics, timelines, pipeline treemap and status flow"></td>
-    <td><img src="docs/images/settings.png" alt="Settings page with colour-coded sections"></td>
+    <td width="50%" valign="top"><img src="docs/images/analytics.png" alt="Analytics dashboard with metrics, timelines, pipeline treemap and status flow"></td>
+    <td width="50%" valign="top"><img src="docs/images/settings.png" alt="Settings page with colour-coded sections"></td>
   </tr>
   <tr>
     <td align="center"><sub>Analytics dashboard</sub></td>
