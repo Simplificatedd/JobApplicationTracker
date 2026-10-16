@@ -1,4 +1,4 @@
-import { BarChart3, Table2 } from "lucide-react";
+import { type LucideIcon, Repeat, Table2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 export interface ChartDatum {
@@ -6,22 +6,78 @@ export interface ChartDatum {
   value: number;
 }
 
+export interface ChartView {
+  icon: LucideIcon;
+  id: string;
+  label: string;
+  render: () => ReactNode;
+}
+
+const VIEW_STORAGE_PREFIX = "jat.analytics.view.";
+
+function readStoredView(storageKey: string | undefined) {
+  if (!storageKey) {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(`${VIEW_STORAGE_PREFIX}${storageKey}`);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredView(storageKey: string | undefined, viewId: string) {
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(`${VIEW_STORAGE_PREFIX}${storageKey}`, viewId);
+  } catch {
+    // Storage can be unavailable; the view still switches for this visit.
+  }
+}
+
 export function ChartCard({
   action,
   children,
   className = "",
   description,
-  table,
   title,
+  viewStorageKey,
+  views,
 }: {
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   description?: string;
-  table?: { columns: [string, string]; rows: ChartDatum[] };
   title: string;
+  // Remembers the chosen view per chart in this browser only.
+  viewStorageKey?: string;
+  // Alternative ways to draw the same data; the header button cycles them.
+  views?: ChartView[];
 }) {
-  const [showTable, setShowTable] = useState(false);
+  const [selectedViewId, setSelectedViewId] = useState(() =>
+    readStoredView(viewStorageKey),
+  );
+  const viewIndex = Math.max(
+    0,
+    views?.findIndex((view) => view.id === selectedViewId) ?? 0,
+  );
+  const currentView = views?.[viewIndex];
+  const nextView = views?.[(viewIndex + 1) % (views?.length ?? 1)];
+
+  function cycleView() {
+    if (!views || !nextView) {
+      return;
+    }
+
+    setSelectedViewId(nextView.id);
+    writeStoredView(viewStorageKey, nextView.id);
+  }
+
+  const CurrentIcon = currentView?.icon;
 
   return (
     <article className={`surface-panel flex min-w-0 flex-col rounded-lg p-4 ${className}`}>
@@ -32,38 +88,53 @@ export function ChartCard({
             <p className="mt-0.5 text-xs text-muted">{description}</p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {action}
-          {table ? (
+          {views && views.length > 1 && currentView && nextView && CurrentIcon ? (
             <button
-              aria-label={showTable ? `Show ${title} chart` : `Show ${title} as a table`}
-              aria-pressed={showTable}
-              className="icon-button h-8 w-8"
-              onClick={() => setShowTable((current) => !current)}
-              title={showTable ? "Show chart" : "Show table"}
+              aria-label={`${title}: showing ${currentView.label}. Switch to ${nextView.label}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface pl-2 pr-2.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-blue-50"
+              onClick={cycleView}
+              title={`Switch to ${nextView.label}`}
               type="button"
             >
-              {showTable ? (
-                <BarChart3 aria-hidden="true" size={15} />
-              ) : (
-                <Table2 aria-hidden="true" size={15} />
-              )}
+              <CurrentIcon aria-hidden="true" className="text-primary" size={14} />
+              {currentView.label}
+              <span className="tabular-nums text-muted">
+                {viewIndex + 1}/{views.length}
+              </span>
+              <Repeat aria-hidden="true" className="text-muted" size={12} />
             </button>
           ) : null}
         </div>
       </header>
-      <div className="mt-4 min-w-0 flex-1">
-        {showTable && table ? <ChartTable {...table} /> : children}
+      <div className="mt-4 min-w-0 flex-1" key={currentView?.id}>
+        {currentView ? currentView.render() : children}
       </div>
     </article>
   );
 }
 
+export function tableView(
+  columns: [string, string],
+  rows: ChartDatum[],
+  formatValue: (value: number) => string = String,
+): ChartView {
+  return {
+    icon: Table2,
+    id: "table",
+    label: "Table",
+    render: () => <ChartTable columns={columns} formatValue={formatValue} rows={rows} />,
+  };
+}
+
 function ChartTable({
   columns,
+  formatValue,
   rows,
 }: {
   columns: [string, string];
+  formatValue: (value: number) => string;
   rows: ChartDatum[];
 }) {
   if (rows.length === 0) {
@@ -84,7 +155,7 @@ function ChartTable({
             <tr key={row.label}>
               <td className="px-3 py-2 text-foreground">{row.label}</td>
               <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                {row.value}
+                {formatValue(row.value)}
               </td>
             </tr>
           ))}

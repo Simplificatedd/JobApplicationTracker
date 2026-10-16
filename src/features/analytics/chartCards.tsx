@@ -5,7 +5,20 @@ import {
   type ApplicationOutcomePath,
 } from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
-import { ChartCard, type ChartDatum, HorizontalBarChart } from "./charts";
+import {
+  ChartArea,
+  ChartBar,
+  ChartColumn,
+  ChartLine,
+  Donut,
+} from "lucide-react";
+import {
+  ChartCard,
+  type ChartDatum,
+  type ChartView,
+  HorizontalBarChart,
+  tableView,
+} from "./charts";
 import { ColumnChart } from "./ColumnChart";
 import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import { type ChartSeries, MultiSeriesChart } from "./MultiSeriesChart";
@@ -16,6 +29,14 @@ import {
   useIncludeNotSet,
 } from "./notSetFilter";
 import { formatPeriod, TimeSeriesChart } from "./TimeSeriesChart";
+
+// A card's chart plus a table of the same numbers.
+function chartAndTable(
+  chart: ChartView,
+  table: { columns: [string, string]; rows: ChartDatum[] },
+): ChartView[] {
+  return [chart, tableView(table.columns, table.rows)];
+}
 
 export function ActivityComparisonCard({
   grouping,
@@ -28,17 +49,25 @@ export function ActivityComparisonCard({
     <ChartCard
       className="xl:col-span-2"
       description="Click a legend item to show or hide a line"
-      table={{
-        columns: ["Series", "Total"],
-        rows: series.map((item) => ({
-          label: item.label,
-          value: item.data.reduce((sum, point) => sum + point.value, 0),
-        })),
-      }}
       title="Activity comparison"
-    >
-      <MultiSeriesChart grouping={grouping} series={series} />
-    </ChartCard>
+      views={chartAndTable(
+        {
+          icon: ChartLine,
+          id: "chart",
+          label: "Lines",
+          render: () => (
+            <MultiSeriesChart grouping={grouping} series={series} />
+          ),
+        },
+        {
+          columns: ["Series", "Total"],
+          rows: series.map((item) => ({
+            label: item.label,
+            value: item.data.reduce((sum, point) => sum + point.value, 0),
+          })),
+        },
+      )}
+    />
   );
 }
 
@@ -77,11 +106,19 @@ export function ColumnChartCard({
   return (
     <ChartCard
       description={description}
-      table={{ columns: ["Category", "Count"], rows: data }}
       title={title}
-    >
-      <ColumnChart colorFor={colorFor} data={data} shortLabel={shortLabel} />
-    </ChartCard>
+      views={chartAndTable(
+        {
+          icon: ChartColumn,
+          id: "chart",
+          label: "Columns",
+          render: () => (
+            <ColumnChart colorFor={colorFor} data={data} shortLabel={shortLabel} />
+          ),
+        },
+        { columns: ["Category", "Count"], rows: data },
+      )}
+    />
   );
 }
 
@@ -110,15 +147,23 @@ export function DonutChartCard({
         ) : null
       }
       description={describeTotal(visibleData, "applications", notSetCount, includeNotSet)}
-      table={{ columns: ["Category", "Count"], rows: visibleData }}
       title={title}
-    >
-      <DonutChart
-        colorFor={(datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR}
-        data={visibleData}
-        totalLabel="applications"
-      />
-    </ChartCard>
+      views={chartAndTable(
+        {
+          icon: Donut,
+          id: "chart",
+          label: "Donut",
+          render: () => (
+            <DonutChart
+              colorFor={(datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR}
+              data={visibleData}
+              totalLabel="applications"
+            />
+          ),
+        },
+        { columns: ["Category", "Count"], rows: visibleData },
+      )}
+    />
   );
 }
 
@@ -198,22 +243,32 @@ export function CategoryChart({
       description={
         [totalDescription, description].filter(Boolean).join(" · ") || undefined
       }
-      table={{ columns: ["Category", "Count"], rows: visibleData }}
       title={title}
-    >
-      {summary}
-      <HorizontalBarChart
-        color={color}
-        colorFor={colorFor}
-        data={visibleData}
-        formatValue={formatValue}
-        limit={limit}
-        maxValue={maxValue}
-        overflowLabel={overflowLabel}
-        unit={totalUnit}
-        showShare={showShare}
-      />
-    </ChartCard>
+      views={chartAndTable(
+        {
+          icon: ChartBar,
+          id: "chart",
+          label: "Bars",
+          render: () => (
+            <>
+              {summary}
+              <HorizontalBarChart
+                color={color}
+                colorFor={colorFor}
+                data={visibleData}
+                formatValue={formatValue}
+                limit={limit}
+                maxValue={maxValue}
+                overflowLabel={overflowLabel}
+                unit={totalUnit}
+                showShare={showShare}
+              />
+            </>
+          ),
+        },
+        { columns: ["Category", "Count"], rows: visibleData },
+      )}
+    />
   );
 }
 
@@ -235,22 +290,30 @@ export function TimeChart({
   return (
     <ChartCard
       description={description ?? `${total} total`}
-      table={{
-        columns: ["Period", "Count"],
-        rows: data.map((item) => ({
-          label: formatPeriod(item.label, grouping, false),
-          value: item.value,
-        })),
-      }}
       title={title}
-    >
-      <TimeSeriesChart
-        color={color}
-        data={data}
-        grouping={grouping}
-        seriesLabel={title}
-      />
-    </ChartCard>
+      views={chartAndTable(
+        {
+          icon: ChartArea,
+          id: "chart",
+          label: "Area",
+          render: () => (
+            <TimeSeriesChart
+              color={color}
+              data={data}
+              grouping={grouping}
+              seriesLabel={title}
+            />
+          ),
+        },
+        {
+          columns: ["Period", "Count"],
+          rows: data.map((item) => ({
+            label: formatPeriod(item.label, grouping, false),
+            value: item.value,
+          })),
+        },
+      )}
+    />
   );
 }
 
