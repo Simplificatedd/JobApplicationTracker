@@ -30,6 +30,7 @@ import {
   formatPeriod,
   TimeSeriesChart,
 } from "./TimeSeriesChart";
+import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import {
   deriveApplicationsBySource,
   deriveAppliedByWeekday,
@@ -416,13 +417,15 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("workModeMix") ? (
-            <CategoryChart
+            <DonutChartCard
+              colors={WORK_MODE_COLORS}
               title="Work mode"
               data={deriveWorkModeMix(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("jobTypeMix") ? (
-            <CategoryChart
+            <DonutChartCard
+              colors={JOB_TYPE_COLORS}
               title="Job type"
               data={deriveJobTypeMix(rangedApplications)}
             />
@@ -603,6 +606,44 @@ function KeyMetrics({
         }
       />
     </section>
+  );
+}
+
+// Fixed per-value colors so a value keeps its color when others are filtered out.
+const WORK_MODE_COLORS: Record<string, string> = {
+  Remote: "var(--chart-1)",
+  Hybrid: "var(--chart-2)",
+  Onsite: "var(--chart-3)",
+};
+
+const JOB_TYPE_COLORS: Record<string, string> = {
+  Internship: "var(--chart-1)",
+  "Part Time": "var(--chart-2)",
+  "Full Time": "var(--chart-3)",
+  Contract: "var(--chart-4)",
+  Other: "var(--chart-5)",
+};
+
+function DonutChartCard({
+  colors,
+  data,
+  title,
+}: {
+  colors: Record<string, string>;
+  data: ChartDatum[];
+  title: string;
+}) {
+  return (
+    <ChartCard
+      table={{ columns: ["Category", "Count"], rows: data }}
+      title={title}
+    >
+      <DonutChart
+        colorFor={(datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR}
+        data={data}
+        totalLabel="applications"
+      />
+    </ChartCard>
   );
 }
 
