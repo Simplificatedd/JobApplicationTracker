@@ -23,7 +23,9 @@ import { ChartCard, StackedShareBar, StatTile } from "./charts";
 import { fillPeriods } from "./TimeSeriesChart";
 import {
   ActivityComparisonCard,
+  bySourceName,
   CategoryChart,
+  createCategoryColors,
   fromColorMap,
   getFollowUpColor,
   getOutcomeColor,
@@ -130,6 +132,10 @@ export function AnalyticsPage({
     isInRange(item.receivedAt || item.createdAt),
   );
   const grouping = analyticsSettings.defaultTimeGrouping;
+  // Shared so a source keeps the same colour across source charts.
+  const sourceColorFor = createCategoryColors(
+    deriveApplicationsBySource(rangedApplications),
+  );
   const [isCustomizing, setIsCustomizing] = useState(false);
   const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
@@ -424,7 +430,7 @@ export function AnalyticsPage({
           {visibleCharts.has("responseRateBySource") ? (
             <CategoryChart
               chartId="responseRateBySource"
-              color="var(--chart-5)"
+              colorFor={bySourceName(sourceColorFor)}
               description="Share past Awaiting Response (applications in brackets)"
               formatValue={(value) => `${value}%`}
               maxValue={100}
@@ -449,7 +455,7 @@ export function AnalyticsPage({
           {visibleCharts.has("applicationsBySource") ? (
             <CategoryChart
               chartId="applicationsBySource"
-              color="var(--chart-5)"
+              colorFor={sourceColorFor}
               limit={8}
               notSetFilterId="applicationsBySource"
               overflowLabel="sources"
@@ -462,7 +468,6 @@ export function AnalyticsPage({
           {visibleCharts.has("topCompanies") ? (
             <CategoryChart
               chartId="topCompanies"
-              color="var(--chart-7)"
               limit={8}
               notSetFilterId="topCompanies"
               overflowLabel="companies"
@@ -510,7 +515,6 @@ export function AnalyticsPage({
           {visibleCharts.has("interviewTypes") ? (
             <CategoryChart
               chartId="interviewTypes"
-              color="var(--chart-2)"
               limit={8}
               notSetFilterId="interviewTypes"
               overflowLabel="types"
@@ -523,7 +527,6 @@ export function AnalyticsPage({
           {visibleCharts.has("assessmentTypes") ? (
             <CategoryChart
               chartId="assessmentTypes"
-              color="var(--chart-3)"
               limit={8}
               notSetFilterId="assessmentTypes"
               overflowLabel="types"

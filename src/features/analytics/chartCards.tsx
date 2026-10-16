@@ -50,6 +50,44 @@ type ColorFor = (datum: ChartDatum, index: number) => string;
 /* Colours                                                             */
 /* ------------------------------------------------------------------ */
 
+const CATEGORICAL_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+];
+// Categories past the eighth palette slot share one muted tone rather than
+// generating hues that are hard to tell apart.
+const OVERFLOW_CATEGORY_COLOR = "#cbd5e1";
+
+// Assigns palette slots in the order categories appear in `data` (already
+// sorted by size), skipping "Not set", which is always neutral grey.
+export function createCategoryColors(data: ChartDatum[]): ColorFor {
+  const slots = new Map<string, string>();
+
+  data
+    .filter((item) => !isNotSetLabel(item.label))
+    .forEach((item, index) => {
+      slots.set(item.label, CATEGORICAL_COLORS[index] ?? OVERFLOW_CATEGORY_COLOR);
+    });
+
+  return (datum) =>
+    isNotSetLabel(datum.label)
+      ? NEUTRAL_SEGMENT_COLOR
+      : (slots.get(datum.label) ?? OVERFLOW_CATEGORY_COLOR);
+}
+
+// Rate rows are labelled "Source (count)"; colour them by the source name so
+// they match the applications-by-source chart.
+export function bySourceName(colorFor: ColorFor): ColorFor {
+  return (datum, index) =>
+    colorFor({ ...datum, label: datum.label.replace(/ \(\d+\)$/, "") }, index);
+}
+
 export const STATUS_COLORS: Record<(typeof STATUS_TONE)[keyof typeof STATUS_TONE], string> = {
   awaiting: "#fbbf24",
   assessment: "#14b8a6",
@@ -193,7 +231,6 @@ function describeTotal(
 
 export function CategoryChart({
   chartId,
-  color = "var(--color-primary)",
   colorFor,
   data,
   description,
@@ -211,8 +248,7 @@ export function CategoryChart({
   views,
 }: {
   chartId: string;
-  // Single colour used when colorFor is not given.
-  color?: string;
+  // Defaults to the categorical palette assigned by size order.
   colorFor?: ColorFor;
   data: ChartDatum[];
   description?: string;
@@ -239,7 +275,7 @@ export function CategoryChart({
   const { hasNotSet, notSetCount, visibleData } = notSetFilterId
     ? applyNotSetFilter(data, includeNotSet)
     : { hasNotSet: false, notSetCount: 0, visibleData: data };
-  const resolveColor = colorFor ?? (() => color);
+  const resolveColor = colorFor ?? createCategoryColors(data);
   const categoryCount = visibleData.filter(
     (item) => !isNotSetLabel(item.label),
   ).length;
