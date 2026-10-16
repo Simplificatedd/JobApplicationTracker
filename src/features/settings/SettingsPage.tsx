@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   UserRound,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
@@ -575,48 +575,71 @@ type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 // written out in full so Tailwind can find them.
 const SECTION_ACCENTS: Record<
   SettingsSectionId,
-  { navActive: string; navIcon: string; strip: string; tile: string }
+  {
+    // Classes for a selected segmented option inside the section.
+    choice: string;
+    navActive: string;
+    navIcon: string;
+    strip: string;
+    // Classes for a switch's "on" track inside the section.
+    switchOn: string;
+    tile: string;
+  }
 > = {
   account: {
+    choice: "text-blue-700",
     navActive: "bg-blue-50 text-blue-700",
     navIcon: "text-blue-500",
     strip: "bg-blue-500",
+    switchOn: "peer-checked:bg-blue-500",
     tile: "bg-blue-50 text-blue-600",
   },
   data: {
+    choice: "text-emerald-700",
     navActive: "bg-emerald-50 text-emerald-700",
     navIcon: "text-emerald-500",
     strip: "bg-emerald-500",
+    switchOn: "peer-checked:bg-emerald-500",
     tile: "bg-emerald-50 text-emerald-600",
   },
   general: {
+    choice: "text-violet-700",
     navActive: "bg-violet-50 text-violet-700",
     navIcon: "text-violet-500",
     strip: "bg-violet-500",
+    switchOn: "peer-checked:bg-violet-500",
     tile: "bg-violet-50 text-violet-600",
   },
   contacts: {
+    choice: "text-amber-700",
     navActive: "bg-amber-50 text-amber-700",
     navIcon: "text-amber-500",
     strip: "bg-amber-400",
+    switchOn: "peer-checked:bg-amber-500",
     tile: "bg-amber-50 text-amber-600",
   },
   table: {
+    choice: "text-sky-700",
     navActive: "bg-sky-50 text-sky-700",
     navIcon: "text-sky-500",
     strip: "bg-sky-500",
+    switchOn: "peer-checked:bg-sky-500",
     tile: "bg-sky-50 text-sky-600",
   },
   alerts: {
+    choice: "text-rose-700",
     navActive: "bg-rose-50 text-rose-700",
     navIcon: "text-rose-500",
     strip: "bg-rose-500",
+    switchOn: "peer-checked:bg-rose-500",
     tile: "bg-rose-50 text-rose-600",
   },
   reset: {
+    choice: "text-red-700",
     navActive: "bg-red-50 text-red-700",
     navIcon: "text-red-500",
     strip: "bg-red-500",
+    switchOn: "peer-checked:bg-red-500",
     tile: "bg-red-50 text-red-600",
   },
 };
@@ -690,6 +713,11 @@ function SettingsNav({ activeSection }: { activeSection: SettingsSectionId }) {
   );
 }
 
+const SectionAccentContext = createContext<{ choice: string; switchOn: string }>({
+  choice: "text-foreground",
+  switchOn: "peer-checked:bg-primary",
+});
+
 function SettingsSection({
   children,
   description,
@@ -731,7 +759,9 @@ function SettingsSection({
           <p className="text-xs text-muted">{description}</p>
         </div>
       </header>
-      <div className="divide-y divide-border px-4 sm:px-5">{children}</div>
+      <SectionAccentContext.Provider value={accent}>
+        <div className="divide-y divide-border px-4 sm:px-5">{children}</div>
+      </SectionAccentContext.Provider>
     </section>
   );
 }
@@ -803,6 +833,8 @@ function ToggleField({
   label: string;
   onChange: (checked: boolean) => void;
 }) {
+  const accent = useContext(SectionAccentContext);
+
   return (
     <label
       className={`flex items-start justify-between gap-4 py-3 ${
@@ -821,7 +853,7 @@ function ToggleField({
         />
         <span
           aria-hidden="true"
-          className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-primary peer-focus-visible:shadow-[var(--focus-ring)]"
+          className={`h-6 w-11 rounded-full bg-slate-300 transition peer-focus-visible:shadow-[var(--focus-ring)] ${accent.switchOn}`}
         />
         <span
           aria-hidden="true"
@@ -847,6 +879,8 @@ function ToggleButtonField({
   onChange: (checked: boolean) => void;
   onLabel: string;
 }) {
+  const accent = useContext(SectionAccentContext);
+
   return (
     <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
@@ -863,7 +897,7 @@ function ToggleButtonField({
             aria-checked={checked === option.isOn}
             className={`h-8 rounded-md px-3 text-sm font-medium transition ${
               checked === option.isOn
-                ? "bg-surface text-foreground shadow-sm"
+                ? `bg-surface font-semibold shadow-sm ${accent.choice}`
                 : "text-muted hover:text-foreground"
             }`}
             key={option.text}
