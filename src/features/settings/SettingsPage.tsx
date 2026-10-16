@@ -148,7 +148,7 @@ export function SettingsPage({
     <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-6">
       <SettingsNav activeSection={activeSection} onSelect={selectSection} />
 
-      <div className="min-w-0 max-w-4xl space-y-5">
+      <div className="min-w-0 space-y-5">
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 px-5 py-5 text-white shadow-sm sm:px-6">
           <span
             aria-hidden="true"
