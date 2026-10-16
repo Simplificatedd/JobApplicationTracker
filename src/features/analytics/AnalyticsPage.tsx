@@ -24,16 +24,16 @@ import { fillPeriods } from "./TimeSeriesChart";
 import {
   ActivityComparisonCard,
   CategoryChart,
-  ColumnChartCard,
-  DonutChartCard,
+  fromColorMap,
   getFollowUpColor,
   getOutcomeColor,
   getPathColor,
+  getResponseTimeColor,
   getStatusColor,
-  RESPONSE_TIME_COLORS,
+  JOB_TYPE_COLORS,
   RESPONSE_TIME_SHORT_LABELS,
   TimeChart,
-  WEEKDAY_MUTED_COLOR,
+  WORK_MODE_COLORS,
 } from "./chartCards";
 import {
   deriveApplicationsBySource,
@@ -129,6 +129,7 @@ export function AnalyticsPage({
   const rangedAssessments = scopedAssessments.filter((item) =>
     isInRange(item.receivedAt || item.createdAt),
   );
+  const grouping = analyticsSettings.defaultTimeGrouping;
   const [isCustomizing, setIsCustomizing] = useState(false);
   const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
@@ -289,32 +290,23 @@ export function AnalyticsPage({
         <section className="grid gap-4 xl:grid-cols-2">
           {visibleCharts.has("activityComparison") ? (
             <ActivityComparisonCard
-              grouping={analyticsSettings.defaultTimeGrouping}
+              grouping={grouping}
               series={[
                 {
                   color: "var(--chart-1)",
-                  data: deriveApplicationsOverTime(
-                    rangedApplications,
-                    analyticsSettings.defaultTimeGrouping,
-                  ),
+                  data: deriveApplicationsOverTime(rangedApplications, grouping),
                   id: "applications",
                   label: "Applications",
                 },
                 {
                   color: "var(--chart-2)",
-                  data: deriveInterviewsOverTime(
-                    rangedInterviews,
-                    analyticsSettings.defaultTimeGrouping,
-                  ),
+                  data: deriveInterviewsOverTime(rangedInterviews, grouping),
                   id: "interviews",
                   label: "Interviews",
                 },
                 {
                   color: "var(--chart-3)",
-                  data: deriveAssessmentsOverTime(
-                    rangedAssessments,
-                    analyticsSettings.defaultTimeGrouping,
-                  ),
+                  data: deriveAssessmentsOverTime(rangedAssessments, grouping),
                   id: "assessments",
                   label: "Assessments",
                 },
@@ -323,92 +315,89 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("applicationsOverTime") ? (
             <TimeChart
-              grouping={analyticsSettings.defaultTimeGrouping}
+              chartId="applicationsOverTime"
               color="var(--chart-1)"
+              grouping={grouping}
               title="Applications over time"
-              data={deriveApplicationsOverTime(
-                rangedApplications,
-                analyticsSettings.defaultTimeGrouping,
-              )}
+              data={deriveApplicationsOverTime(rangedApplications, grouping)}
             />
           ) : null}
           {visibleCharts.has("cumulativeApplications") ? (
             <TimeChart
-              description="Running total within the selected range"
-              grouping={analyticsSettings.defaultTimeGrouping}
+              chartId="cumulativeApplications"
               color="var(--chart-6)"
+              description="Running total within the selected range"
+              grouping={grouping}
               title="Cumulative applications"
               data={toCumulative(
                 fillPeriods(
-                  deriveApplicationsOverTime(
-                    rangedApplications,
-                    analyticsSettings.defaultTimeGrouping,
-                  ),
-                  analyticsSettings.defaultTimeGrouping,
+                  deriveApplicationsOverTime(rangedApplications, grouping),
+                  grouping,
                 ),
               )}
             />
           ) : null}
           {visibleCharts.has("statusPipeline") ? (
             <CategoryChart
+              chartId="statusPipeline"
               colorFor={getStatusColor}
-              summary={
-                <StackedShareBar
-                  colorFor={getStatusColor}
-                  data={derivePipelineByStatus(rangedApplications)}
-                />
-              }
+              summary={(data) => (
+                <StackedShareBar colorFor={getStatusColor} data={data} />
+              )}
               title="Pipeline by status"
+              totalUnit="applications"
+              views={["bars", "treemap", "waffle", "columns", "table"]}
               data={derivePipelineByStatus(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("followUpLoad") ? (
             <CategoryChart
+              chartId="followUpLoad"
               colorFor={getFollowUpColor}
               description="Current follow-ups; not limited by date range"
               title="Follow-up load"
+              views={["bars", "donut", "columns", "table"]}
               data={deriveFollowUpLoad(scopedApplications, userSettings)}
             />
           ) : null}
           {visibleCharts.has("statusChangesOverTime") ? (
             <TimeChart
-              grouping={analyticsSettings.defaultTimeGrouping}
+              chartId="statusChangesOverTime"
               color="var(--chart-7)"
+              grouping={grouping}
               title="Status changes over time"
               data={deriveActivityOverTime(
                 rangedActivities.filter(
                   (activity) => activity.type === "status_changed",
                 ),
-                analyticsSettings.defaultTimeGrouping,
+                grouping,
               )}
             />
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
             <TimeChart
-              grouping={analyticsSettings.defaultTimeGrouping}
+              chartId="interviewsOverTime"
               color="var(--chart-2)"
+              grouping={grouping}
               title="Interviews over time"
-              data={deriveInterviewsOverTime(
-                rangedInterviews,
-                analyticsSettings.defaultTimeGrouping,
-              )}
+              data={deriveInterviewsOverTime(rangedInterviews, grouping)}
             />
           ) : null}
           {visibleCharts.has("assessmentsOverTime") ? (
             <TimeChart
-              grouping={analyticsSettings.defaultTimeGrouping}
+              chartId="assessmentsOverTime"
               color="var(--chart-3)"
+              grouping={grouping}
               title="Assessment invitations over time"
-              data={deriveAssessmentsOverTime(
-                rangedAssessments,
-                analyticsSettings.defaultTimeGrouping,
-              )}
+              data={deriveAssessmentsOverTime(rangedAssessments, grouping)}
             />
           ) : null}
           {visibleCharts.has("outcomes") ? (
             <CategoryChart
+              chartId="outcomes"
               colorFor={getOutcomeColor}
               title="Offers and rejections"
+              views={["bars", "columns", "lollipop", "table"]}
               data={deriveOutcomes(
                 rangedApplications,
                 scopedActivities,
@@ -419,8 +408,11 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
             <CategoryChart
+              chartId="applicationPaths"
               colorFor={getPathColor}
               title="Application paths"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "table"]}
               data={deriveApplicationPaths(
                 rangedApplications,
                 scopedActivities,
@@ -431,93 +423,113 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("responseRateBySource") ? (
             <CategoryChart
-              description="Share of applications past Awaiting Response (count in brackets)"
+              chartId="responseRateBySource"
+              color="var(--chart-5)"
+              description="Share past Awaiting Response (applications in brackets)"
               formatValue={(value) => `${value}%`}
               maxValue={100}
-              showShare={false}
-              color="var(--chart-5)"
               notSetFilterId="responseRateBySource"
+              showShare={false}
               title="Response rate by source"
+              views={["bars", "radial", "lollipop", "table"]}
               data={deriveResponseRateBySource(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("timeToFirstResponse") ? (
-            <ColumnChartCard
-              colorFor={(_, index) => RESPONSE_TIME_COLORS[index] ?? "var(--chart-ramp-5)"}
+            <CategoryChart
+              chartId="timeToFirstResponse"
+              colorFor={getResponseTimeColor}
               description="Days from applying to the first status change"
               shortLabel={(label) => RESPONSE_TIME_SHORT_LABELS[label] ?? label}
               title="Time to first response"
+              views={["columns", "bars", "donut", "table"]}
               data={deriveTimeToFirstResponse(rangedApplications, scopedActivities)}
             />
           ) : null}
           {visibleCharts.has("applicationsBySource") ? (
             <CategoryChart
+              chartId="applicationsBySource"
               color="var(--chart-5)"
-              notSetFilterId="applicationsBySource"
-              totalUnit="applications"
               limit={8}
+              notSetFilterId="applicationsBySource"
               overflowLabel="sources"
               title="Applications by source"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "columns", "table"]}
               data={deriveApplicationsBySource(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("topCompanies") ? (
             <CategoryChart
+              chartId="topCompanies"
               color="var(--chart-7)"
-              notSetFilterId="topCompanies"
-              totalUnit="applications"
               limit={8}
+              notSetFilterId="topCompanies"
               overflowLabel="companies"
               title="Top companies"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "table"]}
               data={deriveTopCompanies(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("workModeMix") ? (
-            <DonutChartCard
-              colors={WORK_MODE_COLORS}
+            <CategoryChart
+              chartId="workModeMix"
+              colorFor={fromColorMap(WORK_MODE_COLORS)}
               notSetFilterId="workModeMix"
               title="Work mode"
+              totalUnit="applications"
+              views={["donut", "waffle", "bars", "treemap", "table"]}
               data={deriveWorkModeMix(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("jobTypeMix") ? (
-            <DonutChartCard
-              colors={JOB_TYPE_COLORS}
+            <CategoryChart
+              chartId="jobTypeMix"
+              colorFor={fromColorMap(JOB_TYPE_COLORS)}
               notSetFilterId="jobTypeMix"
               title="Job type"
+              totalUnit="applications"
+              views={["donut", "waffle", "bars", "treemap", "table"]}
               data={deriveJobTypeMix(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("appliedByWeekday") ? (
-            <ColumnChartCard
-              colorFor={(_, __, isMax) =>
-                isMax ? "var(--chart-1)" : WEEKDAY_MUTED_COLOR
-              }
+            <CategoryChart
+              chartId="appliedByWeekday"
+              colorFor={() => "var(--chart-1)"}
               description="Busiest day highlighted"
+              emphasizeMax
               shortLabel={(label) => label.slice(0, 3)}
               title="Applications by weekday"
+              totalUnit="applications"
+              views={["columns", "radar", "bars", "table"]}
               data={deriveAppliedByWeekday(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("interviewTypes") ? (
             <CategoryChart
+              chartId="interviewTypes"
               color="var(--chart-2)"
-              notSetFilterId="interviewTypes"
-              totalUnit="interviews"
               limit={8}
+              notSetFilterId="interviewTypes"
               overflowLabel="types"
               title="Interview stage types"
+              totalUnit="interviews"
+              views={["bars", "donut", "treemap", "table"]}
               data={deriveInterviewTypes(rangedInterviews)}
             />
           ) : null}
           {visibleCharts.has("assessmentTypes") ? (
             <CategoryChart
+              chartId="assessmentTypes"
               color="var(--chart-3)"
-              notSetFilterId="assessmentTypes"
-              totalUnit="assessments"
               limit={8}
+              notSetFilterId="assessmentTypes"
               overflowLabel="types"
               title="Assessment types"
+              totalUnit="assessments"
+              views={["bars", "donut", "treemap", "table"]}
               data={deriveAssessmentTypes(rangedAssessments)}
             />
           ) : null}
@@ -678,21 +690,6 @@ function KeyMetrics({
     </section>
   );
 }
-
-// Fixed per-value colors so a value keeps its color when others are filtered out.
-const WORK_MODE_COLORS: Record<string, string> = {
-  Remote: "var(--chart-1)",
-  Hybrid: "var(--chart-2)",
-  Onsite: "var(--chart-3)",
-};
-
-const JOB_TYPE_COLORS: Record<string, string> = {
-  Internship: "var(--chart-1)",
-  "Part Time": "var(--chart-2)",
-  "Full Time": "var(--chart-3)",
-  Contract: "var(--chart-4)",
-  Other: "var(--chart-5)",
-};
 
 function ActivityCalendar({
   assessments,

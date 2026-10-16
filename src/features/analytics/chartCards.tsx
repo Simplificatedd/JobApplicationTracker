@@ -1,3 +1,16 @@
+import {
+  ChartArea,
+  ChartBar,
+  ChartColumn,
+  ChartColumnStacked,
+  ChartLine,
+  ChartPie,
+  CircleDot,
+  Donut,
+  LayoutDashboard,
+  LayoutGrid,
+  Radar,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { STATUS_TONE } from "../../lib/constants";
 import {
@@ -6,19 +19,19 @@ import {
 } from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
 import {
-  ChartArea,
-  ChartBar,
-  ChartColumn,
-  ChartLine,
-  Donut,
-} from "lucide-react";
-import {
   ChartCard,
   type ChartDatum,
   type ChartView,
   HorizontalBarChart,
   tableView,
 } from "./charts";
+import {
+  RadarChart,
+  RadialBarChart,
+  StackedColumnChart,
+  TreemapChart,
+  WaffleChart,
+} from "./chartViews";
 import { ColumnChart } from "./ColumnChart";
 import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import { type ChartSeries, MultiSeriesChart } from "./MultiSeriesChart";
@@ -28,294 +41,14 @@ import {
   NotSetToggle,
   useIncludeNotSet,
 } from "./notSetFilter";
-import { formatPeriod, TimeSeriesChart } from "./TimeSeriesChart";
+import { fillPeriods, formatPeriod, TimeSeriesChart } from "./TimeSeriesChart";
 
-// A card's chart plus a table of the same numbers.
-function chartAndTable(
-  chart: ChartView,
-  table: { columns: [string, string]; rows: ChartDatum[] },
-): ChartView[] {
-  return [chart, tableView(table.columns, table.rows)];
-}
+type TimeGrouping = AnalyticsSettings["defaultTimeGrouping"];
+type ColorFor = (datum: ChartDatum, index: number) => string;
 
-export function ActivityComparisonCard({
-  grouping,
-  series,
-}: {
-  grouping: AnalyticsSettings["defaultTimeGrouping"];
-  series: ChartSeries[];
-}) {
-  return (
-    <ChartCard
-      className="xl:col-span-2"
-      description="Click a legend item to show or hide a line"
-      title="Activity comparison"
-      views={chartAndTable(
-        {
-          icon: ChartLine,
-          id: "chart",
-          label: "Lines",
-          render: () => (
-            <MultiSeriesChart grouping={grouping} series={series} />
-          ),
-        },
-        {
-          columns: ["Series", "Total"],
-          rows: series.map((item) => ({
-            label: item.label,
-            value: item.data.reduce((sum, point) => sum + point.value, 0),
-          })),
-        },
-      )}
-    />
-  );
-}
-
-// Ordered response-time buckets use the validated light-to-dark blue ramp.
-export const RESPONSE_TIME_COLORS = [
-  "var(--chart-ramp-1)",
-  "var(--chart-ramp-2)",
-  "var(--chart-ramp-3)",
-  "var(--chart-ramp-4)",
-  "var(--chart-ramp-5)",
-];
-
-export const RESPONSE_TIME_SHORT_LABELS: Record<string, string> = {
-  "Within 1 week": "≤ 1 wk",
-  "1–2 weeks": "1–2 wk",
-  "2–4 weeks": "2–4 wk",
-  "1–2 months": "1–2 mo",
-  "Over 2 months": "2+ mo",
-};
-
-export const WEEKDAY_MUTED_COLOR = "#b7d3f6";
-
-export function ColumnChartCard({
-  colorFor,
-  data,
-  description,
-  shortLabel,
-  title,
-}: {
-  colorFor: (datum: ChartDatum, index: number, isMax: boolean) => string;
-  data: ChartDatum[];
-  description?: string;
-  shortLabel?: (label: string) => string;
-  title: string;
-}) {
-  return (
-    <ChartCard
-      description={description}
-      title={title}
-      views={chartAndTable(
-        {
-          icon: ChartColumn,
-          id: "chart",
-          label: "Columns",
-          render: () => (
-            <ColumnChart colorFor={colorFor} data={data} shortLabel={shortLabel} />
-          ),
-        },
-        { columns: ["Category", "Count"], rows: data },
-      )}
-    />
-  );
-}
-
-export function DonutChartCard({
-  colors,
-  data,
-  notSetFilterId,
-  title,
-}: {
-  colors: Record<string, string>;
-  data: ChartDatum[];
-  notSetFilterId: string;
-  title: string;
-}) {
-  const [includeNotSet, setIncludeNotSet] = useIncludeNotSet(notSetFilterId);
-  const { hasNotSet, notSetCount, visibleData } = applyNotSetFilter(
-    data,
-    includeNotSet,
-  );
-
-  return (
-    <ChartCard
-      action={
-        hasNotSet ? (
-          <NotSetToggle includeNotSet={includeNotSet} onChange={setIncludeNotSet} />
-        ) : null
-      }
-      description={describeTotal(visibleData, "applications", notSetCount, includeNotSet)}
-      title={title}
-      views={chartAndTable(
-        {
-          icon: Donut,
-          id: "chart",
-          label: "Donut",
-          render: () => (
-            <DonutChart
-              colorFor={(datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR}
-              data={visibleData}
-              totalLabel="applications"
-            />
-          ),
-        },
-        { columns: ["Category", "Count"], rows: visibleData },
-      )}
-    />
-  );
-}
-
-// "66 applications · 55 not set" / "11 applications · 55 not set hidden"
-function describeTotal(
-  data: ChartDatum[],
-  unit: string,
-  notSetCount: number,
-  includeNotSet: boolean,
-) {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  const notSetNote =
-    notSetCount > 0
-      ? ` · ${notSetCount} not set${includeNotSet ? "" : " hidden"}`
-      : "";
-
-  return `Total ${total} ${unit}${notSetNote}`;
-}
-
-export function CategoryChart({
-  color,
-  colorFor,
-  data,
-  description,
-  formatValue,
-  limit,
-  maxValue,
-  notSetFilterId,
-  overflowLabel,
-  showShare,
-  summary,
-  title,
-  totalUnit,
-}: {
-  color?: string;
-  colorFor?: (datum: ChartDatum, index: number) => string;
-  data: ChartDatum[];
-  description?: string;
-  formatValue?: (value: number) => string;
-  limit?: number;
-  maxValue?: number;
-  // Adds an include/exclude "Not set" toggle, remembered per chart.
-  notSetFilterId?: string;
-  // Plural noun for the categories, e.g. "companies".
-  overflowLabel?: string;
-  showShare?: boolean;
-  summary?: ReactNode;
-  title: string;
-  // When set, the card shows the total count in this unit.
-  totalUnit?: string;
-}) {
-  const [includeNotSet, setIncludeNotSet] = useIncludeNotSet(notSetFilterId);
-  const { hasNotSet, notSetCount, visibleData } = notSetFilterId
-    ? applyNotSetFilter(data, includeNotSet)
-    : { hasNotSet: false, notSetCount: 0, visibleData: data };
-  const categoryCount = visibleData.filter(
-    (item) => !isNotSetLabel(item.label),
-  ).length;
-  const totalDescription = totalUnit
-    ? [
-        describeTotal(visibleData, totalUnit, notSetCount, includeNotSet),
-        overflowLabel && categoryCount > 0
-          ? `${categoryCount} ${overflowLabel}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : undefined;
-
-  return (
-    <ChartCard
-      action={
-        hasNotSet ? (
-          <NotSetToggle includeNotSet={includeNotSet} onChange={setIncludeNotSet} />
-        ) : null
-      }
-      description={
-        [totalDescription, description].filter(Boolean).join(" · ") || undefined
-      }
-      title={title}
-      views={chartAndTable(
-        {
-          icon: ChartBar,
-          id: "chart",
-          label: "Bars",
-          render: () => (
-            <>
-              {summary}
-              <HorizontalBarChart
-                color={color}
-                colorFor={colorFor}
-                data={visibleData}
-                formatValue={formatValue}
-                limit={limit}
-                maxValue={maxValue}
-                overflowLabel={overflowLabel}
-                unit={totalUnit}
-                showShare={showShare}
-              />
-            </>
-          ),
-        },
-        { columns: ["Category", "Count"], rows: visibleData },
-      )}
-    />
-  );
-}
-
-export function TimeChart({
-  color,
-  data,
-  description,
-  grouping,
-  title,
-}: {
-  color?: string;
-  data: ChartDatum[];
-  description?: string;
-  grouping: AnalyticsSettings["defaultTimeGrouping"];
-  title: string;
-}) {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-
-  return (
-    <ChartCard
-      description={description ?? `${total} total`}
-      title={title}
-      views={chartAndTable(
-        {
-          icon: ChartArea,
-          id: "chart",
-          label: "Area",
-          render: () => (
-            <TimeSeriesChart
-              color={color}
-              data={data}
-              grouping={grouping}
-              seriesLabel={title}
-            />
-          ),
-        },
-        {
-          columns: ["Period", "Count"],
-          rows: data.map((item) => ({
-            label: formatPeriod(item.label, grouping, false),
-            value: item.value,
-          })),
-        },
-      )}
-    />
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Colours                                                             */
+/* ------------------------------------------------------------------ */
 
 export const STATUS_COLORS: Record<(typeof STATUS_TONE)[keyof typeof STATUS_TONE], string> = {
   awaiting: "#fbbf24",
@@ -372,4 +105,381 @@ export function getOutcomeColor(datum: ChartDatum) {
 export function getPathColor(datum: ChartDatum) {
   const path = PATH_BY_LABEL.get(datum.label);
   return path ? PATH_COLORS[path] : "var(--color-primary)";
+}
+
+// Ordered response-time buckets use the validated light-to-dark blue ramp.
+const RESPONSE_TIME_COLORS = [
+  "var(--chart-ramp-1)",
+  "var(--chart-ramp-2)",
+  "var(--chart-ramp-3)",
+  "var(--chart-ramp-4)",
+  "var(--chart-ramp-5)",
+];
+
+export function getResponseTimeColor(_: ChartDatum, index: number) {
+  return RESPONSE_TIME_COLORS[index] ?? "var(--chart-ramp-5)";
+}
+
+export const RESPONSE_TIME_SHORT_LABELS: Record<string, string> = {
+  "Within 1 week": "≤ 1 wk",
+  "1–2 weeks": "1–2 wk",
+  "2–4 weeks": "2–4 wk",
+  "1–2 months": "1–2 mo",
+  "Over 2 months": "2+ mo",
+};
+
+export const WORK_MODE_COLORS: Record<string, string> = {
+  Remote: "var(--chart-1)",
+  Hybrid: "var(--chart-2)",
+  Onsite: "var(--chart-3)",
+};
+
+export const JOB_TYPE_COLORS: Record<string, string> = {
+  Internship: "var(--chart-1)",
+  "Part Time": "var(--chart-2)",
+  "Full Time": "var(--chart-3)",
+  Contract: "var(--chart-4)",
+  Other: "var(--chart-5)",
+};
+
+export function fromColorMap(colors: Record<string, string>): ColorFor {
+  return (datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR;
+}
+
+const WEEKDAY_MUTED_COLOR = "#b7d3f6";
+
+/* ------------------------------------------------------------------ */
+/* Category charts                                                     */
+/* ------------------------------------------------------------------ */
+
+export type CategoryViewId =
+  | "bars"
+  | "lollipop"
+  | "columns"
+  | "donut"
+  | "waffle"
+  | "treemap"
+  | "radial"
+  | "radar"
+  | "table";
+
+const CATEGORY_VIEW_META: Record<CategoryViewId, Pick<ChartView, "icon" | "label">> = {
+  bars: { icon: ChartBar, label: "Bars" },
+  lollipop: { icon: CircleDot, label: "Lollipop" },
+  columns: { icon: ChartColumn, label: "Columns" },
+  donut: { icon: Donut, label: "Donut" },
+  waffle: { icon: LayoutGrid, label: "Waffle" },
+  treemap: { icon: LayoutDashboard, label: "Treemap" },
+  radial: { icon: ChartPie, label: "Radial" },
+  radar: { icon: Radar, label: "Radar" },
+  table: { icon: ChartBar, label: "Table" },
+};
+
+// "Total 66 applications · 55 not set" / "Total 11 applications · 55 not set hidden"
+function describeTotal(
+  data: ChartDatum[],
+  unit: string,
+  notSetCount: number,
+  includeNotSet: boolean,
+) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const notSetNote =
+    notSetCount > 0
+      ? ` · ${notSetCount} not set${includeNotSet ? "" : " hidden"}`
+      : "";
+
+  return `Total ${total} ${unit}${notSetNote}`;
+}
+
+export function CategoryChart({
+  chartId,
+  color = "var(--color-primary)",
+  colorFor,
+  data,
+  description,
+  emphasizeMax = false,
+  formatValue = String,
+  limit,
+  maxValue,
+  notSetFilterId,
+  overflowLabel,
+  shortLabel,
+  showShare,
+  summary,
+  title,
+  totalUnit,
+  views,
+}: {
+  chartId: string;
+  // Single colour used when colorFor is not given.
+  color?: string;
+  colorFor?: ColorFor;
+  data: ChartDatum[];
+  description?: string;
+  // Column view highlights the largest value and mutes the rest.
+  emphasizeMax?: boolean;
+  formatValue?: (value: number) => string;
+  limit?: number;
+  maxValue?: number;
+  // Adds an include/exclude "Not set" toggle, remembered per chart.
+  notSetFilterId?: string;
+  // Plural noun for the categories, e.g. "companies".
+  overflowLabel?: string;
+  shortLabel?: (label: string) => string;
+  showShare?: boolean;
+  // Extra content shown above the bars view, e.g. a stacked strip.
+  summary?: (data: ChartDatum[]) => ReactNode;
+  title: string;
+  // When set, the card shows the total count in this unit.
+  totalUnit?: string;
+  // Views offered by the header button, in cycling order.
+  views: CategoryViewId[];
+}) {
+  const [includeNotSet, setIncludeNotSet] = useIncludeNotSet(notSetFilterId);
+  const { hasNotSet, notSetCount, visibleData } = notSetFilterId
+    ? applyNotSetFilter(data, includeNotSet)
+    : { hasNotSet: false, notSetCount: 0, visibleData: data };
+  const resolveColor = colorFor ?? (() => color);
+  const categoryCount = visibleData.filter(
+    (item) => !isNotSetLabel(item.label),
+  ).length;
+  const totalDescription = totalUnit
+    ? [
+        describeTotal(visibleData, totalUnit, notSetCount, includeNotSet),
+        overflowLabel && categoryCount > 0
+          ? `${categoryCount} ${overflowLabel}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
+  const topData = limit ? visibleData.slice(0, limit) : visibleData;
+
+  function renderView(viewId: CategoryViewId) {
+    switch (viewId) {
+      case "bars":
+      case "lollipop":
+        return (
+          <>
+            {viewId === "bars" ? summary?.(visibleData) : null}
+            <HorizontalBarChart
+              colorFor={resolveColor}
+              data={visibleData}
+              formatValue={formatValue}
+              limit={limit}
+              maxValue={maxValue}
+              overflowLabel={overflowLabel}
+              showShare={showShare}
+              unit={totalUnit}
+              variant={viewId}
+            />
+          </>
+        );
+      case "columns":
+        return (
+          <ColumnChart
+            colorFor={(datum, index, isMax) =>
+              emphasizeMax
+                ? isMax
+                  ? resolveColor(datum, index)
+                  : WEEKDAY_MUTED_COLOR
+                : resolveColor(datum, index)
+            }
+            data={topData}
+            shortLabel={shortLabel}
+          />
+        );
+      case "donut":
+        return (
+          <DonutChart
+            colorFor={resolveColor}
+            data={visibleData}
+            totalLabel={totalUnit ?? "total"}
+          />
+        );
+      case "waffle":
+        return <WaffleChart colorFor={resolveColor} data={topData} />;
+      case "treemap":
+        return <TreemapChart colorFor={resolveColor} data={visibleData} />;
+      case "radial":
+        return (
+          <RadialBarChart
+            colorFor={resolveColor}
+            data={visibleData}
+            formatValue={formatValue}
+            maxValue={maxValue}
+          />
+        );
+      case "radar":
+        return (
+          <RadarChart
+            color={resolveColor(visibleData[0] ?? { label: "", value: 0 }, 0)}
+            data={visibleData}
+            shortLabel={shortLabel}
+          />
+        );
+      case "table":
+        return null;
+    }
+  }
+
+  const chartViews = views.map((viewId) =>
+    viewId === "table"
+      ? tableView(["Category", totalUnit ? "Count" : "Value"], visibleData, formatValue)
+      : {
+          ...CATEGORY_VIEW_META[viewId],
+          id: viewId,
+          render: () => renderView(viewId),
+        },
+  );
+
+  return (
+    <ChartCard
+      action={
+        hasNotSet ? (
+          <NotSetToggle includeNotSet={includeNotSet} onChange={setIncludeNotSet} />
+        ) : null
+      }
+      description={
+        [totalDescription, description].filter(Boolean).join(" · ") || undefined
+      }
+      title={title}
+      viewStorageKey={chartId}
+      views={chartViews}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Time charts                                                         */
+/* ------------------------------------------------------------------ */
+
+export function TimeChart({
+  chartId,
+  color,
+  data,
+  description,
+  grouping,
+  title,
+}: {
+  chartId: string;
+  color: string;
+  data: ChartDatum[];
+  description?: string;
+  grouping: TimeGrouping;
+  title: string;
+}) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const periods = fillPeriods(data, grouping);
+
+  return (
+    <ChartCard
+      description={description ?? `${total} total`}
+      title={title}
+      viewStorageKey={chartId}
+      views={[
+        {
+          icon: ChartArea,
+          id: "area",
+          label: "Area",
+          render: () => (
+            <TimeSeriesChart color={color} data={data} grouping={grouping} seriesLabel={title} />
+          ),
+        },
+        {
+          icon: ChartLine,
+          id: "line",
+          label: "Line",
+          render: () => (
+            <TimeSeriesChart
+              color={color}
+              data={data}
+              grouping={grouping}
+              seriesLabel={title}
+              variant="line"
+            />
+          ),
+        },
+        {
+          icon: ChartColumn,
+          id: "columns",
+          label: "Columns",
+          render: () => (
+            <ColumnChart
+              colorFor={() => color}
+              data={periods}
+              shortLabel={(label) => formatPeriod(label, grouping, true)}
+            />
+          ),
+        },
+        tableView(
+          ["Period", "Count"],
+          data.map((item) => ({
+            label: formatPeriod(item.label, grouping, false),
+            value: item.value,
+          })),
+        ),
+      ]}
+    />
+  );
+}
+
+export function ActivityComparisonCard({
+  grouping,
+  series,
+}: {
+  grouping: TimeGrouping;
+  series: ChartSeries[];
+}) {
+  const labels = [
+    ...new Set(series.flatMap((item) => item.data.map((point) => point.label))),
+  ].sort((left, right) => left.localeCompare(right));
+  const periods = fillPeriods(
+    labels.map((label) => ({ label, value: 0 })),
+    grouping,
+  ).map((point) => point.label);
+
+  return (
+    <ChartCard
+      className="xl:col-span-2"
+      description="Applications, interviews and assessments on one timeline"
+      title="Activity comparison"
+      viewStorageKey="activityComparison"
+      views={[
+        {
+          icon: ChartLine,
+          id: "lines",
+          label: "Lines",
+          render: () => <MultiSeriesChart grouping={grouping} series={series} />,
+        },
+        {
+          icon: ChartColumnStacked,
+          id: "stacked",
+          label: "Stacked",
+          render: () => (
+            <StackedColumnChart
+              formatLabel={(label, short) => formatPeriod(label, grouping, short)}
+              labels={periods}
+              series={series.map((item) => {
+                const counts = new Map(item.data.map((point) => [point.label, point.value]));
+                return {
+                  color: item.color,
+                  id: item.id,
+                  label: item.label,
+                  values: periods.map((label) => counts.get(label) ?? 0),
+                };
+              })}
+            />
+          ),
+        },
+        tableView(
+          ["Series", "Total"],
+          series.map((item) => ({
+            label: item.label,
+            value: item.data.reduce((sum, point) => sum + point.value, 0),
+          })),
+        ),
+      ]}
+    />
+  );
 }
