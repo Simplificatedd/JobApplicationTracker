@@ -119,18 +119,33 @@ export function HorizontalBarChart({
   color = "var(--color-primary)",
   data,
   formatValue = String,
+  limit,
   maxValue: fixedMaxValue,
+  overflowLabel = "more",
   showShare = true,
+  unit,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
   color?: string;
   data: ChartDatum[];
   formatValue?: (value: number) => string;
+  // Shows only the first `limit` rows with a "Show all" toggle for the rest,
+  // instead of folding the tail into a misleading "Other" bar.
+  limit?: number;
   maxValue?: number;
+  // Plural noun for hidden rows, e.g. "companies".
+  overflowLabel?: string;
   showShare?: boolean;
+  // Unit for counts in the overflow summary, e.g. "applications".
+  unit?: string;
 }) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const hasMounted = useHasMounted();
+  const isLimited = limit !== undefined && data.length > limit;
+  const visibleData = isLimited && !isExpanded ? data.slice(0, limit) : data;
+  const hiddenData = isLimited ? data.slice(limit) : [];
+  const hiddenTotal = hiddenData.reduce((sum, item) => sum + item.value, 0);
   const maxValue = fixedMaxValue ?? Math.max(1, ...data.map((item) => item.value));
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -139,58 +154,80 @@ export function HorizontalBarChart({
   }
 
   return (
-    <ul className="space-y-2.5" onPointerLeave={() => setActiveLabel(null)}>
-      {data.map((item, index) => {
-        const isActive = activeLabel === item.label;
-        const isDimmed = activeLabel !== null && !isActive;
-        const share = Math.round((item.value / total) * 100);
+    <div>
+      <ul
+        className={`space-y-2.5 ${isExpanded ? "max-h-[22rem] overflow-y-auto pr-1" : ""}`}
+        onPointerLeave={() => setActiveLabel(null)}
+      >
+        {visibleData.map((item, index) => {
+          const isActive = activeLabel === item.label;
+          const isDimmed = activeLabel !== null && !isActive;
+          const share = Math.round((item.value / total) * 100);
 
-        return (
-          <li
-            aria-label={`${item.label}: ${formatValue(item.value)}${showShare ? ` (${share}%)` : ""}`}
-            className={`grid grid-cols-[minmax(5.5rem,8rem)_1fr_2rem] items-center gap-3 sm:grid-cols-[minmax(6.5rem,11rem)_1fr_4.5rem] rounded-md px-1 py-0.5 outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
-              isDimmed ? "opacity-45" : "opacity-100"
-            }`}
-            key={item.label}
-            onBlur={() => setActiveLabel(null)}
-            onFocus={() => setActiveLabel(item.label)}
-            onPointerEnter={() => setActiveLabel(item.label)}
-            tabIndex={0}
-          >
-            <span className="truncate text-sm text-foreground" title={item.label}>
-              {item.label}
-            </span>
-            <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <span
-                className={`block h-full rounded-full transition-[width] duration-700 ease-out ${
-                  barClassName?.(item, index) ?? ""
-                }`}
-                style={{
-                  backgroundColor: barClassName ? undefined : color,
-                  width: hasMounted && item.value > 0
-                    ? `${Math.max(2, (item.value / maxValue) * 100)}%`
-                    : "0%",
-                }}
-              />
-            </span>
-            <span className="text-right text-sm tabular-nums">
-              <span className="font-semibold text-foreground">
-                {formatValue(item.value)}
+          return (
+            <li
+              aria-label={`${item.label}: ${formatValue(item.value)}${showShare ? ` (${share}%)` : ""}`}
+              className={`grid grid-cols-[minmax(5.5rem,8rem)_1fr_2rem] items-center gap-3 sm:grid-cols-[minmax(6.5rem,11rem)_1fr_4.5rem] rounded-md px-1 py-0.5 outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-primary ${
+                isDimmed ? "opacity-45" : "opacity-100"
+              }`}
+              key={item.label}
+              onBlur={() => setActiveLabel(null)}
+              onFocus={() => setActiveLabel(item.label)}
+              onPointerEnter={() => setActiveLabel(item.label)}
+              tabIndex={0}
+            >
+              <span className="truncate text-sm text-foreground" title={item.label}>
+                {item.label}
               </span>
-              {showShare ? (
+              <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <span
-                  className={`ml-1.5 hidden text-xs text-muted transition-opacity sm:inline ${
-                    isActive ? "opacity-100" : "opacity-0"
+                  className={`block h-full rounded-full transition-[width] duration-700 ease-out ${
+                    barClassName?.(item, index) ?? ""
                   }`}
-                >
-                  {share}%
+                  style={{
+                    backgroundColor: barClassName ? undefined : color,
+                    width: hasMounted && item.value > 0
+                      ? `${Math.max(2, (item.value / maxValue) * 100)}%`
+                      : "0%",
+                  }}
+                />
+              </span>
+              <span className="text-right text-sm tabular-nums">
+                <span className="font-semibold text-foreground">
+                  {formatValue(item.value)}
                 </span>
-              ) : null}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+                {showShare ? (
+                  <span
+                    className={`ml-1.5 hidden text-xs text-muted transition-opacity sm:inline ${
+                      isActive ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    {share}%
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {isLimited ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5 text-xs text-muted">
+          <span>
+            {isExpanded
+              ? `Showing all ${data.length} ${overflowLabel}`
+              : `+${formatValue(hiddenTotal)}${unit ? ` ${unit}` : ""} across ${hiddenData.length} more ${overflowLabel}`}
+          </span>
+          <button
+            aria-expanded={isExpanded}
+            className="rounded-md px-2 py-1 font-semibold text-primary hover:bg-blue-50"
+            onClick={() => setIsExpanded((current) => !current)}
+            type="button"
+          >
+            {isExpanded ? `Show top ${limit}` : `Show all ${data.length}`}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
