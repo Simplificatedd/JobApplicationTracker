@@ -34,6 +34,7 @@ import {
   getStatusColor,
   JOB_TYPE_COLORS,
   RESPONSE_TIME_SHORT_LABELS,
+  StatusFlowCard,
   TimeChart,
   WORK_MODE_COLORS,
 } from "./chartCards";
@@ -44,6 +45,7 @@ import {
   deriveInterviewTypes,
   deriveJobTypeMix,
   deriveResponseRateBySource,
+  deriveStatusTransitions,
   deriveTimeToFirstResponse,
   deriveTopCompanies,
   deriveWorkModeMix,
@@ -71,6 +73,7 @@ const chartOptions: Array<{
   { group: "Activity", id: "applicationsOverTime", label: "Applications over time" },
   { group: "Activity", id: "cumulativeApplications", label: "Cumulative applications" },
   { group: "Pipeline and outcomes", id: "statusPipeline", label: "Pipeline by status" },
+  { group: "Pipeline and outcomes", id: "statusFlow", label: "Status flow" },
   { group: "Pipeline and outcomes", id: "followUpLoad", label: "Follow-up load" },
   { group: "Activity", id: "activityCalendar", label: "Activity calendar" },
   { group: "Activity", id: "statusChangesOverTime", label: "Status changes over time" },
@@ -355,6 +358,9 @@ export function AnalyticsPage({
               views={["bars", "treemap", "waffle", "columns", "table"]}
               data={derivePipelineByStatus(rangedApplications)}
             />
+          ) : null}
+          {visibleCharts.has("statusFlow") ? (
+            <StatusFlowCard links={deriveStatusTransitions(rangedActivities)} />
           ) : null}
           {visibleCharts.has("followUpLoad") ? (
             <CategoryChart

@@ -10,9 +10,10 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Radar,
+  Workflow,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { STATUS_TONE } from "../../lib/constants";
+import { APPLICATION_STATUSES, STATUS_TONE } from "../../lib/constants";
 import {
   APPLICATION_OUTCOME_PATH_LABELS,
   type ApplicationOutcomePath,
@@ -26,6 +27,8 @@ import {
   tableView,
 } from "./charts";
 import {
+  FlowChart,
+  type FlowLink,
   RadarChart,
   RadialBarChart,
   StackedColumnChart,
@@ -515,6 +518,53 @@ export function ActivityComparisonCard({
             value: item.data.reduce((sum, point) => sum + point.value, 0),
           })),
         ),
+      ]}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Status flow                                                         */
+/* ------------------------------------------------------------------ */
+
+export function StatusFlowCard({ links }: { links: FlowLink[] }) {
+  const pairs = links.map((link) => ({
+    label: `${link.from} → ${link.to}`,
+    value: link.value,
+  }));
+  const total = links.reduce((sum, link) => sum + link.value, 0);
+  const colorForStatus = (label: string) => getStatusColor({ label, value: 0 });
+
+  return (
+    <ChartCard
+      className="xl:col-span-2"
+      description={`${total} recorded status ${total === 1 ? "change" : "changes"}`}
+      title="Status flow"
+      viewStorageKey="statusFlow"
+      views={[
+        {
+          icon: Workflow,
+          id: "flow",
+          label: "Flow",
+          render: () => (
+            <FlowChart colorFor={colorForStatus} links={links} order={APPLICATION_STATUSES} />
+          ),
+        },
+        {
+          icon: ChartBar,
+          id: "bars",
+          label: "Bars",
+          render: () => (
+            <HorizontalBarChart
+              colorFor={(datum) => colorForStatus(datum.label.split(" → ")[1] ?? "")}
+              data={pairs}
+              limit={10}
+              overflowLabel="transitions"
+              unit="changes"
+            />
+          ),
+        },
+        tableView(["Change", "Count"], pairs),
       ]}
     />
   );

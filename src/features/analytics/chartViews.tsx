@@ -630,3 +630,150 @@ export function StackedColumnChart({
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Flow (one-step Sankey)                                              */
+/* ------------------------------------------------------------------ */
+
+export interface FlowLink {
+  from: string;
+  to: string;
+  value: number;
+}
+
+const FLOW_HEIGHT = 280;
+const FLOW_NODE_WIDTH = 10;
+const FLOW_NODE_GAP = 10;
+const FLOW_LABEL_SPACE = 132;
+
+export function FlowChart({
+  colorFor,
+  links,
+  order,
+}: {
+  colorFor: (label: string) => string;
+  links: FlowLink[];
+  // Node order top to bottom on both sides.
+  order: readonly string[];
+}) {
+  const [containerRef, width] = useElementWidth();
+  const [activeLink, setActiveLink] = useState<string | null>(null);
+  const hasMounted = useHasMounted();
+  const total = links.reduce((sum, link) => sum + link.value, 0);
+
+  if (total === 0) {
+    return <EmptyChart message="No status changes recorded yet." />;
+  }
+
+  const sortByOrder = (labels: string[]) =>
+    [...new Set(labels)].sort((left, right) => order.indexOf(left) - order.indexOf(right));
+  const sources = sortByOrder(links.map((link) => link.from));
+  const targets = sortByOrder(links.map((link) => link.to));
+  const sumFor = (label: string, side: "from" | "to") =>
+    links.filter((link) => link[side] === label).reduce((sum, link) => sum + link.value, 0);
+  const maxNodes = Math.max(sources.length, targets.length);
+  const scale = (FLOW_HEIGHT - FLOW_NODE_GAP * (maxNodes - 1)) / total;
+
+  function layoutNodes(labels: string[], side: "from" | "to") {
+    let y = 0;
+    return new Map(
+      labels.map((label) => {
+        const height = Math.max(2, sumFor(label, side) * scale);
+        const node = { height, y };
+        y += height + FLOW_NODE_GAP;
+        return [label, node] as const;
+      }),
+    );
+  }
+
+  const sourceNodes = layoutNodes(sources, "from");
+  const targetNodes = layoutNodes(targets, "to");
+  const leftX = FLOW_LABEL_SPACE;
+  const rightX = Math.max(leftX + 80, width - FLOW_LABEL_SPACE);
+  const sourceOffsets = new Map(sources.map((label) => [label, 0]));
+  const targetOffsets = new Map(targets.map((label) => [label, 0]));
+  const orderedLinks = [...links].sort(
+    (left, right) =>
+      order.indexOf(left.from) - order.indexOf(right.from) ||
+      order.indexOf(left.to) - order.indexOf(right.to),
+  );
+  const ribbons = orderedLinks.map((link) => {
+    const thickness = Math.max(1.5, link.value * scale);
+    const source = sourceNodes.get(link.from)!;
+    const target = targetNodes.get(link.to)!;
+    const y0 = source.y + (sourceOffsets.get(link.from) ?? 0);
+    const y1 = target.y + (targetOffsets.get(link.to) ?? 0);
+    sourceOffsets.set(link.from, (sourceOffsets.get(link.from) ?? 0) + thickness);
+    targetOffsets.set(link.to, (targetOffsets.get(link.to) ?? 0) + thickness);
+    const x0 = leftX + FLOW_NODE_WIDTH;
+    const x1 = rightX;
+    const midX = (x0 + x1) / 2;
+
+    return {
+      key: `${link.from}→${link.to}`,
+      link,
+      path: `M${x0},${y0} C${midX},${y0} ${midX},${y1} ${x1},${y1} L${x1},${y1 + thickness} C${midX},${y1 + thickness} ${midX},${y0 + thickness} ${x0},${y0 + thickness} Z`,
+    };
+  });
+  const active = ribbons.find((ribbon) => ribbon.key === activeLink);
+
+  return (
+    <div ref={containerRef}>
+      {width > 0 ? (
+        <svg
+          aria-label={links.map((link) => `${link.from} to ${link.to}: ${link.value}`).join(", ")}
+          className="block overflow-visible"
+          height={FLOW_HEIGHT}
+          onPointerLeave={() => setActiveLink(null)}
+          role="img"
+          width={width}
+        >
+          {ribbons.map((ribbon) => (
+            <path
+              d={ribbon.path}
+              fill={colorFor(ribbon.link.from)}
+              key={ribbon.key}
+              onPointerEnter={() => setActiveLink(ribbon.key)}
+              opacity={!hasMounted ? 0 : activeLink === null ? 0.4 : activeLink === ribbon.key ? 0.75 : 0.12}
+              style={{ cursor: "pointer", transition: "opacity 400ms ease-out" }}
+            />
+          ))}
+          {[...sourceNodes].map(([label, node]) => (
+            <g key={`from-${label}`}>
+              <rect fill={colorFor(label)} height={node.height} rx={2} width={FLOW_NODE_WIDTH} x={leftX} y={node.y} />
+              <text
+                className="fill-foreground text-[11px]"
+                dominantBaseline="middle"
+                textAnchor="end"
+                x={leftX - 8}
+                y={node.y + node.height / 2}
+              >
+                {label} · {sumFor(label, "from")}
+              </text>
+            </g>
+          ))}
+          {[...targetNodes].map(([label, node]) => (
+            <g key={`to-${label}`}>
+              <rect fill={colorFor(label)} height={node.height} rx={2} width={FLOW_NODE_WIDTH} x={rightX} y={node.y} />
+              <text
+                className="fill-foreground text-[11px]"
+                dominantBaseline="middle"
+                x={rightX + FLOW_NODE_WIDTH + 8}
+                y={node.y + node.height / 2}
+              >
+                {label} · {sumFor(label, "to")}
+              </text>
+            </g>
+          ))}
+        </svg>
+      ) : (
+        <div style={{ height: FLOW_HEIGHT }} />
+      )}
+      <p className="mt-2 h-4 truncate text-xs text-muted">
+        {active
+          ? `${active.link.from} → ${active.link.to}: ${active.link.value} ${active.link.value === 1 ? "change" : "changes"}`
+          : "Left: status before · Right: status after · hover a flow"}
+      </p>
+    </div>
+  );
+}
