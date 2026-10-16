@@ -1,9 +1,11 @@
 import {
   Bell,
+  CircleCheck,
   Cloud,
   Download,
   FileDown,
   FileUp,
+  HardDriveDownload,
   LogOut,
   type LucideIcon,
   RotateCcw,
@@ -11,6 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Table2,
+  TriangleAlert,
   UserRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -46,7 +49,16 @@ export function SettingsPage({
   const [backupStatus, setBackupStatus] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
+  // Remounts the file input so the same file can be chosen again after cancel.
+  const [importInputKey, setImportInputKey] = useState(0);
   const activeSection = useActiveSection();
+
+  function clearBackupSelection() {
+    setBackupFile(null);
+    setBackupPreview(null);
+    setBackupError("");
+    setImportInputKey((current) => current + 1);
+  }
 
   async function exportFullBackup() {
     setBackupError("");
@@ -111,6 +123,7 @@ export function SettingsPage({
       setBackupStatus("Backup restored.");
       setBackupFile(null);
       setBackupPreview(null);
+      setImportInputKey((current) => current + 1);
     } catch (error) {
       setBackupError(getErrorMessage(error));
     } finally {
@@ -203,68 +216,102 @@ export function SettingsPage({
               Sign out
             </a>
           </div>
+        </SettingsSection>
+
+        <SettingsSection
+          description="Download your data or restore it from a backup file."
+          icon={HardDriveDownload}
+          id="data"
+          title="Backup and export"
+        >
+          <div className="grid gap-3 py-4 sm:grid-cols-2">
+            <ExportTile
+              description="Everything, including files, as JSON. Use this to restore later."
+              icon={FileDown}
+              label="Full backup"
+              onClick={exportFullBackup}
+            />
+            <ExportTile
+              description="Applications as a spreadsheet-friendly CSV."
+              icon={Download}
+              label="CSV export"
+              onClick={exportCsv}
+            />
+          </div>
           <div className="space-y-3 py-4">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <ActionButton onClick={exportFullBackup}>
-                <FileDown aria-hidden="true" size={16} />
-                Full backup
-              </ActionButton>
-              <ActionButton onClick={exportCsv}>
-                <Download aria-hidden="true" size={16} />
-                CSV export
-              </ActionButton>
-            </div>
-            <label className="block rounded-lg border border-border bg-surface px-3 py-3">
-              <SettingLabel
-                description="Preview a tracker backup before replacing your cloud data."
-                label="Import backup"
-              />
+            <SettingLabel
+              description="Preview a tracker backup before replacing your cloud data."
+              label="Import backup"
+            />
+            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-primary/50 hover:bg-blue-50/40 focus-within:shadow-[var(--focus-ring)]">
+              <FileUp aria-hidden="true" className="text-muted" size={20} />
+              <span className="text-sm font-medium text-foreground">
+                {backupFile ? backupFile.name : "Drop a backup file here or click to browse"}
+              </span>
+              <span className="text-xs text-muted">JSON backups exported from this tracker</span>
               <input
                 accept="application/json,.json"
-                className="field-control mt-3"
+                aria-label="Import backup"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                key={importInputKey}
                 onChange={(event) => previewBackup(event.target.files?.[0])}
                 type="file"
               />
             </label>
             {backupPreview ? (
-              <div className="rounded-lg border border-border bg-surface px-3 py-3 text-sm text-foreground">
-                <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-3 text-sm text-foreground">
+                <p className="flex items-center gap-2 font-semibold text-amber-900">
+                  <TriangleAlert aria-hidden="true" size={16} />
+                  This backup will replace all of your cloud data
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <PreviewCount label="Applications" value={backupPreview.applications} />
                   <PreviewCount label="Contacts" value={backupPreview.contacts} />
                   <PreviewCount label="Activities" value={backupPreview.activities} />
-                  <PreviewCount
-                    label="Interviews"
-                    value={backupPreview.interviews}
-                  />
+                  <PreviewCount label="Interviews" value={backupPreview.interviews} />
                   <PreviewCount label="Assessments" value={backupPreview.assessments} />
                   <PreviewCount label="Resumes" value={backupPreview.resumes} />
                   <PreviewCount label="Files" value={backupPreview.resumeFiles} />
-                  <PreviewCount
-                    label="Cover letters"
-                    value={backupPreview.coverLetters}
-                  />
+                  <PreviewCount label="Cover letters" value={backupPreview.coverLetters} />
                   <PreviewCount
                     label="Cover letter files"
                     value={backupPreview.coverLetterFiles}
                   />
                 </div>
-                <button
-                  className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isImportingBackup}
-                  onClick={importBackup}
-                  type="button"
-                >
-                  <FileUp aria-hidden="true" size={16} />
-                  Replace cloud data
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isImportingBackup}
+                    onClick={importBackup}
+                    type="button"
+                  >
+                    <FileUp aria-hidden="true" size={16} />
+                    Replace cloud data
+                  </button>
+                  <button
+                    className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    disabled={isImportingBackup}
+                    onClick={clearBackupSelection}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : null}
             {backupError ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-destructive">
+              <p
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-destructive"
+                role="alert"
+              >
                 {backupError}
               </p>
             ) : backupStatus ? (
-              <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-info">
+              <p
+                className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-success"
+                role="status"
+              >
+                <CircleCheck aria-hidden="true" size={16} />
                 {backupStatus}
               </p>
             ) : null}
@@ -445,6 +492,7 @@ export function SettingsPage({
 
 const SETTINGS_SECTIONS = [
   { id: "account", label: "Account", icon: UserRound },
+  { id: "data", label: "Backup and export", icon: HardDriveDownload },
   { id: "general", label: "General", icon: SlidersHorizontal },
   { id: "contacts", label: "Contacts and safety", icon: ShieldCheck },
   { id: "table", label: "Applications table", icon: Table2 },
@@ -558,29 +606,39 @@ function SettingsSection({
   );
 }
 
-function ActionButton({
-  children,
+function ExportTile({
+  description,
+  icon: Icon,
+  label,
   onClick,
 }: {
-  children: React.ReactNode;
+  description: string;
+  icon: LucideIcon;
+  label: string;
   onClick: () => void;
 }) {
   return (
     <button
-      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      className="group flex items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left transition hover:border-primary/40 hover:bg-blue-50/40"
       onClick={onClick}
       type="button"
     >
-      {children}
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-foreground group-hover:bg-blue-100 group-hover:text-primary">
+        <Icon aria-hidden="true" size={16} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-foreground">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted">{description}</span>
+      </span>
     </button>
   );
 }
 
 function PreviewCount({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md bg-slate-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+    <div className="rounded-md bg-surface px-3 py-2">
+      <p className="text-xs font-medium text-muted">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
