@@ -9,7 +9,6 @@ import {
   LogOut,
   type LucideIcon,
   RotateCcw,
-  Settings,
   ShieldCheck,
   SlidersHorizontal,
   Table2,
@@ -144,47 +143,9 @@ export function SettingsPage({
       <SettingsNav activeSection={activeSection} />
 
       <div className="min-w-0 max-w-4xl space-y-5">
-        <section className="surface-panel rounded-lg px-4 py-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Settings aria-hidden="true" className="text-muted" size={22} />
-              <h2 className="text-lg font-semibold text-foreground">
-                Tracker preferences
-              </h2>
-            </div>
-            {isConfirmingReset ? (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
-                  onClick={() => {
-                    onResetSettings();
-                    setIsConfirmingReset(false);
-                  }}
-                  type="button"
-                >
-                  <RotateCcw aria-hidden="true" size={16} />
-                  Confirm reset
-                </button>
-                <button
-                  className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-                  onClick={() => setIsConfirmingReset(false)}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-                onClick={() => setIsConfirmingReset(true)}
-                type="button"
-              >
-                <RotateCcw aria-hidden="true" size={16} />
-                Reset
-              </button>
-            )}
-          </div>
-        </section>
+        <p className="text-sm text-muted">
+          Changes save automatically and sync to your signed-in devices.
+        </p>
 
         <SettingsSection
           description="Your signed-in cloud workspace."
@@ -494,6 +455,50 @@ export function SettingsPage({
           />
         </SettingsSection>
 
+        <SettingsSection
+          description="Restore every preference on this page to its default."
+          icon={RotateCcw}
+          id="reset"
+          title="Reset preferences"
+          tone="danger"
+        >
+          <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs leading-5 text-muted">
+              Your applications, contacts and files are not affected.
+            </p>
+            {isConfirmingReset ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                  onClick={() => {
+                    onResetSettings();
+                    setIsConfirmingReset(false);
+                  }}
+                  type="button"
+                >
+                  <RotateCcw aria-hidden="true" size={16} />
+                  Confirm reset
+                </button>
+                <button
+                  className="h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                  onClick={() => setIsConfirmingReset(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
+                onClick={() => setIsConfirmingReset(true)}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" size={16} />
+                Reset preferences
+              </button>
+            )}
+          </div>
+        </SettingsSection>
       </div>
     </div>
   );
@@ -506,6 +511,7 @@ const SETTINGS_SECTIONS = [
   { id: "contacts", label: "Contacts and safety", icon: ShieldCheck },
   { id: "table", label: "Applications table", icon: Table2 },
   { id: "alerts", label: "Notifications and labs", icon: Bell },
+  { id: "reset", label: "Reset", icon: RotateCcw },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -580,23 +586,29 @@ function SettingsSection({
   icon: Icon,
   id,
   title,
+  tone = "default",
 }: {
   children: React.ReactNode;
   description: string;
   icon: LucideIcon;
   id: SettingsSectionId;
   title: string;
+  tone?: "default" | "danger";
 }) {
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className="surface-panel scroll-mt-28 rounded-lg"
+      className={`surface-panel scroll-mt-28 rounded-lg ${
+        tone === "danger" ? "border-red-200" : ""
+      }`}
       id={`settings-${id}`}
     >
       <header className="flex items-start gap-3 border-b border-border px-4 py-3 sm:px-5">
         <span
           aria-hidden="true"
-          className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary"
+          className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+            tone === "danger" ? "bg-red-50 text-destructive" : "bg-blue-50 text-primary"
+          }`}
         >
           <Icon size={16} />
         </span>
