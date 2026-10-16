@@ -30,6 +30,18 @@ import {
   formatPeriod,
   TimeSeriesChart,
 } from "./TimeSeriesChart";
+import {
+  deriveApplicationsBySource,
+  deriveAppliedByWeekday,
+  deriveAssessmentTypes,
+  deriveInterviewTypes,
+  deriveJobTypeMix,
+  deriveResponseRateBySource,
+  deriveTimeToFirstResponse,
+  deriveTopCompanies,
+  deriveWorkModeMix,
+  toCumulative,
+} from "./extraMetrics";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -41,16 +53,32 @@ interface AnalyticsPageProps {
   userSettings: UserSettings;
 }
 
-const chartOptions = [
-  { id: "applicationsOverTime", label: "Applications over time" },
-  { id: "statusPipeline", label: "Pipeline by status" },
-  { id: "followUpLoad", label: "Follow-up load" },
-  { id: "activityCalendar", label: "Activity calendar" },
-  { id: "statusChangesOverTime", label: "Status changes over time" },
-  { id: "interviewsOverTime", label: "Interviews over time" },
-  { id: "assessmentsOverTime", label: "Assessment invitations over time" },
-  { id: "outcomes", label: "Offers and rejections" },
-  { id: "applicationPaths", label: "Application paths" },
+const CHART_GROUPS = ["Activity", "Pipeline and outcomes", "Breakdowns"] as const;
+
+const chartOptions: Array<{
+  group: (typeof CHART_GROUPS)[number];
+  id: string;
+  label: string;
+}> = [
+  { group: "Activity", id: "applicationsOverTime", label: "Applications over time" },
+  { group: "Activity", id: "cumulativeApplications", label: "Cumulative applications" },
+  { group: "Pipeline and outcomes", id: "statusPipeline", label: "Pipeline by status" },
+  { group: "Pipeline and outcomes", id: "followUpLoad", label: "Follow-up load" },
+  { group: "Activity", id: "activityCalendar", label: "Activity calendar" },
+  { group: "Activity", id: "statusChangesOverTime", label: "Status changes over time" },
+  { group: "Activity", id: "interviewsOverTime", label: "Interviews over time" },
+  { group: "Activity", id: "assessmentsOverTime", label: "Assessment invitations over time" },
+  { group: "Pipeline and outcomes", id: "outcomes", label: "Offers and rejections" },
+  { group: "Pipeline and outcomes", id: "applicationPaths", label: "Application paths" },
+  { group: "Pipeline and outcomes", id: "responseRateBySource", label: "Response rate by source" },
+  { group: "Pipeline and outcomes", id: "timeToFirstResponse", label: "Time to first response" },
+  { group: "Breakdowns", id: "applicationsBySource", label: "Applications by source" },
+  { group: "Breakdowns", id: "topCompanies", label: "Top companies" },
+  { group: "Breakdowns", id: "workModeMix", label: "Work mode" },
+  { group: "Breakdowns", id: "jobTypeMix", label: "Job type" },
+  { group: "Breakdowns", id: "appliedByWeekday", label: "Applications by weekday" },
+  { group: "Breakdowns", id: "interviewTypes", label: "Interview stage types" },
+  { group: "Breakdowns", id: "assessmentTypes", label: "Assessment types" },
 ];
 
 export function AnalyticsPage({
@@ -189,31 +217,44 @@ export function AnalyticsPage({
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
               Analytics settings
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {chartOptions.map((chart) => {
-                const isVisible = visibleCharts.has(chart.id);
+            <div className="mt-3 space-y-3">
+              {CHART_GROUPS.map((group) => (
+                <fieldset className="min-w-0" key={group}>
+                  <legend className="mb-2 text-xs font-medium text-muted">
+                    {group}
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {chartOptions
+                      .filter((chart) => chart.group === group)
+                      .map((chart) => {
+                        const isVisible = visibleCharts.has(chart.id);
 
-                return (
-                  <label
-                    className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                      isVisible
-                        ? "border-primary/40 bg-blue-50 text-foreground"
-                        : "border-border bg-surface text-muted hover:text-foreground"
-                    }`}
-                    key={chart.id}
-                  >
-                    <input
-                      checked={isVisible}
-                      className="h-4 w-4 shrink-0 rounded border-border text-primary"
-                      onChange={(event) =>
-                        toggleChart(chart.id, event.target.checked)
-                      }
-                      type="checkbox"
-                    />
-                    <span className="min-w-0 break-words">{chart.label}</span>
-                  </label>
-                );
-              })}
+                        return (
+                          <label
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                              isVisible
+                                ? "border-primary/40 bg-blue-50 text-foreground"
+                                : "border-border bg-surface text-muted hover:text-foreground"
+                            }`}
+                            key={chart.id}
+                          >
+                            <input
+                              checked={isVisible}
+                              className="h-4 w-4 shrink-0 rounded border-border text-primary"
+                              onChange={(event) =>
+                                toggleChart(chart.id, event.target.checked)
+                              }
+                              type="checkbox"
+                            />
+                            <span className="min-w-0 break-words">
+                              {chart.label}
+                            </span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </fieldset>
+              ))}
             </div>
           </div>
         ) : null}
@@ -247,6 +288,22 @@ export function AnalyticsPage({
               data={deriveApplicationsOverTime(
                 rangedApplications,
                 analyticsSettings.defaultTimeGrouping,
+              )}
+            />
+          ) : null}
+          {visibleCharts.has("cumulativeApplications") ? (
+            <TimeChart
+              description="Running total within the selected range"
+              grouping={analyticsSettings.defaultTimeGrouping}
+              title="Cumulative applications"
+              data={toCumulative(
+                fillPeriods(
+                  deriveApplicationsOverTime(
+                    rangedApplications,
+                    analyticsSettings.defaultTimeGrouping,
+                  ),
+                  analyticsSettings.defaultTimeGrouping,
+                ),
               )}
             />
           ) : null}
@@ -317,6 +374,66 @@ export function AnalyticsPage({
                 scopedInterviews,
                 scopedAssessments,
               )}
+            />
+          ) : null}
+          {visibleCharts.has("responseRateBySource") ? (
+            <CategoryChart
+              description="Share of applications past Awaiting Response (count in brackets)"
+              formatValue={(value) => `${value}%`}
+              maxValue={100}
+              showShare={false}
+              title="Response rate by source"
+              data={deriveResponseRateBySource(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("timeToFirstResponse") ? (
+            <CategoryChart
+              description="Days from applying to the first status change"
+              title="Time to first response"
+              data={deriveTimeToFirstResponse(rangedApplications, scopedActivities)}
+            />
+          ) : null}
+          {visibleCharts.has("applicationsBySource") ? (
+            <CategoryChart
+              title="Applications by source"
+              data={deriveApplicationsBySource(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("topCompanies") ? (
+            <CategoryChart
+              title="Top companies"
+              data={deriveTopCompanies(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("workModeMix") ? (
+            <CategoryChart
+              title="Work mode"
+              data={deriveWorkModeMix(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("jobTypeMix") ? (
+            <CategoryChart
+              title="Job type"
+              data={deriveJobTypeMix(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("appliedByWeekday") ? (
+            <CategoryChart
+              description="Which days you tend to apply"
+              title="Applications by weekday"
+              data={deriveAppliedByWeekday(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("interviewTypes") ? (
+            <CategoryChart
+              title="Interview stage types"
+              data={deriveInterviewTypes(rangedInterviews)}
+            />
+          ) : null}
+          {visibleCharts.has("assessmentTypes") ? (
+            <CategoryChart
+              title="Assessment types"
+              data={deriveAssessmentTypes(rangedAssessments)}
             />
           ) : null}
           {visibleCharts.has("activityCalendar") ? (
@@ -481,11 +598,17 @@ function CategoryChart({
   barClassName,
   data,
   description,
+  formatValue,
+  maxValue,
+  showShare,
   title,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
   data: ChartDatum[];
   description?: string;
+  formatValue?: (value: number) => string;
+  maxValue?: number;
+  showShare?: boolean;
   title: string;
 }) {
   return (
@@ -494,17 +617,25 @@ function CategoryChart({
       table={{ columns: ["Category", "Count"], rows: data }}
       title={title}
     >
-      <HorizontalBarChart barClassName={barClassName} data={data} />
+      <HorizontalBarChart
+        barClassName={barClassName}
+        data={data}
+        formatValue={formatValue}
+        maxValue={maxValue}
+        showShare={showShare}
+      />
     </ChartCard>
   );
 }
 
 function TimeChart({
   data,
+  description,
   grouping,
   title,
 }: {
   data: ChartDatum[];
+  description?: string;
   grouping: AnalyticsSettings["defaultTimeGrouping"];
   title: string;
 }) {
@@ -512,7 +643,7 @@ function TimeChart({
 
   return (
     <ChartCard
-      description={`${total} total`}
+      description={description ?? `${total} total`}
       table={{
         columns: ["Period", "Count"],
         rows: data.map((item) => ({
