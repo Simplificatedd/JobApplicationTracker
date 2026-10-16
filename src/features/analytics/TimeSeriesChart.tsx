@@ -20,11 +20,14 @@ export function TimeSeriesChart({
   data,
   grouping,
   seriesLabel,
+  variant = "area",
 }: {
   color?: string;
   data: ChartDatum[];
   grouping: TimeGrouping;
   seriesLabel: string;
+  // "line" drops the filled area and always shows point markers.
+  variant?: "area" | "line";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -68,7 +71,7 @@ export function TimeSeriesChart({
   const areaPath = `${linePath} L${xFor(points.length - 1)},${yFor(0)} L${xFor(0)},${yFor(0)} Z`;
   const yTicks = [0, yMax / 2, yMax];
   const xLabelIndexes = getXLabelIndexes(points.length, plotWidth);
-  const showMarkers = points.length <= 40;
+  const showMarkers = variant === "line" || points.length <= 40;
   const activePoint = activeIndex === null ? null : points[activeIndex];
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -159,12 +162,14 @@ export function TimeSeriesChart({
               {formatPeriod(points[index].label, grouping, true)}
             </text>
           ))}
-          <path
-            className="transition-opacity duration-700"
-            d={areaPath}
-            fill={`url(#${gradientId})`}
-            opacity={hasMounted ? 1 : 0}
-          />
+          {variant === "area" ? (
+            <path
+              className="transition-opacity duration-700"
+              d={areaPath}
+              fill={`url(#${gradientId})`}
+              opacity={hasMounted ? 1 : 0}
+            />
+          ) : null}
           <path
             d={linePath}
             fill="none"
@@ -185,7 +190,9 @@ export function TimeSeriesChart({
                     cy={yFor(point.value)}
                     fill={color}
                     key={point.label}
-                    r={2.5}
+                    r={variant === "line" ? 3.5 : 2.5}
+                    stroke={variant === "line" ? "var(--color-surface)" : undefined}
+                    strokeWidth={variant === "line" ? 1.5 : undefined}
                   />
                 ) : null,
               )
