@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   UserRound,
 } from "lucide-react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
@@ -52,7 +52,7 @@ export function SettingsPage({
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   // Remounts the file input so the same file can be chosen again after cancel.
   const [importInputKey, setImportInputKey] = useState(0);
-  const activeSection = useActiveSection();
+  const [activeSection, selectSection] = useActiveSection();
   const visibleColumnCount = APPLICATION_TABLE_COLUMNS.filter(
     (column) =>
       !column.canHide || settings.visibleApplicationColumns.includes(column.id),
@@ -146,7 +146,7 @@ export function SettingsPage({
 
   return (
     <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-6">
-      <SettingsNav activeSection={activeSection} />
+      <SettingsNav activeSection={activeSection} onSelect={selectSection} />
 
       <div className="min-w-0 max-w-4xl space-y-5">
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 px-5 py-5 text-white shadow-sm sm:px-6">
@@ -644,35 +644,65 @@ const SECTION_ACCENTS: Record<
   },
 };
 
-// Highlights the section currently nearest the top of the viewport.
+// Highlights the last section whose top has scrolled past the sticky page
+// header, or the final section once the page is scrolled to the bottom.
+const ACTIVE_SECTION_OFFSET = 140;
+
 function useActiveSection() {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("account");
+  // After a nav click, keep the clicked section highlighted while the smooth
+  // scroll settles, even if it cannot reach the top of the page.
+  const pinnedUntilRef = useRef(0);
+
+  function selectSection(id: SettingsSectionId) {
+    pinnedUntilRef.current = Date.now() + 1000;
+    setActiveSection(id);
+  }
 
   useEffect(() => {
-    const sections = SETTINGS_SECTIONS.map((section) =>
-      document.getElementById(`settings-${section.id}`),
-    ).filter((element): element is HTMLElement => element !== null);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
+    function updateActiveSection() {
+      if (Date.now() < pinnedUntilRef.current) {
+        return;
+      }
 
-        if (visible[0]) {
-          setActiveSection(visible[0].target.id.replace("settings-", "") as SettingsSectionId);
+      const isAtBottom =
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 2;
+      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
+
+      SETTINGS_SECTIONS.forEach((section) => {
+        const element = document.getElementById(`settings-${section.id}`);
+
+        if (element && element.getBoundingClientRect().top <= ACTIVE_SECTION_OFFSET) {
+          current = section.id;
         }
-      },
-      { rootMargin: "-96px 0px -55% 0px" },
-    );
+      });
 
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+      setActiveSection(
+        isAtBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current,
+      );
+    }
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
   }, []);
 
-  return activeSection;
+  return [activeSection, selectSection] as const;
 }
 
-function SettingsNav({ activeSection }: { activeSection: SettingsSectionId }) {
+function SettingsNav({
+  activeSection,
+  onSelect,
+}: {
+  activeSection: SettingsSectionId;
+  onSelect: (id: SettingsSectionId) => void;
+}) {
   return (
     <nav
       aria-label="Settings sections"
@@ -695,6 +725,7 @@ function SettingsNav({ activeSection }: { activeSection: SettingsSectionId }) {
             key={section.id}
             onClick={(event) => {
               event.preventDefault();
+              onSelect(section.id);
               document
                 .getElementById(`settings-${section.id}`)
                 ?.scrollIntoView({ behavior: "smooth", block: "start" });
