@@ -16,6 +16,10 @@ export function ColumnChart({
   const hasMounted = useHasMounted();
   const maxValue = Math.max(0, ...data.map((item) => item.value));
   const total = data.reduce((sum, item) => sum + item.value, 0);
+  // Many columns (for example weekly periods) only label every few columns
+  // and show values on hover to avoid overlapping text.
+  const isDense = data.length > 12;
+  const labelEvery = isDense ? Math.ceil(data.length / 8) : 1;
 
   if (data.length === 0 || total === 0) {
     return <EmptyChart />;
@@ -23,7 +27,7 @@ export function ColumnChart({
 
   return (
     <div
-      className="flex items-end gap-2"
+      className={`flex items-end ${isDense ? "gap-0.5" : "gap-2"}`}
       onPointerLeave={() => setActiveLabel(null)}
     >
       {data.map((item, index) => {
@@ -47,7 +51,11 @@ export function ColumnChart({
               className="flex w-full flex-col items-center justify-end gap-1"
               style={{ height: PLOT_HEIGHT + 20 }}
             >
-              <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-foreground">
+              <span
+                className={`whitespace-nowrap text-xs font-semibold tabular-nums text-foreground ${
+                  isDense && !isActive ? "invisible" : ""
+                }`}
+              >
                 {isActive ? `${item.value} · ${share}%` : item.value}
               </span>
               <div
@@ -62,7 +70,7 @@ export function ColumnChart({
               className="w-full truncate border-t border-border pt-1.5 text-center text-xs text-muted"
               title={item.label}
             >
-              {shortLabel(item.label)}
+              {index % labelEvery === 0 ? shortLabel(item.label) : "\u00a0"}
             </span>
           </div>
         );
