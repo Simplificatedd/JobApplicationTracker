@@ -16,10 +16,12 @@ const PADDING = { top: 16, right: 16, bottom: 28, left: 36 };
 const MAX_FILLED_PERIODS = 400;
 
 export function TimeSeriesChart({
+  color = "var(--color-primary)",
   data,
   grouping,
   seriesLabel,
 }: {
+  color?: string;
   data: ChartDatum[];
   grouping: TimeGrouping;
   seriesLabel: string;
@@ -113,8 +115,8 @@ export function TimeSeriesChart({
         >
           <defs>
             <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+              <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
             </linearGradient>
           </defs>
           {yTicks.map((tick) => (
@@ -167,7 +169,7 @@ export function TimeSeriesChart({
             d={linePath}
             fill="none"
             pathLength={1}
-            stroke="var(--color-primary)"
+            stroke={color}
             strokeDasharray="1"
             strokeDashoffset={hasMounted ? 0 : 1}
             strokeLinecap="round"
@@ -181,7 +183,7 @@ export function TimeSeriesChart({
                   <circle
                     cx={xFor(index)}
                     cy={yFor(point.value)}
-                    fill="var(--color-primary)"
+                    fill={color}
                     key={point.label}
                     r={2.5}
                   />
@@ -201,7 +203,7 @@ export function TimeSeriesChart({
               <circle
                 cx={xFor(activeIndex)}
                 cy={yFor(activePoint.value)}
-                fill="var(--color-primary)"
+                fill={color}
                 r={5}
                 stroke="var(--color-surface)"
                 strokeWidth={2}
@@ -229,7 +231,11 @@ export function TimeSeriesChart({
             {activePoint.value}
           </p>
           <p className="flex items-center gap-1.5 text-xs text-muted">
-            <span aria-hidden="true" className="h-0.5 w-3 rounded-full bg-primary" />
+            <span
+              aria-hidden="true"
+              className="h-0.5 w-3 rounded-full"
+              style={{ backgroundColor: color }}
+            />
             {seriesLabel}
           </p>
           <p className="mt-1 text-xs font-medium text-foreground">

@@ -284,6 +284,7 @@ export function AnalyticsPage({
           {visibleCharts.has("applicationsOverTime") ? (
             <TimeChart
               grouping={analyticsSettings.defaultTimeGrouping}
+              color="var(--chart-1)"
               title="Applications over time"
               data={deriveApplicationsOverTime(
                 rangedApplications,
@@ -295,6 +296,7 @@ export function AnalyticsPage({
             <TimeChart
               description="Running total within the selected range"
               grouping={analyticsSettings.defaultTimeGrouping}
+              color="var(--chart-6)"
               title="Cumulative applications"
               data={toCumulative(
                 fillPeriods(
@@ -325,6 +327,7 @@ export function AnalyticsPage({
           {visibleCharts.has("statusChangesOverTime") ? (
             <TimeChart
               grouping={analyticsSettings.defaultTimeGrouping}
+              color="var(--chart-7)"
               title="Status changes over time"
               data={deriveActivityOverTime(
                 rangedActivities.filter(
@@ -337,6 +340,7 @@ export function AnalyticsPage({
           {visibleCharts.has("interviewsOverTime") ? (
             <TimeChart
               grouping={analyticsSettings.defaultTimeGrouping}
+              color="var(--chart-2)"
               title="Interviews over time"
               data={deriveInterviewsOverTime(
                 rangedInterviews,
@@ -347,6 +351,7 @@ export function AnalyticsPage({
           {visibleCharts.has("assessmentsOverTime") ? (
             <TimeChart
               grouping={analyticsSettings.defaultTimeGrouping}
+              color="var(--chart-3)"
               title="Assessment invitations over time"
               data={deriveAssessmentsOverTime(
                 rangedAssessments,
@@ -356,6 +361,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("outcomes") ? (
             <CategoryChart
+              barClassName={getOutcomeBarClass}
               title="Offers and rejections"
               data={deriveOutcomes(
                 rangedApplications,
@@ -367,6 +373,7 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
             <CategoryChart
+              barClassName={getPathBarClass}
               title="Application paths"
               data={deriveApplicationPaths(
                 rangedApplications,
@@ -382,6 +389,7 @@ export function AnalyticsPage({
               formatValue={(value) => `${value}%`}
               maxValue={100}
               showShare={false}
+              color="var(--chart-5)"
               title="Response rate by source"
               data={deriveResponseRateBySource(rangedApplications)}
             />
@@ -395,12 +403,14 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("applicationsBySource") ? (
             <CategoryChart
+              color="var(--chart-5)"
               title="Applications by source"
               data={deriveApplicationsBySource(rangedApplications)}
             />
           ) : null}
           {visibleCharts.has("topCompanies") ? (
             <CategoryChart
+              color="var(--chart-7)"
               title="Top companies"
               data={deriveTopCompanies(rangedApplications)}
             />
@@ -426,12 +436,14 @@ export function AnalyticsPage({
           ) : null}
           {visibleCharts.has("interviewTypes") ? (
             <CategoryChart
+              color="var(--chart-2)"
               title="Interview stage types"
               data={deriveInterviewTypes(rangedInterviews)}
             />
           ) : null}
           {visibleCharts.has("assessmentTypes") ? (
             <CategoryChart
+              color="var(--chart-3)"
               title="Assessment types"
               data={deriveAssessmentTypes(rangedAssessments)}
             />
@@ -596,6 +608,7 @@ function KeyMetrics({
 
 function CategoryChart({
   barClassName,
+  color,
   data,
   description,
   formatValue,
@@ -604,6 +617,7 @@ function CategoryChart({
   title,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
+  color?: string;
   data: ChartDatum[];
   description?: string;
   formatValue?: (value: number) => string;
@@ -619,6 +633,7 @@ function CategoryChart({
     >
       <HorizontalBarChart
         barClassName={barClassName}
+        color={color}
         data={data}
         formatValue={formatValue}
         maxValue={maxValue}
@@ -629,11 +644,13 @@ function CategoryChart({
 }
 
 function TimeChart({
+  color,
   data,
   description,
   grouping,
   title,
 }: {
+  color?: string;
   data: ChartDatum[];
   description?: string;
   grouping: AnalyticsSettings["defaultTimeGrouping"];
@@ -653,7 +670,12 @@ function TimeChart({
       }}
       title={title}
     >
-      <TimeSeriesChart data={data} grouping={grouping} seriesLabel={title} />
+      <TimeSeriesChart
+        color={color}
+        data={data}
+        grouping={grouping}
+        seriesLabel={title}
+      />
     </ChartCard>
   );
 }
@@ -675,6 +697,43 @@ const FOLLOW_UP_BAR_CLASSES = [
   "bg-amber-400",
   "bg-sky-500",
 ];
+
+// Outcome and path bars reuse the pipeline's status colors so the same
+// outcome reads the same everywhere on the page.
+const OUTCOME_BAR_CLASS: Record<string, string> = {
+  "Offers received": STATUS_BAR_CLASS.offered,
+  Accepted: STATUS_BAR_CLASS.accepted,
+  Rejected: STATUS_BAR_CLASS.rejected,
+};
+
+const PATH_BAR_CLASS: Record<ApplicationOutcomePath, string> = {
+  accepted: STATUS_BAR_CLASS.accepted,
+  offer_pending: STATUS_BAR_CLASS.offered,
+  offered_rejected: "bg-red-300",
+  online_assessment: STATUS_BAR_CLASS.assessment,
+  assessment_rejected: "bg-red-300",
+  interviewing: STATUS_BAR_CLASS.interviewing,
+  interviewed_rejected: "bg-red-400",
+  rejected_without_interview: STATUS_BAR_CLASS.rejected,
+  awaiting_response: STATUS_BAR_CLASS.awaiting,
+  withdrawn: STATUS_BAR_CLASS.withdrawn,
+};
+
+const PATH_BY_LABEL = new Map(
+  Object.entries(APPLICATION_OUTCOME_PATH_LABELS).map(([path, label]) => [
+    label,
+    path as ApplicationOutcomePath,
+  ]),
+);
+
+function getOutcomeBarClass(datum: ChartDatum) {
+  return OUTCOME_BAR_CLASS[datum.label] ?? "bg-primary";
+}
+
+function getPathBarClass(datum: ChartDatum) {
+  const path = PATH_BY_LABEL.get(datum.label);
+  return path ? PATH_BAR_CLASS[path] : "bg-primary";
+}
 
 function getStatusBarClass(datum: ChartDatum) {
   const tone = STATUS_TONE[datum.label as keyof typeof STATUS_TONE];

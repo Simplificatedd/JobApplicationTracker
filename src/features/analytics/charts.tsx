@@ -116,12 +116,14 @@ export function useHasMounted() {
 
 export function HorizontalBarChart({
   barClassName,
+  color = "var(--color-primary)",
   data,
   formatValue = String,
   maxValue: fixedMaxValue,
   showShare = true,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
+  color?: string;
   data: ChartDatum[];
   formatValue?: (value: number) => string;
   maxValue?: number;
@@ -161,9 +163,10 @@ export function HorizontalBarChart({
             <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
               <span
                 className={`block h-full rounded-full transition-[width] duration-700 ease-out ${
-                  barClassName?.(item, index) ?? "bg-primary"
+                  barClassName?.(item, index) ?? ""
                 }`}
                 style={{
+                  backgroundColor: barClassName ? undefined : color,
                   width: hasMounted && item.value > 0
                     ? `${Math.max(2, (item.value / maxValue) * 100)}%`
                     : "0%",
