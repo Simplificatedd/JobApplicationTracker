@@ -34,6 +34,7 @@ import {
 import { type ChartSeries, MultiSeriesChart } from "./MultiSeriesChart";
 import {
   applyNotSetFilter,
+  isNotSetLabel,
   NotSetToggle,
   useIncludeNotSet,
 } from "./notSetFilter";
@@ -459,6 +460,8 @@ export function AnalyticsPage({
               color="var(--chart-5)"
               notSetFilterId="applicationsBySource"
               totalUnit="applications"
+              limit={8}
+              overflowLabel="sources"
               title="Applications by source"
               data={deriveApplicationsBySource(rangedApplications)}
             />
@@ -468,6 +471,8 @@ export function AnalyticsPage({
               color="var(--chart-7)"
               notSetFilterId="topCompanies"
               totalUnit="applications"
+              limit={8}
+              overflowLabel="companies"
               title="Top companies"
               data={deriveTopCompanies(rangedApplications)}
             />
@@ -504,6 +509,8 @@ export function AnalyticsPage({
               color="var(--chart-2)"
               notSetFilterId="interviewTypes"
               totalUnit="interviews"
+              limit={8}
+              overflowLabel="types"
               title="Interview stage types"
               data={deriveInterviewTypes(rangedInterviews)}
             />
@@ -513,6 +520,8 @@ export function AnalyticsPage({
               color="var(--chart-3)"
               notSetFilterId="assessmentTypes"
               totalUnit="assessments"
+              limit={8}
+              overflowLabel="types"
               title="Assessment types"
               data={deriveAssessmentTypes(rangedAssessments)}
             />
@@ -817,8 +826,10 @@ function CategoryChart({
   data,
   description,
   formatValue,
+  limit,
   maxValue,
   notSetFilterId,
+  overflowLabel,
   showShare,
   summary,
   title,
@@ -829,9 +840,12 @@ function CategoryChart({
   data: ChartDatum[];
   description?: string;
   formatValue?: (value: number) => string;
+  limit?: number;
   maxValue?: number;
   // Adds an include/exclude "Not set" toggle, remembered per chart.
   notSetFilterId?: string;
+  // Plural noun for the categories, e.g. "companies".
+  overflowLabel?: string;
   showShare?: boolean;
   summary?: ReactNode;
   title: string;
@@ -842,8 +856,18 @@ function CategoryChart({
   const { hasNotSet, notSetCount, visibleData } = notSetFilterId
     ? applyNotSetFilter(data, includeNotSet)
     : { hasNotSet: false, notSetCount: 0, visibleData: data };
+  const categoryCount = visibleData.filter(
+    (item) => !isNotSetLabel(item.label),
+  ).length;
   const totalDescription = totalUnit
-    ? describeTotal(visibleData, totalUnit, notSetCount, includeNotSet)
+    ? [
+        describeTotal(visibleData, totalUnit, notSetCount, includeNotSet),
+        overflowLabel && categoryCount > 0
+          ? `${categoryCount} ${overflowLabel}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : undefined;
 
   return (
@@ -865,7 +889,10 @@ function CategoryChart({
         color={color}
         data={visibleData}
         formatValue={formatValue}
+        limit={limit}
         maxValue={maxValue}
+        overflowLabel={overflowLabel}
+        unit={totalUnit}
         showShare={showShare}
       />
     </ChartCard>

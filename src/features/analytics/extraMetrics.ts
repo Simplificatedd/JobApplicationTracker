@@ -62,12 +62,20 @@ export function formatOptionLabel(value?: string) {
     .join(" ");
 }
 
+// Open-ended breakdowns return every value; the chart shows the top rows and
+// lets the reader expand the rest.
 export function deriveApplicationsBySource(applications: Application[]) {
-  return countTopValues(applications.map((application) => application.source));
+  return countTopValues(
+    applications.map((application) => application.source),
+    Infinity,
+  );
 }
 
 export function deriveTopCompanies(applications: Application[]) {
-  return countTopValues(applications.map((application) => application.company));
+  return countTopValues(
+    applications.map((application) => application.company),
+    Infinity,
+  );
 }
 
 export function deriveWorkModeMix(applications: Application[]) {
@@ -87,11 +95,15 @@ export function deriveInterviewTypes(interviews: Interview[]) {
     interviews.map((interview) =>
       interview.type === "unknown" ? undefined : getInterviewTypeLabel(interview.type),
     ),
+    Infinity,
   );
 }
 
 export function deriveAssessmentTypes(assessments: Assessment[]) {
-  return countTopValues(assessments.map((item) => formatOptionLabel(item.type)));
+  return countTopValues(
+    assessments.map((item) => formatOptionLabel(item.type)),
+    Infinity,
+  );
 }
 
 export function deriveAppliedByWeekday(applications: Application[]) {
