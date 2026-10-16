@@ -1,4 +1,4 @@
-import { Upload, X } from "lucide-react";
+import { MapPin, Upload, X } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -59,6 +59,8 @@ interface AddApplicationModalProps {
     pendingCoverLetter?: PendingResumeUpload,
   ) => Promise<MutationResult<Application>>;
   coverLetters: CoverLetterMetadata[];
+  /** Location the quick-fill button sets; the button is hidden when absent. */
+  quickLocation?: string;
   resumes: ResumeMetadata[];
 }
 
@@ -151,6 +153,7 @@ export function AddApplicationModal({
   isOpen,
   onClose,
   onCreate,
+  quickLocation,
   resumes,
 }: AddApplicationModalProps) {
   const [cleanForm, setCleanForm] = useState<AddApplicationFormState>(() =>
@@ -840,12 +843,31 @@ export function AddApplicationModal({
             </div>
 
             <Field label="Location">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("location", event.target.value)}
-                type="text"
-                value={form.location}
-              />
+              <div className="flex gap-2">
+                <input
+                  // The quick location button sits inside this label too, so
+                  // name the field explicitly rather than via the label text.
+                  aria-label="Location"
+                  className="field-control min-w-0 flex-1"
+                  onChange={(event) =>
+                    updateForm("location", event.target.value)
+                  }
+                  type="text"
+                  value={form.location}
+                />
+                {quickLocation ? (
+                  <button
+                    aria-label={`Set location to ${quickLocation}`}
+                    className="inline-flex h-10 max-w-[45%] shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    onClick={() => updateForm("location", quickLocation)}
+                    title={`Set location to ${quickLocation}`}
+                    type="button"
+                  >
+                    <MapPin aria-hidden="true" className="shrink-0" size={16} />
+                    <span className="truncate">{quickLocation}</span>
+                  </button>
+                ) : null}
+              </div>
             </Field>
 
             <Field label="Work Mode">

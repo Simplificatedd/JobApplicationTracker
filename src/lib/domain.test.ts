@@ -55,6 +55,13 @@ describe("default user settings", () => {
   it("keeps application column resizing disabled until explicitly enabled", () => {
     expect(DEFAULT_USER_SETTINGS.enableDraggableColumnWidths).toBe(false);
   });
+
+  it("shows the Singapore quick location button by default", () => {
+    expect(DEFAULT_USER_SETTINGS).toMatchObject({
+      enableQuickLocation: true,
+      quickLocation: "Singapore",
+    });
+  });
 });
 
 describe("normalizeUserSettings", () => {
@@ -105,6 +112,19 @@ describe("normalizeUserSettings", () => {
     ).toMatchObject({
       addJobFormLayout: "long_form",
       addJobPresentation: "modal",
+    });
+  });
+
+  it("fills quick location defaults for settings saved before the option existed", () => {
+    const savedSettings: Partial<typeof DEFAULT_USER_SETTINGS> = {
+      ...DEFAULT_USER_SETTINGS,
+    };
+    delete savedSettings.enableQuickLocation;
+    delete savedSettings.quickLocation;
+
+    expect(normalizeUserSettings(savedSettings)).toMatchObject({
+      enableQuickLocation: true,
+      quickLocation: "Singapore",
     });
   });
 });

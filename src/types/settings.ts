@@ -13,6 +13,8 @@ export interface UserSettings {
   includeUpcomingInterviewsInAttention: boolean;
   dueSoonDays: number;
   betaAnalyticsEnabled: boolean;
+  enableQuickLocation: boolean;
+  quickLocation: string;
 }
 
 export interface NotificationState {
