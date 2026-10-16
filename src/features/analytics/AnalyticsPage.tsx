@@ -1,4 +1,12 @@
-import { BarChart3, CalendarDays, Settings2 } from "lucide-react";
+import {
+  BarChart3,
+  Hourglass,
+  MessageCircleReply,
+  Send,
+  Settings2,
+  Trophy,
+} from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -18,6 +26,38 @@ import type {
   Interview,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import { ChartCard, StackedShareBar, StatTile } from "./charts";
+import { fillPeriods } from "./TimeSeriesChart";
+import {
+  ActivityComparisonCard,
+  bySourceName,
+  CategoryChart,
+  createCategoryColors,
+  fromColorMap,
+  getFollowUpColor,
+  getOutcomeColor,
+  getPathColor,
+  getResponseTimeColor,
+  getStatusColor,
+  JOB_TYPE_COLORS,
+  RESPONSE_TIME_SHORT_LABELS,
+  StatusFlowCard,
+  TimeChart,
+  WORK_MODE_COLORS,
+} from "./chartCards";
+import {
+  deriveApplicationsBySource,
+  deriveAppliedByWeekday,
+  deriveAssessmentTypes,
+  deriveInterviewTypes,
+  deriveJobTypeMix,
+  deriveResponseRateBySource,
+  deriveStatusTransitions,
+  deriveTimeToFirstResponse,
+  deriveTopCompanies,
+  deriveWorkModeMix,
+  toCumulative,
+} from "./extraMetrics";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -29,16 +69,34 @@ interface AnalyticsPageProps {
   userSettings: UserSettings;
 }
 
-const chartOptions = [
-  { id: "applicationsOverTime", label: "Applications over time" },
-  { id: "statusPipeline", label: "Pipeline by status" },
-  { id: "followUpLoad", label: "Follow-up load" },
-  { id: "activityCalendar", label: "Activity calendar" },
-  { id: "statusChangesOverTime", label: "Status changes over time" },
-  { id: "interviewsOverTime", label: "Interviews over time" },
-  { id: "assessmentsOverTime", label: "Assessment invitations over time" },
-  { id: "outcomes", label: "Offers and rejections" },
-  { id: "applicationPaths", label: "Application paths" },
+const CHART_GROUPS = ["Activity", "Pipeline and outcomes", "Breakdowns"] as const;
+
+const chartOptions: Array<{
+  group: (typeof CHART_GROUPS)[number];
+  id: string;
+  label: string;
+}> = [
+  { group: "Activity", id: "activityComparison", label: "Activity comparison" },
+  { group: "Activity", id: "applicationsOverTime", label: "Applications over time" },
+  { group: "Activity", id: "cumulativeApplications", label: "Cumulative applications" },
+  { group: "Pipeline and outcomes", id: "statusPipeline", label: "Pipeline by status" },
+  { group: "Pipeline and outcomes", id: "statusFlow", label: "Status flow" },
+  { group: "Pipeline and outcomes", id: "followUpLoad", label: "Follow-up load" },
+  { group: "Activity", id: "activityCalendar", label: "Activity calendar" },
+  { group: "Activity", id: "statusChangesOverTime", label: "Status changes over time" },
+  { group: "Activity", id: "interviewsOverTime", label: "Interviews over time" },
+  { group: "Activity", id: "assessmentsOverTime", label: "Assessment invitations over time" },
+  { group: "Pipeline and outcomes", id: "outcomes", label: "Offers and rejections" },
+  { group: "Pipeline and outcomes", id: "applicationPaths", label: "Application paths" },
+  { group: "Pipeline and outcomes", id: "responseRateBySource", label: "Response rate by source" },
+  { group: "Pipeline and outcomes", id: "timeToFirstResponse", label: "Time to first response" },
+  { group: "Breakdowns", id: "applicationsBySource", label: "Applications by source" },
+  { group: "Breakdowns", id: "topCompanies", label: "Top companies" },
+  { group: "Breakdowns", id: "workModeMix", label: "Work mode" },
+  { group: "Breakdowns", id: "jobTypeMix", label: "Job type" },
+  { group: "Breakdowns", id: "appliedByWeekday", label: "Applications by weekday" },
+  { group: "Breakdowns", id: "interviewTypes", label: "Interview stage types" },
+  { group: "Breakdowns", id: "assessmentTypes", label: "Assessment types" },
 ];
 
 export function AnalyticsPage({
@@ -65,7 +123,35 @@ export function AnalyticsPage({
   const scopedAssessments = assessments.filter((item) =>
     scopedApplicationIds.has(item.applicationId),
   );
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  // The date range is view-only state. Timeline charts filter each record by
+  // its own date; outcome classification still sees the full record history.
+  const rangeStart = getRangeStart(dateRange);
+  const isInRange = (value?: string) =>
+    !rangeStart || (Boolean(value) && new Date(value as string) >= rangeStart);
+  const rangedApplications = scopedApplications.filter((application) =>
+    isInRange(application.dateApplied || application.createdAt),
+  );
+  const rangedActivities = scopedActivities.filter((activity) =>
+    isInRange(activity.createdAt),
+  );
+  const rangedInterviews = scopedInterviews.filter((interview) =>
+    isInRange(interview.dateTime),
+  );
+  const rangedAssessments = scopedAssessments.filter((item) =>
+    isInRange(item.receivedAt || item.createdAt),
+  );
+  const grouping = analyticsSettings.defaultTimeGrouping;
+  // Shared so a source keeps the same colour across source charts.
+  const sourceColorFor = createCategoryColors(
+    deriveApplicationsBySource(rangedApplications),
+  );
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
+  const visibleChartCount = chartOptions.filter((chart) =>
+    visibleCharts.has(chart.id),
+  ).length;
   const hasData =
     scopedApplications.length > 0 ||
     scopedActivities.length > 0 ||
@@ -99,23 +185,22 @@ export function AnalyticsPage({
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <select
-              aria-label="Analytics time grouping"
-              className="field-control h-10 w-auto min-w-32"
-              onChange={(event) =>
-                onUpdateAnalyticsSettings({
-                  defaultTimeGrouping: event.target
-                    .value as AnalyticsSettings["defaultTimeGrouping"],
-                })
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              label="Analytics date range"
+              onChange={setDateRange}
+              options={DATE_RANGE_OPTIONS}
+              value={dateRange}
+            />
+            <SegmentedControl
+              label="Analytics time grouping"
+              onChange={(value) =>
+                onUpdateAnalyticsSettings({ defaultTimeGrouping: value })
               }
+              options={TIME_GROUPING_OPTIONS}
               value={analyticsSettings.defaultTimeGrouping}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-            <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground">
+            />
+            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50">
               <input
                 checked={analyticsSettings.includeArchived}
                 className="h-4 w-4 rounded border-border text-primary"
@@ -128,34 +213,85 @@ export function AnalyticsPage({
               />
               Include archived
             </label>
+            <button
+              aria-controls={customizePanelId}
+              aria-expanded={isCustomizing}
+              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                isCustomizing
+                  ? "border-primary bg-blue-50 text-primary"
+                  : "border-border text-foreground hover:bg-slate-50"
+              }`}
+              onClick={() => setIsCustomizing((current) => !current)}
+              type="button"
+            >
+              <Settings2 aria-hidden="true" size={16} />
+              Customize
+              <span className="rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-muted">
+                {visibleChartCount}/{chartOptions.length}
+              </span>
+            </button>
           </div>
         </div>
+        {isCustomizing ? (
+          <div
+            className="mt-4 border-t border-border pt-4"
+            id={customizePanelId}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+              Analytics settings
+            </p>
+            <div className="mt-3 space-y-3">
+              {CHART_GROUPS.map((group) => (
+                <fieldset className="min-w-0" key={group}>
+                  <legend className="mb-2 text-xs font-medium text-muted">
+                    {group}
+                  </legend>
+                  <div className="flex flex-wrap gap-2">
+                    {chartOptions
+                      .filter((chart) => chart.group === group)
+                      .map((chart) => {
+                        const isVisible = visibleCharts.has(chart.id);
+
+                        return (
+                          <label
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                              isVisible
+                                ? "border-primary/40 bg-blue-50 text-foreground"
+                                : "border-border bg-surface text-muted hover:text-foreground"
+                            }`}
+                            key={chart.id}
+                          >
+                            <input
+                              checked={isVisible}
+                              className="h-4 w-4 shrink-0 rounded border-border text-primary"
+                              onChange={(event) =>
+                                toggleChart(chart.id, event.target.checked)
+                              }
+                              type="checkbox"
+                            />
+                            <span className="min-w-0 break-words">
+                              {chart.label}
+                            </span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      <section className="surface-panel rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <Settings2 aria-hidden="true" className="text-muted" size={18} />
-          <h3 className="text-sm font-semibold uppercase text-muted">
-            Analytics settings
-          </h3>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {chartOptions.map((chart) => (
-            <label
-              className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-foreground"
-              key={chart.id}
-            >
-              <span className="min-w-0 break-words">{chart.label}</span>
-              <input
-                checked={visibleCharts.has(chart.id)}
-                className="h-4 w-4 shrink-0 rounded border-border text-primary"
-                onChange={(event) => toggleChart(chart.id, event.target.checked)}
-                type="checkbox"
-              />
-            </label>
-          ))}
-        </div>
-      </section>
+      {hasData ? (
+        <KeyMetrics
+          activities={scopedActivities}
+          applications={rangedApplications}
+          assessments={scopedAssessments}
+          dateRange={dateRange}
+          interviews={scopedInterviews}
+        />
+      ) : null}
 
       {!hasData ? (
         <section className="surface-panel rounded-lg px-6 py-12 text-center">
@@ -168,61 +304,121 @@ export function AnalyticsPage({
         </section>
       ) : (
         <section className="grid gap-4 xl:grid-cols-2">
+          {visibleCharts.has("activityComparison") ? (
+            <ActivityComparisonCard
+              grouping={grouping}
+              series={[
+                {
+                  color: "var(--chart-1)",
+                  data: deriveApplicationsOverTime(rangedApplications, grouping),
+                  id: "applications",
+                  label: "Applications",
+                },
+                {
+                  color: "var(--chart-2)",
+                  data: deriveInterviewsOverTime(rangedInterviews, grouping),
+                  id: "interviews",
+                  label: "Interviews",
+                },
+                {
+                  color: "var(--chart-3)",
+                  data: deriveAssessmentsOverTime(rangedAssessments, grouping),
+                  id: "assessments",
+                  label: "Assessments",
+                },
+              ]}
+            />
+          ) : null}
           {visibleCharts.has("applicationsOverTime") ? (
-            <BarChart
+            <TimeChart
+              chartId="applicationsOverTime"
+              color="var(--chart-1)"
+              grouping={grouping}
               title="Applications over time"
-              data={deriveApplicationsOverTime(
-                scopedApplications,
-                analyticsSettings.defaultTimeGrouping,
+              data={deriveApplicationsOverTime(rangedApplications, grouping)}
+            />
+          ) : null}
+          {visibleCharts.has("cumulativeApplications") ? (
+            <TimeChart
+              chartId="cumulativeApplications"
+              color="var(--chart-6)"
+              description="Running total within the selected range"
+              grouping={grouping}
+              title="Cumulative applications"
+              data={toCumulative(
+                fillPeriods(
+                  deriveApplicationsOverTime(rangedApplications, grouping),
+                  grouping,
+                ),
               )}
             />
           ) : null}
           {visibleCharts.has("statusPipeline") ? (
-            <BarChart
+            <CategoryChart
+              chartId="statusPipeline"
+              colorFor={getStatusColor}
+              summary={(data) => (
+                <StackedShareBar colorFor={getStatusColor} data={data} />
+              )}
               title="Pipeline by status"
-              data={derivePipelineByStatus(scopedApplications)}
+              totalUnit="applications"
+              views={["bars", "treemap", "waffle", "columns", "table"]}
+              data={derivePipelineByStatus(rangedApplications)}
             />
           ) : null}
+          {visibleCharts.has("statusFlow") ? (
+            <StatusFlowCard links={deriveStatusTransitions(rangedActivities)} />
+          ) : null}
           {visibleCharts.has("followUpLoad") ? (
-            <BarChart
+            <CategoryChart
+              chartId="followUpLoad"
+              colorFor={getFollowUpColor}
+              description="Current follow-ups; not limited by date range"
               title="Follow-up load"
+              views={["bars", "donut", "columns", "table"]}
               data={deriveFollowUpLoad(scopedApplications, userSettings)}
             />
           ) : null}
           {visibleCharts.has("statusChangesOverTime") ? (
-            <BarChart
+            <TimeChart
+              chartId="statusChangesOverTime"
+              color="var(--chart-7)"
+              grouping={grouping}
               title="Status changes over time"
               data={deriveActivityOverTime(
-                scopedActivities.filter(
+                rangedActivities.filter(
                   (activity) => activity.type === "status_changed",
                 ),
-                analyticsSettings.defaultTimeGrouping,
+                grouping,
               )}
             />
           ) : null}
           {visibleCharts.has("interviewsOverTime") ? (
-            <BarChart
+            <TimeChart
+              chartId="interviewsOverTime"
+              color="var(--chart-2)"
+              grouping={grouping}
               title="Interviews over time"
-              data={deriveInterviewsOverTime(
-                scopedInterviews,
-                analyticsSettings.defaultTimeGrouping,
-              )}
+              data={deriveInterviewsOverTime(rangedInterviews, grouping)}
             />
           ) : null}
           {visibleCharts.has("assessmentsOverTime") ? (
-            <BarChart
+            <TimeChart
+              chartId="assessmentsOverTime"
+              color="var(--chart-3)"
+              grouping={grouping}
               title="Assessment invitations over time"
-              data={deriveAssessmentsOverTime(
-                scopedAssessments,
-                analyticsSettings.defaultTimeGrouping,
-              )}
+              data={deriveAssessmentsOverTime(rangedAssessments, grouping)}
             />
           ) : null}
           {visibleCharts.has("outcomes") ? (
-            <BarChart
+            <CategoryChart
+              chartId="outcomes"
+              colorFor={getOutcomeColor}
               title="Offers and rejections"
+              views={["bars", "columns", "lollipop", "table"]}
               data={deriveOutcomes(
-                scopedApplications,
+                rangedApplications,
                 scopedActivities,
                 scopedInterviews,
                 scopedAssessments,
@@ -230,22 +426,135 @@ export function AnalyticsPage({
             />
           ) : null}
           {visibleCharts.has("applicationPaths") ? (
-            <BarChart
+            <CategoryChart
+              chartId="applicationPaths"
+              colorFor={getPathColor}
               title="Application paths"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "table"]}
               data={deriveApplicationPaths(
-                scopedApplications,
+                rangedApplications,
                 scopedActivities,
                 scopedInterviews,
                 scopedAssessments,
               )}
             />
           ) : null}
+          {visibleCharts.has("responseRateBySource") ? (
+            <CategoryChart
+              chartId="responseRateBySource"
+              colorFor={bySourceName(sourceColorFor)}
+              description="Share past Awaiting Response (applications in brackets)"
+              formatValue={(value) => `${value}%`}
+              maxValue={100}
+              notSetFilterId="responseRateBySource"
+              showShare={false}
+              title="Response rate by source"
+              views={["bars", "radial", "lollipop", "table"]}
+              data={deriveResponseRateBySource(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("timeToFirstResponse") ? (
+            <CategoryChart
+              chartId="timeToFirstResponse"
+              colorFor={getResponseTimeColor}
+              description="Days from applying to the first status change"
+              shortLabel={(label) => RESPONSE_TIME_SHORT_LABELS[label] ?? label}
+              title="Time to first response"
+              views={["columns", "bars", "donut", "table"]}
+              data={deriveTimeToFirstResponse(rangedApplications, scopedActivities)}
+            />
+          ) : null}
+          {visibleCharts.has("applicationsBySource") ? (
+            <CategoryChart
+              chartId="applicationsBySource"
+              colorFor={sourceColorFor}
+              limit={8}
+              notSetFilterId="applicationsBySource"
+              overflowLabel="sources"
+              title="Applications by source"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "columns", "table"]}
+              data={deriveApplicationsBySource(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("topCompanies") ? (
+            <CategoryChart
+              chartId="topCompanies"
+              limit={8}
+              notSetFilterId="topCompanies"
+              overflowLabel="companies"
+              title="Top companies"
+              totalUnit="applications"
+              views={["bars", "treemap", "lollipop", "table"]}
+              data={deriveTopCompanies(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("workModeMix") ? (
+            <CategoryChart
+              chartId="workModeMix"
+              colorFor={fromColorMap(WORK_MODE_COLORS)}
+              notSetFilterId="workModeMix"
+              title="Work mode"
+              totalUnit="applications"
+              views={["donut", "waffle", "bars", "treemap", "table"]}
+              data={deriveWorkModeMix(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("jobTypeMix") ? (
+            <CategoryChart
+              chartId="jobTypeMix"
+              colorFor={fromColorMap(JOB_TYPE_COLORS)}
+              notSetFilterId="jobTypeMix"
+              title="Job type"
+              totalUnit="applications"
+              views={["donut", "waffle", "bars", "treemap", "table"]}
+              data={deriveJobTypeMix(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("appliedByWeekday") ? (
+            <CategoryChart
+              chartId="appliedByWeekday"
+              colorFor={() => "var(--chart-1)"}
+              description="Busiest day highlighted"
+              emphasizeMax
+              shortLabel={(label) => label.slice(0, 3)}
+              title="Applications by weekday"
+              totalUnit="applications"
+              views={["columns", "radar", "bars", "table"]}
+              data={deriveAppliedByWeekday(rangedApplications)}
+            />
+          ) : null}
+          {visibleCharts.has("interviewTypes") ? (
+            <CategoryChart
+              chartId="interviewTypes"
+              limit={8}
+              notSetFilterId="interviewTypes"
+              overflowLabel="types"
+              title="Interview stage types"
+              totalUnit="interviews"
+              views={["bars", "donut", "treemap", "table"]}
+              data={deriveInterviewTypes(rangedInterviews)}
+            />
+          ) : null}
+          {visibleCharts.has("assessmentTypes") ? (
+            <CategoryChart
+              chartId="assessmentTypes"
+              limit={8}
+              notSetFilterId="assessmentTypes"
+              overflowLabel="types"
+              title="Assessment types"
+              totalUnit="assessments"
+              views={["bars", "donut", "treemap", "table"]}
+              data={deriveAssessmentTypes(rangedAssessments)}
+            />
+          ) : null}
           {visibleCharts.has("activityCalendar") ? (
             <ActivityCalendar
-              activities={scopedActivities}
-              applications={scopedApplications}
-              assessments={scopedAssessments}
-              interviews={scopedInterviews}
+              activities={rangedActivities}
+              applications={rangedApplications}
+              assessments={rangedAssessments}
+              interviews={rangedInterviews}
             />
           ) : null}
         </section>
@@ -254,37 +563,158 @@ export function AnalyticsPage({
   );
 }
 
-function BarChart({ data, title }: { data: ChartDatum[]; title: string }) {
-  const maxValue = Math.max(1, ...data.map((item) => item.value));
+type DateRange = "all" | "30d" | "90d" | "12m";
+
+const DATE_RANGE_OPTIONS: ReadonlyArray<{ label: string; value: DateRange }> = [
+  { label: "All time", value: "all" },
+  { label: "30 days", value: "30d" },
+  { label: "90 days", value: "90d" },
+  { label: "12 months", value: "12m" },
+];
+
+function getRangeStart(range: DateRange) {
+  if (range === "all") {
+    return null;
+  }
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  if (range === "12m") {
+    start.setFullYear(start.getFullYear() - 1);
+  } else {
+    start.setDate(start.getDate() - (range === "30d" ? 30 : 90));
+  }
+
+  return start;
+}
+
+const TIME_GROUPING_OPTIONS: ReadonlyArray<{
+  label: string;
+  value: AnalyticsSettings["defaultTimeGrouping"];
+}> = [
+  { label: "Daily", value: "daily" },
+  { label: "Weekly", value: "weekly" },
+  { label: "Monthly", value: "monthly" },
+];
+
+function SegmentedControl<Value extends string>({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: Value) => void;
+  options: ReadonlyArray<{ label: string; value: Value }>;
+  value: Value;
+}) {
+  return (
+    <div
+      aria-label={label}
+      className="inline-flex h-9 items-center rounded-lg border border-border bg-background p-0.5"
+      role="radiogroup"
+    >
+      {options.map((option) => (
+        <button
+          aria-checked={option.value === value}
+          className={`h-full whitespace-nowrap rounded-md px-2.5 text-sm font-medium transition sm:px-3 ${
+            option.value === value
+              ? "bg-surface text-foreground shadow-sm"
+              : "text-muted hover:text-foreground"
+          }`}
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          role="radio"
+          type="button"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function KeyMetrics({
+  activities,
+  applications,
+  assessments,
+  dateRange,
+  interviews,
+}: {
+  activities: Activity[];
+  applications: Application[];
+  assessments: Assessment[];
+  dateRange: DateRange;
+  interviews: Interview[];
+}) {
+  const countWithStatus = (...statuses: Application["status"][]) =>
+    applications.filter((application) => statuses.includes(application.status))
+      .length;
+  const withdrawn = countWithStatus("Withdrawn");
+  const awaiting = countWithStatus("Awaiting Response");
+  const responseBase = applications.length - withdrawn;
+  const responded = responseBase - awaiting;
+  const [offers, accepted] = deriveOutcomes(
+    applications,
+    activities,
+    interviews,
+    assessments,
+  );
+  const weeklyApplications = fillPeriods(
+    deriveApplicationsOverTime(applications, "weekly"),
+    "weekly",
+  ).map((item) => item.value);
+  const rangeLabel =
+    DATE_RANGE_OPTIONS.find((option) => option.value === dateRange)?.label ??
+    "All time";
 
   return (
-    <article className="surface-panel rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {data.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
-          No data for this chart.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {data.map((item) => (
-            <div className="grid grid-cols-[minmax(7rem,12rem)_1fr_2rem] items-center gap-3" key={item.label}>
-              <p className="truncate text-sm font-medium text-foreground">
-                {item.label}
-              </p>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${Math.max(5, (item.value / maxValue) * 100)}%` }}
-                />
-              </div>
-              <p className="text-right text-sm font-semibold text-foreground">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </article>
+    <section
+      aria-label="Key metrics"
+      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
+      <StatTile
+        detail={dateRange === "all" ? "All time" : `Applied in the last ${rangeLabel.toLowerCase()}`}
+        accent="var(--chart-1)"
+        icon={Send}
+        label="Applications"
+        sparkline={weeklyApplications}
+        value={String(applications.length)}
+      />
+      <StatTile
+        accent="var(--chart-2)"
+        detail="Online assessments and interviews"
+        icon={Hourglass}
+        label="In progress"
+        value={String(countWithStatus("Online Assessment", "Interviewing"))}
+      />
+      <StatTile
+        accent="var(--chart-7)"
+        detail={`${accepted.value} accepted`}
+        icon={Trophy}
+        label="Offers received"
+        value={String(offers.value)}
+      />
+      <StatTile
+        detail={
+          responseBase > 0
+            ? `${responded} of ${responseBase} heard back`
+            : "No applications yet"
+        }
+        accent="var(--chart-3)"
+        icon={MessageCircleReply}
+        label="Response rate"
+        progress={
+          responseBase > 0 ? (responded / responseBase) * 100 : undefined
+        }
+        value={
+          responseBase > 0
+            ? `${Math.round((responded / responseBase) * 100)}%`
+            : "–"
+        }
+      />
+    </section>
   );
 }
 
@@ -305,31 +735,184 @@ function ActivityCalendar({
     interviews,
     assessments,
   );
+  const activeDays = days.filter((day) => day.tone !== "none").length;
 
   return (
-    <article className="surface-panel rounded-lg p-4 xl:col-span-2">
-      <div className="flex items-center gap-2">
-        <CalendarDays aria-hidden="true" className="text-muted" size={18} />
-        <h3 className="text-sm font-semibold text-foreground">Activity calendar</h3>
+    <ChartCard
+      className="xl:col-span-2"
+      description={`${activeDays} active ${activeDays === 1 ? "day" : "days"}`}
+      title="Activity calendar"
+    >
+      <ActivityHeatmap days={days} />
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
+        <LegendItem className={HEATMAP_TONE_CLASS.none} label="No activity" />
+        <LegendItem className={HEATMAP_TONE_CLASS.activity} label="Any activity" />
+        <LegendItem className={HEATMAP_TONE_CLASS.rejection} label="Rejection-only" />
       </div>
-      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(0.75rem,1fr))] gap-1">
-        {days.map((day) => (
-          <button
-            aria-label={day.summary}
-            className={`h-3 rounded-sm ${day.colorClass}`}
-            key={day.date}
-            title={day.summary}
-            type="button"
-          />
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium text-muted">
-        <LegendItem className="bg-slate-200" label="No activity" />
-        <LegendItem className="bg-success" label="Any activity" />
-        <LegendItem className="bg-destructive" label="Rejection-only" />
-      </div>
-    </article>
+    </ChartCard>
   );
+}
+
+type CalendarDay = ReturnType<typeof deriveActivityCalendarDays>[number];
+
+const HEATMAP_TONE_CLASS: Record<CalendarDay["tone"], string> = {
+  none: "bg-slate-100",
+  activity: "bg-emerald-500",
+  rejection: "bg-red-400",
+};
+
+const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
+
+function ActivityHeatmap({ days }: { days: CalendarDay[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeDay, setActiveDay] = useState<{
+    day: CalendarDay;
+    left: number;
+    top: number;
+  } | null>(null);
+  const weeks = groupDaysIntoWeeks(days);
+  const monthLabels = getMonthLabels(weeks);
+
+  useEffect(() => {
+    const scroller = scrollRef.current;
+
+    if (scroller) {
+      scroller.scrollLeft = scroller.scrollWidth;
+    }
+  }, [weeks.length]);
+
+  function showDay(day: CalendarDay, target: HTMLElement) {
+    const scroller = scrollRef.current;
+
+    if (!scroller) {
+      return;
+    }
+
+    const cell = target.getBoundingClientRect();
+    const container = scroller.parentElement?.getBoundingClientRect();
+
+    setActiveDay({
+      day,
+      left: cell.left - (container?.left ?? 0) + cell.width / 2,
+      top: cell.top - (container?.top ?? 0),
+    });
+  }
+
+  return (
+    <div className="relative">
+      <div className="overflow-x-auto pb-1" ref={scrollRef}>
+        <div className="inline-flex gap-[3px]">
+          <div className="mr-1 grid grid-rows-[14px_repeat(7,13px)] gap-[3px] text-[10px] leading-[13px] text-muted">
+            <span />
+            {WEEKDAY_LABELS.map((label, index) => (
+              <span key={index}>{label}</span>
+            ))}
+          </div>
+          {weeks.map((week, weekIndex) => (
+            <div className="grid grid-rows-[14px_repeat(7,13px)] gap-[3px]" key={weekIndex}>
+              <span className="whitespace-nowrap text-[10px] leading-[14px] text-muted">
+                {monthLabels[weekIndex]}
+              </span>
+              {week.map((day, dayIndex) =>
+                day ? (
+                  <button
+                    aria-label={`${formatCalendarDate(day.date)}. ${day.summary}`}
+                    className={`h-[13px] w-[13px] rounded-[3px] transition hover:ring-2 hover:ring-foreground/30 focus-visible:ring-2 focus-visible:ring-primary ${HEATMAP_TONE_CLASS[day.tone]}`}
+                    key={day.date}
+                    onBlur={() => setActiveDay(null)}
+                    onFocus={(event) => showDay(day, event.currentTarget)}
+                    onPointerEnter={(event) => showDay(day, event.currentTarget)}
+                    onPointerLeave={() => setActiveDay(null)}
+                    type="button"
+                  />
+                ) : (
+                  <span key={`empty-${dayIndex}`} />
+                ),
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {activeDay ? (
+        <div
+          className="pointer-events-none absolute z-10 max-w-72 -translate-x-1/2 -translate-y-full rounded-md border border-border bg-surface px-3 py-2 text-xs shadow-popover"
+          style={{ left: activeDay.left, top: activeDay.top - 6 }}
+        >
+          <p className="font-semibold text-foreground">
+            {formatCalendarDate(activeDay.day.date)}
+          </p>
+          <p className="mt-0.5 text-muted">
+            {activeDay.day.summary.replace(/^On this date: /, "")}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Columns are Sunday-first weeks; leading and trailing slots stay empty.
+function groupDaysIntoWeeks(days: CalendarDay[]) {
+  const weeks: Array<Array<CalendarDay | null>> = [];
+  let currentWeek: Array<CalendarDay | null> = [];
+
+  days.forEach((day, index) => {
+    const weekday = new Date(`${day.date}T00:00:00.000Z`).getUTCDay();
+
+    if (index === 0) {
+      currentWeek = Array.from({ length: weekday }, () => null);
+    } else if (weekday === 0) {
+      weeks.push(currentWeek);
+      currentWeek = [];
+    }
+
+    currentWeek.push(day);
+  });
+
+  if (currentWeek.length > 0) {
+    weeks.push([
+      ...currentWeek,
+      ...Array.from({ length: 7 - currentWeek.length }, () => null),
+    ]);
+  }
+
+  return weeks;
+}
+
+// Labels the first week of each month. When two labels would crowd each other
+// (for example a partial first month), the later month keeps its label.
+function getMonthLabels(weeks: Array<Array<CalendarDay | null>>) {
+  const labels = weeks.map(() => "");
+  let lastLabelIndex = -Infinity;
+
+  weeks.forEach((week, weekIndex) => {
+    const firstDay = week.find((day) => day !== null);
+    const previousDay = weeks[weekIndex - 1]?.find((day) => day !== null);
+
+    if (!firstDay || firstDay.date.slice(0, 7) === previousDay?.date.slice(0, 7)) {
+      return;
+    }
+
+    if (weekIndex - lastLabelIndex < 3) {
+      labels[lastLabelIndex] = "";
+    }
+
+    labels[weekIndex] = new Date(
+      `${firstDay.date}T00:00:00.000Z`,
+    ).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+    lastLabelIndex = weekIndex;
+  });
+
+  return labels;
+}
+
+function formatCalendarDate(date: string) {
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    weekday: "short",
+    year: "numeric",
+  });
 }
 
 function LegendItem({
@@ -341,15 +924,10 @@ function LegendItem({
 }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className={`h-3 w-3 rounded-sm ${className}`} />
+      <span className={`h-3 w-3 rounded-[3px] ${className}`} />
       {label}
     </span>
   );
-}
-
-interface ChartDatum {
-  label: string;
-  value: number;
 }
 
 function deriveApplicationsOverTime(
@@ -609,12 +1187,12 @@ export function deriveActivityCalendarDays(
       primaryActivityCount === eventCounts.rejections;
 
     days.push({
-      colorClass: !hasAnyActivity
-        ? "bg-slate-200 hover:bg-slate-300"
-        : hasOnlyRejections
-          ? "bg-destructive hover:opacity-80"
-          : "bg-success hover:opacity-80",
       date: key,
+      tone: !hasAnyActivity
+        ? ("none" as const)
+        : hasOnlyRejections
+          ? ("rejection" as const)
+          : ("activity" as const),
       summary: hasAnyActivity
         ? `On this date: ${summaryParts.join("; ")}.`
         : `On this date: no activity.`,
