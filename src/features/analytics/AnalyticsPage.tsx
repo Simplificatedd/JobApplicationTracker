@@ -32,6 +32,11 @@ import {
   TimeSeriesChart,
 } from "./TimeSeriesChart";
 import { type ChartSeries, MultiSeriesChart } from "./MultiSeriesChart";
+import {
+  applyNotSetFilter,
+  NotSetToggle,
+  useIncludeNotSet,
+} from "./notSetFilter";
 import { ColumnChart } from "./ColumnChart";
 import { DonutChart, NEUTRAL_SEGMENT_COLOR } from "./DonutChart";
 import {
@@ -435,6 +440,7 @@ export function AnalyticsPage({
               maxValue={100}
               showShare={false}
               color="var(--chart-5)"
+              notSetFilterId="responseRateBySource"
               title="Response rate by source"
               data={deriveResponseRateBySource(rangedApplications)}
             />
@@ -451,6 +457,8 @@ export function AnalyticsPage({
           {visibleCharts.has("applicationsBySource") ? (
             <CategoryChart
               color="var(--chart-5)"
+              notSetFilterId="applicationsBySource"
+              totalUnit="applications"
               title="Applications by source"
               data={deriveApplicationsBySource(rangedApplications)}
             />
@@ -458,6 +466,8 @@ export function AnalyticsPage({
           {visibleCharts.has("topCompanies") ? (
             <CategoryChart
               color="var(--chart-7)"
+              notSetFilterId="topCompanies"
+              totalUnit="applications"
               title="Top companies"
               data={deriveTopCompanies(rangedApplications)}
             />
@@ -465,6 +475,7 @@ export function AnalyticsPage({
           {visibleCharts.has("workModeMix") ? (
             <DonutChartCard
               colors={WORK_MODE_COLORS}
+              notSetFilterId="workModeMix"
               title="Work mode"
               data={deriveWorkModeMix(rangedApplications)}
             />
@@ -472,6 +483,7 @@ export function AnalyticsPage({
           {visibleCharts.has("jobTypeMix") ? (
             <DonutChartCard
               colors={JOB_TYPE_COLORS}
+              notSetFilterId="jobTypeMix"
               title="Job type"
               data={deriveJobTypeMix(rangedApplications)}
             />
@@ -490,6 +502,8 @@ export function AnalyticsPage({
           {visibleCharts.has("interviewTypes") ? (
             <CategoryChart
               color="var(--chart-2)"
+              notSetFilterId="interviewTypes"
+              totalUnit="interviews"
               title="Interview stage types"
               data={deriveInterviewTypes(rangedInterviews)}
             />
@@ -497,6 +511,8 @@ export function AnalyticsPage({
           {visibleCharts.has("assessmentTypes") ? (
             <CategoryChart
               color="var(--chart-3)"
+              notSetFilterId="assessmentTypes"
+              totalUnit="assessments"
               title="Assessment types"
               data={deriveAssessmentTypes(rangedAssessments)}
             />
@@ -745,24 +761,54 @@ function ColumnChartCard({
 function DonutChartCard({
   colors,
   data,
+  notSetFilterId,
   title,
 }: {
   colors: Record<string, string>;
   data: ChartDatum[];
+  notSetFilterId: string;
   title: string;
 }) {
+  const [includeNotSet, setIncludeNotSet] = useIncludeNotSet(notSetFilterId);
+  const { hasNotSet, notSetCount, visibleData } = applyNotSetFilter(
+    data,
+    includeNotSet,
+  );
+
   return (
     <ChartCard
-      table={{ columns: ["Category", "Count"], rows: data }}
+      action={
+        hasNotSet ? (
+          <NotSetToggle includeNotSet={includeNotSet} onChange={setIncludeNotSet} />
+        ) : null
+      }
+      description={describeTotal(visibleData, "applications", notSetCount, includeNotSet)}
+      table={{ columns: ["Category", "Count"], rows: visibleData }}
       title={title}
     >
       <DonutChart
         colorFor={(datum) => colors[datum.label] ?? NEUTRAL_SEGMENT_COLOR}
-        data={data}
+        data={visibleData}
         totalLabel="applications"
       />
     </ChartCard>
   );
+}
+
+// "66 applications · 55 not set" / "11 applications · 55 not set hidden"
+function describeTotal(
+  data: ChartDatum[],
+  unit: string,
+  notSetCount: number,
+  includeNotSet: boolean,
+) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const notSetNote =
+    notSetCount > 0
+      ? ` · ${notSetCount} not set${includeNotSet ? "" : " hidden"}`
+      : "";
+
+  return `Total ${total} ${unit}${notSetNote}`;
 }
 
 function CategoryChart({
@@ -772,9 +818,11 @@ function CategoryChart({
   description,
   formatValue,
   maxValue,
+  notSetFilterId,
   showShare,
   summary,
   title,
+  totalUnit,
 }: {
   barClassName?: (datum: ChartDatum, index: number) => string;
   color?: string;
@@ -782,21 +830,40 @@ function CategoryChart({
   description?: string;
   formatValue?: (value: number) => string;
   maxValue?: number;
+  // Adds an include/exclude "Not set" toggle, remembered per chart.
+  notSetFilterId?: string;
   showShare?: boolean;
   summary?: ReactNode;
   title: string;
+  // When set, the card shows the total count in this unit.
+  totalUnit?: string;
 }) {
+  const [includeNotSet, setIncludeNotSet] = useIncludeNotSet(notSetFilterId);
+  const { hasNotSet, notSetCount, visibleData } = notSetFilterId
+    ? applyNotSetFilter(data, includeNotSet)
+    : { hasNotSet: false, notSetCount: 0, visibleData: data };
+  const totalDescription = totalUnit
+    ? describeTotal(visibleData, totalUnit, notSetCount, includeNotSet)
+    : undefined;
+
   return (
     <ChartCard
-      description={description}
-      table={{ columns: ["Category", "Count"], rows: data }}
+      action={
+        hasNotSet ? (
+          <NotSetToggle includeNotSet={includeNotSet} onChange={setIncludeNotSet} />
+        ) : null
+      }
+      description={
+        [totalDescription, description].filter(Boolean).join(" · ") || undefined
+      }
+      table={{ columns: ["Category", "Count"], rows: visibleData }}
       title={title}
     >
       {summary}
       <HorizontalBarChart
         barClassName={barClassName}
         color={color}
-        data={data}
+        data={visibleData}
         formatValue={formatValue}
         maxValue={maxValue}
         showShare={showShare}

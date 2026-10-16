@@ -6,8 +6,7 @@ import type {
   Interview,
 } from "../../types/application";
 import type { ChartDatum } from "./charts";
-
-const NOT_SET_LABEL = "Not set";
+import { NOT_SET_LABEL } from "./notSetFilter";
 const OTHER_LABEL = "Other";
 const WEEKDAY_LABELS = [
   "Sunday",
