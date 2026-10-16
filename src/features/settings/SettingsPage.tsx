@@ -192,29 +192,38 @@ export function SettingsPage({
           id="account"
           title="Account and sync"
         >
-          <div className="flex items-start gap-3 py-4 text-sm leading-6 text-foreground">
-            <Cloud aria-hidden="true" className="mt-1 shrink-0 text-info" size={18} />
-            <div>
-              <p className="font-semibold">Cloud sync is active</p>
-              <p className="text-muted">
-                D1 stores your tracker data and R2 stores resume and cover letter files. This
-                browser keeps a local cache for faster loading.
-              </p>
-              {cloudAccountEmail ? (
-                <p className="mt-1 break-all text-muted">
-                  Signed in as {cloudAccountEmail}
+          <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-base font-semibold text-primary"
+              >
+                {(cloudAccountEmail?.[0] ?? "?").toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="break-all text-sm font-semibold text-foreground">
+                  {cloudAccountEmail ?? "Signed in"}
                 </p>
-              ) : null}
+                <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-success">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-success" />
+                  Cloud sync is active
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="py-4">
             <a
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
               href="/cdn-cgi/access/logout"
             >
               <LogOut aria-hidden="true" size={16} />
               Sign out
             </a>
+          </div>
+          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted">
+            <Cloud aria-hidden="true" className="mt-0.5 shrink-0 text-info" size={16} />
+            <p>
+              D1 stores your tracker data and R2 stores resume and cover letter
+              files. This browser keeps a local cache for faster loading.
+            </p>
           </div>
         </SettingsSection>
 
