@@ -79,7 +79,7 @@ your own Cloudflare account where only the people you allow can sign in.
 
 Deploy your own copy to **Cloudflare Pages** behind **Cloudflare Access**, so the
 site asks for a sign-in and only the email addresses you approve can open it.
-Everything fits within Cloudflare's free allowances for personal use.
+Personal use should fit within Cloudflare's free allowances.
 
 ```mermaid
 flowchart LR
@@ -90,7 +90,7 @@ flowchart LR
 ```
 
 **You need:** a free [Cloudflare account](https://dash.cloudflare.com/sign-up), a
-GitHub account, and [Node.js 22](https://nodejs.org/). Plan on about 20 minutes.
+GitHub account, and [Node.js 22](https://nodejs.org/).
 
 > [!NOTE]
 > Cloudflare may ask you to add a payment method before it enables R2 or Zero
