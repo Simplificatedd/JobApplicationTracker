@@ -65,7 +65,7 @@ Do not commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 
 ## 2. Create D1 and R2 storage
 
-In **Cloudflare -> Storage & Databases**:
+In **Cloudflare → Storage & Databases**:
 
 1. Create a D1 database named `job-application-tracker`.
 2. Copy its database ID.
@@ -90,7 +90,7 @@ command may open a browser window so you can approve access to Cloudflare.
 
 ## 3. Create a Git-integrated Pages project
 
-1. Open **Workers & Pages -> Create application -> Pages -> Connect to Git**.
+1. Open **Workers & Pages → Create application → Pages → Connect to Git**.
 2. Authorize GitHub if prompted and select your fork.
 3. Configure the build:
    - Production branch: `main`
@@ -106,7 +106,7 @@ the `functions/` API with the frontend and automatically deploys later pushes.
 
 ## 4. Choose the Access login method
 
-Open **Zero Trust -> Integrations -> Identity providers**. Use one of these:
+Open **Zero Trust → Integrations → Identity providers**. Use one of these:
 
 - **Cloudflare account:** Cloudflare is the easiest provider for a personal
   deployment. Add or configure the Cloudflare provider, enable **Restrict to
@@ -121,7 +121,7 @@ Open **Zero Trust -> Integrations -> Identity providers**. Use one of these:
 An identity provider is simply the account system used on the sign-in screen.
 Choose one option; you do not need to configure all three.
 
-Your team name and full team domain are shown under **Zero Trust -> Settings ->
+Your team name and full team domain are shown under **Zero Trust → Settings →
 Team name and domain**. The value used later must include `https://`, for example
 `https://my-team.cloudflareaccess.com`.
 
@@ -131,9 +131,9 @@ Cloudflare Pages initially creates an Access application for wildcard preview
 URLs. Convert that generated application to protect the production hostname:
 
 1. In **Workers & Pages**, select the Pages project.
-2. Go to **Settings -> General** and select **Enable access policy**.
+2. Go to **Settings → General** and select **Enable access policy**.
 3. Select **Manage** on the generated Access policy.
-4. In **Zero Trust -> Access controls -> Applications**, configure the
+4. In **Zero Trust → Access controls → Applications**, configure the
    generated application.
 5. Under **Destinations / Public hostnames**, set:
    - Subdomain: blank (delete the `*`)
@@ -153,7 +153,7 @@ URLs. Convert that generated application to protect the production hostname:
    authentication** may be turned on.
 10. Save the application and use **Policy tester** with your login email.
 
-To protect previews too, return to the Pages project's **Settings -> General**
+To protect previews too, return to the Pages project's **Settings → General**
 and enable the Access policy again after securing production. Cloudflare should
 then show separate Access applications for the root production hostname and
 the wildcard previews. Do not replace the production AUD below with the preview
@@ -165,8 +165,8 @@ These two values let the server verify that a sign-in really came from your
 Cloudflare Access application rather than trusting an email supplied by the
 browser:
 
-1. Copy the team domain from **Zero Trust -> Settings -> Team name and domain**.
-2. Go to **Zero Trust -> Access controls -> Applications**.
+1. Copy the team domain from **Zero Trust → Settings → Team name and domain**.
+2. Go to **Zero Trust → Access controls → Applications**.
 3. Select **Configure** for the production application whose destination is the
    exact `<project>.pages.dev` hostname, not `*.<project>.pages.dev`.
 4. Under **Additional settings** (shown as **Details** in some dashboard
@@ -178,7 +178,7 @@ that application is deleted and recreated.
 
 ## 7. Bind storage and add runtime values
 
-In **Workers & Pages -> your Pages project -> Settings**, configure the
+In **Workers & Pages → your Pages project → Settings**, configure the
 **Production** environment:
 
 | Type | Variable name | Value |
@@ -188,8 +188,8 @@ In **Workers & Pages -> your Pages project -> Settings**, configure the
 | Variable or secret | `TEAM_DOMAIN` | `https://<your-team-name>.cloudflareaccess.com` |
 | Variable or secret | `POLICY_AUD` | Production application's AUD tag |
 
-Bindings are normally under **Settings -> Bindings**; runtime values are under
-**Settings -> Variables and Secrets**. Dashboard labels can vary slightly.
+Bindings are normally under **Settings → Bindings**; runtime values are under
+**Settings → Variables and Secrets**. Dashboard labels can vary slightly.
 Add the values specifically to Production. Do not set `LOCAL_DEV_AUTH_EMAIL` in
 Cloudflare; that variable is intentionally restricted to localhost.
 
@@ -233,15 +233,15 @@ both methods would create duplicate deployments.
 
 For a Direct Upload project:
 
-1. In Cloudflare, open **My Profile -> API Tokens -> Create Token -> Create
+1. In Cloudflare, open **My Profile → API Tokens → Create Token → Create
    Custom Token**.
-2. Add only the **Account -> Cloudflare Pages -> Edit** permission.
+2. Add only the **Account → Cloudflare Pages → Edit** permission.
 3. Under **Account Resources**, include only the account that owns the Pages
    project. Create the token and copy it when Cloudflare displays it.
 4. Find the account ID in the Cloudflare dashboard. You can also run
    `npx wrangler whoami` from the project folder.
-5. In the GitHub repository, open **Settings -> Secrets and variables ->
-   Actions -> Secrets** and add:
+5. In the GitHub repository, open **Settings → Secrets and variables →
+   Actions → Secrets** and add:
    - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID.
    - `CLOUDFLARE_API_TOKEN`: the token created above.
 6. Open the **Variables** tab on the same GitHub page and add:
@@ -254,10 +254,10 @@ Name** column in `npx wrangler pages project list`, without `.pages.dev`.
 
 Forked repositories may initially have GitHub Actions disabled. If necessary,
 open the repository's **Actions** tab and enable workflows. After adding all
-three settings, open **Actions -> CI -> Run workflow**, select `main`, and run
+three settings, open **Actions → CI → Run workflow**, select `main`, and run
 it once. The `verify` job must pass before `Deploy production` starts. Confirm
-the same commit appears under **Cloudflare -> Workers & Pages -> your project
--> Deployments**.
+the same commit appears under **Cloudflare → Workers & Pages → your project
+→ Deployments**.
 
 After activation, every push or merge to `main` is verified and deployed.
 Pull requests never deploy, missing configuration skips the deployment job,
