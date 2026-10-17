@@ -147,16 +147,19 @@ Deploy, then note your address, for example `https://<your-project>.pages.dev`.
 
 ### 4. Put the site behind Cloudflare Access
 
-1. In your Pages project, open **Settings → General** and select
+1. If you have never used **Zero Trust**, open it from the dashboard once to
+   set it up: choose a team name (it becomes
+   `<your-team>.cloudflareaccess.com`) and select the **Free** plan.
+2. In your Pages project, open **Settings → General** and select
    **Enable access policy**, then **Manage**.
-2. Under **Destinations / Public hostnames**, clear the subdomain (delete the
+3. Under **Destinations / Public hostnames**, clear the subdomain (delete the
    `*`) so the destination is exactly `<your-project>.pages.dev`. Rename the
    application if Cloudflare reports a naming conflict.
-3. Add a policy with action **Allow** and **Include → Emails** set to your email
+4. Add a policy with action **Allow** and **Include → Emails** set to your email
    address (and anyone else you want to let in).
-4. Under **Authentication**, choose **One-time PIN**. Access emails a short code
+5. Under **Authentication**, choose **One-time PIN**. Access emails a short code
    to approved addresses, so no other login setup is needed.
-5. Save, then use **Policy tester** with your email to confirm you are allowed.
+6. Save, then use **Policy tester** with your email to confirm you are allowed.
 
 > [!WARNING]
 > Never use **Everyone**, an email wildcard, **Bypass**, or **Service Auth** in
