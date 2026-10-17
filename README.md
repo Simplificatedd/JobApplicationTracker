@@ -104,6 +104,7 @@ Select **Fork** at the top of this page, then clone your fork:
 ```bash
 git clone https://github.com/<your-username>/JobApplicationTracker.git
 cd JobApplicationTracker
+nvm use            # or make sure `node --version` reports 22
 npm ci
 npm run check
 ```
