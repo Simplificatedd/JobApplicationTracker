@@ -210,6 +210,7 @@ latest `main` deployment, then visit your site:
 - [ ] The site asks you to sign in before showing anything.
 - [ ] After signing in, **Settings** shows **Cloud sync is active** with your email.
 - [ ] A test application is still there after a refresh.
+- [ ] Delete the test application before you start using or sharing the site.
 
 🎉 **Done.** Your tracker is live at `https://<your-project>.pages.dev`, and only
 the emails in your Allow policy can open it.
