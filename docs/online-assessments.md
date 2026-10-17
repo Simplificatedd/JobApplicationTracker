@@ -16,7 +16,7 @@ Assessments have independent stable numbers, optional name, type, provider, link
 - Conversion never changes current application status or rewrites existing status activities. Offer migration remains gated at **data version < 2**, independently of the current version, so modern Offered records remain Offered. Assessment actions also preserve application status, archive state, and other metadata changed concurrently in another tab.
 - Provider-only legacy classifications remain provider-only through scheduling edits and normalization. Assessment edits carry field changes and apply them to the latest record during cloud revision retries. The editor compares its draft with the record captured when editing began, so unchanged fields cannot overwrite a submission/result entered elsewhere. Removed assessments reject stale updates. Conversion checks the source before removal; equivalent repeated conversions preserve newer assessment edits, while changed or deleted sources reject the conversion without saving.
 
-## Backups and downgrade behaviour
+## Backups and downgrade behavior
 
 The importer accepts backup schemas **1, 2, and 3**, validates assessment ownership, identity, numbers, enums, dates, duration, legacy source, and collection limits, then migrates the snapshot. Full export/import preserves all assessment fields and legacy source metadata. Import retains the existing replacement semantics; importing a backup repeatedly does not accumulate duplicates. Import previews count interviews and assessments separately.
 

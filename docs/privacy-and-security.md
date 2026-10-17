@@ -17,7 +17,7 @@ Use **Settings → Backup and export → Full backup** regularly. A full backup 
 snapshot and stored document files as base64 data. Restoring a backup replaces the
 signed-in user's cloud data and refreshes the browser cache.
 
-## Privacy Notes
+## Privacy notes
 
 - Each D1 row and R2 object is scoped to the verified Cloudflare Access subject.
 - No analytics service or third-party telemetry is used.
