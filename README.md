@@ -16,7 +16,7 @@ your own Cloudflare account where only the people you allow can sign in.
 
 [Features](#-features) · [Quickstart](#-quickstart-host-your-own-private-tracker) · [Local development](#-local-development) · [Docs](#-documentation) · [FAQ](#-faq)
 
-<img src="docs/images/applications.png" alt="Applications table with statuses, follow-ups and quick actions" width="900">
+<img src="docs/images/applications.png" alt="Applications table with statuses, follow-ups, and quick actions" width="900">
 
 </div>
 
@@ -64,8 +64,8 @@ your own Cloudflare account where only the people you allow can sign in.
 
 <table>
   <tr>
-    <td width="50%" valign="top"><img src="docs/images/analytics.png" alt="Analytics dashboard with metrics, timelines, pipeline treemap and status flow"></td>
-    <td width="50%" valign="top"><img src="docs/images/settings.png" alt="Settings page with colour-coded sections"></td>
+    <td width="50%" valign="top"><img src="docs/images/analytics.png" alt="Analytics dashboard with metrics, timelines, a pipeline treemap, and a status flow"></td>
+    <td width="50%" valign="top"><img src="docs/images/settings.png" alt="Settings page with color-coded sections"></td>
   </tr>
   <tr>
     <td align="center"><sub>Analytics dashboard</sub></td>
