@@ -25,26 +25,29 @@ your own Cloudflare account where only the people you allow can sign in.
 <table>
   <tr>
     <td width="33%" valign="top">
-      <h3>📋 Applications table</h3>
+      <h3>🗂️ Applications table</h3>
       Search, filter, and sort with a sticky header, pinned columns, quick-edit
-      popovers, resizable columns, and mobile cards.
+      popovers, resizable columns, and mobile cards. Keep contacts per
+      application, and archive or restore entries.
     </td>
     <td width="33%" valign="top">
       <h3>🔔 Reminders</h3>
-      Follow-ups, interview deadlines, and pending offers surface in a
-      notification bell and a <em>Needs attention</em> focus mode.
+      Follow-ups, interview and assessment deadlines, and pending offers
+      surface in a notification bell and a <em>Needs attention</em> focus mode.
     </td>
     <td width="33%" valign="top">
-      <h3>📊 Analytics</h3>
+      <h3>📊 Analytics (beta)</h3>
       Key metrics, date ranges, and charts you can switch between views:
-      bars, treemaps, donuts, timelines, a status flow, and more.
+      bars, treemaps, donuts, timelines, a status flow, and more. Turn it on
+      in <strong>Settings → Notifications and labs</strong>.
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
       <h3>🗓️ Interviews &amp; assessments</h3>
       Multiple interview rounds and online assessments per application, each
-      with its own schedule, deadline, and result.
+      with its own schedule and deadline, plus assessment progress and
+      results.
     </td>
     <td width="33%" valign="top">
       <h3>📄 Resume library</h3>
