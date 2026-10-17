@@ -13,7 +13,7 @@ resume and cover-letter files to D1 and R2. After that, cloud state is authorita
 optimistic revisions, retry transient failures, and rebase a mutation when
 another session has written a newer revision.
 
-Use **Settings → Full backup** regularly. A full backup includes the tracker
+Use **Settings → Backup and export → Full backup** regularly. A full backup includes the tracker
 snapshot and stored document files as base64 data. Restoring a backup replaces the
 signed-in user's cloud data and refreshes the browser cache.
 
