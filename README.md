@@ -169,7 +169,9 @@ steps 4 to 7 are done.
 4. Add a policy with action **Allow** and **Include → Emails** set to your email
    address (and anyone else you want to let in).
 5. Under **Authentication**, choose **One-time PIN**. Access emails a short code
-   to approved addresses, so no other login setup is needed.
+   to approved addresses, so no other login setup is needed. If One-time PIN is
+   not listed, add it under **Zero Trust → Integrations → Identity providers**
+   first.
 6. Save, then use **Policy tester** with your email to confirm you are allowed.
 
 > [!WARNING]

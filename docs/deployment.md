@@ -111,8 +111,9 @@ Open **Zero Trust -> Integrations -> Identity providers**. Use one of these:
 - **Cloudflare account:** Cloudflare is the easiest provider for a personal
   deployment. Add or configure the Cloudflare provider, enable **Restrict to
   account members**, save it, and use **Test** to confirm sign-in.
-- **One-time PIN:** no provider setup is required. Access emails a short-lived
-  code to addresses allowed by the application's policy.
+- **One-time PIN:** no external account is needed. If it is not already listed,
+  add **One-time PIN** here. Access emails a short-lived code to addresses
+  allowed by the application's policy.
 - **Google:** add the Google identity provider and complete its OAuth setup. Its
   authorized redirect URI is
   `https://<your-team-name>.cloudflareaccess.com/cdn-cgi/access/callback`.
