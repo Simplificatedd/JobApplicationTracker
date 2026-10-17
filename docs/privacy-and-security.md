@@ -27,7 +27,6 @@ signed-in user's cloud data and refreshes the browser cache.
 - Server-side safety budgets stop resume storage above 5 GiB, tracker snapshots
   above 512 MiB, or more than 100,000 R2 writes and 1,000,000 R2 reads in one
   UTC calendar month. Requests fail closed when a budget is exhausted.
-- Demo seed data uses fictional companies, people, and URLs.
 
 ## Cost and usage guardrails
 
