@@ -184,7 +184,7 @@ steps 4 to 7 are done.
 | Value | Where to find it |
 | --- | --- |
 | Team domain | **Zero Trust → Settings → Team name and domain**, written as `https://<your-team>.cloudflareaccess.com` |
-| Application Audience (AUD) tag | **Zero Trust → Access controls → Applications →** your `<your-project>.pages.dev` application **→ Configure → Additional settings** |
+| Application Audience (AUD) tag | **Zero Trust → Access controls → Applications →** your `<your-project>.pages.dev` application **→ Configure → Additional settings** (called **Details** in some layouts) |
 
 These let the server verify that every request really came through your Access
 sign-in.
@@ -192,7 +192,8 @@ sign-in.
 ### 6. Connect storage and secrets
 
 In **Workers & Pages → your project → Settings**, add these to the
-**Production** environment:
+**Production** environment. Bindings go under **Bindings**; the two values go
+under **Variables and Secrets**.
 
 | Type | Name | Value |
 | --- | --- | --- |
