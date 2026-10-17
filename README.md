@@ -228,7 +228,8 @@ the emails in your Allow policy can open it.
 ## 💻 Local development
 
 Use Node.js 22 (see `.nvmrc`). Local sign-in uses `LOCAL_DEV_AUTH_EMAIL`, which
-only works on `localhost`:
+only works on `localhost`. The placeholder database ID in the example config is
+fine locally; you only need a real D1 ID to deploy.
 
 ```bash
 nvm use
