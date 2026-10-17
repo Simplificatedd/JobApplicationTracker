@@ -149,6 +149,8 @@ fork, and use these build settings:
 | Build output directory | `dist` |
 
 Deploy, then note your address, for example `https://<your-project>.pages.dev`.
+The site loads but cannot save or load data yet. That is expected until
+steps 4 to 7 are done.
 
 > [!TIP]
 > Use **Connect to Git**, not Direct Upload. Every later push to `main` then
