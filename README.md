@@ -120,14 +120,22 @@ In the Cloudflare dashboard, open **Storage & Databases**:
 2. Create an **R2** bucket named `job-application-tracker-resumes`. Keep the
    **Standard** storage class and leave public access **off**.
 
-Then create the database tables from your terminal:
+Then create the database tables from your terminal. First copy the config:
 
 ```bash
 cp wrangler.example.jsonc wrangler.jsonc
-# Replace replace-with-your-d1-database-id in wrangler.jsonc with your D1 ID
+```
+
+Open `wrangler.jsonc` and replace `replace-with-your-d1-database-id` with your
+D1 database ID. Then sign in and apply the migrations:
+
+```bash
 npx wrangler login
 npx wrangler d1 migrations apply job-application-tracker --remote
 ```
+
+`wrangler login` opens a browser to approve access. Check that the migration
+targets the Cloudflare account you expect, then answer `Yes` when asked.
 
 ### 3. Create the Pages site
 
