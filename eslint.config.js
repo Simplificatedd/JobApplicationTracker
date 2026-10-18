@@ -6,10 +6,22 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["coverage", "dist", "planning"],
+    ignores: [
+      "coverage",
+      "dist",
+      "planning",
+      ".claude/worktrees/**",
+      ".agents/worktrees/**",
+      ".codex/worktrees/**",
+    ],
   },
   {
-    files: ["**/*.{ts,tsx}"],
+    files: [
+      "src/**/*.{ts,tsx}",
+      "functions/**/*.{ts,tsx}",
+      "vite.config.ts",
+      "tailwind.config.ts",
+    ],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: 2020,
