@@ -5,6 +5,8 @@ dist/
 *.local
 *.tsbuildinfo
 planning/
+# Local codebase audit reports
+/audit/
 coverage/
 .dev.vars
 .dev.vars.*
