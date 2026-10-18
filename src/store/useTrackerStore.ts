@@ -223,6 +223,24 @@ export function useTrackerStore(): TrackerStore {
   useEffect(() => {
     let isActive = true;
 
+    const handleAccountChanged = () => {
+      setActivities([]);
+      setAnalyticsSettings(DEFAULT_ANALYTICS_SETTINGS);
+      setApplications([]);
+      setAssessments([]);
+      setCloudAccountEmail(null);
+      setContacts([]);
+      setCoverLetters([]);
+      setInterviews([]);
+      setNotificationState(DEFAULT_NOTIFICATION_STATE);
+      setResumes([]);
+      setSettings(DEFAULT_USER_SETTINGS);
+      setTablePreferences(null);
+      setStorageError("Signed-in account changed. Reload the tracker.");
+      setIsStorageLoading(false);
+    };
+    window.addEventListener("tracker-account-changed", handleAccountChanged);
+
     setIsStorageLoading(true);
     setStorageError(null);
 
@@ -260,6 +278,7 @@ export function useTrackerStore(): TrackerStore {
 
     return () => {
       isActive = false;
+      window.removeEventListener("tracker-account-changed", handleAccountChanged);
     };
   }, [storageRetryKey]);
 

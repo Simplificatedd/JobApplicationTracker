@@ -7,6 +7,7 @@ import {
 } from "../lib/domain";
 import type { Application, ResumeMetadata } from "../types/application";
 import {
+  CloudApiError,
   CloudRevisionConflictError,
   type CloudAccount,
   type CloudApiClient,
@@ -72,7 +73,7 @@ function createSnapshot(
 }
 
 class FakeCloudApi implements CloudApiClient {
-  account: CloudAccount = { email: "student@example.edu" };
+  account: CloudAccount = { id: "student-id", email: "student@example.edu" };
   files = new Map<string, Blob>();
   state: CloudStateEnvelope | null = null;
   conflictState: CloudStateEnvelope | null = null;
@@ -161,15 +162,201 @@ describe("cloud storage adapter", () => {
       { file, storageKey: resume.storageKey },
     ]);
     const api = new FakeCloudApi();
-    const adapter = createCloudStorageAdapter({ api, cache });
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("cloud-migration-account"),
+      legacyCache: cache,
+      confirmLegacyMigration: () => true,
+    });
 
     await expect(adapter.initialize()).resolves.toMatchObject({
       applications: [{ id: application.id }],
       resumes: [{ id: resume.id }],
     });
-    expect(adapter.getAccount()).toEqual({ email: "student@example.edu" });
+    expect(adapter.getAccount()).toEqual({ id: "student-id", email: "student@example.edu" });
     expect(api.state).toMatchObject({ revision: 1 });
     await expect(api.files.get(resume.storageKey)?.text()).resolves.toBe("%PDF-");
+    await expect(cache.exportSnapshot()).resolves.toMatchObject({
+      applications: [{ id: application.id }],
+    });
+    await expect(cache.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+  });
+
+  it("does not transfer unowned local data when migration is declined", async () => {
+    const legacyCache = createCache("cloud-unowned-declined");
+    await legacyCache.initialize();
+    await legacyCache.importSnapshot(createSnapshot([application], [resume]), [
+      { file: new Blob(["private"]), storageKey: resume.storageKey },
+    ]);
+    const api = new FakeCloudApi();
+    let prompts = 0;
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("cloud-declined-account"),
+      legacyCache,
+      confirmLegacyMigration: () => { prompts += 1; return false; },
+    });
+
+    await expect(adapter.initialize()).resolves.toMatchObject({
+      applications: [], resumes: [],
+    });
+    expect(prompts).toBe(1);
+    expect(api.files.size).toBe(0);
+    expect(api.state?.snapshot.applications).toEqual([]);
+    await expect(legacyCache.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+  });
+
+  it("keeps legacy data for a retry when migration upload fails", async () => {
+    const legacyCache = createCache("cloud-unowned-retry");
+    await legacyCache.initialize();
+    await legacyCache.importSnapshot(createSnapshot([application], [resume]), [
+      { file: new Blob(["private"]), storageKey: resume.storageKey },
+    ]);
+    const api = new FakeCloudApi();
+    let failUpload = true;
+    const originalPut = api.putResumeFile.bind(api);
+    api.putResumeFile = async (key, file) => {
+      if (failUpload) {
+        failUpload = false;
+        throw new Error("Upload interrupted");
+      }
+      return originalPut(key, file);
+    };
+    let prompts = 0;
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("cloud-unowned-retry-account"),
+      legacyCache,
+      confirmLegacyMigration: () => { prompts += 1; return true; },
+    });
+
+    await expect(adapter.initialize()).rejects.toThrow("Upload interrupted");
+    expect(api.state).toBeNull();
+    await expect(legacyCache.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+    await expect(adapter.initialize()).resolves.toMatchObject({
+      applications: [{ id: application.id }],
+      resumes: [{ id: resume.id }],
+    });
+    expect(prompts).toBe(2);
+  });
+
+  it("keeps account caches separate and blocks stale-tab reads after a switch", async () => {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: createSnapshot([application], [resume]),
+      updatedAt: application.updatedAt,
+    };
+    const indexedDb = new IDBFactory();
+    const caches = new Map<string, ReturnType<typeof createCache>>();
+    const cacheForAccount = (id: string) => {
+      let cache = caches.get(id);
+      if (!cache) {
+        cache = createIndexedDbStorageAdapter({
+          databaseName: `cloud-owner-${id}`,
+          indexedDb,
+        });
+        caches.set(id, cache);
+      }
+      return cache;
+    };
+    const originalFile = new Blob(["account A only"]);
+    await cacheForAccount("student-id").initialize();
+    await cacheForAccount("student-id").importSnapshot(
+      createSnapshot([application], [resume]),
+      [{ file: originalFile, storageKey: resume.storageKey }],
+    );
+    let accountChanged = 0;
+    const adapter = createCloudStorageAdapter({
+      api,
+      cacheForAccount,
+      onAccountChanged: () => { accountChanged += 1; },
+    });
+    await adapter.initialize();
+    await expect(caches.get("student-id")?.listApplications()).resolves.toHaveLength(1);
+    await expect(adapter.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+
+    api.account = { id: "other-id", email: "other@example.edu" };
+    api.state = null;
+    await expect(adapter.listApplications()).rejects.toThrow("Signed-in account changed");
+    await expect(adapter.getResumeFile(resume.storageKey)).rejects.toThrow("Signed-in account changed");
+    await expect(adapter.commitMutation({ applications: [application] })).rejects.toThrow("Signed-in account changed");
+    expect(accountChanged).toBe(1);
+    expect(api.state).toBeNull();
+
+    const other = createCloudStorageAdapter({
+      api,
+      cacheForAccount,
+      legacyCache: createCache("cloud-owner-empty-legacy"),
+    });
+    await expect(other.initialize()).resolves.toMatchObject({ applications: [] });
+    await expect(caches.get("student-id")?.listApplications()).resolves.toHaveLength(1);
+    await expect(caches.get("other-id")?.listApplications()).resolves.toHaveLength(0);
+    await expect(caches.get("other-id")?.listResumeFiles()).resolves.toEqual([]);
+    await expect(caches.get("student-id")?.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+
+    api.account = { id: "student-id", email: "student@example.edu" };
+    api.state = {
+      revision: 1,
+      snapshot: createSnapshot([application], [resume]),
+      updatedAt: application.updatedAt,
+    };
+    const restored = createCloudStorageAdapter({ api, cacheForAccount });
+    await expect(restored.initialize()).resolves.toMatchObject({
+      applications: [{ id: application.id }],
+      resumes: [{ id: resume.id }],
+    });
+    await expect(restored.getResumeFile(resume.storageKey)).resolves.toBeDefined();
+  });
+
+  it("does not use unowned data when the second account already has remote state", async () => {
+    const legacyCache = createCache("cloud-existing-b-legacy");
+    await legacyCache.initialize();
+    await legacyCache.importSnapshot(createSnapshot([application]));
+    const api = new FakeCloudApi();
+    api.account = { id: "other-id", email: "other@example.edu" };
+    api.state = {
+      revision: 2,
+      snapshot: createSnapshot([{ ...application, id: "other-app" }]),
+      updatedAt: application.updatedAt,
+    };
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("cloud-existing-b-account"),
+      legacyCache,
+      confirmLegacyMigration: () => { throw new Error("must not prompt"); },
+    });
+
+    await expect(adapter.initialize()).resolves.toMatchObject({
+      applications: [{ id: "other-app" }],
+    });
+    expect(api.state.snapshot.applications).toHaveLength(1);
+    await expect(legacyCache.listApplications()).resolves.toMatchObject([
+      { id: application.id },
+    ]);
+  });
+
+  it("locks a stale tab when the server rejects a raced account change", async () => {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: createSnapshot(),
+      updatedAt: application.updatedAt,
+    };
+    let changed = 0;
+    const adapter = createCloudStorageAdapter({
+      api,
+      cache: createCache("cloud-raced-account"),
+      onAccountChanged: () => { changed += 1; },
+    });
+    await adapter.initialize();
+    api.saveState = async () => {
+      throw new CloudApiError("Signed-in account changed.", 412);
+    };
+    await expect(adapter.commitMutation({ applications: [application] }))
+      .rejects.toThrow("Signed-in account changed");
+    expect(changed).toBe(1);
+    await expect(adapter.listApplications()).rejects.toThrow("Signed-in account changed");
   });
 
   it("uses cloud state as authoritative and refreshes the local cache", async () => {
