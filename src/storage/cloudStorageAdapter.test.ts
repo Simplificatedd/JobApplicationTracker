@@ -1,5 +1,5 @@
 import { IDBFactory } from "fake-indexeddb";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
@@ -130,6 +130,146 @@ function createCache(name: string) {
     indexedDb: new IDBFactory(),
   });
 }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
+describe("account invalidation during pending work", () => {
+  function setup() {
+    const api = new FakeCloudApi();
+    api.state = {
+      revision: 1,
+      snapshot: { ...createSnapshot([application], [resume]), dataVersion: TRACKER_DATA_VERSION },
+      updatedAt: application.updatedAt,
+    };
+    const cache = createCache("invalidation-races");
+    const changed = vi.fn();
+    const adapter = createCloudStorageAdapter({ api, cache, onAccountChanged: changed });
+    async function invalidate() {
+      api.account = { id: "other-id", email: "other@example.edu" };
+      await expect(adapter.listApplications()).rejects.toThrow("Signed-in account changed");
+      expect(changed).toHaveBeenCalledTimes(1);
+      expect(adapter.getAccount()).toBeNull();
+    }
+    return { api, cache, adapter, invalidate, changed };
+  }
+
+  it("rejects an old final session response instead of returning initialization data", async () => {
+    const { api, adapter, invalidate } = setup();
+    const entered = deferred<void>();
+    const session = deferred<CloudAccount>();
+    const oldAccount = api.account;
+    let calls = 0;
+    vi.spyOn(api, "getSession").mockImplementation(async () => {
+      if (++calls === 2) {
+        entered.resolve();
+        return session.promise;
+      }
+      return api.account;
+    });
+    const pending = expect(adapter.initialize()).rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    session.resolve(oldAccount);
+    await pending;
+  });
+
+  it("rejects a cached A file that resolves after B was detected", async () => {
+    const { cache, adapter, invalidate } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    const file = deferred<Blob>();
+    vi.spyOn(cache, "getResumeFile").mockImplementation(() => {
+      entered.resolve();
+      return file.promise;
+    });
+    const pending = expect(adapter.getResumeFile(resume.storageKey)).rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    file.resolve(new Blob(["A private bytes"]));
+    await pending;
+  });
+
+  it("rejects a late cloud file without writing it into a cache", async () => {
+    const { api, cache, adapter, invalidate } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    const file = deferred<Blob>();
+    vi.spyOn(api, "getResumeFile").mockImplementation(() => {
+      entered.resolve();
+      return file.promise;
+    });
+    const cacheWrite = vi.spyOn(cache, "saveResumeFile");
+    const pending = expect(adapter.getResumeFile(resume.storageKey)).rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    file.resolve(new Blob(["A cloud bytes"]));
+    await pending;
+    expect(cacheWrite).not.toHaveBeenCalled();
+  });
+
+  it("rejects a successful late state write without refreshing or resurrecting state", async () => {
+    const { api, cache, adapter, invalidate } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    const saved = deferred<CloudStateEnvelope>();
+    const oldState = api.state!;
+    vi.spyOn(api, "saveState").mockImplementation(() => {
+      entered.resolve();
+      return saved.promise;
+    });
+    const refresh = vi.spyOn(cache, "importSnapshot");
+    const pending = expect(adapter.commitMutation({ applications: [application] }))
+      .rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    saved.resolve({ ...oldState, revision: 2 });
+    await pending;
+    expect(refresh).not.toHaveBeenCalled();
+    await expect(adapter.exportSnapshot()).rejects.toThrow("Signed-in account changed");
+  });
+
+  it("rejects a late cached file write instead of reporting success", async () => {
+    const { cache, adapter, invalidate } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    const written = deferred<void>();
+    vi.spyOn(cache, "saveResumeFile").mockImplementation(() => {
+      entered.resolve();
+      return written.promise;
+    });
+    const pending = expect(adapter.saveResumeFile(resume.storageKey, new Blob(["A"])))
+      .rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    written.resolve();
+    await pending;
+  });
+
+  it("does not retry a late revision conflict after invalidation", async () => {
+    const { api, adapter, invalidate, changed } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    let reject!: (error: Error) => void;
+    const response = new Promise<CloudStateEnvelope>((_, fail) => { reject = fail; });
+    const save = vi.spyOn(api, "saveState").mockImplementation(() => {
+      entered.resolve();
+      return response;
+    });
+    const pending = expect(adapter.commitMutation({ applications: [application] }))
+      .rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    reject(new CloudRevisionConflictError(api.state));
+    await pending;
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(adapter.getAccount()).toBeNull();
+  });
+});
 
 describe("cloud storage adapter", () => {
   it("applies atomic record writes and deletes to a snapshot", () => {

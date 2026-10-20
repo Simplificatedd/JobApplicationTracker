@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -191,29 +199,30 @@ export interface TrackerStore extends AssessmentActions {
 }
 
 export function useTrackerStore(): TrackerStore {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [contacts, setContacts] = useState<ApplicationContact[]>([]);
-  const [coverLetters, setCoverLetters] = useState<CoverLetterMetadata[]>([]);
-  const [cloudAccountEmail, setCloudAccountEmail] = useState<string | null>(
-    null,
+  const accountInvalidated = useRef(false);
+  const [activities, setActivities] = useAccountState<Activity[]>([], accountInvalidated);
+  const [applications, setApplications] = useAccountState<Application[]>([], accountInvalidated);
+  const [contacts, setContacts] = useAccountState<ApplicationContact[]>([], accountInvalidated);
+  const [coverLetters, setCoverLetters] = useAccountState<CoverLetterMetadata[]>([], accountInvalidated);
+  const [cloudAccountEmail, setCloudAccountEmail] = useAccountState<string | null>(
+    null, accountInvalidated,
   );
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [isStorageLoading, setIsStorageLoading] = useState(true);
-  const [resumes, setResumes] = useState<ResumeMetadata[]>([]);
+  const [assessments, setAssessments] = useAccountState<Assessment[]>([], accountInvalidated);
+  const [interviews, setInterviews] = useAccountState<Interview[]>([], accountInvalidated);
+  const [isStorageLoading, setIsStorageLoading] = useAccountState(true, accountInvalidated);
+  const [resumes, setResumes] = useAccountState<ResumeMetadata[]>([], accountInvalidated);
   const [settings, setSettings] =
-    useState<UserSettings>(DEFAULT_USER_SETTINGS);
-  const [analyticsSettings, setAnalyticsSettings] = useState<AnalyticsSettings>(
-    DEFAULT_ANALYTICS_SETTINGS,
+    useAccountState<UserSettings>(DEFAULT_USER_SETTINGS, accountInvalidated);
+  const [analyticsSettings, setAnalyticsSettings] = useAccountState<AnalyticsSettings>(
+    DEFAULT_ANALYTICS_SETTINGS, accountInvalidated,
   );
-  const [notificationState, setNotificationState] = useState<NotificationState>(
-    DEFAULT_NOTIFICATION_STATE,
+  const [notificationState, setNotificationState] = useAccountState<NotificationState>(
+    DEFAULT_NOTIFICATION_STATE, accountInvalidated,
   );
-  const [storageError, setStorageError] = useState<string | null>(null);
+  const [storageError, setStorageError] = useAccountState<string | null>(null, accountInvalidated);
   const [storageRetryKey, setStorageRetryKey] = useState(0);
   const [tablePreferences, setTablePreferences] =
-    useState<TablePreferences | null>(null);
+    useAccountState<TablePreferences | null>(null, accountInvalidated);
   const analyticsMutationQueue = useRef(createMutationQueue()).current;
   const [applicationMutationQueue] = useState(createMutationQueue);
   const notificationMutationQueue = useRef(createMutationQueue()).current;
@@ -224,6 +233,8 @@ export function useTrackerStore(): TrackerStore {
     let isActive = true;
 
     const handleAccountChanged = () => {
+      if (accountInvalidated.current) return;
+      isActive = false;
       setActivities([]);
       setAnalyticsSettings(DEFAULT_ANALYTICS_SETTINGS);
       setApplications([]);
@@ -238,6 +249,8 @@ export function useTrackerStore(): TrackerStore {
       setTablePreferences(null);
       setStorageError("Signed-in account changed. Reload the tracker.");
       setIsStorageLoading(false);
+      // Clear first, then permanently block publishers from this store instance.
+      accountInvalidated.current = true;
     };
     window.addEventListener("tracker-account-changed", handleAccountChanged);
 
@@ -280,9 +293,21 @@ export function useTrackerStore(): TrackerStore {
       isActive = false;
       window.removeEventListener("tracker-account-changed", handleAccountChanged);
     };
-  }, [storageRetryKey]);
+  }, [
+    storageRetryKey, setActivities, setAnalyticsSettings, setApplications,
+    setAssessments, setCloudAccountEmail, setContacts, setCoverLetters,
+    setInterviews, setNotificationState, setResumes, setSettings,
+    setTablePreferences, setStorageError, setIsStorageLoading,
+  ]);
+
+  function assertAccountActive() {
+    if (accountInvalidated.current) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
+  }
 
   function retryStorage() {
+    if (accountInvalidated.current) return;
     setStorageRetryKey((current) => current + 1);
   }
 
@@ -291,6 +316,7 @@ export function useTrackerStore(): TrackerStore {
   ) {
     return applicationMutationQueue.run(async () => {
       try {
+        assertAccountActive();
         return await operation();
       } catch (error) {
         const message = getStorageErrorMessage(error);
@@ -1520,6 +1546,7 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("The resume file is missing from local storage.");
     }
 
+    assertAccountActive();
     return file;
   }
 
@@ -1536,6 +1563,7 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("The cover letter file is missing from storage.");
     }
 
+    assertAccountActive();
     return file;
   }
 
@@ -1593,6 +1621,7 @@ export function useTrackerStore(): TrackerStore {
       (coverLetterFile) => coverLetterFile !== null,
     );
 
+    assertAccountActive();
     return createBackupFile({ coverLetterFiles, resumeFiles, snapshot });
   }
 
@@ -1641,6 +1670,7 @@ export function useTrackerStore(): TrackerStore {
   }
 
   function exportApplicationsCsv() {
+    assertAccountActive();
     return createApplicationsCsv({ applications, coverLetters, resumes });
   }
 
@@ -1770,7 +1800,9 @@ export function useTrackerStore(): TrackerStore {
     mutation: StorageMutation,
   ): Promise<MutationResult> {
     try {
+      assertAccountActive();
       await cloudStorageAdapter.commitMutation(mutation);
+      assertAccountActive();
       setStorageError(null);
       return success();
     } catch (error) {
@@ -1786,6 +1818,7 @@ export function useTrackerStore(): TrackerStore {
   ) {
     try {
       await promise;
+      assertAccountActive();
       updateState();
       setStorageError(null);
       return true;
@@ -1847,6 +1880,19 @@ export function useTrackerStore(): TrackerStore {
     updateSettings,
     updateTablePreferences,
   };
+}
+
+// React preserves setter queue order: the account-change resets follow every
+// already queued update; this gate prevents late continuations queuing new ones.
+function useAccountState<Value>(
+  initial: Value | (() => Value),
+  invalidated: MutableRefObject<boolean>,
+): [Value, Dispatch<SetStateAction<Value>>] {
+  const [value, setValue] = useState(initial);
+  const publish = useCallback<Dispatch<SetStateAction<Value>>>((next) => {
+    if (!invalidated.current) setValue(next);
+  }, [invalidated]);
+  return [value, publish];
 }
 
 function createActivity(
