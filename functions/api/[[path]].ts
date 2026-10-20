@@ -65,7 +65,7 @@ export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
       const storageKey = decodeURIComponent(resumeMatch[1]);
 
       if (context.request.method === "GET") {
-        return getResumeFile(context.env, user, storageKey);
+        return await getResumeFile(context.env, user, storageKey);
       }
 
       if (context.request.method === "PUT") {
