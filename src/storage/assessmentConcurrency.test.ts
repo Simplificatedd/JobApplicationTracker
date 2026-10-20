@@ -24,7 +24,7 @@ class RevisionApi implements CloudApiClient {
   constructor(data: StorageSnapshot) {
     this.state = { revision: 1, snapshot: structuredClone(data), updatedAt: timestamp };
   }
-  async getSession() { return { email: "test@example.edu" }; }
+  async getSession() { return { id: "test-user", email: "test@example.edu" }; }
   async getState() { return structuredClone(this.state); }
   async saveState(data: StorageSnapshot, revision: number | null) {
     if (revision !== this.state.revision) {

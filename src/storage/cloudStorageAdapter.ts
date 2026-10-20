@@ -1,4 +1,6 @@
 import {
+  DEFAULT_ANALYTICS_SETTINGS,
+  DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
   normalizeApplicationStatus,
 } from "../lib/domain";
@@ -24,12 +26,17 @@ import type { NotificationState, UserSettings } from "../types/settings";
 import type { TablePreferences } from "../types/tablePreferences";
 import {
   cloudApiClient,
+  CloudApiError,
   CloudRevisionConflictError,
   type CloudAccount,
   type CloudApiClient,
   type CloudStateEnvelope,
 } from "./cloudApi";
-import { indexedDbStorageAdapter } from "./indexedDbAdapter";
+import {
+  createIndexedDbStorageAdapter,
+  indexedDbStorageAdapter,
+  TRACKER_DB_NAME,
+} from "./indexedDbAdapter";
 import {
   TRACKER_DATA_VERSION,
   type ResumeBlobRecord,
@@ -186,39 +193,147 @@ export interface CloudStorageAdapter extends StorageAdapter {
 
 export function createCloudStorageAdapter({
   api = cloudApiClient,
-  cache = indexedDbStorageAdapter,
+  cache: injectedCache,
+  cacheForAccount = (id) => createIndexedDbStorageAdapter({
+    databaseName: `${TRACKER_DB_NAME}:account:${encodeURIComponent(id)}`,
+  }),
+  legacyCache = indexedDbStorageAdapter,
+  confirmLegacyMigration = (account) =>
+    window.confirm(
+      `Local tracker data was found without an account owner. It may belong to another account. Import it into ${account.email}? The original local data will be kept.`,
+    ),
+  onAccountChanged = () => {
+    window.dispatchEvent(new Event("tracker-account-changed"));
+    window.location.reload();
+  },
 }: {
   api?: CloudApiClient;
   cache?: StorageAdapter;
+  cacheForAccount?: (accountId: string) => StorageAdapter;
+  legacyCache?: StorageAdapter;
+  confirmLegacyMigration?: (account: CloudAccount) => boolean | Promise<boolean>;
+  onAccountChanged?: () => void;
 } = {}): CloudStorageAdapter {
   let account: CloudAccount | null = null;
+  let cache: StorageAdapter | null = null;
   let cloudState: CloudStateEnvelope | null = null;
   let initializePromise: Promise<StorageSnapshot> | null = null;
+  let accountIdentityChanged = false;
+  let accountGeneration = 0;
   let mutationQueue = Promise.resolve();
 
   function getAccount() {
     return account;
   }
 
-  function initialize() {
+  function activeCache() {
+    assertActive();
+    if (!cache) throw new Error("Account storage has not been initialized.");
+    return cache;
+  }
+
+  function accountId() {
+    assertActive();
+    if (!account) throw new Error("Signed-in account has not been verified.");
+    return account.id;
+  }
+
+  function accountChanged() {
+    if (accountIdentityChanged) assertActive();
+    accountIdentityChanged = true;
+    accountGeneration += 1;
+    account = null;
+    cache = null;
+    cloudState = null;
+    initializePromise = null;
+    onAccountChanged();
+    throw new Error("Signed-in account changed. Reload the tracker.");
+  }
+
+  function assertActive(generation = accountGeneration) {
+    if (accountIdentityChanged || generation !== accountGeneration) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
+  }
+
+  // Fence the public boundary too: a cached result or a local write can finish
+  // after invalidation without making another cloud request.
+  function guarded<Args extends unknown[], Result>(
+    operation: (...args: Args) => Promise<Result>,
+  ) {
+    return async (...args: Args): Promise<Result> => {
+      const generation = accountGeneration;
+      assertActive(generation);
+      try {
+        const result = await operation(...args);
+        assertActive(generation);
+        return result;
+      } catch (error) {
+        assertActive(generation);
+        throw error;
+      }
+    };
+  }
+
+  function activeCloudState(state: CloudStateEnvelope) {
+    assertActive();
+    return normalizeCloudState(state);
+  }
+
+  async function cloudRequest<T>(operation: Promise<T>): Promise<T> {
+    const generation = accountGeneration;
+    try {
+      const result = await operation;
+      assertActive(generation);
+      return result;
+    } catch (error) {
+      assertActive(generation);
+      if (error instanceof CloudApiError && error.status === 412) {
+        accountChanged();
+      }
+      throw error;
+    }
+  }
+
+  async function verifyAccount() {
+    if (accountIdentityChanged) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
+    const current = await api.getSession();
+    assertActive();
+    if (!current.id || !current.email) {
+      throw new Error("The signed-in account has no verified identity.");
+    }
+    if (account && current.id !== account.id) accountChanged();
+    return current;
+  }
+
+  async function initialize() {
+    if (accountIdentityChanged) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
     if (!initializePromise) {
       initializePromise = initializeNow().catch((error) => {
         initializePromise = null;
         throw error;
       });
     }
-
-    return initializePromise;
+    const snapshot = await initializePromise;
+    await verifyAccount();
+    return snapshot;
   }
 
   async function initializeNow() {
-    const localSnapshot = normalizeSnapshot(await cache.initialize());
-    account = await api.getSession();
-    const remoteState = await api.getState();
+    const verified = await verifyAccount();
+    assertActive();
+    account = verified;
+    cache = injectedCache ?? cacheForAccount(account.id);
+    const remoteState = await cloudRequest(api.getState(accountId()));
+    assertActive();
 
     if (remoteState) {
       let current = remoteState;
-      cloudState = normalizeCloudState(current);
+      cloudState = activeCloudState(current);
       // Persist the entire migration atomically under the existing revision guard.
       for (
         let attempt = 0;
@@ -227,8 +342,8 @@ export function createCloudStorageAdapter({
         attempt += 1
       ) {
         try {
-          cloudState = normalizeCloudState(
-            await api.saveState(cloudState.snapshot, cloudState.revision),
+          cloudState = activeCloudState(
+            await cloudRequest(api.saveState(cloudState.snapshot, cloudState.revision, accountId())),
           );
           break;
         } catch (error) {
@@ -239,28 +354,40 @@ export function createCloudStorageAdapter({
           )
             throw error;
           current = error.current;
-          cloudState = normalizeCloudState(current);
+          cloudState = activeCloudState(current);
         }
       }
       await refreshCache(cloudState.snapshot);
       return cloudState.snapshot;
     }
 
-    const localFiles = await cache.listResumeFiles();
+    const scopedSnapshot = normalizeSnapshot(await activeCache().initialize());
+    const scopedFiles = await activeCache().listResumeFiles();
+    let localSnapshot = scopedSnapshot;
+    let localFiles = scopedFiles;
+    if (!hasUserData(scopedSnapshot, scopedFiles)) {
+      const unownedSnapshot = normalizeSnapshot(await legacyCache.initialize());
+      const unownedFiles = await legacyCache.listResumeFiles();
+      if (hasUserData(unownedSnapshot, unownedFiles) &&
+        await confirmLegacyMigration(account)) {
+        localSnapshot = unownedSnapshot;
+        localFiles = unownedFiles;
+      }
+    }
     await Promise.all(
       localFiles.map(({ file, storageKey }) =>
-        api.putResumeFile(storageKey, file),
+        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
       ),
     );
 
     try {
-      cloudState = normalizeCloudState(await api.saveState(localSnapshot, null));
+      cloudState = activeCloudState(await cloudRequest(api.saveState(localSnapshot, null, accountId())));
     } catch (error) {
       if (!(error instanceof CloudRevisionConflictError) || !error.current) {
         throw error;
       }
 
-      cloudState = normalizeCloudState(error.current);
+      cloudState = activeCloudState(error.current);
     }
 
     await refreshCache(cloudState.snapshot, localFiles);
@@ -268,6 +395,9 @@ export function createCloudStorageAdapter({
   }
 
   async function ensureInitialized() {
+    if (accountIdentityChanged) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
     if (!cloudState) {
       await initialize();
     }
@@ -275,6 +405,9 @@ export function createCloudStorageAdapter({
     if (!cloudState) {
       throw new Error("Cloud storage did not return an initialized snapshot.");
     }
+
+    await verifyAccount();
+    assertActive();
 
     return cloudState;
   }
@@ -302,8 +435,9 @@ export function createCloudStorageAdapter({
 
         try {
           const saved = normalizeCloudState(
-            await api.saveState(nextSnapshot, current.revision),
+            await cloudRequest(api.saveState(nextSnapshot, current.revision, accountId())),
           );
+          assertActive();
           cloudState = saved;
           await refreshCache(saved.snapshot, localFiles);
           return saved.snapshot;
@@ -312,7 +446,7 @@ export function createCloudStorageAdapter({
             throw error;
           }
 
-          current = normalizeCloudState(error.current);
+          current = activeCloudState(error.current);
           cloudState = current;
         }
       }
@@ -327,7 +461,7 @@ export function createCloudStorageAdapter({
     snapshot: StorageSnapshot,
     addedFiles: readonly ResumeBlobRecord[] = [],
   ) {
-    const currentFiles = await cache.listResumeFiles();
+    const currentFiles = await activeCache().listResumeFiles();
     const filesByKey = new Map(
       [...currentFiles, ...addedFiles].map((record) => [record.storageKey, record]),
     );
@@ -341,15 +475,16 @@ export function createCloudStorageAdapter({
       referencedKeys.has(record.storageKey),
     );
 
-    await cache.importSnapshot(snapshot, retainedFiles);
+    await activeCache().importSnapshot(snapshot, retainedFiles);
   }
 
   async function commitMutation(mutation: StorageMutation) {
+    await ensureInitialized();
     const resumeFiles = [...(mutation.resumeFiles ?? [])];
 
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
-        api.putResumeFile(storageKey, file),
+        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
       ),
     );
     await mutateSnapshot(
@@ -359,9 +494,12 @@ export function createCloudStorageAdapter({
 
     await Promise.allSettled(
       (mutation.deleteResumeFileKeys ?? []).map((storageKey) =>
-        api.deleteResumeFile(storageKey),
+        cloudRequest(api.deleteResumeFile(storageKey, accountId())),
       ),
     );
+    if (accountIdentityChanged) {
+      throw new Error("Signed-in account changed. Reload the tracker.");
+    }
   }
 
   async function snapshot() {
@@ -541,6 +679,9 @@ export function createCloudStorageAdapter({
             storageKey: resume.storageKey,
           };
         } catch {
+          if (accountIdentityChanged) {
+            throw new Error("Signed-in account changed. Reload the tracker.");
+          }
           return null;
         }
       }),
@@ -549,25 +690,28 @@ export function createCloudStorageAdapter({
   }
 
   async function saveResumeFile(storageKey: string, file: Blob) {
-    await api.putResumeFile(storageKey, file);
-    await cache.saveResumeFile(storageKey, file);
+    await ensureInitialized();
+    await cloudRequest(api.putResumeFile(storageKey, file, accountId()));
+    await activeCache().saveResumeFile(storageKey, file);
   }
 
   async function getResumeFile(storageKey: string) {
-    const cached = await cache.getResumeFile(storageKey);
+    await ensureInitialized();
+    const cached = await activeCache().getResumeFile(storageKey);
 
     if (cached) {
       return cached;
     }
 
-    const file = await api.getResumeFile(storageKey);
-    await cache.saveResumeFile(storageKey, file);
+    const file = await cloudRequest(api.getResumeFile(storageKey, accountId()));
+    await activeCache().saveResumeFile(storageKey, file);
     return file;
   }
 
   async function deleteResumeFile(storageKey: string) {
-    await api.deleteResumeFile(storageKey);
-    await cache.deleteResumeFile(storageKey);
+    await ensureInitialized();
+    await cloudRequest(api.deleteResumeFile(storageKey, accountId()));
+    await activeCache().deleteResumeFile(storageKey);
   }
 
   async function clearResumeFiles() {
@@ -576,9 +720,9 @@ export function createCloudStorageAdapter({
       ...(await listCoverLetterMetadata()),
     ];
     await Promise.allSettled(
-      documents.map((document) => api.deleteResumeFile(document.storageKey)),
+      documents.map((document) => cloudRequest(api.deleteResumeFile(document.storageKey, accountId()))),
     );
-    await cache.clearResumeFiles();
+    await activeCache().clearResumeFiles();
   }
 
   async function getSettings() {
@@ -630,68 +774,91 @@ export function createCloudStorageAdapter({
     importedSnapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
   ) {
+    await ensureInitialized();
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
-        api.putResumeFile(storageKey, file),
+        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
       ),
     );
     await mutateSnapshot(() => importedSnapshot, resumeFiles);
   }
 
   return {
-    initialize,
-    commitMutation,
-    listApplications,
-    getApplication,
-    createApplication,
-    updateApplication,
-    archiveApplication,
-    restoreApplication,
-    deleteApplication,
-    listContacts,
-    saveContacts,
-    createContact,
-    updateContact,
-    deleteContact,
-    listActivities,
-    appendActivity,
-    deleteActivitiesForApplication,
-    listAssessments,
-    listInterviews,
-    saveInterview,
-    deleteInterview,
-    deleteInterviewsForApplication,
-    listResumeMetadata,
-    listCoverLetterMetadata,
-    saveCoverLetter,
-    updateCoverLetterMetadata,
-    deleteCoverLetterMetadata,
-    saveResume,
-    createResumeMetadata,
-    updateResumeMetadata,
-    deleteResumeMetadata,
-    listResumeFiles,
-    saveResumeFile,
-    getResumeFile,
-    deleteResumeFile,
-    clearResumeFiles,
-    getSettings,
-    saveSettings,
-    resetSettings,
-    getNotificationState,
-    saveNotificationState,
-    getAnalyticsSettings,
-    saveAnalyticsSettings,
-    getTablePreferences,
-    saveTablePreferences,
-    resetTablePreferences,
-    exportSnapshot,
-    importSnapshot,
+    initialize: guarded(initialize),
+    commitMutation: guarded(commitMutation),
+    listApplications: guarded(listApplications),
+    getApplication: guarded(getApplication),
+    createApplication: guarded(createApplication),
+    updateApplication: guarded(updateApplication),
+    archiveApplication: guarded(archiveApplication),
+    restoreApplication: guarded(restoreApplication),
+    deleteApplication: guarded(deleteApplication),
+    listContacts: guarded(listContacts),
+    saveContacts: guarded(saveContacts),
+    createContact: guarded(createContact),
+    updateContact: guarded(updateContact),
+    deleteContact: guarded(deleteContact),
+    listActivities: guarded(listActivities),
+    appendActivity: guarded(appendActivity),
+    deleteActivitiesForApplication: guarded(deleteActivitiesForApplication),
+    listAssessments: guarded(listAssessments),
+    listInterviews: guarded(listInterviews),
+    saveInterview: guarded(saveInterview),
+    deleteInterview: guarded(deleteInterview),
+    deleteInterviewsForApplication: guarded(deleteInterviewsForApplication),
+    listResumeMetadata: guarded(listResumeMetadata),
+    listCoverLetterMetadata: guarded(listCoverLetterMetadata),
+    saveCoverLetter: guarded(saveCoverLetter),
+    updateCoverLetterMetadata: guarded(updateCoverLetterMetadata),
+    deleteCoverLetterMetadata: guarded(deleteCoverLetterMetadata),
+    saveResume: guarded(saveResume),
+    createResumeMetadata: guarded(createResumeMetadata),
+    updateResumeMetadata: guarded(updateResumeMetadata),
+    deleteResumeMetadata: guarded(deleteResumeMetadata),
+    listResumeFiles: guarded(listResumeFiles),
+    saveResumeFile: guarded(saveResumeFile),
+    getResumeFile: guarded(getResumeFile),
+    deleteResumeFile: guarded(deleteResumeFile),
+    clearResumeFiles: guarded(clearResumeFiles),
+    getSettings: guarded(getSettings),
+    saveSettings: guarded(saveSettings),
+    resetSettings: guarded(resetSettings),
+    getNotificationState: guarded(getNotificationState),
+    saveNotificationState: guarded(saveNotificationState),
+    getAnalyticsSettings: guarded(getAnalyticsSettings),
+    saveAnalyticsSettings: guarded(saveAnalyticsSettings),
+    getTablePreferences: guarded(getTablePreferences),
+    saveTablePreferences: guarded(saveTablePreferences),
+    resetTablePreferences: guarded(resetTablePreferences),
+    exportSnapshot: guarded(exportSnapshot),
+    importSnapshot: guarded(importSnapshot),
     getAccount,
   };
 }
 
 export const cloudStorageAdapter = createCloudStorageAdapter();
+
+function hasUserData(
+  snapshot: StorageSnapshot,
+  files: readonly ResumeBlobRecord[],
+) {
+  return files.length > 0 ||
+    [
+      snapshot.activities,
+      snapshot.applications,
+      snapshot.contacts,
+      snapshot.coverLetters ?? [],
+      snapshot.assessments ?? [],
+      snapshot.interviews,
+      snapshot.resumes,
+    ].some((records) => records.length > 0) ||
+    JSON.stringify(snapshot.settings) !== JSON.stringify(DEFAULT_USER_SETTINGS) ||
+    snapshot.tablePreferences !== null ||
+    JSON.stringify(snapshot.notificationState) !==
+      JSON.stringify(DEFAULT_NOTIFICATION_STATE) ||
+    JSON.stringify(snapshot.analyticsSettings) !==
+      JSON.stringify(DEFAULT_ANALYTICS_SETTINGS);
+}
 
 function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
   return {

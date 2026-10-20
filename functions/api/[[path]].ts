@@ -26,7 +26,16 @@ export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
     const route = url.pathname.replace(/^\/api\/?/, "");
 
     if (route === "session" && context.request.method === "GET") {
-      return jsonResponse({ email: user.email });
+      return jsonResponse({ id: user.id, email: user.email });
+    }
+
+    // Bind every data request to the identity the client used to choose its cache.
+    // A stale tab must never write account A's snapshot after the Access cookie
+    // changes to account B, even if that happens between two client requests.
+    if (route === "state" || route.startsWith("resume-files/")) {
+      if (context.request.headers.get("X-Tracker-Account-Id") !== user.id) {
+        throw new HttpError(412, "Signed-in account changed. Reload the tracker.");
+      }
     }
 
     if (route === "state") {

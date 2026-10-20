@@ -24,6 +24,25 @@ const snapshot = {
 };
 
 describe("cloud API client", () => {
+  it("requires a verified stable identity and binds data requests to it", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ email: "student@example.edu" }))
+      .mockResolvedValueOnce(Response.json({ id: "student-id", email: "student@example.edu" }))
+      .mockResolvedValueOnce(Response.json({ error: "Cloud state has not been created." }, { status: 404 }));
+    const client = createCloudApiClient({ fetcher, retryDelays: [] });
+
+    await expect(client.getSession()).rejects.toMatchObject({
+      message: "The signed-in account has no verified identity.",
+    });
+    await expect(client.getSession()).resolves.toEqual({
+      id: "student-id", email: "student@example.edu",
+    });
+    await expect(client.getState("student-id")).resolves.toBeNull();
+    expect(fetcher.mock.calls[2][1]?.headers).toMatchObject({
+      "X-Tracker-Account-Id": "student-id",
+    });
+  });
+
   it.each([
     { error: "This workspace uses a newer data format. Refresh or update the tracker before saving." },
     { current: { revision: 4 }, error: "Invalid conflict response." },
@@ -40,7 +59,7 @@ describe("cloud API client", () => {
       Response.json(body, { status: 409 }),
     );
     const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
-    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    const error = await client.saveState(snapshot, 3, "student-id").catch((error: unknown) => error);
 
     expect(error).toBeInstanceOf(CloudApiError);
     expect(error).not.toBeInstanceOf(CloudRevisionConflictError);
@@ -60,7 +79,7 @@ describe("cloud API client", () => {
       ),
       retryDelays: [],
     });
-    await expect(client.saveState(snapshot, 3)).rejects.toMatchObject({
+    await expect(client.saveState(snapshot, 3, "student-id")).rejects.toMatchObject({
       status: 409,
       message: "Cloud storage request failed (409). Refresh the tracker and try again.",
     });
@@ -73,7 +92,7 @@ describe("cloud API client", () => {
       ),
       retryDelays: [],
     });
-    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    const error = await client.saveState(snapshot, 3, "student-id").catch((error: unknown) => error);
     expect(error).toBeInstanceOf(CloudRevisionConflictError);
     expect(error).toMatchObject({ current: null, status: 409 });
   });
@@ -89,7 +108,7 @@ describe("cloud API client", () => {
       fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ current }, { status: 409 })),
       retryDelays: [],
     });
-    const error = await client.saveState(snapshot, 3).catch((error: unknown) => error);
+    const error = await client.saveState(snapshot, 3, "student-id").catch((error: unknown) => error);
     expect(error).toBeInstanceOf(CloudRevisionConflictError);
     expect(error).toMatchObject({ current: JSON.parse(JSON.stringify(current)) });
   });
@@ -99,11 +118,12 @@ describe("cloud API client", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
       .mockResolvedValueOnce(
-        Response.json({ email: "student@example.edu" }),
+        Response.json({ id: "student-id", email: "student@example.edu" }),
       );
     const client = createCloudApiClient({ fetcher, retryDelays: [0] });
 
     await expect(client.getSession()).resolves.toEqual({
+      id: "student-id",
       email: "student@example.edu",
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -142,7 +162,7 @@ describe("cloud API client", () => {
       retryDelays: [],
     });
 
-    await expect(client.saveState(snapshot, 3)).rejects.toMatchObject({
+    await expect(client.saveState(snapshot, 3, "student-id")).rejects.toMatchObject({
       current,
       status: 409,
     } satisfies Partial<CloudRevisionConflictError>);

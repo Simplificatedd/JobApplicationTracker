@@ -1,6 +1,7 @@
 import type { StorageSnapshot } from "./StorageAdapter";
 
 export interface CloudAccount {
+  id: string;
   email: string;
 }
 
@@ -26,14 +27,15 @@ export class CloudRevisionConflictError extends CloudApiError {
 }
 
 export interface CloudApiClient {
-  deleteResumeFile(storageKey: string): Promise<void>;
-  getResumeFile(storageKey: string): Promise<Blob>;
+  deleteResumeFile(storageKey: string, accountId: string): Promise<void>;
+  getResumeFile(storageKey: string, accountId: string): Promise<Blob>;
   getSession(): Promise<CloudAccount>;
-  getState(): Promise<CloudStateEnvelope | null>;
-  putResumeFile(storageKey: string, file: Blob): Promise<void>;
+  getState(accountId: string): Promise<CloudStateEnvelope | null>;
+  putResumeFile(storageKey: string, file: Blob, accountId: string): Promise<void>;
   saveState(
     snapshot: StorageSnapshot,
     baseRevision: number | null,
+    accountId: string,
   ): Promise<CloudStateEnvelope>;
 }
 
@@ -114,11 +116,19 @@ export function createCloudApiClient(
   return {
     async getSession() {
       const response = await requireSuccess(await request("/session"));
-      return (await response.json()) as CloudAccount;
+      const account: unknown = await response.json();
+      if (!isRecord(account) || typeof account.id !== "string" ||
+        !account.id.trim() || typeof account.email !== "string" ||
+        !account.email.trim()) {
+        throw new CloudApiError("The signed-in account has no verified identity.", 0);
+      }
+      return { id: account.id, email: account.email };
     },
 
-    async getState() {
-      const response = await request("/state");
+    async getState(accountId) {
+      const response = await request("/state", {
+        headers: { "X-Tracker-Account-Id": accountId },
+      });
 
       if (response.status === 404) {
         return null;
@@ -128,10 +138,10 @@ export function createCloudApiClient(
       return (await response.json()) as CloudStateEnvelope;
     },
 
-    async saveState(snapshot, baseRevision) {
+    async saveState(snapshot, baseRevision, accountId) {
       const response = await request("/state", {
         body: JSON.stringify({ baseRevision, snapshot }),
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Tracker-Account-Id": accountId },
         method: "PUT",
       });
 
@@ -155,28 +165,29 @@ export function createCloudApiClient(
       return (await response.json()) as CloudStateEnvelope;
     },
 
-    async putResumeFile(storageKey, file) {
+    async putResumeFile(storageKey, file, accountId) {
       await requireSuccess(
         await request(`/resume-files/${encodeURIComponent(storageKey)}`, {
           body: file,
-          headers: { "Content-Type": file.type },
+          headers: { "Content-Type": file.type, "X-Tracker-Account-Id": accountId },
           method: "PUT",
         }),
       );
     },
 
-    async getResumeFile(storageKey) {
+    async getResumeFile(storageKey, accountId) {
       const response = await requireSuccess(
         await request(`/resume-files/${encodeURIComponent(storageKey)}`, {
-          headers: { Accept: "application/octet-stream" },
+          headers: { Accept: "application/octet-stream", "X-Tracker-Account-Id": accountId },
         }),
       );
       return response.blob();
     },
 
-    async deleteResumeFile(storageKey) {
+    async deleteResumeFile(storageKey, accountId) {
       await requireSuccess(
         await request(`/resume-files/${encodeURIComponent(storageKey)}`, {
+          headers: { "X-Tracker-Account-Id": accountId },
           method: "DELETE",
         }),
       );
