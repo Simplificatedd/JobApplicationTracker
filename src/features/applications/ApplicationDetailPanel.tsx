@@ -821,112 +821,6 @@ function EditForm({
           <option value="other">Other</option>
         </select>
       </Field>
-      <Field label="Resume">
-        <select
-          className="field-control"
-          onChange={(event) => updateDraft("resumeId", event.target.value)}
-          value={draft.resumeId}
-        >
-          <option value="">Unassigned</option>
-          {resumes.map((resume) => (
-            <option key={resume.id} value={resume.id}>
-            {resume.displayName}
-          </option>
-        ))}
-      </select>
-        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Upload aria-hidden="true" size={16} />
-            Upload new resume
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <input
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="field-control sm:col-span-2"
-              onChange={(event) =>
-                setResumeUploadFile(event.target.files?.[0] ?? null)
-              }
-              type="file"
-            />
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("resumeUploadName", event.target.value)
-              }
-              placeholder="Display name"
-              type="text"
-              value={draft.resumeUploadName}
-            />
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("resumeUploadVersion", event.target.value)
-              }
-              placeholder="Version label"
-              type="text"
-              value={draft.resumeUploadVersion}
-            />
-          </div>
-          {resumeUploadError ? (
-            <p className="mt-2 text-xs font-medium text-destructive">
-              {resumeUploadError}
-            </p>
-          ) : null}
-        </div>
-      </Field>
-      <Field label="Cover Letter">
-        <select
-          className="field-control"
-          onChange={(event) => updateDraft("coverLetterId", event.target.value)}
-          value={draft.coverLetterId}
-        >
-          <option value="">Unassigned</option>
-          {coverLetters.map((coverLetter) => (
-            <option key={coverLetter.id} value={coverLetter.id}>
-              {coverLetter.displayName}
-            </option>
-          ))}
-        </select>
-        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Upload aria-hidden="true" size={16} />
-            Upload new cover letter
-          </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <input
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="field-control sm:col-span-2"
-              onChange={(event) =>
-                setCoverLetterUploadFile(event.target.files?.[0] ?? null)
-              }
-              type="file"
-            />
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("coverLetterUploadName", event.target.value)
-              }
-              placeholder="Display name"
-              type="text"
-              value={draft.coverLetterUploadName}
-            />
-            <input
-              className="field-control"
-              onChange={(event) =>
-                updateDraft("coverLetterUploadVersion", event.target.value)
-              }
-              placeholder="Version label"
-              type="text"
-              value={draft.coverLetterUploadVersion}
-            />
-          </div>
-          {coverLetterUploadError ? (
-            <p className="mt-2 text-xs font-medium text-destructive">
-              {coverLetterUploadError}
-            </p>
-          ) : null}
-        </div>
-      </Field>
       <Field label="Source">
         <select
           className="field-control"
@@ -941,6 +835,114 @@ function EditForm({
           ))}
         </select>
       </Field>
+      <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+        <Field label="Resume">
+          <select
+            className="field-control"
+            onChange={(event) => updateDraft("resumeId", event.target.value)}
+            value={draft.resumeId}
+          >
+            <option value="">Unassigned</option>
+            {resumes.map((resume) => (
+              <option key={resume.id} value={resume.id}>
+                {resume.displayName}
+              </option>
+            ))}
+          </select>
+          <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Upload aria-hidden="true" size={16} />
+              Upload new resume
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="field-control sm:col-span-2"
+                onChange={(event) =>
+                  setResumeUploadFile(event.target.files?.[0] ?? null)
+                }
+                type="file"
+              />
+              <input
+                className="field-control"
+                onChange={(event) =>
+                  updateDraft("resumeUploadName", event.target.value)
+                }
+                placeholder="Display name"
+                type="text"
+                value={draft.resumeUploadName}
+              />
+              <input
+                className="field-control"
+                onChange={(event) =>
+                  updateDraft("resumeUploadVersion", event.target.value)
+                }
+                placeholder="Version label"
+                type="text"
+                value={draft.resumeUploadVersion}
+              />
+            </div>
+            {resumeUploadError ? (
+              <p className="mt-2 text-xs font-medium text-destructive">
+                {resumeUploadError}
+              </p>
+            ) : null}
+          </div>
+        </Field>
+        <Field label="Cover Letter">
+          <select
+            className="field-control"
+            onChange={(event) => updateDraft("coverLetterId", event.target.value)}
+            value={draft.coverLetterId}
+          >
+            <option value="">Unassigned</option>
+            {coverLetters.map((coverLetter) => (
+              <option key={coverLetter.id} value={coverLetter.id}>
+                {coverLetter.displayName}
+              </option>
+            ))}
+          </select>
+          <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Upload aria-hidden="true" size={16} />
+              Upload new cover letter
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <input
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="field-control sm:col-span-2"
+                onChange={(event) =>
+                  setCoverLetterUploadFile(event.target.files?.[0] ?? null)
+                }
+                type="file"
+              />
+              <input
+                className="field-control"
+                onChange={(event) =>
+                  updateDraft("coverLetterUploadName", event.target.value)
+                }
+                placeholder="Display name"
+                type="text"
+                value={draft.coverLetterUploadName}
+              />
+              <input
+                className="field-control"
+                onChange={(event) =>
+                  updateDraft("coverLetterUploadVersion", event.target.value)
+                }
+                placeholder="Version label"
+                type="text"
+                value={draft.coverLetterUploadVersion}
+              />
+            </div>
+            {coverLetterUploadError ? (
+              <p className="mt-2 text-xs font-medium text-destructive">
+                {coverLetterUploadError}
+              </p>
+            ) : null}
+          </div>
+        </Field>
+      </div>
       <Field label="Application URL">
         <input
           className="field-control"
