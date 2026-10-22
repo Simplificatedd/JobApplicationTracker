@@ -45,11 +45,19 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
+import {
+  equalStoredValue,
+  mergeChangedFields,
+  rebaseStorageMutation,
+  StorageConflictError,
+} from "./mutationRebase";
+
 const MAX_CONFLICT_RETRIES = 3;
 
 export function applyStorageMutation(
   snapshot: StorageSnapshot,
   mutation: StorageMutation,
+  baseSnapshot: StorageSnapshot = snapshot,
 ): StorageSnapshot {
   // A conversion must still refer to the source the user actually saw. Guard both
   // race directions before deleting the interview or overwriting an existing assessment.
@@ -80,7 +88,8 @@ export function applyStorageMutation(
       repeatedConversions.add(write.id);
     }
   }
-  return {
+  mutation = rebaseStorageMutation(snapshot, mutation, baseSnapshot);
+  const next: StorageSnapshot = {
     ...snapshot,
     activities: upsertRecords(snapshot.activities, mutation.activities),
     applications: upsertRecords(
@@ -133,6 +142,39 @@ export function applyStorageMutation(
       mutation.deleteResumeIds,
     ),
   };
+  const parents = new Set(next.applications.map((item) => item.id));
+  const childWrites = [
+    ...(mutation.activities ?? []), ...(mutation.contacts ?? []),
+    ...(mutation.interviews ?? []), ...(mutation.assessments ?? []),
+    ...(mutation.assessmentUpdates ?? []).flatMap((patch) =>
+      next.assessments?.filter((item) => item.id === patch.id) ?? []),
+  ];
+  for (const child of childWrites) {
+    if (!parents.has(child.applicationId)) {
+      throw new StorageConflictError("The record's application was removed in another session.");
+    }
+  }
+  const deletedResumes = new Set(mutation.deleteResumeIds);
+  const deletedLetters = new Set(mutation.deleteCoverLetterIds);
+  next.applications = next.applications.map((item) => ({
+    ...item,
+    contactsCount: next.contacts.filter((contact) => contact.applicationId === item.id).length,
+    ...(item.resumeId && deletedResumes.has(item.resumeId) ? { resumeId: undefined } : {}),
+    ...(item.coverLetterId && deletedLetters.has(item.coverLetterId) ? { coverLetterId: undefined } : {}),
+  }));
+  for (const write of mutation.applications ?? []) {
+    const saved = next.applications.find((item) => item.id === write.id)!;
+    const previous = baseSnapshot.applications.find((item) => item.id === saved.id);
+    if (saved.resumeId && saved.resumeId !== previous?.resumeId &&
+      !next.resumes.some((item) => item.id === saved.resumeId)) {
+      throw new StorageConflictError("The selected resume was removed in another session.");
+    }
+    if (saved.coverLetterId && saved.coverLetterId !== previous?.coverLetterId &&
+      !next.coverLetters.some((item) => item.id === saved.coverLetterId)) {
+      throw new StorageConflictError("The selected cover letter was removed in another session.");
+    }
+  }
+  return next;
 }
 
 function mergeAssessmentWrites(
@@ -189,6 +231,9 @@ function removeRecords<T extends { id: string }>(
 
 export interface CloudStorageAdapter extends StorageAdapter {
   getAccount(): CloudAccount | null;
+  // Last acknowledged server state, for synchronous UI publication after a
+  // verified operation. This does not fetch, repair the cache, or rerun startup.
+  getCurrentSnapshot(): StorageSnapshot;
 }
 
 export function createCloudStorageAdapter({
@@ -224,6 +269,12 @@ export function createCloudStorageAdapter({
 
   function getAccount() {
     return account;
+  }
+
+  function getCurrentSnapshot(): StorageSnapshot {
+    assertActive();
+    if (!cloudState) throw new Error("Cloud storage has not been initialized.");
+    return structuredClone(cloudState.snapshot);
   }
 
   function activeCache() {
@@ -451,9 +502,7 @@ export function createCloudStorageAdapter({
         }
       }
 
-      throw new Error(
-        "Cloud data changed repeatedly. Refresh the tracker and try again.",
-      );
+      throw new StorageConflictError("Cloud data changed repeatedly during the save.");
     });
   }
 
@@ -479,8 +528,14 @@ export function createCloudStorageAdapter({
   }
 
   async function commitMutation(mutation: StorageMutation) {
-    await ensureInitialized();
+    // Freeze the editor's baseline before queued work, uploads or conflict responses
+    // can advance this adapter's current state. Reuse this intent on every retry.
+    const captured = cloudState ? structuredClone(cloudState.snapshot) : null;
+    mutation = structuredClone(mutation);
+    const initialized = await ensureInitialized();
+    const base = captured ?? structuredClone(initialized.snapshot);
     const resumeFiles = [...(mutation.resumeFiles ?? [])];
+    applyStorageMutation(initialized.snapshot, mutation, base);
 
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
@@ -488,7 +543,7 @@ export function createCloudStorageAdapter({
       ),
     );
     await mutateSnapshot(
-      (snapshot) => applyStorageMutation(snapshot, mutation),
+      (snapshot) => applyStorageMutation(snapshot, mutation, base),
       resumeFiles,
     );
 
@@ -515,7 +570,7 @@ export function createCloudStorageAdapter({
   }
 
   async function createApplication(application: Application) {
-    await commitMutation({ applications: [application] });
+    await commitMutation({ applications: [application], creates: { applications: [application.id] } });
   }
 
   async function updateApplication(application: Application) {
@@ -531,24 +586,36 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteApplication(id: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      activities: current.activities.filter(
-        (activity) => activity.applicationId !== id,
-      ),
-      applications: current.applications.filter(
-        (application) => application.id !== id,
-      ),
-      contacts: current.contacts.filter(
-        (contact) => contact.applicationId !== id,
-      ),
-      assessments: (current.assessments ?? []).filter(
-        (item) => item.applicationId !== id,
-      ),
-      interviews: current.interviews.filter(
-        (interview) => interview.applicationId !== id,
-      ),
-    }));
+    const before = structuredClone(await snapshot());
+    await mutateSnapshot((current) => {
+      if (current.applications.some((item) => item.id === id)) {
+        for (const key of ["applications", "activities", "contacts", "interviews", "assessments"] as const) {
+          const related = (data: StorageSnapshot) => (data[key] ?? []).filter((item) =>
+            "applicationId" in item ? item.applicationId === id : item.id === id);
+          if (!equalStoredValue(related(before), related(current))) {
+            throw new StorageConflictError("Application or its related records changed in another session before deletion.");
+          }
+        }
+      }
+      return {
+        ...current,
+        activities: current.activities.filter(
+          (activity) => activity.applicationId !== id,
+        ),
+        applications: current.applications.filter(
+          (application) => application.id !== id,
+        ),
+        contacts: current.contacts.filter(
+          (contact) => contact.applicationId !== id,
+        ),
+        assessments: (current.assessments ?? []).filter(
+          (item) => item.applicationId !== id,
+        ),
+        interviews: current.interviews.filter(
+          (interview) => interview.applicationId !== id,
+        ),
+      };
+    });
   }
 
   async function listContacts(applicationId?: string) {
@@ -563,7 +630,7 @@ export function createCloudStorageAdapter({
   }
 
   async function createContact(contact: ApplicationContact) {
-    await commitMutation({ contacts: [contact] });
+    await commitMutation({ contacts: [contact], creates: { contacts: [contact.id] } });
   }
 
   async function updateContact(contact: ApplicationContact) {
@@ -638,6 +705,7 @@ export function createCloudStorageAdapter({
   async function saveCoverLetter(coverLetter: CoverLetterMetadata, file: Blob) {
     await commitMutation({
       coverLetters: [coverLetter],
+      creates: { coverLetters: [coverLetter.id] },
       resumeFiles: [{ file, storageKey: coverLetter.storageKey }],
     });
   }
@@ -653,12 +721,13 @@ export function createCloudStorageAdapter({
   async function saveResume(resume: ResumeMetadata, file: Blob) {
     await commitMutation({
       resumes: [resume],
+      creates: { resumes: [resume.id] },
       resumeFiles: [{ file, storageKey: resume.storageKey }],
     });
   }
 
   async function createResumeMetadata(resume: ResumeMetadata) {
-    await commitMutation({ resumes: [resume] });
+    await commitMutation({ resumes: [resume], creates: { resumes: [resume.id] } });
   }
 
   async function updateResumeMetadata(resume: ResumeMetadata) {
@@ -730,7 +799,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveSettings(settings: UserSettings) {
-    await mutateSnapshot((current) => ({ ...current, settings }));
+    const before = structuredClone((await snapshot()).settings);
+    await mutateSnapshot((current) => ({ ...current, settings: mergeChangedFields(before, settings, current.settings, "settings") }));
   }
 
   async function resetSettings() {
@@ -743,7 +813,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveNotificationState(notificationState: NotificationState) {
-    await mutateSnapshot((current) => ({ ...current, notificationState }));
+    const before = structuredClone((await snapshot()).notificationState);
+    await mutateSnapshot((current) => ({ ...current, notificationState: mergeChangedFields(before, notificationState, current.notificationState, "notificationState") }));
   }
 
   async function getAnalyticsSettings() {
@@ -751,7 +822,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveAnalyticsSettings(analyticsSettings: AnalyticsSettings) {
-    await mutateSnapshot((current) => ({ ...current, analyticsSettings }));
+    const before = structuredClone((await snapshot()).analyticsSettings);
+    await mutateSnapshot((current) => ({ ...current, analyticsSettings: mergeChangedFields(before, analyticsSettings, current.analyticsSettings, "analyticsSettings") }));
   }
 
   async function getTablePreferences() {
@@ -759,11 +831,30 @@ export function createCloudStorageAdapter({
   }
 
   async function saveTablePreferences(tablePreferences: TablePreferences) {
-    await mutateSnapshot((current) => ({ ...current, tablePreferences }));
+    const before = structuredClone((await snapshot()).tablePreferences);
+    await mutateSnapshot((current) => {
+      if (before && current.tablePreferences) {
+        return {
+          ...current,
+          tablePreferences: mergeChangedFields(before, tablePreferences, current.tablePreferences, "Table preferences"),
+        };
+      }
+      if (!equalStoredValue(before, current.tablePreferences) &&
+        !equalStoredValue(tablePreferences, current.tablePreferences)) {
+        throw new StorageConflictError("Table preferences changed in another session.");
+      }
+      return { ...current, tablePreferences };
+    });
   }
 
   async function resetTablePreferences() {
-    await mutateSnapshot((current) => ({ ...current, tablePreferences: null }));
+    const before = structuredClone((await snapshot()).tablePreferences);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.tablePreferences)) {
+        throw new StorageConflictError("Table preferences changed in another session.");
+      }
+      return { ...current, tablePreferences: null };
+    });
   }
 
   async function exportSnapshot() {
@@ -774,13 +865,18 @@ export function createCloudStorageAdapter({
     importedSnapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
   ) {
-    await ensureInitialized();
+    const before = structuredClone(await snapshot());
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
         cloudRequest(api.putResumeFile(storageKey, file, accountId())),
       ),
     );
-    await mutateSnapshot(() => importedSnapshot, resumeFiles);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current)) {
+        throw new StorageConflictError("Workspace changed in another session during restore.");
+      }
+      return importedSnapshot;
+    }, resumeFiles);
   }
 
   return {
@@ -833,6 +929,7 @@ export function createCloudStorageAdapter({
     exportSnapshot: guarded(exportSnapshot),
     importSnapshot: guarded(importSnapshot),
     getAccount,
+    getCurrentSnapshot,
   };
 }
 

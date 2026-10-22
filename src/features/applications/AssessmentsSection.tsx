@@ -94,6 +94,7 @@ export function AssessmentsSection({
       ? await assessmentActions.updateAssessment(
           editingId,
           assessmentDraftToUpdate(draft, original!),
+          original,
         )
       : await assessmentActions.addAssessment(input);
     setBusy(false);
@@ -110,6 +111,7 @@ export function AssessmentsSection({
     const result = await assessmentActions.updateAssessment(
       assessment.id,
       submittedAssessmentUpdate(new Date().toISOString()),
+      assessment,
     );
     setBusy(false);
     setError(result.ok ? "" : result.error);
