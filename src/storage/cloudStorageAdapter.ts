@@ -156,9 +156,13 @@ export function applyStorageMutation(
   }
   const deletedResumes = new Set(mutation.deleteResumeIds);
   const deletedLetters = new Set(mutation.deleteCoverLetterIds);
+  const contactCounts = new Map<string, number>();
+  for (const contact of next.contacts) {
+    contactCounts.set(contact.applicationId, (contactCounts.get(contact.applicationId) ?? 0) + 1);
+  }
   next.applications = next.applications.map((item) => ({
     ...item,
-    contactsCount: next.contacts.filter((contact) => contact.applicationId === item.id).length,
+    contactsCount: contactCounts.get(item.id) ?? 0,
     ...(item.resumeId && deletedResumes.has(item.resumeId) ? { resumeId: undefined } : {}),
     ...(item.coverLetterId && deletedLetters.has(item.coverLetterId) ? { coverLetterId: undefined } : {}),
   }));
@@ -653,12 +657,13 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteActivitiesForApplication(applicationId: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      activities: current.activities.filter(
-        (activity) => activity.applicationId !== applicationId,
-      ),
-    }));
+    const before = (await snapshot()).activities.filter((item) => item.applicationId === applicationId);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.activities.filter((item) => item.applicationId === applicationId))) {
+        throw new StorageConflictError("Activities changed in another session before deletion.");
+      }
+      return { ...current, activities: current.activities.filter((item) => item.applicationId !== applicationId) };
+    });
   }
 
   async function listAssessments(applicationId?: string) {
@@ -686,12 +691,13 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteInterviewsForApplication(applicationId: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      interviews: current.interviews.filter(
-        (interview) => interview.applicationId !== applicationId,
-      ),
-    }));
+    const before = (await snapshot()).interviews.filter((item) => item.applicationId === applicationId);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.interviews.filter((item) => item.applicationId === applicationId))) {
+        throw new StorageConflictError("Interviews changed in another session before deletion.");
+      }
+      return { ...current, interviews: current.interviews.filter((item) => item.applicationId !== applicationId) };
+    });
   }
 
   async function listResumeMetadata() {

@@ -72,7 +72,7 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
-import { StorageConflictError } from "../storage/mutationRebase";
+import { assertRecordIdentity, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -534,6 +534,7 @@ export function useTrackerStore(): TrackerStore {
     if (editBase && editBase.id !== id) {
       return failure("The edit baseline belongs to a different application.");
     }
+    if (editBase) assertRecordIdentity(editBase, currentApplication, "Application");
     const beforeApplication = { ...currentApplication };
     if (editBase) {
       for (const key of Object.keys(input) as (keyof ApplicationUpdate)[]) {
@@ -592,12 +593,28 @@ export function useTrackerStore(): TrackerStore {
       input,
       updatedAt,
     );
+    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
+    const displayedInterview = selectCurrentInterview(
+      interviews.filter((item) => item.applicationId === id), new Date(updatedAt),
+    );
+    if (shouldPersistInterviewUpdate(input) && editBase &&
+      displayedInterview?.id !== currentInterview?.id) {
+      throw new StorageConflictError("The current interview changed while this table edit was open.");
+    }
     const updatedInterview = shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
           updatedAt,
-          selectCurrentInterview(currentInterviews, new Date(updatedAt))?.id,
+          currentInterview?.id,
+        )
+      : undefined;
+    // Application interview fields are projections. Carry their displayed values
+    // into the canonical interview baseline, where conflict checks actually run.
+    const expectedInterview = updatedInterview && currentInterview
+      ? buildInterviewRecord(
+          { ...beforeApplication, status: "Interviewing" },
+          currentInterviews, updatedAt, currentInterview.id,
         )
       : undefined;
     const markedResume = resumeUpload
@@ -623,7 +640,8 @@ export function useTrackerStore(): TrackerStore {
         : undefined;
     const result = await commitMutation({
       expected: {
-        applications: [beforeApplication], interviews: currentInterviews,
+        applications: [beforeApplication],
+        interviews: expectedInterview ? [expectedInterview] : currentInterviews,
         resumes: currentResumes, coverLetters: currentCoverLetters,
       },
       creates: {
@@ -1667,11 +1685,19 @@ export function useTrackerStore(): TrackerStore {
   ): Promise<MutationResult<StorageSnapshot>> {
     try {
       assertAccountActive();
+      const displayedRecords = {
+        applications, contacts, interviews, assessments, activities, resumes, coverLetters,
+      };
+      for (const collection of ["applications", "contacts", "interviews", "assessments", "resumes", "coverLetters"] as const) {
+        for (const write of mutation[collection] ?? []) {
+          const displayed = displayedRecords[collection].find((item) => item.id === write.id);
+          if (displayed) assertRecordIdentity(displayed, write, `${collection} record`);
+        }
+      }
       await cloudStorageAdapter.commitMutation({
         ...mutation,
         expected: {
-          applications, contacts, interviews, assessments, activities,
-          resumes, coverLetters, ...mutation.expected,
+          ...displayedRecords, ...mutation.expected,
         },
       });
       const saved = publishCommittedSnapshot();
@@ -1770,6 +1796,7 @@ function expectedRecord<RecordType extends { id: string }>(
   if (original.id !== current.id) {
     throw new StorageConflictError("The edit baseline belongs to a different record.");
   }
+  assertRecordIdentity(original, current, "The edited record");
   const expected = { ...current };
   for (const key of Object.keys(changes)) {
     Object.assign(expected, { [key]: Reflect.get(original, key) });

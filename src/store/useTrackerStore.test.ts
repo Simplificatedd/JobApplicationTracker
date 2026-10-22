@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ANALYTICS_SETTINGS, DEFAULT_NOTIFICATION_STATE, DEFAULT_USER_SETTINGS } from "../lib/domain";
-import { application } from "../test/assessmentFixtures";
+import { application, interview } from "../test/assessmentFixtures";
 import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
 import { snapshot as createSnapshot } from "../test/assessmentFixtures";
@@ -212,9 +212,9 @@ describe("store reconciliation after mutations", () => {
 
 
 describe("store with two independent revision-aware cloud adapters", () => {
-  async function sessions() {
+  async function sessions(data = createSnapshot()) {
     const { createCloudStorageAdapter } = await vi.importActual<typeof import("../storage/cloudStorageAdapter")>("../storage/cloudStorageAdapter");
-    const api = new RevisionApi(createSnapshot());
+    const api = new RevisionApi(data);
     const a = createCloudStorageAdapter({ api, cache: createTestStorageAdapter() });
     const cache = createTestStorageAdapter();
     const b = createCloudStorageAdapter({ api, cache });
@@ -263,5 +263,54 @@ describe("store with two independent revision-aware cloud adapters", () => {
     expect(RenderStore().contacts).toHaveLength(2);
     expect(RenderStore().applications[0].contactsCount).toBe(2);
     expect(api.state.snapshot.applications[0].contactsCount).toBe(2);
+  });
+
+  it("rejects a stale table interview edit after the same adapter received a newer value", async () => {
+    const source = { ...interview(1), dateTime: "2026-11-01T10:00:00.000Z" };
+    const { api, b, store } = await sessions(createSnapshot({ interviews: [source] }));
+    await b.saveInterview({ ...source, dateTime: "2026-11-02T10:00:00.000Z" });
+    const saved = structuredClone(api.state);
+    const result = await store.updateApplication(application.id, { interviewDateTime: "2026-11-03T10:00:00.000Z" });
+    expect(result.ok).toBe(false);
+    expect(api.state).toEqual(saved);
+    expect(RenderStore().interviews[0].dateTime).toBe("2026-11-02T10:00:00.000Z");
+  });
+
+  it("preserves an independent interview field when a stale table edit changes its schedule", async () => {
+    const source = { ...interview(1), dateTime: "2026-11-01T10:00:00.000Z" };
+    const { api, b, store } = await sessions(createSnapshot({ interviews: [source] }));
+    await b.saveInterview({ ...source, location: "New location" });
+    const result = await store.updateApplication(application.id, { interviewDateTime: "2026-11-03T10:00:00.000Z" });
+    expect(result.ok).toBe(true);
+    expect(api.state.snapshot.interviews[0]).toMatchObject({ location: "New location", dateTime: "2026-11-03T10:00:00.000Z" });
+  });
+
+  it("does not apply a table edit to a different interview selected after a refresh", async () => {
+    const source = { ...interview(1), dateTime: "2026-11-03T10:00:00.000Z" };
+    const { api, b, store } = await sessions(createSnapshot({ interviews: [source] }));
+    const added = { ...interview(2), dateTime: "2026-11-01T10:00:00.000Z" };
+    await b.commitMutation({ interviews: [added], creates: { interviews: [added.id] } });
+    const saved = structuredClone(api.state);
+    expect((await store.updateApplication(application.id, { interviewLocation: "Old table edit" })).ok).toBe(false);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("keeps the old editor from editing a recreated application after adapter refresh", async () => {
+    const { api, b, store } = await sessions();
+    await b.deleteApplication(application.id);
+    await b.createApplication({ ...application, createdAt: "2026-10-23T00:00:00.000Z" });
+    const saved = structuredClone(api.state);
+    expect((await store.updateApplication(application.id, { notes: "Old draft" }, undefined, undefined, application)).ok).toBe(false);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("does not associate a replacement document using an old displayed selection", async () => {
+    const document = { id: "doc", displayName: "Resume", originalFileName: "r.pdf", downloadFileName: "r.pdf", fileExtension: "pdf" as const, mimeType: "application/pdf", fileSize: 5, storageKey: "old-file", contentHash: "hash", uploadedAt: application.createdAt, updatedAt: application.updatedAt };
+    const { api, b, store } = await sessions(createSnapshot({ resumes: [document] }));
+    await b.deleteResumeMetadata(document.id);
+    await b.createResumeMetadata({ ...document, storageKey: "new-file", uploadedAt: "2026-10-23T00:00:00.000Z" });
+    const saved = structuredClone(api.state);
+    expect((await store.updateApplication(application.id, { resumeId: document.id })).ok).toBe(false);
+    expect(api.state).toEqual(saved);
   });
 });
