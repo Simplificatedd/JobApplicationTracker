@@ -144,6 +144,13 @@ describe("cloud API client", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("does not replay snapshot writes after a server failure with an uncertain commit outcome", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: "Service unavailable" }, { status: 503 }));
+    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
+    await expect(client.saveState(snapshot, 3, "student-id")).rejects.toMatchObject({ status: 503 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the server state with a revision conflict", async () => {
     const current = {
       revision: 4,

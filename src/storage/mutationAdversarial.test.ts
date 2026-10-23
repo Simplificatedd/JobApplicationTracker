@@ -4,7 +4,7 @@ import { application, interview, snapshot, timestamp } from "../test/assessmentF
 import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
 import { createCloudStorageAdapter } from "./cloudStorageAdapter";
-
+import { CloudApiError, createCloudApiClient } from "./cloudApi";
 
 beforeAll(() => vi.stubGlobal("IDBKeyRange", IDBKeyRange));
 afterAll(() => vi.unstubAllGlobals());
@@ -127,5 +127,47 @@ describe("adversarial mutation ordering", () => {
     const saved = structuredClone(api.state);
     await expect(b.updateContact({ ...contact, notes: "Old draft" })).rejects.toThrow(/replaced|recreated/);
     expect(api.state).toEqual(saved);
+  });
+
+  it("surfaces network failure during resolution and preserves intent on a later valid edit", async () => {
+    const { api, a, b, original } = await sessions();
+    await a.updateApplication({ ...original, company: "Remote company" });
+    const save = api.saveState.bind(api);
+    let attempts = 0;
+    api.saveState = async (...args) => {
+      if (++attempts === 2) throw new CloudApiError("Network interrupted", 0);
+      return save(...args);
+    };
+    await expect(b.updateApplication({ ...original, notes: "Failed notes" })).rejects.toThrow("Network interrupted");
+    expect(api.state.snapshot.applications[0]).toMatchObject({ company: "Remote company" });
+    expect(api.state.snapshot.applications[0].notes).toBeUndefined();
+    api.saveState = save;
+    await b.commitMutation({ applications: [{ ...original, notes: "New user edit" }], expected: { applications: [original] } });
+    expect(api.state.snapshot.applications[0]).toMatchObject({ company: "Remote company", notes: "New user edit" });
+  });
+
+  it("does not replay an ambiguous creation when its lost response is followed by deletion", async () => {
+    const server = new RevisionApi(snapshot({ applications: [], dataVersion: 3, assessments: [] }));
+    let puts = 0;
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      if (String(input).endsWith("/session")) return Response.json(await server.getSession());
+      if (init?.method !== "PUT") return Response.json(await server.getState());
+      puts++;
+      const { snapshot: proposed, baseRevision } = JSON.parse(String(init.body));
+      if (baseRevision !== server.state.revision) return Response.json({ current: server.state }, { status: 409 });
+      await server.saveState(proposed, baseRevision);
+      if (puts === 1) {
+        // The commit succeeded, then another browser deleted it before the lost
+        // response could be retried. Absence alone cannot distinguish this ABA.
+        server.state = { ...server.state, revision: server.state.revision + 1, snapshot: { ...server.state.snapshot, applications: [] } };
+        throw new TypeError("Connection lost after commit");
+      }
+      return Response.json(server.state);
+    });
+    const adapter = createCloudStorageAdapter({ api: createCloudApiClient({ fetcher, retryDelays: [0] }), cache: createTestStorageAdapter() });
+    await adapter.initialize();
+    await expect(adapter.createApplication(application)).rejects.toThrow(/could not be confirmed|unavailable/);
+    expect(server.state.snapshot.applications).toEqual([]);
+    expect(puts).toBe(1);
   });
 });
