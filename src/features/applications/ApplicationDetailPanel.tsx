@@ -16,7 +16,6 @@ import {
   APPLICATION_STATUSES,
   getInterviewTypeLabel,
 } from "../../lib/constants";
-import { changedDraftFields } from "../../lib/editIntent";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import {
   formatDate,
@@ -85,12 +84,10 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingResumeUpload,
-    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   onUpdateInterview: (
     id: string,
     input: InterviewUpdate,
-    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   interviews: Interview[];
   resume?: ResumeMetadata;
@@ -128,7 +125,6 @@ export function ApplicationDetailPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
-  const [editBase, setEditBase] = useState(() => structuredClone(application));
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [coverLetterUploadError, setCoverLetterUploadError] = useState("");
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
@@ -141,7 +137,6 @@ export function ApplicationDetailPanel({
   useEscapeKey(!isDiscardWarningOpen, requestClose);
 
   function startEditing() {
-    setEditBase(structuredClone(application));
     setDraft(toDraft(application));
     setResumeUploadError("");
     setCoverLetterUploadError("");
@@ -176,12 +171,39 @@ export function ApplicationDetailPanel({
     }
 
     setFollowUpAutoResetError("");
+    const followUpPromptDays =
+      normalizeFollowUpPromptDays(draft.followUpPromptDays) ?? 7;
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setIsSaving(true);
-    const result = await onUpdate(
-      application.id,
-      applicationDraftToUpdate(draft, editBase),
+    const result = await onUpdate(application.id, {
+      company: draft.company.trim(),
+      jobTitle: draft.jobTitle.trim() || application.jobTitle,
+      jobDescription: draft.jobDescription.trim(),
+      status: draft.status,
+      location: trimOptional(draft.location),
+      workMode: draft.workMode,
+      jobType: draft.jobType,
+      source: trimOptional(draft.source),
+      applicationUrl: trimOptional(draft.applicationUrl),
+      dateApplied: trimOptional(draft.dateApplied),
+      roleStartDate: trimOptional(draft.roleStartDate),
+      roleEndDate: trimOptional(draft.roleEndDate),
+      followUpNeeded: draft.followUpNeeded,
+      followUpDate: trimOptional(draft.followUpDate),
+      followUpAutoResetEnabled: draft.followUpAutoResetEnabled,
+      followUpPromptDays,
+      offerDeadline:
+        draft.status === "Offered"
+          ? trimOptional(draft.offerDeadline)
+          : application.offerDeadline,
+      priority: draft.priority,
+      resumeId: trimOptional(draft.resumeId),
+      coverLetterId: trimOptional(draft.coverLetterId),
+      coverLetterVersion: trimOptional(draft.coverLetterVersion),
+      salary: trimOptional(draft.salary),
+      notes: trimOptional(draft.notes),
+    },
       resumeUploadFile
         ? {
             file: resumeUploadFile,
@@ -202,7 +224,6 @@ export function ApplicationDetailPanel({
             },
           }
         : undefined,
-      editBase,
     );
     setIsSaving(false);
 
@@ -239,7 +260,7 @@ export function ApplicationDetailPanel({
 
     if (
       isEditing &&
-      (isDraftDirty(draft, editBase) ||
+      (isDraftDirty(draft, application) ||
         resumeUploadFile ||
         coverLetterUploadFile)
     ) {
@@ -431,7 +452,6 @@ function ReadOnlyDetails({
   onUpdateInterview: (
     id: string,
     input: InterviewUpdate,
-    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   resume?: ResumeMetadata;
   resumeActionError: string;
@@ -1213,45 +1233,6 @@ function toDraft(application: Application) {
     salary: application.salary ?? "",
     notes: application.notes ?? "",
   };
-}
-
-// Keep the edit's original baseline even when the parent receives a newer record.
-// Unchanged form fields must not become writes merely because a draft is old.
-export function applicationDraftToUpdate(
-  draft: ApplicationDraft,
-  original: Application,
-): ApplicationUpdate {
-  const update: ApplicationUpdate = {
-    company: draft.company.trim(),
-    jobTitle: draft.jobTitle.trim() || original.jobTitle,
-    jobDescription: draft.jobDescription.trim(),
-    status: draft.status,
-    location: trimOptional(draft.location),
-    workMode: draft.workMode,
-    jobType: draft.jobType,
-    source: trimOptional(draft.source),
-    applicationUrl: trimOptional(draft.applicationUrl),
-    dateApplied: trimOptional(draft.dateApplied),
-    roleStartDate: trimOptional(draft.roleStartDate),
-    roleEndDate: trimOptional(draft.roleEndDate),
-    followUpNeeded: draft.followUpNeeded,
-    followUpDate: trimOptional(draft.followUpDate),
-    followUpAutoResetEnabled: draft.followUpAutoResetEnabled,
-    followUpPromptDays: normalizeFollowUpPromptDays(draft.followUpPromptDays) ?? 7,
-    offerDeadline:
-      draft.status === "Offered"
-        ? trimOptional(draft.offerDeadline)
-        : original.offerDeadline,
-    priority: draft.priority,
-    resumeId: trimOptional(draft.resumeId),
-    coverLetterId: trimOptional(draft.coverLetterId),
-    coverLetterVersion: trimOptional(draft.coverLetterVersion),
-    salary: trimOptional(draft.salary),
-    notes: trimOptional(draft.notes),
-  };
-  const changes = changedDraftFields(draft, toDraft(original), update);
-  if (draft.status !== "Offered") delete changes.offerDeadline;
-  return changes;
 }
 
 function toDateTimeLocal(value?: string) {

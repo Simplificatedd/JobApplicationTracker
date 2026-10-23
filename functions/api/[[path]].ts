@@ -17,11 +17,6 @@ import {
   saveCloudState,
 } from "../lib/state";
 import type { CloudflareEnv } from "../lib/types";
-import {
-  MUTATION_PROTOCOL_ERROR,
-  MUTATION_PROTOCOL_HEADER,
-  MUTATION_PROTOCOL_VERSION,
-} from "../../src/storage/mutationProtocol";
 
 export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
   try {
@@ -40,10 +35,6 @@ export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
     if (route === "state" || route.startsWith("resume-files/")) {
       if (context.request.headers.get("X-Tracker-Account-Id") !== user.id) {
         throw new HttpError(412, "Signed-in account changed. Reload the tracker.");
-      }
-      if ((context.request.method === "PUT" || context.request.method === "DELETE") &&
-        context.request.headers.get(MUTATION_PROTOCOL_HEADER) !== MUTATION_PROTOCOL_VERSION) {
-        throw new HttpError(426, MUTATION_PROTOCOL_ERROR);
       }
     }
 

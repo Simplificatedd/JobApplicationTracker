@@ -1,5 +1,4 @@
 import type { StorageSnapshot } from "./StorageAdapter";
-import { MUTATION_PROTOCOL_HEADER, MUTATION_PROTOCOL_VERSION } from "./mutationProtocol";
 
 export interface CloudAccount {
   id: string;
@@ -55,31 +54,23 @@ export function createCloudApiClient(
 
   async function request(path: string, init: RequestInit = {}) {
     let lastError: unknown;
-    // A lost response may hide a successful commit followed by another session's
-    // deletion. Replaying the request and rebasing a 409 could recreate that ID.
-    // Keep transport retries for reads/files; an ambiguous snapshot save requires
-    // the user to reload and inspect the outcome instead of replaying intent.
-    const stateWrite = path === "/state" && init.method === "PUT";
-    const delays = stateWrite ? [] : retryDelays;
 
-    for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
       try {
         const response = await fetcher(`${baseUrl}${path}`, {
           ...init,
           credentials: "same-origin",
           headers: {
             Accept: "application/json",
-            ...(init.method === "PUT" || init.method === "DELETE"
-              ? { [MUTATION_PROTOCOL_HEADER]: MUTATION_PROTOCOL_VERSION } : {}),
             ...init.headers,
           },
         });
 
         if (
-          attempt < delays.length &&
+          attempt < retryDelays.length &&
           (response.status === 429 || response.status >= 500)
         ) {
-          await delay(delays[attempt]);
+          await delay(retryDelays[attempt]);
           continue;
         }
 
@@ -87,18 +78,16 @@ export function createCloudApiClient(
       } catch (error) {
         lastError = error;
 
-        if (attempt >= delays.length) {
+        if (attempt >= retryDelays.length) {
           break;
         }
 
-        await delay(delays[attempt]);
+        await delay(retryDelays[attempt]);
       }
     }
 
     throw new CloudApiError(
-      stateWrite
-        ? "The save outcome could not be confirmed. Reload the tracker and inspect the current data before retrying."
-        : lastError instanceof Error
+      lastError instanceof Error
         ? `Cloud storage is unavailable. ${lastError.message}`
         : "Cloud storage is unavailable.",
       0,
