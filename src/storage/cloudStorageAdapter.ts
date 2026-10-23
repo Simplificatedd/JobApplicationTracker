@@ -45,7 +45,7 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
-import { rebaseStorageMutation } from "./mutationRebase";
+import { rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
 
 const MAX_CONFLICT_RETRIES = 3;
 
@@ -84,7 +84,7 @@ export function applyStorageMutation(
     }
   }
   mutation = rebaseStorageMutation(snapshot, mutation, baseSnapshot);
-  return {
+  const next: StorageSnapshot = {
     ...snapshot,
     activities: upsertRecords(snapshot.activities, mutation.activities),
     applications: upsertRecords(
@@ -137,6 +137,43 @@ export function applyStorageMutation(
       mutation.deleteResumeIds,
     ),
   };
+  const parents = new Set(next.applications.map((item) => item.id));
+  const childWrites = [
+    ...(mutation.activities ?? []), ...(mutation.contacts ?? []),
+    ...(mutation.interviews ?? []), ...(mutation.assessments ?? []),
+    ...(mutation.assessmentUpdates ?? []).flatMap((patch) =>
+      next.assessments?.filter((item) => item.id === patch.id) ?? []),
+  ];
+  for (const child of childWrites) {
+    if (!parents.has(child.applicationId)) {
+      throw new StorageConflictError("The record's application was removed in another session.");
+    }
+  }
+  const deletedResumes = new Set(mutation.deleteResumeIds);
+  const deletedLetters = new Set(mutation.deleteCoverLetterIds);
+  const contactCounts = new Map<string, number>();
+  for (const contact of next.contacts) {
+    contactCounts.set(contact.applicationId, (contactCounts.get(contact.applicationId) ?? 0) + 1);
+  }
+  next.applications = next.applications.map((item) => ({
+    ...item,
+    contactsCount: contactCounts.get(item.id) ?? 0,
+    ...(item.resumeId && deletedResumes.has(item.resumeId) ? { resumeId: undefined } : {}),
+    ...(item.coverLetterId && deletedLetters.has(item.coverLetterId) ? { coverLetterId: undefined } : {}),
+  }));
+  for (const write of mutation.applications ?? []) {
+    const saved = next.applications.find((item) => item.id === write.id)!;
+    const previous = baseSnapshot.applications.find((item) => item.id === saved.id);
+    if (saved.resumeId && saved.resumeId !== previous?.resumeId &&
+      !next.resumes.some((item) => item.id === saved.resumeId)) {
+      throw new StorageConflictError("The selected resume was removed in another session.");
+    }
+    if (saved.coverLetterId && saved.coverLetterId !== previous?.coverLetterId &&
+      !next.coverLetters.some((item) => item.id === saved.coverLetterId)) {
+      throw new StorageConflictError("The selected cover letter was removed in another session.");
+    }
+  }
+  return next;
 }
 
 function mergeAssessmentWrites(
