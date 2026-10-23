@@ -497,6 +497,7 @@ describe("cloud storage adapter", () => {
       .rejects.toThrow("Signed-in account changed");
     expect(changed).toBe(1);
     await expect(adapter.listApplications()).rejects.toThrow("Signed-in account changed");
+    expect(() => adapter.getCurrentSnapshot()).toThrow("Signed-in account changed");
   });
 
   it("uses cloud state as authoritative and refreshes the local cache", async () => {

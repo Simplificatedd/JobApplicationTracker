@@ -45,7 +45,12 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
-import { equalStoredValue, mergeChangedFields, rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
+import {
+  equalStoredValue,
+  mergeChangedFields,
+  rebaseStorageMutation,
+  StorageConflictError,
+} from "./mutationRebase";
 
 const MAX_CONFLICT_RETRIES = 3;
 
@@ -230,6 +235,9 @@ function removeRecords<T extends { id: string }>(
 
 export interface CloudStorageAdapter extends StorageAdapter {
   getAccount(): CloudAccount | null;
+  // Last acknowledged server state, for synchronous UI publication after a
+  // verified operation. This does not fetch, repair the cache, or rerun startup.
+  getCurrentSnapshot(): StorageSnapshot;
 }
 
 export function createCloudStorageAdapter({
@@ -265,6 +273,12 @@ export function createCloudStorageAdapter({
 
   function getAccount() {
     return account;
+  }
+
+  function getCurrentSnapshot(): StorageSnapshot {
+    assertActive();
+    if (!cloudState) throw new Error("Cloud storage has not been initialized.");
+    return structuredClone(cloudState.snapshot);
   }
 
   function activeCache() {
@@ -492,9 +506,7 @@ export function createCloudStorageAdapter({
         }
       }
 
-      throw new Error(
-        "Cloud data changed repeatedly. Refresh the tracker and try again.",
-      );
+      throw new StorageConflictError("Cloud data changed repeatedly during the save.");
     });
   }
 
@@ -923,6 +935,7 @@ export function createCloudStorageAdapter({
     exportSnapshot: guarded(exportSnapshot),
     importSnapshot: guarded(importSnapshot),
     getAccount,
+    getCurrentSnapshot,
   };
 }
 

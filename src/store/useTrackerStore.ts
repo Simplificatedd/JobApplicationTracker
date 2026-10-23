@@ -62,7 +62,6 @@ import {
   isUpcomingInterview,
   selectCurrentInterview,
   updateInterviewRecord,
-  upsertInterviewHistory,
 } from "../lib/interviews";
 import {
   assessmentFromInterview,
@@ -77,6 +76,7 @@ import { assertRecordIdentity, StorageConflictError } from "../storage/mutationR
 import type {
   ResumeBlobRecord,
   StorageMutation,
+  StorageSnapshot,
 } from "../storage/StorageAdapter";
 
 export type ApplicationInput = Omit<
@@ -325,10 +325,7 @@ export function useTrackerStore(): TrackerStore {
         assertAccountActive();
         return await operation();
       } catch (error) {
-        const message = getStorageErrorMessage(error);
-
-        setStorageError(message);
-        return failure(message);
+        return mutationFailure(error);
       }
     });
   }
@@ -345,7 +342,6 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    setActivities((current) => sortActivities([activity, ...current]));
     return success();
   }
 
@@ -459,34 +455,7 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    setApplications((current) => [application, ...current]);
-    setActivities((current) => sortActivities([createdActivity, ...current]));
-
-    if (interview) {
-      setInterviews((current) => [interview, ...current]);
-    }
-
-    if (markedResume) {
-      setResumes((current) =>
-        sortResumes([
-          markedResume,
-          ...current.filter((resume) => resume.id !== markedResume.id),
-        ]),
-      );
-    }
-
-    if (markedCoverLetter) {
-      setCoverLetters((current) =>
-        sortResumes([
-          markedCoverLetter,
-          ...current.filter(
-            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
-          ),
-        ]),
-      );
-    }
-
-    return success(application);
+    return success(result.value.applications.find((item) => item.id === application.id)!);
   }
 
   function getMarkedResume(
@@ -702,43 +671,6 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    setApplications((current) =>
-      current.map((application) =>
-        application.id === id ? updatedApplication : application,
-      ),
-    );
-
-    if (updatedInterview) {
-      setInterviews((current) =>
-        upsertInterviewHistory(current, updatedInterview),
-      );
-    }
-
-    if (newActivities.length > 0) {
-      setActivities((current) => sortActivities([...newActivities, ...current]));
-    }
-
-    if (markedResume) {
-      setResumes((current) =>
-        sortResumes([
-          markedResume,
-          ...current.filter((resume) => resume.id !== markedResume.id),
-        ]),
-      );
-    }
-
-
-    if (markedCoverLetter) {
-      setCoverLetters((current) =>
-        sortResumes([
-          markedCoverLetter,
-          ...current.filter(
-            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
-          ),
-        ]),
-      );
-    }
-
     return success();
   }
 
@@ -772,25 +704,40 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === id ? archivedApplication : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
 
-  async function refreshStages() {
-    const snapshot = await cloudStorageAdapter.exportSnapshot();
-    setApplications(
-      withContactCounts(snapshot.applications, snapshot.contacts),
-    );
+  function publishSnapshot(snapshot: StorageSnapshot) {
+    assertAccountActive();
+    setApplications(withContactCounts(snapshot.applications, snapshot.contacts));
+    setContacts(snapshot.contacts);
     setInterviews(snapshot.interviews);
     setAssessments(snapshot.assessments ?? []);
     setActivities(sortActivities(snapshot.activities));
-    return snapshot;
+    setResumes(sortResumes(snapshot.resumes));
+    setCoverLetters(sortResumes(snapshot.coverLetters));
+    setSettings(normalizeUserSettings(snapshot.settings));
+    setNotificationState(snapshot.notificationState);
+    setAnalyticsSettings(snapshot.analyticsSettings);
+    setTablePreferences(snapshot.tablePreferences);
+  }
+
+  function publishCommittedSnapshot() {
+    const saved = cloudStorageAdapter.getCurrentSnapshot();
+    publishSnapshot(saved);
+    return saved;
+  }
+
+  async function mutationFailure(error: unknown) {
+    if (error instanceof StorageConflictError && !accountInvalidated.current) {
+      // The adapter already received the authoritative conflict snapshot. This
+      // hydrates that result; it neither retries the write nor reruns startup.
+      try { publishCommittedSnapshot(); } catch { /* Preserve the original conflict. */ }
+    }
+    const message = getStorageErrorMessage(error);
+    setStorageError(message);
+    return failure(message);
   }
 
   async function addAssessment(
@@ -824,7 +771,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = await refreshStages();
+      const saved = result.value;
       return success(
         saved.assessments?.find((item) => item.id === assessment.id) ??
           assessment,
@@ -864,7 +811,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = await refreshStages();
+      const saved = result.value;
       const updated = saved.assessments?.find((item) => item.id === id);
       return updated
         ? success(updated)
@@ -897,7 +844,6 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      await refreshStages();
       return success();
     });
   }
@@ -953,7 +899,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = await refreshStages();
+      const saved = result.value;
       return success(
         saved.assessments?.find((item) => item.id === assessment.id) ??
           assessment,
@@ -1023,19 +969,7 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === updatedApplication.id
-            ? updatedApplication
-            : candidate,
-        ),
-      );
-      setInterviews((current) => [
-        interview,
-        ...current.filter((candidate) => candidate.id !== interview.id),
-      ]);
-      setActivities((current) => sortActivities([...activities, ...current]));
-      return success(interview);
+      return success(result.value.interviews.find((item) => item.id === interview.id)!);
     });
   }
 
@@ -1094,20 +1028,7 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === updatedApplication.id
-            ? updatedApplication
-            : candidate,
-        ),
-      );
-      setInterviews((current) =>
-        current.map((candidate) =>
-          candidate.id === id ? updatedInterview : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
-      return success(updatedInterview);
+      return success(result.value.interviews.find((item) => item.id === updatedInterview.id)!);
     });
   }
 
@@ -1155,17 +1076,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === updatedApplication.id
-            ? updatedApplication
-            : candidate,
-        ),
-      );
-      setInterviews((current) =>
-        current.filter((candidate) => candidate.id !== id),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1200,12 +1110,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === id ? restoredApplication : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1213,23 +1117,8 @@ export function useTrackerStore(): TrackerStore {
   async function deleteApplication(id: string): Promise<MutationResult> {
     return runApplicationMutation(async () => {
       await cloudStorageAdapter.deleteApplication(id);
+      publishCommittedSnapshot();
       setStorageError(null);
-
-      setApplications((current) =>
-        current.filter((application) => application.id !== id),
-      );
-      setAssessments((current) =>
-        current.filter((item) => item.applicationId !== id),
-      );
-      setContacts((current) =>
-        current.filter((contact) => contact.applicationId !== id),
-      );
-      setActivities((current) =>
-        current.filter((activity) => activity.applicationId !== id),
-      );
-      setInterviews((current) =>
-        current.filter((interview) => interview.applicationId !== id),
-      );
       return success();
     });
   }
@@ -1277,17 +1166,7 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setContacts((current) => [contact, ...current]);
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === updatedApplication.id
-            ? updatedApplication
-            : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
-
-      return success(contact);
+      return success(result.value.contacts.find((item) => item.id === contact.id)!);
     });
   }
 
@@ -1332,12 +1211,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setContacts((current) =>
-        current.map((candidate) =>
-          candidate.id === id ? updatedContact : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1386,17 +1259,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setContacts((current) =>
-        current.filter((candidate) => candidate.id !== id),
-      );
-      setApplications((current) =>
-        current.map((candidate) =>
-          candidate.id === updatedApplication.id
-            ? updatedApplication
-            : candidate,
-        ),
-      );
-      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1419,7 +1281,7 @@ export function useTrackerStore(): TrackerStore {
     try {
       await cloudStorageAdapter.saveResume(result.resume, file);
       setStorageError(null);
-      setResumes((current) => sortResumes([result.resume, ...current]));
+      publishCommittedSnapshot();
     } catch (error) {
       setStorageError(getStorageErrorMessage(error));
       throw error;
@@ -1446,9 +1308,7 @@ export function useTrackerStore(): TrackerStore {
     try {
       await cloudStorageAdapter.saveCoverLetter(result.coverLetter, file);
       setStorageError(null);
-      setCoverLetters((current) =>
-        sortResumes([result.coverLetter, ...current]),
-      );
+      publishCommittedSnapshot();
     } catch (error) {
       setStorageError(getStorageErrorMessage(error));
       throw error;
@@ -1475,11 +1335,6 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    setResumes((current) =>
-      sortResumes(
-        current.map((resume) => (resume.id === id ? updatedResume : resume)),
-      ),
-    );
     return success();
   }
 
@@ -1506,13 +1361,6 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    setCoverLetters((current) =>
-      sortResumes(
-        current.map((coverLetter) =>
-          coverLetter.id === id ? updatedCoverLetter : coverLetter,
-        ),
-      ),
-    );
     return success();
   }
 
@@ -1548,14 +1396,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setResumes((current) => current.filter((resume) => resume.id !== id));
-      setApplications((current) =>
-        current.map((application) =>
-          application.resumeId === id
-            ? { ...application, resumeId: undefined, updatedAt }
-            : application,
-        ),
-      );
       return success();
     });
   }
@@ -1593,16 +1433,6 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      setCoverLetters((current) =>
-        current.filter((coverLetter) => coverLetter.id !== id),
-      );
-      setApplications((current) =>
-        current.map((application) =>
-          application.coverLetterId === id
-            ? { ...application, coverLetterId: undefined, updatedAt }
-            : application,
-        ),
-      );
       return success();
     });
   }
@@ -1730,17 +1560,7 @@ export function useTrackerStore(): TrackerStore {
 
     await cloudStorageAdapter.importSnapshot(snapshot, resumeFiles);
 
-    setActivities(sortActivities(snapshot.activities));
-    setAnalyticsSettings(snapshot.analyticsSettings);
-    setApplications(snapshot.applications);
-    setContacts(snapshot.contacts);
-    setCoverLetters(sortResumes(snapshot.coverLetters));
-    setInterviews(snapshot.interviews);
-    setAssessments(snapshot.assessments ?? []);
-    setNotificationState(snapshot.notificationState);
-    setResumes(sortResumes(snapshot.resumes));
-    setSettings(snapshot.settings);
-    setTablePreferences(snapshot.tablePreferences);
+    publishCommittedSnapshot();
   }
 
   function exportApplicationsCsv() {
@@ -1762,7 +1582,6 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveNotificationState(updatedState),
-          () => setNotificationState(updatedState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1782,7 +1601,6 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveNotificationState(updatedState),
-          () => setNotificationState(updatedState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1802,7 +1620,6 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveSettings(updatedSettings),
-          () => setSettings(updatedSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1823,7 +1640,6 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
-          () => setAnalyticsSettings(updatedSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1834,9 +1650,7 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetSettings() {
     return settingsMutationQueue.run(() =>
-      persistThenUpdate(cloudStorageAdapter.resetSettings(), () =>
-        setSettings(DEFAULT_USER_SETTINGS),
-      ),
+      persistThenUpdate(cloudStorageAdapter.resetSettings()),
     );
   }
 
@@ -1852,7 +1666,6 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
-          () => setTablePreferences(updatedTablePreferences),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1863,16 +1676,13 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetTablePreferences() {
     return tablePreferencesMutationQueue.run(() =>
-      persistThenUpdate(
-        cloudStorageAdapter.resetTablePreferences(),
-        () => setTablePreferences(null),
-      ),
+      persistThenUpdate(cloudStorageAdapter.resetTablePreferences()),
     );
   }
 
   async function commitMutation(
     mutation: StorageMutation,
-  ): Promise<MutationResult> {
+  ): Promise<MutationResult<StorageSnapshot>> {
     try {
       assertAccountActive();
       const displayedRecords = {
@@ -1890,24 +1700,18 @@ export function useTrackerStore(): TrackerStore {
           ...displayedRecords, ...mutation.expected,
         },
       });
-      assertAccountActive();
+      const saved = publishCommittedSnapshot();
       setStorageError(null);
-      return success();
+      return success(saved);
     } catch (error) {
-      const message = getStorageErrorMessage(error);
-      setStorageError(message);
-      return failure(message);
+      return mutationFailure(error);
     }
   }
 
-  async function persistThenUpdate(
-    promise: Promise<unknown>,
-    updateState: () => void,
-  ) {
+  async function persistThenUpdate(promise: Promise<unknown>) {
     try {
       await promise;
-      assertAccountActive();
-      updateState();
+      publishCommittedSnapshot();
       setStorageError(null);
       return true;
     } catch (error) {

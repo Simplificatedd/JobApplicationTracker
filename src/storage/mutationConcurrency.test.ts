@@ -276,4 +276,30 @@ describe("aggregate mutation intent and derived state", () => {
     await expect(b.adapter.commitMutation({ assessments: [{ ...record, notes: "Retry stale" }] })).rejects.toThrow(/removed|not loaded/);
     expect(api.state.snapshot.assessments).toEqual([]);
   });
+
+  it("bounds repeated revision conflicts, publishes the latest snapshot and allows a later retry", async () => {
+    const { api, b, original } = await pair();
+    api.beforeSave = () => {
+      api.state = { ...api.state, revision: api.state.revision + 1, snapshot: { ...api.state.snapshot, applications: [{ ...original, company: `Remote ${api.state.revision}` }] } };
+    };
+    await expect(b.adapter.updateApplication({ ...original, notes: "Local" })).rejects.toThrow(/changed repeatedly.*No changes were saved/);
+    expect(api.conflicts).toBe(3);
+    expect(b.adapter.getCurrentSnapshot()).toEqual(api.state.snapshot);
+    expect(api.state.snapshot.applications[0].notes).toBeUndefined();
+    api.beforeSave = undefined;
+    await b.adapter.commitMutation({ applications: [{ ...original, notes: "Local" }], expected: { applications: [original] } });
+    expect(api.state.snapshot.applications[0]).toMatchObject({ company: "Remote 4", notes: "Local" });
+  });
+
+  it("keeps a queued edit's original baseline even when another local operation finishes first", async () => {
+    const { api, b, original } = await pair();
+    const first = b.adapter.updateApplication({ ...original, company: "First" });
+    const second = b.adapter.updateApplication({ ...original, company: "Second" });
+    await first;
+    await expect(second).rejects.toThrow(/company changed/);
+    expect(api.state.snapshot.applications[0].company).toBe("First");
+    const detached = b.adapter.getCurrentSnapshot();
+    detached.applications[0].company = "Outside mutation";
+    expect(b.adapter.getCurrentSnapshot().applications[0].company).toBe("First");
+  });
 });
