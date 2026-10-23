@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { IDBKeyRange } from "fake-indexeddb";
-import { snapshot } from "../test/assessmentFixtures";
+import { application, snapshot, timestamp } from "../test/assessmentFixtures";
 import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
 import { createCloudStorageAdapter } from "./cloudStorageAdapter";
@@ -8,6 +8,7 @@ import { createCloudStorageAdapter } from "./cloudStorageAdapter";
 
 beforeAll(() => vi.stubGlobal("IDBKeyRange", IDBKeyRange));
 afterAll(() => vi.unstubAllGlobals());
+const recreatedAt = "2026-10-23T00:00:00.000Z";
 function client(api: RevisionApi) {
   return createCloudStorageAdapter({ api, cache: createTestStorageAdapter() });
 }
@@ -64,5 +65,50 @@ describe("adversarial mutation ordering", () => {
     await expect(b.updateApplication({ ...original, notes: "Local notes" })).rejects.toThrow(/notes changed/);
     expect(api.conflicts).toBe(2);
     expect(api.state.snapshot.applications[0].notes).toBe("Remote notes");
+  });
+
+  it("rejects an old edit when its ID belongs to a recreated application", async () => {
+    const { api, a, b, original } = await sessions();
+    await a.deleteApplication(original.id);
+    await a.createApplication({ ...original, createdAt: recreatedAt, company: "Recreated" });
+    const saved = structuredClone(api.state);
+    await expect(b.updateApplication({ ...original, notes: "Old draft" })).rejects.toThrow(/replaced|recreated/);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("does not attach a stale new child to a recreated parent with the same ID", async () => {
+    const { api, a, b, original } = await sessions();
+    await a.deleteApplication(original.id);
+    await a.createApplication({ ...original, createdAt: recreatedAt });
+    await expect(b.createContact({ id: "stale-child", applicationId: original.id, name: "Recruiter", createdAt: timestamp, updatedAt: timestamp })).rejects.toThrow(/replaced|recreated/);
+    expect(api.state.snapshot.contacts).toEqual([]);
+  });
+
+  it("does not use explicit create to recreate an ID already known by the caller", async () => {
+    const { api, a, b, original } = await sessions();
+    await a.deleteApplication(original.id);
+    await expect(b.createApplication(original)).rejects.toThrow(/removed|exists|creation/);
+    expect(api.state.snapshot.applications).toEqual([]);
+  });
+
+  it("does not edit a replacement document with the old metadata baseline", async () => {
+    const document = { id: "doc", displayName: "Resume", originalFileName: "r.pdf", downloadFileName: "r.pdf", fileExtension: "pdf" as const, mimeType: "application/pdf", fileSize: 5, storageKey: "old-file", contentHash: "old-hash", uploadedAt: timestamp, updatedAt: timestamp };
+    const { api, a, b } = await sessions(snapshot({ resumes: [document] }));
+    await a.deleteResumeMetadata(document.id);
+    await a.createResumeMetadata({ ...document, storageKey: "replacement-file", uploadedAt: recreatedAt });
+    const saved = structuredClone(api.state);
+    await expect(b.updateResumeMetadata({ ...document, notes: "Old draft" })).rejects.toThrow(/replaced|recreated/);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("does not edit a same-ID contact now belonging to a different application", async () => {
+    const contact = { id: "contact", applicationId: application.id, name: "Recruiter", createdAt: timestamp, updatedAt: timestamp };
+    const other = { ...application, id: "other" };
+    const { api, a, b } = await sessions(snapshot({ applications: [application, other], contacts: [contact] }));
+    await a.deleteContact(contact.id);
+    await a.createContact({ ...contact, applicationId: other.id });
+    const saved = structuredClone(api.state);
+    await expect(b.updateContact({ ...contact, notes: "Old draft" })).rejects.toThrow(/replaced|recreated/);
+    expect(api.state).toEqual(saved);
   });
 });

@@ -6,6 +6,17 @@ export class StorageConflictError extends Error {
   }
 }
 
+// These existing immutable values distinguish a replacement from an edit. No
+// stored schema change is needed, and legacy records missing an optional value
+// compare in the same way as their JSON representation.
+export function assertRecordIdentity(before: object, current: object, label: string) {
+  for (const key of ["id", "createdAt", "uploadedAt", "applicationId", "storageKey"]) {
+    if (!equalStoredValue(Reflect.get(before, key), Reflect.get(current, key))) {
+      throw new StorageConflictError(`${label} was replaced or recreated in another session.`);
+    }
+  }
+}
+
 const APPLICATION_DERIVED_FIELDS = new Set([
   "contactsCount", "stageMigrationVersion", "interviewRound", "interviewDateTime",
   "interviewType", "interviewMode", "interviewLocation", "interviewMeetingUrl",
@@ -56,6 +67,8 @@ function mergeRecord<RecordType extends { id: string }>(
   current: RecordType | undefined, mutation: StorageMutation,
 ): RecordType {
   if (!current) throw new StorageConflictError(`${collection} record was removed in another session.`);
+  assertRecordIdentity(before, current, `${collection} record`);
+  assertRecordIdentity(before, proposed, `${collection} record`);
   const ignore = (key: string) => ignoredField(collection, key) ||
     (collection === "applications" && key === "resumeId" &&
       mutation.deleteResumeIds?.includes((before as { resumeId?: string }).resumeId ?? "")) ||
@@ -92,6 +105,9 @@ export function rebaseStorageMutation(
         (!before && (collection === "activities" ||
           (collection === "assessments" && mutation.deleteInterviewIds?.includes(write.id) &&
             (write as { legacyInterview?: unknown }).legacyInterview)))) {
+        if (before && !saved) {
+          throw new StorageConflictError(`${collection} record was removed; creation cannot reuse a previously loaded record.`);
+        }
         if (saved && !equalStoredValue(saved, write)) {
           throw new StorageConflictError(`${collection} record already exists in another session.`);
         }
@@ -121,6 +137,18 @@ export function rebaseStorageMutation(
   checkDeletes("resumes", mutation.deleteResumeIds);
   checkDeletes("coverLetters", mutation.deleteCoverLetterIds);
 
+  // A child may retain its own ID while its parent is deleted and replaced.
+  // Existence alone must not attach work from the old parent to the new one.
+  function checkParent(record: { applicationId: string }) {
+    const before = original<{ id: string; createdAt: string }>("applications", record.applicationId);
+    const parent = current.applications.find((item) => item.id === record.applicationId);
+    if (before && parent) assertRecordIdentity(before, parent, "The record's application");
+  }
+  for (const record of [
+    ...(mutation.activities ?? []), ...(mutation.contacts ?? []),
+    ...(mutation.interviews ?? []), ...(mutation.assessments ?? []),
+  ]) checkParent(record);
+
   const patches = new Map<string, NonNullable<StorageMutation["assessmentUpdates"]>[number]>();
   for (const patch of mutation.assessmentUpdates ?? []) {
     const previous = patches.get(patch.id);
@@ -129,6 +157,7 @@ export function rebaseStorageMutation(
   for (const patch of patches.values()) {
     const before = original<NonNullable<StorageSnapshot["assessments"]>[number]>("assessments", patch.id);
     if (!before) throw new StorageConflictError("Assessment was removed or was not loaded.");
+    checkParent(before);
     patch.changes = Object.fromEntries(Object.entries(patch.changes).filter(([key, value]) =>
       !equalStoredValue(Reflect.get(before, key), value)));
     const saved = current.assessments?.find((record) => record.id === patch.id);
