@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import { contactDraftToUpdate } from "./ContactsPanel";
+import { interviewDraftToUpdate } from "./InterviewsSection";
+import { documentDraftToUpdate } from "../resumes/ResumesPage";
+import { interview } from "../../test/assessmentFixtures";
+import { application } from "../../test/assessmentFixtures";
+import { applicationDraftToUpdate } from "./ApplicationDetailPanel";
+
+// Build the form's public draft shape from an unchanged submission, retaining
+// display-only date conversions and upload fields independently of persisted data.
+function draft() {
+  return {
+    ...application, company: application.company, jobTitle: application.jobTitle,
+    location: "", source: "", applicationUrl: "", dateApplied: "", roleStartDate: "", roleEndDate: "",
+    followUpDate: "", followUpAutoResetEnabled: false, followUpPromptDays: "",
+    offerDeadline: "", resumeId: "", resumeUploadName: "", resumeUploadVersion: "",
+    coverLetterId: "", coverLetterUploadName: "", coverLetterUploadVersion: "",
+    coverLetterVersion: "", salary: "", notes: "",
+  };
+}
+
+describe("application edit intent", () => {
+  it("does not resubmit unchanged fields from an old draft", () => {
+    expect(applicationDraftToUpdate(draft(), application)).toEqual({});
+    expect(applicationDraftToUpdate({ ...draft(), notes: "New notes" }, application)).toEqual({ notes: "New notes" });
+  });
+
+  it("retains explicit clearing while preserving unchanged imported whitespace", () => {
+    const original = { ...application, company: " Imported company ", notes: "Original notes" };
+    expect(applicationDraftToUpdate({ ...draft(), company: original.company, notes: "" }, original)).toEqual({ notes: undefined });
+  });
+
+  it("compares local date input with the original displayed value, not the ISO timestamp", () => {
+    const original = { ...application, status: "Offered" as const, offerDeadline: "2026-10-23T04:00:00.000Z" };
+    const time = new Date(original.offerDeadline);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const local = `${time.getFullYear()}-${pad(time.getMonth()+1)}-${pad(time.getDate())}T${pad(time.getHours())}:${pad(time.getMinutes())}`;
+    expect(applicationDraftToUpdate({ ...draft(), status: "Offered", offerDeadline: local }, original)).toEqual({});
+  });
+
+  it("includes document unassignment as explicit changed fields", () => {
+    expect(applicationDraftToUpdate(draft(), { ...application, resumeId: "r", coverLetterId: "c" })).toEqual({ resumeId: undefined, coverLetterId: undefined });
+  });
+});
+
+
+describe("other editor change intent", () => {
+  it("does not resubmit unrelated contact fields and retains explicit clearing", () => {
+    const original = { id: "contact", applicationId: application.id, name: " Name ", role: "Hiring", createdAt: application.createdAt, updatedAt: application.updatedAt };
+    const draft = { name: original.name, role: original.role, notes: "", email: "", phone: "", linkedInUrl: "" };
+    expect(contactDraftToUpdate(draft, original)).toEqual({});
+    expect(contactDraftToUpdate({ ...draft, role: "", notes: "New note" }, original)).toEqual({ role: undefined, notes: "New note" });
+  });
+
+  it("does not resubmit unrelated interview fields or reset its deadline mode", () => {
+    const original = { ...interview(2), notes: " Original notes " };
+    const draft = { dateTime: "", deadline: "", deadlineReceivedAt: "", location: "", meetingUrl: "", mode: original.mode, notes: original.notes, platform: "", proctored: original.proctored, round: "2", type: original.type };
+    expect(interviewDraftToUpdate(draft, original)).toEqual({});
+    expect(interviewDraftToUpdate({ ...draft, location: "Office" }, original)).toEqual({ location: "Office" });
+  });
+
+  it("limits document metadata edits to changed fields", () => {
+    const original = { id: "doc", displayName: "Resume", originalFileName: "r.pdf", downloadFileName: "r.pdf", fileExtension: "pdf" as const, mimeType: "application/pdf", fileSize: 5, storageKey: "file", contentHash: "hash", uploadedAt: application.createdAt, updatedAt: application.updatedAt, notes: " Notes " };
+    const draft = { displayName: original.displayName, downloadFileName: original.downloadFileName, notes: original.notes, versionLabel: "" };
+    expect(documentDraftToUpdate(draft, original)).toEqual({});
+    expect(documentDraftToUpdate({ ...draft, versionLabel: "v2" }, original)).toEqual({ versionLabel: "v2" });
+  });
+});

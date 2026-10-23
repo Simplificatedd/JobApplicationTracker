@@ -5,6 +5,7 @@ import {
   INTERVIEW_MODE_OPTIONS,
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
+import { changedDraftFields } from "../../lib/editIntent";
 import { formatDateTime } from "../../lib/format";
 import {
   calculateInterviewDeadline,
@@ -35,6 +36,7 @@ interface InterviewsSectionProps {
   onUpdate: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
 }
 
@@ -64,6 +66,7 @@ export function InterviewsSection({
 }: InterviewsSectionProps) {
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [draft, setDraft] = useState<InterviewDraft | null>(null);
+  const [editBase, setEditBase] = useState<Interview | undefined>();
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const sortedInterviews = sortInterviewHistory(interviews);
@@ -75,6 +78,7 @@ export function InterviewsSection({
   }
 
   function startEditing(interview: Interview) {
+    setEditBase(structuredClone(interview));
     setEditingId(interview.id);
     setDraft(createDraft(interview));
     setError("");
@@ -119,7 +123,7 @@ export function InterviewsSection({
     const result =
       editingId === "new"
         ? await onAdd({ ...input, applicationId: application.id })
-        : await onUpdate(editingId, input);
+        : await onUpdate(editingId, interviewDraftToUpdate(draft, editBase!), editBase);
     setIsSaving(false);
 
     if (!result.ok) {
@@ -550,6 +554,16 @@ function createDraft(interview?: Interview, suggestedRound?: number): InterviewD
     round: interview?.round ? String(interview.round) : String(suggestedRound ?? ""),
     type: interview?.type ?? "unknown",
   };
+}
+
+export function interviewDraftToUpdate(draft: InterviewDraft, original: Interview): InterviewUpdate {
+  const initial = createDraft(original);
+  const normalized = toInterviewUpdate(draft, draft.round ? Number(draft.round) : undefined);
+  const changes: InterviewUpdate = changedDraftFields(draft, initial, normalized);
+  if (draft.deadline === initial.deadline && draft.deadlineReceivedAt === initial.deadlineReceivedAt) {
+    delete changes.deadlineEntryMode;
+  }
+  return changes;
 }
 
 function toInterviewUpdate(

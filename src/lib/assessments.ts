@@ -369,6 +369,7 @@ export interface AssessmentActions {
   updateAssessment: (
     id: string,
     input: AssessmentUpdate,
+    expectedAssessment?: Assessment,
   ) => Promise<import("../store/useTrackerStore").MutationResult<Assessment>>;
   deleteAssessment: (
     id: string,

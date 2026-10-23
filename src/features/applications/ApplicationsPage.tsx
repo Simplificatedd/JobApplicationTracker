@@ -73,16 +73,19 @@ interface ApplicationsPageProps {
   updateContact: (
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
   updateInterview: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   updateApplication: (
     id: string,
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingResumeUpload,
+    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updateTablePreferences: (preferences: Partial<TablePreferences>) => void;
