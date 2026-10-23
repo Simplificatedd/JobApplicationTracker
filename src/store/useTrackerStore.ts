@@ -73,7 +73,7 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
-import { assertRecordIdentity } from "../storage/mutationRebase";
+import { assertRecordIdentity, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -191,6 +191,7 @@ export interface TrackerStore extends AssessmentActions {
   updateContact: (
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
   updateInterview: (
     id: string,
@@ -1239,6 +1240,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt: createdAt,
       };
       const result = await commitMutation({
+        expected: { applications: [application], contacts: currentContacts },
         creates: { contacts: [contact.id] },
         activities: [activity],
         applications: [updatedApplication],
@@ -1266,6 +1268,7 @@ export function useTrackerStore(): TrackerStore {
   async function updateContact(
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ): Promise<MutationResult> {
     return runApplicationMutation(async () => {
       const contact = (await cloudStorageAdapter.listContacts()).find(
@@ -1294,6 +1297,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
+        expected: { contacts: [expectedRecord(contact, expectedContact ?? contacts.find((item) => item.id === id), input)] },
         activities: [activity],
         contacts: [updatedContact],
       });
@@ -1346,6 +1350,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       };
       const result = await commitMutation({
+        expected: { applications: [application], contacts: [contact] },
         activities: [activity],
         applications: [updatedApplication],
         deleteContactIds: [id],
@@ -1946,6 +1951,23 @@ function useAccountState<Value>(
     if (!invalidated.current) setValue(next);
   }, [invalidated]);
   return [value, publish];
+}
+
+function expectedRecord<RecordType extends { id: string }>(
+  current: RecordType,
+  original: RecordType | undefined,
+  changes: object,
+): RecordType {
+  if (!original) return current;
+  if (original.id !== current.id) {
+    throw new StorageConflictError("The edit baseline belongs to a different record.");
+  }
+  assertRecordIdentity(original, current, "The edited record");
+  const expected = { ...current };
+  for (const key of Object.keys(changes)) {
+    Object.assign(expected, { [key]: Reflect.get(original, key) });
+  }
+  return expected;
 }
 
 function createActivity(

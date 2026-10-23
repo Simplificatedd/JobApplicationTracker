@@ -73,6 +73,7 @@ interface ApplicationsPageProps {
   updateContact: (
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
   updateInterview: (
     id: string,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-
+import { contactDraftToUpdate } from "./ContactsPanel";
 
 
 
@@ -40,5 +40,15 @@ describe("application edit intent", () => {
 
   it("includes document unassignment as explicit changed fields", () => {
     expect(applicationDraftToUpdate(draft(), { ...application, resumeId: "r", coverLetterId: "c" })).toEqual({ resumeId: undefined, coverLetterId: undefined });
+  });
+});
+
+
+describe("other editor change intent", () => {
+  it("does not resubmit unrelated contact fields and retains explicit clearing", () => {
+    const original = { id: "contact", applicationId: application.id, name: " Name ", role: "Hiring", createdAt: application.createdAt, updatedAt: application.updatedAt };
+    const draft = { name: original.name, role: original.role, notes: "", email: "", phone: "", linkedInUrl: "" };
+    expect(contactDraftToUpdate(draft, original)).toEqual({});
+    expect(contactDraftToUpdate({ ...draft, role: "", notes: "New note" }, original)).toEqual({ role: undefined, notes: "New note" });
   });
 });
