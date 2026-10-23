@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { IDBKeyRange } from "fake-indexeddb";
-import { application, snapshot, timestamp } from "../test/assessmentFixtures";
+import { application, interview, snapshot, timestamp } from "../test/assessmentFixtures";
 import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
 import { createCloudStorageAdapter } from "./cloudStorageAdapter";
@@ -89,6 +89,23 @@ describe("adversarial mutation ordering", () => {
     await a.deleteApplication(original.id);
     await expect(b.createApplication(original)).rejects.toThrow(/removed|exists|creation/);
     expect(api.state.snapshot.applications).toEqual([]);
+  });
+
+  it("rejects a stale bulk interview deletion instead of deleting a concurrent edit", async () => {
+    const record = interview(1);
+    const { api, a, b } = await sessions(snapshot({ interviews: [record] }));
+    await a.saveInterview({ ...record, notes: "New notes" });
+    const saved = structuredClone(api.state);
+    await expect(b.deleteInterviewsForApplication(application.id)).rejects.toThrow(/changed.*another session/);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("does not delete activities appended by another session during a bulk clear", async () => {
+    const { api, a, b } = await sessions();
+    await a.appendActivity({ id: "new-activity", applicationId: application.id, type: "updated", message: "New activity", createdAt: timestamp });
+    const saved = structuredClone(api.state);
+    await expect(b.deleteActivitiesForApplication(application.id)).rejects.toThrow(/changed.*another session/);
+    expect(api.state).toEqual(saved);
   });
 
   it("does not edit a replacement document with the old metadata baseline", async () => {

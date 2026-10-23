@@ -109,6 +109,22 @@ describe("aggregate mutation intent and derived state", () => {
     expect(api.state.snapshot.applications[0].notes).toBeUndefined();
   });
 
+  it("rejects delete-vs-edit instead of silently erasing the newer edit", async () => {
+    const { api, a, b, original } = await pair();
+    await a.adapter.updateApplication({ ...original, notes: "Keep this edit" });
+    const saved = structuredClone(api.state);
+    await expect(b.adapter.deleteApplication(original.id)).rejects.toThrow(/changed.*another session/);
+    expect(api.state).toEqual(saved);
+  });
+
+  it("rejects deleting an aggregate with a newly added child", async () => {
+    const { api, a, b, original } = await pair();
+    await a.adapter.createContact(contact);
+    await expect(b.adapter.deleteApplication(original.id)).rejects.toThrow(/changed.*another session/);
+    expect(api.state.snapshot.contacts).toHaveLength(1);
+    expect(api.state.snapshot.applications).toHaveLength(1);
+  });
+
   it("merges concurrent child creation and derives contact counts from the committed records", async () => {
     const { api, a, b } = await pair();
     await a.adapter.createContact(contact);

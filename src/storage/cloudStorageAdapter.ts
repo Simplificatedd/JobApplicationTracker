@@ -45,7 +45,7 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
-import { rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
+import { equalStoredValue, rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
 
 const MAX_CONFLICT_RETRIES = 3;
 
@@ -578,24 +578,36 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteApplication(id: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      activities: current.activities.filter(
-        (activity) => activity.applicationId !== id,
-      ),
-      applications: current.applications.filter(
-        (application) => application.id !== id,
-      ),
-      contacts: current.contacts.filter(
-        (contact) => contact.applicationId !== id,
-      ),
-      assessments: (current.assessments ?? []).filter(
-        (item) => item.applicationId !== id,
-      ),
-      interviews: current.interviews.filter(
-        (interview) => interview.applicationId !== id,
-      ),
-    }));
+    const before = structuredClone(await snapshot());
+    await mutateSnapshot((current) => {
+      if (current.applications.some((item) => item.id === id)) {
+        for (const key of ["applications", "activities", "contacts", "interviews", "assessments"] as const) {
+          const related = (data: StorageSnapshot) => (data[key] ?? []).filter((item) =>
+            "applicationId" in item ? item.applicationId === id : item.id === id);
+          if (!equalStoredValue(related(before), related(current))) {
+            throw new StorageConflictError("Application or its related records changed in another session before deletion.");
+          }
+        }
+      }
+      return {
+        ...current,
+        activities: current.activities.filter(
+          (activity) => activity.applicationId !== id,
+        ),
+        applications: current.applications.filter(
+          (application) => application.id !== id,
+        ),
+        contacts: current.contacts.filter(
+          (contact) => contact.applicationId !== id,
+        ),
+        assessments: (current.assessments ?? []).filter(
+          (item) => item.applicationId !== id,
+        ),
+        interviews: current.interviews.filter(
+          (interview) => interview.applicationId !== id,
+        ),
+      };
+    });
   }
 
   async function listContacts(applicationId?: string) {
@@ -633,12 +645,13 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteActivitiesForApplication(applicationId: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      activities: current.activities.filter(
-        (activity) => activity.applicationId !== applicationId,
-      ),
-    }));
+    const before = (await snapshot()).activities.filter((item) => item.applicationId === applicationId);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.activities.filter((item) => item.applicationId === applicationId))) {
+        throw new StorageConflictError("Activities changed in another session before deletion.");
+      }
+      return { ...current, activities: current.activities.filter((item) => item.applicationId !== applicationId) };
+    });
   }
 
   async function listAssessments(applicationId?: string) {
@@ -666,12 +679,13 @@ export function createCloudStorageAdapter({
   }
 
   async function deleteInterviewsForApplication(applicationId: string) {
-    await mutateSnapshot((current) => ({
-      ...current,
-      interviews: current.interviews.filter(
-        (interview) => interview.applicationId !== applicationId,
-      ),
-    }));
+    const before = (await snapshot()).interviews.filter((item) => item.applicationId === applicationId);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.interviews.filter((item) => item.applicationId === applicationId))) {
+        throw new StorageConflictError("Interviews changed in another session before deletion.");
+      }
+      return { ...current, interviews: current.interviews.filter((item) => item.applicationId !== applicationId) };
+    });
   }
 
   async function listResumeMetadata() {
