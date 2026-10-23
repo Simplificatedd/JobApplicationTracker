@@ -165,10 +165,12 @@ export interface TrackerStore extends AssessmentActions {
   updateResume: (
     id: string,
     input: ResumeMetadataUpdate,
+    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   updateCoverLetter: (
     id: string,
     input: ResumeMetadataUpdate,
+    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   uploadResume: (
     file: File,
@@ -1458,6 +1460,7 @@ export function useTrackerStore(): TrackerStore {
   async function updateResume(
     id: string,
     input: ResumeMetadataUpdate,
+    expectedDocument?: ResumeMetadata,
   ): Promise<MutationResult> {
     const currentResume = resumes.find((resume) => resume.id === id);
 
@@ -1466,7 +1469,7 @@ export function useTrackerStore(): TrackerStore {
     }
 
     const updatedResume = updateResumeMetadata(currentResume, input);
-    const result = await commitMutation({ resumes: [updatedResume] });
+    const result = await commitMutation({ resumes: [updatedResume], expected: { resumes: [expectedRecord(currentResume, expectedDocument, input)] } });
 
     if (!result.ok) {
       return result;
@@ -1483,6 +1486,7 @@ export function useTrackerStore(): TrackerStore {
   async function updateCoverLetter(
     id: string,
     input: ResumeMetadataUpdate,
+    expectedDocument?: ResumeMetadata,
   ): Promise<MutationResult> {
     const currentCoverLetter = coverLetters.find(
       (coverLetter) => coverLetter.id === id,
@@ -1496,7 +1500,7 @@ export function useTrackerStore(): TrackerStore {
       currentCoverLetter,
       input,
     );
-    const result = await commitMutation({ coverLetters: [updatedCoverLetter] });
+    const result = await commitMutation({ coverLetters: [updatedCoverLetter], expected: { coverLetters: [expectedRecord(currentCoverLetter, expectedDocument, input)] } });
 
     if (!result.ok) {
       return result;
@@ -1534,6 +1538,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       }));
       const result = await commitMutation({
+        expected: { applications: currentApplications, resumes: [currentResume] },
         applications: updatedApplications,
         deleteResumeIds: [id],
         deleteResumeFileKeys: [currentResume.storageKey],
@@ -1578,6 +1583,7 @@ export function useTrackerStore(): TrackerStore {
           updatedAt,
         }));
       const result = await commitMutation({
+        expected: { applications: currentApplications, coverLetters: [currentCoverLetter] },
         applications: updatedApplications,
         deleteCoverLetterIds: [id],
         deleteResumeFileKeys: [currentCoverLetter.storageKey],

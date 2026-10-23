@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contactDraftToUpdate } from "./ContactsPanel";
 import { interviewDraftToUpdate } from "./InterviewsSection";
-
+import { documentDraftToUpdate } from "../resumes/ResumesPage";
 import { interview } from "../../test/assessmentFixtures";
 import { application } from "../../test/assessmentFixtures";
 import { applicationDraftToUpdate } from "./ApplicationDetailPanel";
@@ -57,5 +57,12 @@ describe("other editor change intent", () => {
     const draft = { dateTime: "", deadline: "", deadlineReceivedAt: "", location: "", meetingUrl: "", mode: original.mode, notes: original.notes, platform: "", proctored: original.proctored, round: "2", type: original.type };
     expect(interviewDraftToUpdate(draft, original)).toEqual({});
     expect(interviewDraftToUpdate({ ...draft, location: "Office" }, original)).toEqual({ location: "Office" });
+  });
+
+  it("limits document metadata edits to changed fields", () => {
+    const original = { id: "doc", displayName: "Resume", originalFileName: "r.pdf", downloadFileName: "r.pdf", fileExtension: "pdf" as const, mimeType: "application/pdf", fileSize: 5, storageKey: "file", contentHash: "hash", uploadedAt: application.createdAt, updatedAt: application.updatedAt, notes: " Notes " };
+    const draft = { displayName: original.displayName, downloadFileName: original.downloadFileName, notes: original.notes, versionLabel: "" };
+    expect(documentDraftToUpdate(draft, original)).toEqual({});
+    expect(documentDraftToUpdate({ ...draft, versionLabel: "v2" }, original)).toEqual({ versionLabel: "v2" });
   });
 });
