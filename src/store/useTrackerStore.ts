@@ -833,6 +833,7 @@ export function useTrackerStore(): TrackerStore {
   async function updateAssessment(
     id: string,
     input: AssessmentUpdate,
+    expectedAssessment?: Assessment,
   ): Promise<MutationResult<Assessment>> {
     return runApplicationMutation(async () => {
       const error = validateAssessment(input);
@@ -848,6 +849,7 @@ export function useTrackerStore(): TrackerStore {
         return failure("Active application could not be found.");
       const timestamp = createTimestamp();
       const result = await commitMutation({
+        expected: { assessments: [expectedRecord(assessment, expectedAssessment ?? assessments.find((item) => item.id === id), input)] },
         assessmentUpdates: [{ id, changes: input, updatedAt: timestamp }],
         applications: [{ ...application, updatedAt: timestamp }],
         activities: [
