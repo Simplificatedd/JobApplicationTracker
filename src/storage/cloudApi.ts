@@ -1,4 +1,5 @@
 import type { StorageSnapshot } from "./StorageAdapter";
+import { MUTATION_PROTOCOL_HEADER, MUTATION_PROTOCOL_VERSION } from "./mutationProtocol";
 
 export interface CloudAccount {
   id: string;
@@ -68,6 +69,8 @@ export function createCloudApiClient(
           credentials: "same-origin",
           headers: {
             Accept: "application/json",
+            ...(init.method === "PUT" || init.method === "DELETE"
+              ? { [MUTATION_PROTOCOL_HEADER]: MUTATION_PROTOCOL_VERSION } : {}),
             ...init.headers,
           },
         });
