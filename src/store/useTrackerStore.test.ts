@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_ANALYTICS_SETTINGS, DEFAULT_NOTIFICATION_STATE, DEFAULT_USER_SETTINGS } from "../lib/domain";
+import { application } from "../test/assessmentFixtures";
+
+
+
+
 import type { StorageSnapshot } from "../storage/StorageAdapter";
 
 // A small hook host lets these tests control promise/event ordering without a
@@ -26,7 +31,9 @@ vi.mock("react", () => ({
 }));
 const storage = vi.hoisted(() => ({
   initialize: vi.fn(), getAccount: vi.fn(), commitMutation: vi.fn(),
-  getSettings: vi.fn(), saveSettings: vi.fn(),
+  getSettings: vi.fn(), saveSettings: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
+  getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
+  listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
 import { useTrackerStore } from "./useTrackerStore";
@@ -63,6 +70,14 @@ beforeEach(() => {
   storage.commitMutation.mockResolvedValue(undefined);
   storage.getSettings.mockResolvedValue(snapshot.settings);
   storage.saveSettings.mockResolvedValue(undefined);
+  storage.exportSnapshot.mockResolvedValue(snapshot);
+  storage.getCurrentSnapshot.mockReturnValue(snapshot);
+  storage.getApplication.mockResolvedValue(application);
+  storage.listInterviews.mockResolvedValue([]);
+  storage.listResumeMetadata.mockResolvedValue([]);
+  storage.listCoverLetterMetadata.mockResolvedValue([]);
+  storage.listContacts.mockResolvedValue([]);
+  storage.deleteApplication.mockResolvedValue(undefined);
 });
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); vi.unstubAllGlobals(); });
 
@@ -115,5 +130,33 @@ describe("store account invalidation", () => {
     await pending;
     expect(RenderStore().activities).toEqual([]);
     expect(RenderStore().storageError).toContain("Signed-in account changed");
+  });
+});
+
+
+describe("store reconciliation after mutations", () => {
+  const initial = { ...snapshot, applications: [application] };
+  async function mounted() {
+    storage.initialize.mockResolvedValue(initial);
+    storage.getCurrentSnapshot.mockReturnValue(initial);
+    RenderStore(); await flush();
+    return RenderStore();
+  }
+
+  it("passes the editor's original field baseline after another operation updated the same adapter", async () => {
+    const store = await mounted();
+    storage.getApplication.mockResolvedValue({ ...application, company: "New local value", notes: "Unrelated current notes" });
+    await store.updateApplication(application.id, { company: "My draft" }, undefined, undefined, application);
+    const mutation = storage.commitMutation.mock.calls[0][0];
+    expect(mutation.expected.applications[0]).toMatchObject({ company: application.company, notes: "Unrelated current notes" });
+    expect(mutation.applications[0]).toMatchObject({ company: "My draft", notes: "Unrelated current notes" });
+  });
+
+  it("uses the displayed field baseline for quick edits when the adapter has advanced", async () => {
+    const store = await mounted();
+    storage.getApplication.mockResolvedValue({ ...application, company: "Advanced adapter", notes: "Current notes" });
+    await store.updateApplication(application.id, { company: "Quick edit" });
+    const mutation = storage.commitMutation.mock.calls[0][0];
+    expect(mutation.expected.applications[0]).toMatchObject({ company: application.company, notes: "Current notes" });
   });
 });

@@ -83,6 +83,7 @@ interface ApplicationsPageProps {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingResumeUpload,
+    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   updateSettings: (settings: Partial<UserSettings>) => void;
   updateTablePreferences: (preferences: Partial<TablePreferences>) => void;

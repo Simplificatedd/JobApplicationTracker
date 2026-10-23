@@ -73,6 +73,7 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
+import { assertRecordIdentity } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -184,6 +185,7 @@ export interface TrackerStore extends AssessmentActions {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
+    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   updateAnalyticsSettings: (input: Partial<AnalyticsSettings>) => Promise<boolean>;
   updateContact: (
@@ -424,6 +426,7 @@ export function useTrackerStore(): TrackerStore {
           currentCoverLetters,
         );
     const result = await commitMutation({
+      expected: { resumes: currentResumes, coverLetters: currentCoverLetters },
       creates: {
         applications: [application.id],
         interviews: interview ? [interview.id] : [],
@@ -523,9 +526,10 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
+    expectedApplication?: Application,
   ): Promise<MutationResult> {
     return runApplicationMutation(() =>
-      updateApplicationNow(id, input, pendingResume, pendingCoverLetter),
+      updateApplicationNow(id, input, pendingResume, pendingCoverLetter, expectedApplication),
     );
   }
 
@@ -534,6 +538,7 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
+    expectedApplication?: Application,
   ): Promise<MutationResult> {
     const [
       currentApplication,
@@ -550,6 +555,20 @@ export function useTrackerStore(): TrackerStore {
 
     if (!currentApplication) {
       return failure("Application could not be found.");
+    }
+
+    const editBase = expectedApplication ?? applications.find((item) => item.id === id);
+    if (editBase && editBase.id !== id) {
+      return failure("The edit baseline belongs to a different application.");
+    }
+    if (editBase) assertRecordIdentity(editBase, currentApplication, "Application");
+    const beforeApplication = { ...currentApplication };
+    if (editBase) {
+      for (const key of Object.keys(input) as (keyof ApplicationUpdate)[]) {
+        Object.assign(beforeApplication, { [key]: editBase[key] });
+      }
+      if (pendingResume) beforeApplication.resumeId = editBase.resumeId;
+      if (pendingCoverLetter) beforeApplication.coverLetterId = editBase.coverLetterId;
     }
 
     let resumeUpload: ResumeUploadResult | undefined;
@@ -631,6 +650,10 @@ export function useTrackerStore(): TrackerStore {
           )
         : undefined;
     const result = await commitMutation({
+      expected: {
+        applications: [beforeApplication], interviews: currentInterviews,
+        resumes: currentResumes, coverLetters: currentCoverLetters,
+      },
       creates: {
         interviews: updatedInterview && !currentInterviews.some((item) => item.id === updatedInterview.id) ? [updatedInterview.id] : [],
         resumes: resumeUpload ? [resumeUpload.resume.id] : [],
@@ -719,6 +742,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
+        expected: { applications: [application] },
         activities: [activity],
         applications: [archivedApplication],
       });
@@ -1140,6 +1164,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
+        expected: { applications: [application] },
         activities: [activity],
         applications: [restoredApplication],
       });
@@ -1815,7 +1840,21 @@ export function useTrackerStore(): TrackerStore {
   ): Promise<MutationResult> {
     try {
       assertAccountActive();
-      await cloudStorageAdapter.commitMutation(mutation);
+      const displayedRecords = {
+        applications, contacts, interviews, assessments, activities, resumes, coverLetters,
+      };
+      for (const collection of ["applications", "contacts", "interviews", "assessments", "resumes", "coverLetters"] as const) {
+        for (const write of mutation[collection] ?? []) {
+          const displayed = displayedRecords[collection].find((item) => item.id === write.id);
+          if (displayed) assertRecordIdentity(displayed, write, `${collection} record`);
+        }
+      }
+      await cloudStorageAdapter.commitMutation({
+        ...mutation,
+        expected: {
+          ...displayedRecords, ...mutation.expected,
+        },
+      });
       assertAccountActive();
       setStorageError(null);
       return success();
