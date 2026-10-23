@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { changedDraftFields } from "../../lib/editIntent";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ContactInput, MutationResult } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
@@ -19,6 +20,7 @@ interface ContactsPanelProps {
   onUpdateContact: (
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
 }
 
@@ -272,6 +274,7 @@ function ContactCard({
   onUpdateContact: (
     id: string,
     input: Partial<ContactInput>,
+    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
 }) {
   const safeLinkedInUrl = getSafeHttpUrl(contact.linkedInUrl);
@@ -280,6 +283,7 @@ function ContactCard({
   const [isSaving, setIsSaving] = useState(false);
   const [operationError, setOperationError] = useState("");
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
+  const [editBase, setEditBase] = useState(() => structuredClone(contact));
 
   useEscapeKey(isEditing && !isDiscardWarningOpen, requestCancel);
 
@@ -296,15 +300,9 @@ function ContactCard({
   async function confirm() {
     setIsSaving(true);
     setOperationError("");
-    const result = await onUpdateContact(contact.id, {
-      applicationId: contact.applicationId,
-      email: trimOptional(draft.email),
-      linkedInUrl: trimOptional(draft.linkedInUrl),
-      name: draft.name.trim() || contact.name,
-      notes: trimOptional(draft.notes),
-      phone: trimOptional(draft.phone),
-      role: trimOptional(draft.role),
-    });
+    const result = await onUpdateContact(
+      contact.id, contactDraftToUpdate(draft, editBase), editBase,
+    );
     setIsSaving(false);
 
     if (!result.ok) {
@@ -325,7 +323,7 @@ function ContactCard({
       return;
     }
 
-    if (isContactDraftDirty(draft, toDraft(contact))) {
+    if (isContactDraftDirty(draft, toDraft(editBase))) {
       setIsDiscardWarningOpen(true);
       return;
     }
@@ -441,7 +439,11 @@ function ContactCard({
         <div className="flex shrink-0 gap-2">
           <button
             className="icon-button"
-            onClick={() => setIsEditing(true)}
+            onClick={() => {
+              setEditBase(structuredClone(contact));
+              setDraft(toDraft(contact));
+              setIsEditing(true);
+            }}
             type="button"
           >
             <Pencil aria-hidden="true" size={18} />
@@ -488,6 +490,14 @@ function ContactField({
       />
     </label>
   );
+}
+
+export function contactDraftToUpdate(draft: ContactDraft, original: ApplicationContact): Partial<ContactInput> {
+  return changedDraftFields(draft, toDraft(original), {
+    email: trimOptional(draft.email), linkedInUrl: trimOptional(draft.linkedInUrl),
+    name: draft.name.trim() || original.name, notes: trimOptional(draft.notes),
+    phone: trimOptional(draft.phone), role: trimOptional(draft.role),
+  });
 }
 
 function toDraft(contact: ApplicationContact): ContactDraft {
