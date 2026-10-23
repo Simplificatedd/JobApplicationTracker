@@ -13,7 +13,6 @@ import { useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { changedDraftFields } from "../../lib/editIntent";
 import { formatDate, formatUpdatedAt } from "../../lib/format";
 import { formatFileSize } from "../../lib/resumeFiles";
 import type {
@@ -35,7 +34,6 @@ interface ResumesPageProps {
   onUpdateResume: (
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   onUploadResume: (
     file: File,
@@ -54,7 +52,6 @@ interface CoverLettersPageProps {
   onUpdateCoverLetter: (
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   onUploadCoverLetter: (
     file: File,
@@ -265,7 +262,7 @@ export function ResumesPage({
                     onDelete={() => confirmDelete(resume)}
                     onDownload={() => downloadResume(resume)}
                     onPreview={() => previewResume(resume)}
-                    onUpdate={(input, original) => onUpdateResume(resume.id, input, original)}
+                    onUpdate={(input) => onUpdateResume(resume.id, input)}
                     resume={resume}
                   />
                 ))}
@@ -364,13 +361,12 @@ function ResumeRow({
   onDelete: () => void;
   onDownload: () => void;
   onPreview: () => void;
-  onUpdate: (input: ResumeMetadataUpdate, expectedDocument?: ResumeMetadata) => Promise<MutationResult>;
+  onUpdate: (input: ResumeMetadataUpdate) => Promise<MutationResult>;
   resume: ResumeMetadata;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [editBase, setEditBase] = useState(() => structuredClone(resume));
   const [draft, setDraft] = useState({
     displayName: resume.displayName,
     downloadFileName: resume.downloadFileName,
@@ -381,7 +377,7 @@ function ResumeRow({
   async function save() {
     setIsSaving(true);
     setSaveError("");
-    const result = await onUpdate(documentDraftToUpdate(draft, editBase), editBase);
+    const result = await onUpdate(draft);
     setIsSaving(false);
 
     if (!result.ok) {
@@ -530,19 +526,7 @@ function ResumeRow({
               >
                 <Download aria-hidden="true" size={16} />
               </IconAction>
-              <IconAction
-                label="Edit metadata"
-                onClick={() => {
-                  setEditBase(structuredClone(resume));
-                  setDraft({
-                    displayName: resume.displayName,
-                    downloadFileName: resume.downloadFileName,
-                    notes: resume.notes ?? "",
-                    versionLabel: resume.versionLabel ?? "",
-                  });
-                  setIsEditing(true);
-                }}
-              >
+              <IconAction label="Edit metadata" onClick={() => setIsEditing(true)}>
                 <Pencil aria-hidden="true" size={16} />
               </IconAction>
               <IconAction
@@ -685,14 +669,4 @@ function getLinkedCounts(
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document action failed.";
-}
-
-export function documentDraftToUpdate(
-  draft: { displayName: string; downloadFileName: string; notes: string; versionLabel: string },
-  original: ResumeMetadata,
-): ResumeMetadataUpdate {
-  return changedDraftFields(draft, {
-    displayName: original.displayName, downloadFileName: original.downloadFileName,
-    notes: original.notes ?? "", versionLabel: original.versionLabel ?? "",
-  }, draft);
 }

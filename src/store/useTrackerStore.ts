@@ -62,6 +62,7 @@ import {
   isUpcomingInterview,
   selectCurrentInterview,
   updateInterviewRecord,
+  upsertInterviewHistory,
 } from "../lib/interviews";
 import {
   assessmentFromInterview,
@@ -72,11 +73,9 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
-import { assertRecordIdentity, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
   StorageMutation,
-  StorageSnapshot,
 } from "../storage/StorageAdapter";
 
 export type ApplicationInput = Omit<
@@ -165,12 +164,10 @@ export interface TrackerStore extends AssessmentActions {
   updateResume: (
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   updateCoverLetter: (
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ) => Promise<MutationResult>;
   uploadResume: (
     file: File,
@@ -187,18 +184,15 @@ export interface TrackerStore extends AssessmentActions {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
-    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   updateAnalyticsSettings: (input: Partial<AnalyticsSettings>) => Promise<boolean>;
   updateContact: (
     id: string,
     input: Partial<ContactInput>,
-    expectedContact?: ApplicationContact,
   ) => Promise<MutationResult>;
   updateInterview: (
     id: string,
     input: InterviewUpdate,
-    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   updateSettings: (input: Partial<UserSettings>) => Promise<boolean>;
   updateTablePreferences: (input: Partial<TablePreferences>) => Promise<boolean>;
@@ -325,7 +319,10 @@ export function useTrackerStore(): TrackerStore {
         assertAccountActive();
         return await operation();
       } catch (error) {
-        return mutationFailure(error);
+        const message = getStorageErrorMessage(error);
+
+        setStorageError(message);
+        return failure(message);
       }
     });
   }
@@ -342,6 +339,7 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
+    setActivities((current) => sortActivities([activity, ...current]));
     return success();
   }
 
@@ -426,13 +424,6 @@ export function useTrackerStore(): TrackerStore {
           currentCoverLetters,
         );
     const result = await commitMutation({
-      expected: { resumes: currentResumes, coverLetters: currentCoverLetters },
-      creates: {
-        applications: [application.id],
-        interviews: interview ? [interview.id] : [],
-        resumes: resumeUpload ? [resumeUpload.resume.id] : [],
-        coverLetters: coverLetterUpload ? [coverLetterUpload.coverLetter.id] : [],
-      },
       activities: [createdActivity],
       applications: [application],
       interviews: interview ? [interview] : undefined,
@@ -455,7 +446,34 @@ export function useTrackerStore(): TrackerStore {
       return result;
     }
 
-    return success(result.value.applications.find((item) => item.id === application.id)!);
+    setApplications((current) => [application, ...current]);
+    setActivities((current) => sortActivities([createdActivity, ...current]));
+
+    if (interview) {
+      setInterviews((current) => [interview, ...current]);
+    }
+
+    if (markedResume) {
+      setResumes((current) =>
+        sortResumes([
+          markedResume,
+          ...current.filter((resume) => resume.id !== markedResume.id),
+        ]),
+      );
+    }
+
+    if (markedCoverLetter) {
+      setCoverLetters((current) =>
+        sortResumes([
+          markedCoverLetter,
+          ...current.filter(
+            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
+          ),
+        ]),
+      );
+    }
+
+    return success(application);
   }
 
   function getMarkedResume(
@@ -499,10 +517,9 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
-    expectedApplication?: Application,
   ): Promise<MutationResult> {
     return runApplicationMutation(() =>
-      updateApplicationNow(id, input, pendingResume, pendingCoverLetter, expectedApplication),
+      updateApplicationNow(id, input, pendingResume, pendingCoverLetter),
     );
   }
 
@@ -511,7 +528,6 @@ export function useTrackerStore(): TrackerStore {
     input: ApplicationUpdate,
     pendingResume?: PendingResumeUpload,
     pendingCoverLetter?: PendingCoverLetterUpload,
-    expectedApplication?: Application,
   ): Promise<MutationResult> {
     const [
       currentApplication,
@@ -528,20 +544,6 @@ export function useTrackerStore(): TrackerStore {
 
     if (!currentApplication) {
       return failure("Application could not be found.");
-    }
-
-    const editBase = expectedApplication ?? applications.find((item) => item.id === id);
-    if (editBase && editBase.id !== id) {
-      return failure("The edit baseline belongs to a different application.");
-    }
-    if (editBase) assertRecordIdentity(editBase, currentApplication, "Application");
-    const beforeApplication = { ...currentApplication };
-    if (editBase) {
-      for (const key of Object.keys(input) as (keyof ApplicationUpdate)[]) {
-        Object.assign(beforeApplication, { [key]: editBase[key] });
-      }
-      if (pendingResume) beforeApplication.resumeId = editBase.resumeId;
-      if (pendingCoverLetter) beforeApplication.coverLetterId = editBase.coverLetterId;
     }
 
     let resumeUpload: ResumeUploadResult | undefined;
@@ -593,28 +595,12 @@ export function useTrackerStore(): TrackerStore {
       input,
       updatedAt,
     );
-    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
-    const displayedInterview = selectCurrentInterview(
-      interviews.filter((item) => item.applicationId === id), new Date(updatedAt),
-    );
-    if (shouldPersistInterviewUpdate(input) && editBase &&
-      displayedInterview?.id !== currentInterview?.id) {
-      throw new StorageConflictError("The current interview changed while this table edit was open.");
-    }
     const updatedInterview = shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
           updatedAt,
-          currentInterview?.id,
-        )
-      : undefined;
-    // Application interview fields are projections. Carry their displayed values
-    // into the canonical interview baseline, where conflict checks actually run.
-    const expectedInterview = updatedInterview && currentInterview
-      ? buildInterviewRecord(
-          { ...beforeApplication, status: "Interviewing" },
-          currentInterviews, updatedAt, currentInterview.id,
+          selectCurrentInterview(currentInterviews, new Date(updatedAt))?.id,
         )
       : undefined;
     const markedResume = resumeUpload
@@ -639,16 +625,6 @@ export function useTrackerStore(): TrackerStore {
           )
         : undefined;
     const result = await commitMutation({
-      expected: {
-        applications: [beforeApplication],
-        interviews: expectedInterview ? [expectedInterview] : currentInterviews,
-        resumes: currentResumes, coverLetters: currentCoverLetters,
-      },
-      creates: {
-        interviews: updatedInterview && !currentInterviews.some((item) => item.id === updatedInterview.id) ? [updatedInterview.id] : [],
-        resumes: resumeUpload ? [resumeUpload.resume.id] : [],
-        coverLetters: coverLetterUpload ? [coverLetterUpload.coverLetter.id] : [],
-      },
       activities: newActivities,
       applications: [updatedApplication],
       interviews: updatedInterview ? [updatedInterview] : undefined,
@@ -669,6 +645,43 @@ export function useTrackerStore(): TrackerStore {
 
     if (!result.ok) {
       return result;
+    }
+
+    setApplications((current) =>
+      current.map((application) =>
+        application.id === id ? updatedApplication : application,
+      ),
+    );
+
+    if (updatedInterview) {
+      setInterviews((current) =>
+        upsertInterviewHistory(current, updatedInterview),
+      );
+    }
+
+    if (newActivities.length > 0) {
+      setActivities((current) => sortActivities([...newActivities, ...current]));
+    }
+
+    if (markedResume) {
+      setResumes((current) =>
+        sortResumes([
+          markedResume,
+          ...current.filter((resume) => resume.id !== markedResume.id),
+        ]),
+      );
+    }
+
+
+    if (markedCoverLetter) {
+      setCoverLetters((current) =>
+        sortResumes([
+          markedCoverLetter,
+          ...current.filter(
+            (coverLetter) => coverLetter.id !== markedCoverLetter.id,
+          ),
+        ]),
+      );
     }
 
     return success();
@@ -695,7 +708,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
-        expected: { applications: [application] },
         activities: [activity],
         applications: [archivedApplication],
       });
@@ -704,40 +716,25 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? archivedApplication : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
 
-  function publishSnapshot(snapshot: StorageSnapshot) {
-    assertAccountActive();
-    setApplications(withContactCounts(snapshot.applications, snapshot.contacts));
-    setContacts(snapshot.contacts);
+  async function refreshStages() {
+    const snapshot = await cloudStorageAdapter.exportSnapshot();
+    setApplications(
+      withContactCounts(snapshot.applications, snapshot.contacts),
+    );
     setInterviews(snapshot.interviews);
     setAssessments(snapshot.assessments ?? []);
     setActivities(sortActivities(snapshot.activities));
-    setResumes(sortResumes(snapshot.resumes));
-    setCoverLetters(sortResumes(snapshot.coverLetters));
-    setSettings(normalizeUserSettings(snapshot.settings));
-    setNotificationState(snapshot.notificationState);
-    setAnalyticsSettings(snapshot.analyticsSettings);
-    setTablePreferences(snapshot.tablePreferences);
-  }
-
-  function publishCommittedSnapshot() {
-    const saved = cloudStorageAdapter.getCurrentSnapshot();
-    publishSnapshot(saved);
-    return saved;
-  }
-
-  async function mutationFailure(error: unknown) {
-    if (error instanceof StorageConflictError && !accountInvalidated.current) {
-      // The adapter already received the authoritative conflict snapshot. This
-      // hydrates that result; it neither retries the write nor reruns startup.
-      try { publishCommittedSnapshot(); } catch { /* Preserve the original conflict. */ }
-    }
-    const message = getStorageErrorMessage(error);
-    setStorageError(message);
-    return failure(message);
+    return snapshot;
   }
 
   async function addAssessment(
@@ -758,7 +755,6 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
-        creates: { assessments: [assessment.id] },
         assessments: [assessment],
         applications: [{ ...application, updatedAt: timestamp }],
         activities: [
@@ -771,7 +767,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = result.value;
+      const saved = await refreshStages();
       return success(
         saved.assessments?.find((item) => item.id === assessment.id) ??
           assessment,
@@ -782,7 +778,6 @@ export function useTrackerStore(): TrackerStore {
   async function updateAssessment(
     id: string,
     input: AssessmentUpdate,
-    expectedAssessment?: Assessment,
   ): Promise<MutationResult<Assessment>> {
     return runApplicationMutation(async () => {
       const error = validateAssessment(input);
@@ -798,7 +793,6 @@ export function useTrackerStore(): TrackerStore {
         return failure("Active application could not be found.");
       const timestamp = createTimestamp();
       const result = await commitMutation({
-        expected: { assessments: [expectedRecord(assessment, expectedAssessment ?? assessments.find((item) => item.id === id), input)] },
         assessmentUpdates: [{ id, changes: input, updatedAt: timestamp }],
         applications: [{ ...application, updatedAt: timestamp }],
         activities: [
@@ -811,7 +805,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = result.value;
+      const saved = await refreshStages();
       const updated = saved.assessments?.find((item) => item.id === id);
       return updated
         ? success(updated)
@@ -844,6 +838,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
+      await refreshStages();
       return success();
     });
   }
@@ -899,7 +894,7 @@ export function useTrackerStore(): TrackerStore {
         ],
       });
       if (!result.ok) return result;
-      const saved = result.value;
+      const saved = await refreshStages();
       return success(
         saved.assessments?.find((item) => item.id === assessment.id) ??
           assessment,
@@ -958,8 +953,6 @@ export function useTrackerStore(): TrackerStore {
         ),
       ];
       const result = await commitMutation({
-        expected: { applications: [application], interviews: currentInterviews },
-        creates: { interviews: [interview.id] },
         activities,
         applications: [updatedApplication],
         interviews: [interview],
@@ -969,14 +962,25 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      return success(result.value.interviews.find((item) => item.id === interview.id)!);
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) => [
+        interview,
+        ...current.filter((candidate) => candidate.id !== interview.id),
+      ]);
+      setActivities((current) => sortActivities([...activities, ...current]));
+      return success(interview);
     });
   }
 
   async function updateInterview(
     id: string,
     input: InterviewUpdate,
-    expectedInterview?: Interview,
   ): Promise<MutationResult<Interview>> {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
@@ -1018,7 +1022,6 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
-        expected: { applications: [application], interviews: [expectedRecord(interview, expectedInterview ?? interviews.find((item) => item.id === id), input)] },
         activities: [activity],
         applications: [updatedApplication],
         interviews: [updatedInterview],
@@ -1028,7 +1031,20 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      return success(result.value.interviews.find((item) => item.id === updatedInterview.id)!);
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? updatedInterview : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+      return success(updatedInterview);
     });
   }
 
@@ -1066,7 +1082,6 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
-        expected: { applications: [application], interviews: [interview] },
         activities: [activity],
         applications: [updatedApplication],
         deleteInterviewIds: [id],
@@ -1076,6 +1091,17 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setInterviews((current) =>
+        current.filter((candidate) => candidate.id !== id),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1101,7 +1127,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
-        expected: { applications: [application] },
         activities: [activity],
         applications: [restoredApplication],
       });
@@ -1110,6 +1135,12 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? restoredApplication : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1117,8 +1148,23 @@ export function useTrackerStore(): TrackerStore {
   async function deleteApplication(id: string): Promise<MutationResult> {
     return runApplicationMutation(async () => {
       await cloudStorageAdapter.deleteApplication(id);
-      publishCommittedSnapshot();
       setStorageError(null);
+
+      setApplications((current) =>
+        current.filter((application) => application.id !== id),
+      );
+      setAssessments((current) =>
+        current.filter((item) => item.applicationId !== id),
+      );
+      setContacts((current) =>
+        current.filter((contact) => contact.applicationId !== id),
+      );
+      setActivities((current) =>
+        current.filter((activity) => activity.applicationId !== id),
+      );
+      setInterviews((current) =>
+        current.filter((interview) => interview.applicationId !== id),
+      );
       return success();
     });
   }
@@ -1155,8 +1201,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt: createdAt,
       };
       const result = await commitMutation({
-        expected: { applications: [application], contacts: currentContacts },
-        creates: { contacts: [contact.id] },
         activities: [activity],
         applications: [updatedApplication],
         contacts: [contact],
@@ -1166,14 +1210,23 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
-      return success(result.value.contacts.find((item) => item.id === contact.id)!);
+      setContacts((current) => [contact, ...current]);
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
+
+      return success(contact);
     });
   }
 
   async function updateContact(
     id: string,
     input: Partial<ContactInput>,
-    expectedContact?: ApplicationContact,
   ): Promise<MutationResult> {
     return runApplicationMutation(async () => {
       const contact = (await cloudStorageAdapter.listContacts()).find(
@@ -1202,7 +1255,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       );
       const result = await commitMutation({
-        expected: { contacts: [expectedRecord(contact, expectedContact ?? contacts.find((item) => item.id === id), input)] },
         activities: [activity],
         contacts: [updatedContact],
       });
@@ -1211,6 +1263,12 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setContacts((current) =>
+        current.map((candidate) =>
+          candidate.id === id ? updatedContact : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1249,7 +1307,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       };
       const result = await commitMutation({
-        expected: { applications: [application], contacts: [contact] },
         activities: [activity],
         applications: [updatedApplication],
         deleteContactIds: [id],
@@ -1259,6 +1316,17 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setContacts((current) =>
+        current.filter((candidate) => candidate.id !== id),
+      );
+      setApplications((current) =>
+        current.map((candidate) =>
+          candidate.id === updatedApplication.id
+            ? updatedApplication
+            : candidate,
+        ),
+      );
+      setActivities((current) => sortActivities([activity, ...current]));
       return success();
     });
   }
@@ -1281,7 +1349,7 @@ export function useTrackerStore(): TrackerStore {
     try {
       await cloudStorageAdapter.saveResume(result.resume, file);
       setStorageError(null);
-      publishCommittedSnapshot();
+      setResumes((current) => sortResumes([result.resume, ...current]));
     } catch (error) {
       setStorageError(getStorageErrorMessage(error));
       throw error;
@@ -1308,7 +1376,9 @@ export function useTrackerStore(): TrackerStore {
     try {
       await cloudStorageAdapter.saveCoverLetter(result.coverLetter, file);
       setStorageError(null);
-      publishCommittedSnapshot();
+      setCoverLetters((current) =>
+        sortResumes([result.coverLetter, ...current]),
+      );
     } catch (error) {
       setStorageError(getStorageErrorMessage(error));
       throw error;
@@ -1320,7 +1390,6 @@ export function useTrackerStore(): TrackerStore {
   async function updateResume(
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ): Promise<MutationResult> {
     const currentResume = resumes.find((resume) => resume.id === id);
 
@@ -1329,19 +1398,23 @@ export function useTrackerStore(): TrackerStore {
     }
 
     const updatedResume = updateResumeMetadata(currentResume, input);
-    const result = await commitMutation({ resumes: [updatedResume], expected: { resumes: [expectedRecord(currentResume, expectedDocument, input)] } });
+    const result = await commitMutation({ resumes: [updatedResume] });
 
     if (!result.ok) {
       return result;
     }
 
+    setResumes((current) =>
+      sortResumes(
+        current.map((resume) => (resume.id === id ? updatedResume : resume)),
+      ),
+    );
     return success();
   }
 
   async function updateCoverLetter(
     id: string,
     input: ResumeMetadataUpdate,
-    expectedDocument?: ResumeMetadata,
   ): Promise<MutationResult> {
     const currentCoverLetter = coverLetters.find(
       (coverLetter) => coverLetter.id === id,
@@ -1355,12 +1428,19 @@ export function useTrackerStore(): TrackerStore {
       currentCoverLetter,
       input,
     );
-    const result = await commitMutation({ coverLetters: [updatedCoverLetter], expected: { coverLetters: [expectedRecord(currentCoverLetter, expectedDocument, input)] } });
+    const result = await commitMutation({ coverLetters: [updatedCoverLetter] });
 
     if (!result.ok) {
       return result;
     }
 
+    setCoverLetters((current) =>
+      sortResumes(
+        current.map((coverLetter) =>
+          coverLetter.id === id ? updatedCoverLetter : coverLetter,
+        ),
+      ),
+    );
     return success();
   }
 
@@ -1386,7 +1466,6 @@ export function useTrackerStore(): TrackerStore {
         updatedAt,
       }));
       const result = await commitMutation({
-        expected: { applications: currentApplications, resumes: [currentResume] },
         applications: updatedApplications,
         deleteResumeIds: [id],
         deleteResumeFileKeys: [currentResume.storageKey],
@@ -1396,6 +1475,14 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setResumes((current) => current.filter((resume) => resume.id !== id));
+      setApplications((current) =>
+        current.map((application) =>
+          application.resumeId === id
+            ? { ...application, resumeId: undefined, updatedAt }
+            : application,
+        ),
+      );
       return success();
     });
   }
@@ -1423,7 +1510,6 @@ export function useTrackerStore(): TrackerStore {
           updatedAt,
         }));
       const result = await commitMutation({
-        expected: { applications: currentApplications, coverLetters: [currentCoverLetter] },
         applications: updatedApplications,
         deleteCoverLetterIds: [id],
         deleteResumeFileKeys: [currentCoverLetter.storageKey],
@@ -1433,6 +1519,16 @@ export function useTrackerStore(): TrackerStore {
         return result;
       }
 
+      setCoverLetters((current) =>
+        current.filter((coverLetter) => coverLetter.id !== id),
+      );
+      setApplications((current) =>
+        current.map((application) =>
+          application.coverLetterId === id
+            ? { ...application, coverLetterId: undefined, updatedAt }
+            : application,
+        ),
+      );
       return success();
     });
   }
@@ -1560,7 +1656,17 @@ export function useTrackerStore(): TrackerStore {
 
     await cloudStorageAdapter.importSnapshot(snapshot, resumeFiles);
 
-    publishCommittedSnapshot();
+    setActivities(sortActivities(snapshot.activities));
+    setAnalyticsSettings(snapshot.analyticsSettings);
+    setApplications(snapshot.applications);
+    setContacts(snapshot.contacts);
+    setCoverLetters(sortResumes(snapshot.coverLetters));
+    setInterviews(snapshot.interviews);
+    setAssessments(snapshot.assessments ?? []);
+    setNotificationState(snapshot.notificationState);
+    setResumes(sortResumes(snapshot.resumes));
+    setSettings(snapshot.settings);
+    setTablePreferences(snapshot.tablePreferences);
   }
 
   function exportApplicationsCsv() {
@@ -1582,6 +1688,7 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveNotificationState(updatedState),
+          () => setNotificationState(updatedState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1601,6 +1708,7 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveNotificationState(updatedState),
+          () => setNotificationState(updatedState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1620,6 +1728,7 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveSettings(updatedSettings),
+          () => setSettings(updatedSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1640,6 +1749,7 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          () => setAnalyticsSettings(updatedSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1650,7 +1760,9 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetSettings() {
     return settingsMutationQueue.run(() =>
-      persistThenUpdate(cloudStorageAdapter.resetSettings()),
+      persistThenUpdate(cloudStorageAdapter.resetSettings(), () =>
+        setSettings(DEFAULT_USER_SETTINGS),
+      ),
     );
   }
 
@@ -1666,6 +1778,7 @@ export function useTrackerStore(): TrackerStore {
 
         return persistThenUpdate(
           cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          () => setTablePreferences(updatedTablePreferences),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1676,42 +1789,37 @@ export function useTrackerStore(): TrackerStore {
 
   async function resetTablePreferences() {
     return tablePreferencesMutationQueue.run(() =>
-      persistThenUpdate(cloudStorageAdapter.resetTablePreferences()),
+      persistThenUpdate(
+        cloudStorageAdapter.resetTablePreferences(),
+        () => setTablePreferences(null),
+      ),
     );
   }
 
   async function commitMutation(
     mutation: StorageMutation,
-  ): Promise<MutationResult<StorageSnapshot>> {
+  ): Promise<MutationResult> {
     try {
       assertAccountActive();
-      const displayedRecords = {
-        applications, contacts, interviews, assessments, activities, resumes, coverLetters,
-      };
-      for (const collection of ["applications", "contacts", "interviews", "assessments", "resumes", "coverLetters"] as const) {
-        for (const write of mutation[collection] ?? []) {
-          const displayed = displayedRecords[collection].find((item) => item.id === write.id);
-          if (displayed) assertRecordIdentity(displayed, write, `${collection} record`);
-        }
-      }
-      await cloudStorageAdapter.commitMutation({
-        ...mutation,
-        expected: {
-          ...displayedRecords, ...mutation.expected,
-        },
-      });
-      const saved = publishCommittedSnapshot();
+      await cloudStorageAdapter.commitMutation(mutation);
+      assertAccountActive();
       setStorageError(null);
-      return success(saved);
+      return success();
     } catch (error) {
-      return mutationFailure(error);
+      const message = getStorageErrorMessage(error);
+      setStorageError(message);
+      return failure(message);
     }
   }
 
-  async function persistThenUpdate(promise: Promise<unknown>) {
+  async function persistThenUpdate(
+    promise: Promise<unknown>,
+    updateState: () => void,
+  ) {
     try {
       await promise;
-      publishCommittedSnapshot();
+      assertAccountActive();
+      updateState();
       setStorageError(null);
       return true;
     } catch (error) {
@@ -1785,23 +1893,6 @@ function useAccountState<Value>(
     if (!invalidated.current) setValue(next);
   }, [invalidated]);
   return [value, publish];
-}
-
-function expectedRecord<RecordType extends { id: string }>(
-  current: RecordType,
-  original: RecordType | undefined,
-  changes: object,
-): RecordType {
-  if (!original) return current;
-  if (original.id !== current.id) {
-    throw new StorageConflictError("The edit baseline belongs to a different record.");
-  }
-  assertRecordIdentity(original, current, "The edited record");
-  const expected = { ...current };
-  for (const key of Object.keys(changes)) {
-    Object.assign(expected, { [key]: Reflect.get(original, key) });
-  }
-  return expected;
 }
 
 function createActivity(

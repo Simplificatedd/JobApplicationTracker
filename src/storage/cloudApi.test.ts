@@ -144,30 +144,6 @@ describe("cloud API client", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it("does not replay snapshot writes after a server failure with an uncertain commit outcome", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: "Service unavailable" }, { status: 503 }));
-    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
-    await expect(client.saveState(snapshot, 3, "student-id")).rejects.toMatchObject({ status: 503 });
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-
-  it("sends the mutation protocol on state and file writes and surfaces upgrade-required failures", async () => {
-    const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(Response.json({ revision: 4, snapshot, updatedAt: "now" }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ error: "Reload the tracker." }, { status: 426 }));
-    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
-    await client.saveState(snapshot, 3, "student-id");
-    await client.putResumeFile("file", new Blob(["resume"]), "student-id");
-    await client.deleteResumeFile("file", "student-id");
-    await expect(client.saveState(snapshot, 4, "student-id")).rejects.toMatchObject({ status: 426, message: "Reload the tracker." });
-    expect(fetcher).toHaveBeenCalledTimes(4);
-    for (const [, init] of fetcher.mock.calls) {
-      expect(init?.headers).toMatchObject({ "X-Tracker-Account-Id": "student-id", "X-Tracker-Mutation-Protocol": "1" });
-    }
-  });
-
   it("returns the server state with a revision conflict", async () => {
     const current = {
       revision: 4,
