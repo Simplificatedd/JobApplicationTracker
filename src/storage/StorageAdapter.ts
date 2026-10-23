@@ -36,6 +36,10 @@ export interface ResumeBlobRecord {
 }
 
 export interface StorageMutation {
+  // Records as seen by the editor, before asynchronous work or a local refresh.
+  expected?: Partial<{ [Key in MutationCollection]: readonly NonNullable<StorageSnapshot[Key]>[number][] }>;
+  // New IDs must be intentional: a missing update target is never an upsert.
+  creates?: Partial<Record<MutationCollection, readonly string[]>>;
   activities?: readonly Activity[];
   applications?: readonly Application[];
   contacts?: readonly ApplicationContact[];
@@ -53,6 +57,10 @@ export interface StorageMutation {
   deleteResumeIds?: readonly string[];
   deleteResumeFileKeys?: readonly string[];
 }
+
+export type MutationCollection =
+  | "activities" | "applications" | "contacts" | "coverLetters"
+  | "interviews" | "assessments" | "resumes";
 
 export interface AssessmentPatch {
   id: string;

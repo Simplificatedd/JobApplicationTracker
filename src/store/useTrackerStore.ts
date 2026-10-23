@@ -424,6 +424,12 @@ export function useTrackerStore(): TrackerStore {
           currentCoverLetters,
         );
     const result = await commitMutation({
+      creates: {
+        applications: [application.id],
+        interviews: interview ? [interview.id] : [],
+        resumes: resumeUpload ? [resumeUpload.resume.id] : [],
+        coverLetters: coverLetterUpload ? [coverLetterUpload.coverLetter.id] : [],
+      },
       activities: [createdActivity],
       applications: [application],
       interviews: interview ? [interview] : undefined,
@@ -625,6 +631,11 @@ export function useTrackerStore(): TrackerStore {
           )
         : undefined;
     const result = await commitMutation({
+      creates: {
+        interviews: updatedInterview && !currentInterviews.some((item) => item.id === updatedInterview.id) ? [updatedInterview.id] : [],
+        resumes: resumeUpload ? [resumeUpload.resume.id] : [],
+        coverLetters: coverLetterUpload ? [coverLetterUpload.coverLetter.id] : [],
+      },
       activities: newActivities,
       applications: [updatedApplication],
       interviews: updatedInterview ? [updatedInterview] : undefined,
@@ -755,6 +766,7 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
+        creates: { assessments: [assessment.id] },
         assessments: [assessment],
         applications: [{ ...application, updatedAt: timestamp }],
         activities: [
@@ -953,6 +965,7 @@ export function useTrackerStore(): TrackerStore {
         ),
       ];
       const result = await commitMutation({
+        creates: { interviews: [interview.id] },
         activities,
         applications: [updatedApplication],
         interviews: [interview],
@@ -1201,6 +1214,7 @@ export function useTrackerStore(): TrackerStore {
         updatedAt: createdAt,
       };
       const result = await commitMutation({
+        creates: { contacts: [contact.id] },
         activities: [activity],
         applications: [updatedApplication],
         contacts: [contact],

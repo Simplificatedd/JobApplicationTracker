@@ -493,7 +493,7 @@ describe("cloud storage adapter", () => {
     api.saveState = async () => {
       throw new CloudApiError("Signed-in account changed.", 412);
     };
-    await expect(adapter.commitMutation({ applications: [application] }))
+    await expect(adapter.commitMutation({ applications: [application], creates: { applications: [application.id] } }))
       .rejects.toThrow("Signed-in account changed");
     expect(changed).toBe(1);
     await expect(adapter.listApplications()).rejects.toThrow("Signed-in account changed");
@@ -632,7 +632,7 @@ describe("cloud storage adapter", () => {
     const adapter = createCloudStorageAdapter({ api, cache });
     await adapter.initialize();
 
-    await adapter.commitMutation({ applications: [application] });
+    await adapter.commitMutation({ applications: [application], creates: { applications: [application.id] } });
 
     expect(api.state).toMatchObject({
       // Migration is persisted at revision 3, then the rebased domain write at 4.
@@ -733,6 +733,7 @@ describe("assessment cloud migration and conflicts", () => {
       updatedAt: application.updatedAt,
     };
     await adapter.commitMutation({
+      creates: { assessments: ["two"] },
       assessments: [{ ...first, id: "two" }],
       applications: [initialized.applications[0]],
     });

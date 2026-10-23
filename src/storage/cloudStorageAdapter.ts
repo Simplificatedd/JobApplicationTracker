@@ -45,11 +45,14 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
+import { rebaseStorageMutation } from "./mutationRebase";
+
 const MAX_CONFLICT_RETRIES = 3;
 
 export function applyStorageMutation(
   snapshot: StorageSnapshot,
   mutation: StorageMutation,
+  baseSnapshot: StorageSnapshot = snapshot,
 ): StorageSnapshot {
   // A conversion must still refer to the source the user actually saw. Guard both
   // race directions before deleting the interview or overwriting an existing assessment.
@@ -80,6 +83,7 @@ export function applyStorageMutation(
       repeatedConversions.add(write.id);
     }
   }
+  mutation = rebaseStorageMutation(snapshot, mutation, baseSnapshot);
   return {
     ...snapshot,
     activities: upsertRecords(snapshot.activities, mutation.activities),
@@ -479,8 +483,14 @@ export function createCloudStorageAdapter({
   }
 
   async function commitMutation(mutation: StorageMutation) {
-    await ensureInitialized();
+    // Freeze the editor's baseline before queued work, uploads or conflict responses
+    // can advance this adapter's current state. Reuse this intent on every retry.
+    const captured = cloudState ? structuredClone(cloudState.snapshot) : null;
+    mutation = structuredClone(mutation);
+    const initialized = await ensureInitialized();
+    const base = captured ?? structuredClone(initialized.snapshot);
     const resumeFiles = [...(mutation.resumeFiles ?? [])];
+    applyStorageMutation(initialized.snapshot, mutation, base);
 
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
@@ -488,7 +498,7 @@ export function createCloudStorageAdapter({
       ),
     );
     await mutateSnapshot(
-      (snapshot) => applyStorageMutation(snapshot, mutation),
+      (snapshot) => applyStorageMutation(snapshot, mutation, base),
       resumeFiles,
     );
 
@@ -515,7 +525,7 @@ export function createCloudStorageAdapter({
   }
 
   async function createApplication(application: Application) {
-    await commitMutation({ applications: [application] });
+    await commitMutation({ applications: [application], creates: { applications: [application.id] } });
   }
 
   async function updateApplication(application: Application) {
@@ -563,7 +573,7 @@ export function createCloudStorageAdapter({
   }
 
   async function createContact(contact: ApplicationContact) {
-    await commitMutation({ contacts: [contact] });
+    await commitMutation({ contacts: [contact], creates: { contacts: [contact.id] } });
   }
 
   async function updateContact(contact: ApplicationContact) {
@@ -638,6 +648,7 @@ export function createCloudStorageAdapter({
   async function saveCoverLetter(coverLetter: CoverLetterMetadata, file: Blob) {
     await commitMutation({
       coverLetters: [coverLetter],
+      creates: { coverLetters: [coverLetter.id] },
       resumeFiles: [{ file, storageKey: coverLetter.storageKey }],
     });
   }
@@ -653,12 +664,13 @@ export function createCloudStorageAdapter({
   async function saveResume(resume: ResumeMetadata, file: Blob) {
     await commitMutation({
       resumes: [resume],
+      creates: { resumes: [resume.id] },
       resumeFiles: [{ file, storageKey: resume.storageKey }],
     });
   }
 
   async function createResumeMetadata(resume: ResumeMetadata) {
-    await commitMutation({ resumes: [resume] });
+    await commitMutation({ resumes: [resume], creates: { resumes: [resume.id] } });
   }
 
   async function updateResumeMetadata(resume: ResumeMetadata) {
