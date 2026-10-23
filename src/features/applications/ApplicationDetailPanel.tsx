@@ -90,6 +90,7 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   onUpdateInterview: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   interviews: Interview[];
   resume?: ResumeMetadata;
@@ -430,6 +431,7 @@ function ReadOnlyDetails({
   onUpdateInterview: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   resume?: ResumeMetadata;
   resumeActionError: string;

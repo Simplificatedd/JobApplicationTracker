@@ -196,6 +196,7 @@ export interface TrackerStore extends AssessmentActions {
   updateInterview: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   updateSettings: (input: Partial<UserSettings>) => Promise<boolean>;
   updateTablePreferences: (input: Partial<TablePreferences>) => Promise<boolean>;
@@ -621,12 +622,28 @@ export function useTrackerStore(): TrackerStore {
       input,
       updatedAt,
     );
+    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
+    const displayedInterview = selectCurrentInterview(
+      interviews.filter((item) => item.applicationId === id), new Date(updatedAt),
+    );
+    if (shouldPersistInterviewUpdate(input) && editBase &&
+      displayedInterview?.id !== currentInterview?.id) {
+      throw new StorageConflictError("The current interview changed while this table edit was open.");
+    }
     const updatedInterview = shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
           updatedAt,
-          selectCurrentInterview(currentInterviews, new Date(updatedAt))?.id,
+          currentInterview?.id,
+        )
+      : undefined;
+    // Application interview fields are projections. Carry their displayed values
+    // into the canonical interview baseline, where conflict checks actually run.
+    const expectedInterview = updatedInterview && currentInterview
+      ? buildInterviewRecord(
+          { ...beforeApplication, status: "Interviewing" },
+          currentInterviews, updatedAt, currentInterview.id,
         )
       : undefined;
     const markedResume = resumeUpload
@@ -652,7 +669,8 @@ export function useTrackerStore(): TrackerStore {
         : undefined;
     const result = await commitMutation({
       expected: {
-        applications: [beforeApplication], interviews: currentInterviews,
+        applications: [beforeApplication],
+        interviews: expectedInterview ? [expectedInterview] : currentInterviews,
         resumes: currentResumes, coverLetters: currentCoverLetters,
       },
       creates: {
@@ -990,6 +1008,7 @@ export function useTrackerStore(): TrackerStore {
         ),
       ];
       const result = await commitMutation({
+        expected: { applications: [application], interviews: currentInterviews },
         creates: { interviews: [interview.id] },
         activities,
         applications: [updatedApplication],
@@ -1019,6 +1038,7 @@ export function useTrackerStore(): TrackerStore {
   async function updateInterview(
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ): Promise<MutationResult<Interview>> {
     return runApplicationMutation(async () => {
       if (!isValidInterviewRound(input.round)) {
@@ -1060,6 +1080,7 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
+        expected: { applications: [application], interviews: [expectedRecord(interview, expectedInterview ?? interviews.find((item) => item.id === id), input)] },
         activities: [activity],
         applications: [updatedApplication],
         interviews: [updatedInterview],
@@ -1120,6 +1141,7 @@ export function useTrackerStore(): TrackerStore {
         timestamp,
       );
       const result = await commitMutation({
+        expected: { applications: [application], interviews: [interview] },
         activities: [activity],
         applications: [updatedApplication],
         deleteInterviewIds: [id],

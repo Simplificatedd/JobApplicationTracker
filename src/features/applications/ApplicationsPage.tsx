@@ -78,6 +78,7 @@ interface ApplicationsPageProps {
   updateInterview: (
     id: string,
     input: InterviewUpdate,
+    expectedInterview?: Interview,
   ) => Promise<MutationResult<Interview>>;
   updateApplication: (
     id: string,

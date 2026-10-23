@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { contactDraftToUpdate } from "./ContactsPanel";
+import { interviewDraftToUpdate } from "./InterviewsSection";
 
-
-
+import { interview } from "../../test/assessmentFixtures";
 import { application } from "../../test/assessmentFixtures";
 import { applicationDraftToUpdate } from "./ApplicationDetailPanel";
 
@@ -50,5 +50,12 @@ describe("other editor change intent", () => {
     const draft = { name: original.name, role: original.role, notes: "", email: "", phone: "", linkedInUrl: "" };
     expect(contactDraftToUpdate(draft, original)).toEqual({});
     expect(contactDraftToUpdate({ ...draft, role: "", notes: "New note" }, original)).toEqual({ role: undefined, notes: "New note" });
+  });
+
+  it("does not resubmit unrelated interview fields or reset its deadline mode", () => {
+    const original = { ...interview(2), notes: " Original notes " };
+    const draft = { dateTime: "", deadline: "", deadlineReceivedAt: "", location: "", meetingUrl: "", mode: original.mode, notes: original.notes, platform: "", proctored: original.proctored, round: "2", type: original.type };
+    expect(interviewDraftToUpdate(draft, original)).toEqual({});
+    expect(interviewDraftToUpdate({ ...draft, location: "Office" }, original)).toEqual({ location: "Office" });
   });
 });
