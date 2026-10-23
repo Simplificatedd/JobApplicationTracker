@@ -196,6 +196,26 @@ describe("aggregate mutation intent and derived state", () => {
     expect(api.state.snapshot.applications[0].company).toBe("Newer local value");
   });
 
+  it("rejects a snapshot restore after concurrent changes instead of overwriting them", async () => {
+    const { api, a, b, original } = await pair();
+    const stale = await b.adapter.exportSnapshot();
+    await a.adapter.deleteApplication(original.id);
+    await expect(b.adapter.importSnapshot(stale)).rejects.toThrow(/Workspace changed/);
+    expect(api.state.snapshot.applications).toEqual([]);
+  });
+
+  it("rebases settings fields without silent same-field replacement", async () => {
+    const { api, a, b } = await pair();
+    const base = await b.adapter.getSettings();
+    await a.adapter.saveSettings({ ...base, defaultFollowUpPromptDays: 10 });
+    await b.adapter.saveSettings({ ...base, dueSoonDays: 5 });
+    expect(api.state.snapshot.settings).toMatchObject({ defaultFollowUpPromptDays: 10, dueSoonDays: 5 });
+    const c = client(api); await c.adapter.initialize();
+    const d = client(api); await d.adapter.initialize();
+    await d.adapter.saveSettings({ ...api.state.snapshot.settings, dueSoonDays: 7 });
+    await expect(c.adapter.saveSettings({ ...api.state.snapshot.settings, dueSoonDays: 8 })).rejects.toThrow(/changed.*another session/);
+  });
+
   it("preserves independent updates to different records across multiple sessions", async () => {
     const second = { ...application, id: "second" }, third = { ...application, id: "third" };
     const { api, a, b, original } = await pair(snapshot({ applications: [application, second, third] }));

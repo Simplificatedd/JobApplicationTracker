@@ -45,7 +45,7 @@ import {
   type StorageSnapshot,
 } from "./StorageAdapter";
 
-import { equalStoredValue, rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
+import { equalStoredValue, mergeChangedFields, rebaseStorageMutation, StorageConflictError } from "./mutationRebase";
 
 const MAX_CONFLICT_RETRIES = 3;
 
@@ -793,7 +793,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveSettings(settings: UserSettings) {
-    await mutateSnapshot((current) => ({ ...current, settings }));
+    const before = structuredClone((await snapshot()).settings);
+    await mutateSnapshot((current) => ({ ...current, settings: mergeChangedFields(before, settings, current.settings, "settings") }));
   }
 
   async function resetSettings() {
@@ -806,7 +807,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveNotificationState(notificationState: NotificationState) {
-    await mutateSnapshot((current) => ({ ...current, notificationState }));
+    const before = structuredClone((await snapshot()).notificationState);
+    await mutateSnapshot((current) => ({ ...current, notificationState: mergeChangedFields(before, notificationState, current.notificationState, "notificationState") }));
   }
 
   async function getAnalyticsSettings() {
@@ -814,7 +816,8 @@ export function createCloudStorageAdapter({
   }
 
   async function saveAnalyticsSettings(analyticsSettings: AnalyticsSettings) {
-    await mutateSnapshot((current) => ({ ...current, analyticsSettings }));
+    const before = structuredClone((await snapshot()).analyticsSettings);
+    await mutateSnapshot((current) => ({ ...current, analyticsSettings: mergeChangedFields(before, analyticsSettings, current.analyticsSettings, "analyticsSettings") }));
   }
 
   async function getTablePreferences() {
@@ -822,11 +825,30 @@ export function createCloudStorageAdapter({
   }
 
   async function saveTablePreferences(tablePreferences: TablePreferences) {
-    await mutateSnapshot((current) => ({ ...current, tablePreferences }));
+    const before = structuredClone((await snapshot()).tablePreferences);
+    await mutateSnapshot((current) => {
+      if (before && current.tablePreferences) {
+        return {
+          ...current,
+          tablePreferences: mergeChangedFields(before, tablePreferences, current.tablePreferences, "Table preferences"),
+        };
+      }
+      if (!equalStoredValue(before, current.tablePreferences) &&
+        !equalStoredValue(tablePreferences, current.tablePreferences)) {
+        throw new StorageConflictError("Table preferences changed in another session.");
+      }
+      return { ...current, tablePreferences };
+    });
   }
 
   async function resetTablePreferences() {
-    await mutateSnapshot((current) => ({ ...current, tablePreferences: null }));
+    const before = structuredClone((await snapshot()).tablePreferences);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current.tablePreferences)) {
+        throw new StorageConflictError("Table preferences changed in another session.");
+      }
+      return { ...current, tablePreferences: null };
+    });
   }
 
   async function exportSnapshot() {
@@ -837,13 +859,18 @@ export function createCloudStorageAdapter({
     importedSnapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
   ) {
-    await ensureInitialized();
+    const before = structuredClone(await snapshot());
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
         cloudRequest(api.putResumeFile(storageKey, file, accountId())),
       ),
     );
-    await mutateSnapshot(() => importedSnapshot, resumeFiles);
+    await mutateSnapshot((current) => {
+      if (!equalStoredValue(before, current)) {
+        throw new StorageConflictError("Workspace changed in another session during restore.");
+      }
+      return importedSnapshot;
+    }, resumeFiles);
   }
 
   return {
