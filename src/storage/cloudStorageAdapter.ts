@@ -28,6 +28,7 @@ import {
   cloudApiClient,
   CloudApiError,
   CloudRevisionConflictError,
+  isCloudStateEnvelope,
   type CloudAccount,
   type CloudApiClient,
   type CloudStateEnvelope,
@@ -234,6 +235,13 @@ function removeRecords<T extends { id: string }>(
 }
 
 export interface CloudStorageAdapter extends StorageAdapter {
+  // Preserve the state the caller read before async refresh can advance it.
+  saveSettings(settings: UserSettings, expected?: UserSettings): Promise<void>;
+  saveNotificationState(state: NotificationState, expected?: NotificationState): Promise<void>;
+  saveAnalyticsSettings(settings: AnalyticsSettings, expected?: AnalyticsSettings): Promise<void>;
+  saveTablePreferences(preferences: TablePreferences, expected?: TablePreferences | null): Promise<void>;
+  // Revalidate remote state after pending saves; never replay startup migration.
+  refresh(): Promise<StorageSnapshot>;
   getAccount(): CloudAccount | null;
   getCacheWarning(): string | null;
   subscribeCacheWarning(listener: (warning: string | null) => void): () => void;
@@ -410,9 +418,11 @@ export function createCloudStorageAdapter({
         throw error;
       });
     }
-    const snapshot = await initializePromise;
+    await initializePromise;
     await verifyAccount();
-    return snapshot;
+    // Startup is memoized, but its snapshot is not a current-state read. Saves
+    // may have advanced the acknowledged state while this caller was waiting.
+    return getCurrentSnapshot();
   }
 
   async function initializeNow() {
@@ -493,7 +503,10 @@ export function createCloudStorageAdapter({
     // for that work too, so a late startup import cannot overwrite a newer cache.
     if (initializePromise) {
       await initializePromise;
-    } else if (!cloudState) {
+    } else {
+      // A failed migration may leave normalized, unacknowledged cloudState.
+      // It is not a completed startup: finish initialization before allowing
+      // operations that could race a later startup read or migration.
       await initialize();
     }
 
@@ -584,6 +597,23 @@ export function createCloudStorageAdapter({
       if (!initializePromise) throw new Error("Cloud storage has not been initialized.");
       const current = await ensureInitialized();
       await refreshCache(current);
+    });
+  }
+
+  async function refresh() {
+    return queueMutation(async () => {
+      // Retry unfinished startup normally. A completed startup stays memoized,
+      // keeping migration separate from subsequent remote reads.
+      await initialize();
+      const remote = await cloudRequest(api.getState(accountId()));
+      await verifyAccount();
+      if (!remote || !cloudState || remote.revision < cloudState.revision) {
+        throw new Error("Current cloud state could not be verified. Reload the tracker and inspect the data before retrying.");
+      }
+      const current = activeCloudState(remote);
+      cloudState = current;
+      await refreshCache(current);
+      return getCurrentSnapshot();
     });
   }
 
@@ -870,8 +900,8 @@ export function createCloudStorageAdapter({
     return (await snapshot()).settings;
   }
 
-  async function saveSettings(settings: UserSettings) {
-    const before = structuredClone((await snapshot()).settings);
+  async function saveSettings(settings: UserSettings, expected?: UserSettings) {
+    const before = structuredClone(expected ?? (await snapshot()).settings);
     await mutateSnapshot((current) => ({ ...current, settings: mergeChangedFields(before, settings, current.settings, "settings") }));
   }
 
@@ -884,8 +914,8 @@ export function createCloudStorageAdapter({
     return (await snapshot()).notificationState;
   }
 
-  async function saveNotificationState(notificationState: NotificationState) {
-    const before = structuredClone((await snapshot()).notificationState);
+  async function saveNotificationState(notificationState: NotificationState, expected?: NotificationState) {
+    const before = structuredClone(expected ?? (await snapshot()).notificationState);
     await mutateSnapshot((current) => ({ ...current, notificationState: mergeChangedFields(before, notificationState, current.notificationState, "notificationState") }));
   }
 
@@ -893,8 +923,8 @@ export function createCloudStorageAdapter({
     return (await snapshot()).analyticsSettings;
   }
 
-  async function saveAnalyticsSettings(analyticsSettings: AnalyticsSettings) {
-    const before = structuredClone((await snapshot()).analyticsSettings);
+  async function saveAnalyticsSettings(analyticsSettings: AnalyticsSettings, expected?: AnalyticsSettings) {
+    const before = structuredClone(expected ?? (await snapshot()).analyticsSettings);
     await mutateSnapshot((current) => ({ ...current, analyticsSettings: mergeChangedFields(before, analyticsSettings, current.analyticsSettings, "analyticsSettings") }));
   }
 
@@ -902,8 +932,8 @@ export function createCloudStorageAdapter({
     return (await snapshot()).tablePreferences;
   }
 
-  async function saveTablePreferences(tablePreferences: TablePreferences) {
-    const before = structuredClone((await snapshot()).tablePreferences);
+  async function saveTablePreferences(tablePreferences: TablePreferences, expected?: TablePreferences | null) {
+    const before = structuredClone(expected === undefined ? (await snapshot()).tablePreferences : expected);
     await mutateSnapshot((current) => {
       if (before && current.tablePreferences) {
         return {
@@ -953,6 +983,7 @@ export function createCloudStorageAdapter({
 
   return {
     initialize: guarded(initialize),
+    refresh: guarded(refresh),
     commitMutation: guarded(commitMutation),
     listApplications: guarded(listApplications),
     getApplication: guarded(getApplication),
@@ -1033,6 +1064,11 @@ function hasUserData(
 }
 
 function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
+  // Reuse the protocol's envelope check before trusting revisions, publishing
+  // acknowledged state or writing any server response into the browser cache.
+  if (!isCloudStateEnvelope(state)) {
+    throw new Error("Cloud storage returned invalid state. Reload the tracker and inspect the data before retrying.");
+  }
   return {
     ...state,
     snapshot: normalizeSnapshot(state.snapshot),

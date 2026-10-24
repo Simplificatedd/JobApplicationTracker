@@ -208,6 +208,8 @@ export interface TrackerStore extends AssessmentActions {
 
 export function useTrackerStore(): TrackerStore {
   const accountInvalidated = useRef(false);
+  const hasHydrated = useRef(false);
+  const pendingActions = useRef(new Set<Promise<unknown>>());
   const [activities, setActivities] = useAccountState<Activity[]>([], accountInvalidated);
   const [applications, setApplications] = useAccountState<Application[]>([], accountInvalidated);
   const [contacts, setContacts] = useAccountState<ApplicationContact[]>([], accountInvalidated);
@@ -266,16 +268,28 @@ export function useTrackerStore(): TrackerStore {
     const unsubscribeCacheWarning = cloudStorageAdapter.subscribeCacheWarning(setCacheWarning);
     setCacheWarning(cloudStorageAdapter.getCacheWarning());
 
-    setIsStorageLoading(true);
-    setStorageError(null);
+    // Keep loaded editors mounted so retry cannot discard their unsaved drafts.
+    if (!hasHydrated.current) setIsStorageLoading(true);
 
-    cloudStorageAdapter
-      .initialize()
-      .then(async (snapshot) => {
+    const load = storageRetryKey === 0
+      ? cloudStorageAdapter.initialize()
+      : Promise.allSettled([...pendingActions.current]).then(() => {
+        if (!isActive || accountInvalidated.current) {
+          throw new Error("Signed-in account changed. Reload the tracker.");
+        }
+        return cloudStorageAdapter.refresh();
+      });
+    load
+      .then(() => {
         if (!isActive) {
           return;
         }
 
+        // A save can finish between the load result and this continuation.
+        // Publish the adapter's current acknowledgement, not a captured result.
+        const snapshot = cloudStorageAdapter.getCurrentSnapshot();
+        hasHydrated.current = true;
+        setStorageError(null);
         setActivities(sortActivities(snapshot.activities));
         setAnalyticsSettings(snapshot.analyticsSettings);
         setApplications(
@@ -317,6 +331,19 @@ export function useTrackerStore(): TrackerStore {
     if (accountInvalidated.current) {
       throw new Error("Signed-in account changed. Reload the tracker.");
     }
+  }
+
+  // Track the whole public action, including work before it enters an adapter
+  // queue (editor reads, hashing, uploads). Retry waits for already issued edits.
+  function trackAction<Args extends unknown[], Result>(
+    operation: (...args: Args) => Promise<Result>,
+    ...args: Args
+  ): Promise<Result> {
+    const pending = operation(...args);
+    pendingActions.current.add(pending);
+    const settled = () => { pendingActions.current.delete(pending); };
+    void pending.then(settled, settled);
+    return pending;
   }
 
   function retryStorage() {
@@ -1599,7 +1626,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState, currentState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1618,7 +1645,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState, currentState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1637,7 +1664,7 @@ export function useTrackerStore(): TrackerStore {
         });
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveSettings(updatedSettings),
+          cloudStorageAdapter.saveSettings(updatedSettings, currentSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1657,7 +1684,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings, currentSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1683,7 +1710,7 @@ export function useTrackerStore(): TrackerStore {
         } as TablePreferences;
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences, currentPreferences),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1740,10 +1767,10 @@ export function useTrackerStore(): TrackerStore {
 
   return {
     assessments,
-    addAssessment,
-    updateAssessment,
-    deleteAssessment,
-    convertInterviewToAssessment,
+    addAssessment: (...args) => trackAction(addAssessment, ...args),
+    updateAssessment: (...args) => trackAction(updateAssessment, ...args),
+    deleteAssessment: (...args) => trackAction(deleteAssessment, ...args),
+    convertInterviewToAssessment: (...args) => trackAction(convertInterviewToAssessment, ...args),
     activities,
     analyticsSettings,
     applications,
@@ -1760,37 +1787,37 @@ export function useTrackerStore(): TrackerStore {
     settings,
     storageError,
     tablePreferences,
-    addContact,
-    addInterview,
-    appendActivity,
-    archiveApplication,
-    createApplication,
-    deleteApplication,
-    deleteContact,
-    deleteCoverLetter,
-    deleteInterview,
-    deleteResume,
-    dismissNotification,
+    addContact: (...args) => trackAction(addContact, ...args),
+    addInterview: (...args) => trackAction(addInterview, ...args),
+    appendActivity: (...args) => trackAction(appendActivity, ...args),
+    archiveApplication: (...args) => trackAction(archiveApplication, ...args),
+    createApplication: (...args) => trackAction(createApplication, ...args),
+    deleteApplication: (...args) => trackAction(deleteApplication, ...args),
+    deleteContact: (...args) => trackAction(deleteContact, ...args),
+    deleteCoverLetter: (...args) => trackAction(deleteCoverLetter, ...args),
+    deleteInterview: (...args) => trackAction(deleteInterview, ...args),
+    deleteResume: (...args) => trackAction(deleteResume, ...args),
+    dismissNotification: (...args) => trackAction(dismissNotification, ...args),
     exportApplicationsCsv,
     exportFullBackup,
     getCoverLetterFile,
     getResumeFile,
-    importFullBackup,
+    importFullBackup: (...args) => trackAction(importFullBackup, ...args),
     previewBackupImport,
-    resetSettings,
-    resetTablePreferences,
-    restoreApplication,
-    markNotificationsOpened,
-    updateCoverLetter,
-    updateResume,
-    uploadCoverLetter,
-    uploadResume,
-    updateApplication,
-    updateAnalyticsSettings,
-    updateContact,
-    updateInterview,
-    updateSettings,
-    updateTablePreferences,
+    resetSettings: (...args) => trackAction(resetSettings, ...args),
+    resetTablePreferences: (...args) => trackAction(resetTablePreferences, ...args),
+    restoreApplication: (...args) => trackAction(restoreApplication, ...args),
+    markNotificationsOpened: (...args) => trackAction(markNotificationsOpened, ...args),
+    updateCoverLetter: (...args) => trackAction(updateCoverLetter, ...args),
+    updateResume: (...args) => trackAction(updateResume, ...args),
+    uploadCoverLetter: (...args) => trackAction(uploadCoverLetter, ...args),
+    uploadResume: (...args) => trackAction(uploadResume, ...args),
+    updateApplication: (...args) => trackAction(updateApplication, ...args),
+    updateAnalyticsSettings: (...args) => trackAction(updateAnalyticsSettings, ...args),
+    updateContact: (...args) => trackAction(updateContact, ...args),
+    updateInterview: (...args) => trackAction(updateInterview, ...args),
+    updateSettings: (...args) => trackAction(updateSettings, ...args),
+    updateTablePreferences: (...args) => trackAction(updateTablePreferences, ...args),
   };
 }
 
