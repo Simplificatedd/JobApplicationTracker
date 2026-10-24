@@ -488,7 +488,11 @@ export function createCloudStorageAdapter({
     if (accountIdentityChanged) {
       throw new Error("Signed-in account changed. Reload the tracker.");
     }
-    if (!cloudState) {
+    // Startup publishes cloudState before finishing migration/cache work. Wait
+    // for that work too, so a late startup import cannot overwrite a newer cache.
+    if (initializePromise) {
+      await initializePromise;
+    } else if (!cloudState) {
       await initialize();
     }
 

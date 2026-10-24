@@ -42,6 +42,33 @@ describe("authoritative cloud snapshots with a degraded browser cache", () => {
     expect((await cache.exportSnapshot()).applications[0].notes).toBe("Confirmed while cache unavailable");
   });
 
+  it("waits for startup cache work before repairing or saving a newer snapshot", async () => {
+    const api = new RevisionApi(snapshot());
+    await createCloudStorageAdapter({ api, cache: createTestStorageAdapter() }).initialize();
+    const cache = createTestStorageAdapter();
+    vi.spyOn(cache, "listResumeFiles").mockResolvedValue([]);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    let cached = api.state.snapshot;
+    let imports = 0;
+    vi.spyOn(cache, "importSnapshot").mockImplementation(async (data) => {
+      if (++imports === 1) { entered(); await held; }
+      cached = structuredClone(data);
+    });
+    const adapter = createCloudStorageAdapter({ api, cache });
+    const startup = adapter.initialize();
+    await started;
+    const repair = adapter.repairCache();
+    const update = adapter.updateApplication({ ...application, notes: "After startup" });
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    release();
+    await Promise.all([startup, repair, update]);
+    expect(cached).toEqual(api.state.snapshot);
+    expect(cached.applications[0].notes).toBe("After startup");
+  });
+
   it.each(["read", "write", "open"])("loads remote data despite a cache %s failure", async (failure) => {
     const api = new RevisionApi(snapshot());
     const cache = createTestStorageAdapter();
