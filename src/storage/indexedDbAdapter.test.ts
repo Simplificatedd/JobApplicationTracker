@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
-import { TRACKER_DB_VERSION } from "./indexedDbAdapter";
+import { createIndexedDbStorageAdapter, TRACKER_DB_VERSION } from "./indexedDbAdapter";
 import { DEFAULT_USER_SETTINGS } from "../lib/domain";
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 import type {
@@ -88,6 +88,18 @@ const coverLetter: CoverLetterMetadata = {
 };
 
 describe("indexedDbStorageAdapter", () => {
+  it("can reopen storage after the browser makes IndexedDB available again", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    const adapter = createIndexedDbStorageAdapter();
+    try {
+      await expect(adapter.initialize()).rejects.toThrow("IndexedDB is not available");
+      vi.stubGlobal("indexedDB", new IDBFactory());
+      await expect(adapter.initialize()).resolves.toMatchObject({ applications: [] });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([4, TRACKER_DB_VERSION])(
     "repairs stale metadata in database version %s without changing the seed time",
     async (version) => {

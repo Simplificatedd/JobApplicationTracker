@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { IDBFactory } from "fake-indexeddb";
 import { application, snapshot } from "../test/assessmentFixtures";
 import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
@@ -17,6 +18,30 @@ async function setup() {
 }
 
 describe("authoritative cloud snapshots with a degraded browser cache", () => {
+  it("reopens a temporarily unavailable cache and repairs the latest confirmed state", async () => {
+    const api = new RevisionApi(snapshot());
+    const indexedDb = new IDBFactory();
+    const openDatabase = indexedDb.open.bind(indexedDb);
+    let available = false;
+    const open = vi.spyOn(indexedDb, "open").mockImplementation((...args) => {
+      if (!available) throw new Error("Storage disabled");
+      return openDatabase(...args);
+    });
+    const cache = createTestStorageAdapter({ indexedDb });
+    const adapter = createCloudStorageAdapter({ api, cache });
+    await adapter.initialize();
+    expect(adapter.getCacheWarning()).not.toBeNull();
+    const save = vi.spyOn(api, "saveState");
+    await adapter.updateApplication({ ...application, notes: "Confirmed while cache unavailable" });
+    expect(adapter.getCacheWarning()).not.toBeNull();
+    available = true;
+    await adapter.repairCache();
+    expect(open).toHaveBeenCalledTimes(3);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(adapter.getCacheWarning()).toBeNull();
+    expect((await cache.exportSnapshot()).applications[0].notes).toBe("Confirmed while cache unavailable");
+  });
+
   it.each(["read", "write", "open"])("loads remote data despite a cache %s failure", async (failure) => {
     const api = new RevisionApi(snapshot());
     const cache = createTestStorageAdapter();

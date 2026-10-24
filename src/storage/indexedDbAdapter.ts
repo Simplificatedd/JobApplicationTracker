@@ -78,11 +78,15 @@ export function createIndexedDbStorageAdapter(
 ): StorageAdapter {
   let databasePromise: Promise<IDBDatabase> | null = null;
   const databaseName = options.databaseName ?? TRACKER_DB_NAME;
-  const indexedDb = options.indexedDb ?? globalThis.indexedDB;
 
   function getDatabase() {
     if (!databasePromise) {
-      databasePromise = openDatabase(databaseName, indexedDb);
+      databasePromise = openDatabase(databaseName, options.indexedDb ?? globalThis.indexedDB)
+        .catch((error) => {
+          // A temporary browser-storage failure must not poison later cache repair.
+          databasePromise = null;
+          throw error;
+        });
     }
 
     return databasePromise;
