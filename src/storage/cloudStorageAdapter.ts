@@ -813,39 +813,49 @@ export function createCloudStorageAdapter({
   }
 
   async function saveResumeFile(storageKey: string, file: Blob) {
-    await ensureInitialized();
-    await cloudRequest(api.putResumeFile(storageKey, file, accountId()));
-    await activeCache().saveResumeFile(storageKey, file);
+    await queueMutation(async () => {
+      await ensureInitialized();
+      await cloudRequest(api.putResumeFile(storageKey, file, accountId()));
+      await tryCache(() => activeCache().saveResumeFile(storageKey, file));
+    });
   }
 
   async function getResumeFile(storageKey: string) {
-    await ensureInitialized();
-    const cached = await activeCache().getResumeFile(storageKey);
+    return queueMutation(async () => {
+      await ensureInitialized();
+      const cached = cacheWarning
+        ? undefined
+        : await tryCache(() => activeCache().getResumeFile(storageKey));
 
-    if (cached) {
-      return cached;
-    }
+      if (cached?.value) {
+        return cached.value;
+      }
 
-    const file = await cloudRequest(api.getResumeFile(storageKey, accountId()));
-    await activeCache().saveResumeFile(storageKey, file);
-    return file;
+      const file = await cloudRequest(api.getResumeFile(storageKey, accountId()));
+      await tryCache(() => activeCache().saveResumeFile(storageKey, file));
+      return file;
+    });
   }
 
   async function deleteResumeFile(storageKey: string) {
-    await ensureInitialized();
-    await cloudRequest(api.deleteResumeFile(storageKey, accountId()));
-    await activeCache().deleteResumeFile(storageKey);
+    await queueMutation(async () => {
+      await ensureInitialized();
+      await cloudRequest(api.deleteResumeFile(storageKey, accountId()));
+      await tryCache(() => activeCache().deleteResumeFile(storageKey));
+    });
   }
 
   async function clearResumeFiles() {
-    const documents = [
-      ...(await listResumeMetadata()),
-      ...(await listCoverLetterMetadata()),
-    ];
-    await Promise.allSettled(
-      documents.map((document) => cloudRequest(api.deleteResumeFile(document.storageKey, accountId()))),
-    );
-    await activeCache().clearResumeFiles();
+    await queueMutation(async () => {
+      const documents = [
+        ...(await listResumeMetadata()),
+        ...(await listCoverLetterMetadata()),
+      ];
+      await Promise.allSettled(
+        documents.map((document) => cloudRequest(api.deleteResumeFile(document.storageKey, accountId()))),
+      );
+      await tryCache(() => activeCache().clearResumeFiles());
+    });
   }
 
   async function getSettings() {
