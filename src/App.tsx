@@ -73,8 +73,15 @@ export function App() {
     >
       {tracker.storageError ? (
         <StorageErrorBanner
-          message={tracker.storageError}
+          message={`Cloud storage could not be reached. ${tracker.storageError}`}
           onRetry={tracker.retryStorage}
+        />
+      ) : null}
+      {tracker.cacheWarning ? (
+        <StorageErrorBanner
+          message={tracker.cacheWarning}
+          onRetry={() => { void tracker.repairCache(); }}
+          retryLabel="Repair browser cache"
         />
       ) : null}
       {tracker.isStorageLoading ? (
@@ -110,9 +117,11 @@ export function App() {
 function StorageErrorBanner({
   message,
   onRetry,
+  retryLabel = "Retry",
 }: {
   message: string;
   onRetry: () => void;
+  retryLabel?: string;
 }) {
   return (
     <div
@@ -121,9 +130,7 @@ function StorageErrorBanner({
     >
       <div className="flex min-w-0 items-start gap-3">
         <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} />
-        <p className="min-w-0">
-          Cloud storage could not be reached. {message}
-        </p>
+        <p className="min-w-0">{message}</p>
       </div>
       <button
         className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 font-semibold hover:bg-amber-100"
@@ -131,7 +138,7 @@ function StorageErrorBanner({
         type="button"
       >
         <RefreshCw aria-hidden="true" size={15} />
-        Retry
+        {retryLabel}
       </button>
     </div>
   );

@@ -123,6 +123,7 @@ export interface TrackerStore extends AssessmentActions {
   analyticsSettings: AnalyticsSettings;
   applications: Application[];
   cloudAccountEmail: string | null;
+  cacheWarning: string | null;
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   interviews: Interview[];
@@ -130,6 +131,7 @@ export interface TrackerStore extends AssessmentActions {
   notificationState: NotificationState;
   resumes: ResumeMetadata[];
   retryStorage: () => void;
+  repairCache: () => Promise<void>;
   settings: UserSettings;
   storageError: string | null;
   tablePreferences: TablePreferences | null;
@@ -226,6 +228,7 @@ export function useTrackerStore(): TrackerStore {
     DEFAULT_NOTIFICATION_STATE, accountInvalidated,
   );
   const [storageError, setStorageError] = useAccountState<string | null>(null, accountInvalidated);
+  const [cacheWarning, setCacheWarning] = useAccountState<string | null>(null, accountInvalidated);
   const [storageRetryKey, setStorageRetryKey] = useState(0);
   const [tablePreferences, setTablePreferences] =
     useAccountState<TablePreferences | null>(null, accountInvalidated);
@@ -254,11 +257,14 @@ export function useTrackerStore(): TrackerStore {
       setSettings(DEFAULT_USER_SETTINGS);
       setTablePreferences(null);
       setStorageError("Signed-in account changed. Reload the tracker.");
+      setCacheWarning(null);
       setIsStorageLoading(false);
       // Clear first, then permanently block publishers from this store instance.
       accountInvalidated.current = true;
     };
     window.addEventListener("tracker-account-changed", handleAccountChanged);
+    const unsubscribeCacheWarning = cloudStorageAdapter.subscribeCacheWarning(setCacheWarning);
+    setCacheWarning(cloudStorageAdapter.getCacheWarning());
 
     setIsStorageLoading(true);
     setStorageError(null);
@@ -298,12 +304,13 @@ export function useTrackerStore(): TrackerStore {
     return () => {
       isActive = false;
       window.removeEventListener("tracker-account-changed", handleAccountChanged);
+      unsubscribeCacheWarning();
     };
   }, [
     storageRetryKey, setActivities, setAnalyticsSettings, setApplications,
     setAssessments, setCloudAccountEmail, setContacts, setCoverLetters,
     setInterviews, setNotificationState, setResumes, setSettings,
-    setTablePreferences, setStorageError, setIsStorageLoading,
+    setTablePreferences, setStorageError, setIsStorageLoading, setCacheWarning,
   ]);
 
   function assertAccountActive() {
@@ -315,6 +322,17 @@ export function useTrackerStore(): TrackerStore {
   function retryStorage() {
     if (accountInvalidated.current) return;
     setStorageRetryKey((current) => current + 1);
+  }
+
+  async function repairCache() {
+    if (accountInvalidated.current) return;
+    try {
+      await cloudStorageAdapter.repairCache();
+    } catch (error) {
+      // Cache I/O is best-effort in the adapter. Rejections here are authoritative
+      // failures such as account invalidation; keep the cloud error visible.
+      setStorageError(getStorageErrorMessage(error));
+    }
   }
 
   function runApplicationMutation<Value>(
@@ -1730,6 +1748,7 @@ export function useTrackerStore(): TrackerStore {
     analyticsSettings,
     applications,
     cloudAccountEmail,
+    cacheWarning,
     contacts,
     coverLetters,
     interviews,
@@ -1737,6 +1756,7 @@ export function useTrackerStore(): TrackerStore {
     notificationState,
     resumes,
     retryStorage,
+    repairCache,
     settings,
     storageError,
     tablePreferences,
