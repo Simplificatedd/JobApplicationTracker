@@ -1626,7 +1626,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState, currentState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1645,7 +1645,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveNotificationState(updatedState),
+          cloudStorageAdapter.saveNotificationState(updatedState, currentState),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1664,7 +1664,7 @@ export function useTrackerStore(): TrackerStore {
         });
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveSettings(updatedSettings),
+          cloudStorageAdapter.saveSettings(updatedSettings, currentSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1684,7 +1684,7 @@ export function useTrackerStore(): TrackerStore {
         };
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings),
+          cloudStorageAdapter.saveAnalyticsSettings(updatedSettings, currentSettings),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));
@@ -1710,7 +1710,7 @@ export function useTrackerStore(): TrackerStore {
         } as TablePreferences;
 
         return persistThenUpdate(
-          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences),
+          cloudStorageAdapter.saveTablePreferences(updatedTablePreferences, currentPreferences),
         );
       } catch (error) {
         setStorageError(getStorageErrorMessage(error));

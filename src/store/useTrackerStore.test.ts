@@ -6,6 +6,9 @@ import { RevisionApi } from "../test/revisionApi";
 import { snapshot as createSnapshot } from "../test/assessmentFixtures";
 import { StorageConflictError } from "../storage/mutationRebase";
 import type { StorageSnapshot } from "../storage/StorageAdapter";
+import type { CloudStateEnvelope } from "../storage/cloudApi";
+import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "../features/applications/applicationFilters";
+import type { TablePreferences } from "../types/tablePreferences";
 
 // A small hook host lets these tests control promise/event ordering without a
 // browser or network. State, refs and memoized callbacks persist across renders;
@@ -48,7 +51,10 @@ vi.mock("react", () => ({
 }));
 const storage = vi.hoisted(() => ({
   initialize: vi.fn(), getAccount: vi.fn(), commitMutation: vi.fn(),
-  getSettings: vi.fn(), saveSettings: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
+  getSettings: vi.fn(), saveSettings: vi.fn(),
+  getNotificationState: vi.fn(), saveNotificationState: vi.fn(),
+  getAnalyticsSettings: vi.fn(), saveAnalyticsSettings: vi.fn(),
+  getTablePreferences: vi.fn(), saveTablePreferences: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
   getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(), refresh: vi.fn(),
@@ -89,6 +95,12 @@ beforeEach(() => {
   storage.commitMutation.mockResolvedValue(undefined);
   storage.getSettings.mockResolvedValue(snapshot.settings);
   storage.saveSettings.mockResolvedValue(undefined);
+  storage.getNotificationState.mockResolvedValue(snapshot.notificationState);
+  storage.saveNotificationState.mockResolvedValue(undefined);
+  storage.getAnalyticsSettings.mockResolvedValue(snapshot.analyticsSettings);
+  storage.saveAnalyticsSettings.mockResolvedValue(undefined);
+  storage.getTablePreferences.mockResolvedValue(snapshot.tablePreferences);
+  storage.saveTablePreferences.mockResolvedValue(undefined);
   storage.exportSnapshot.mockResolvedValue(snapshot);
   storage.getCurrentSnapshot.mockReturnValue(snapshot);
   storage.getApplication.mockResolvedValue(application);
@@ -312,6 +324,12 @@ describe("store with two independent revision-aware cloud adapters", () => {
     storage.deleteApplication.mockImplementation(b.deleteApplication);
     storage.getSettings.mockImplementation(b.getSettings);
     storage.saveSettings.mockImplementation(b.saveSettings);
+    storage.getNotificationState.mockImplementation(b.getNotificationState);
+    storage.saveNotificationState.mockImplementation(b.saveNotificationState);
+    storage.getAnalyticsSettings.mockImplementation(b.getAnalyticsSettings);
+    storage.saveAnalyticsSettings.mockImplementation(b.saveAnalyticsSettings);
+    storage.getTablePreferences.mockImplementation(b.getTablePreferences);
+    storage.saveTablePreferences.mockImplementation(b.saveTablePreferences);
     storage.getCacheWarning.mockImplementation(b.getCacheWarning);
     storage.subscribeCacheWarning.mockImplementation(b.subscribeCacheWarning);
     storage.repairCache.mockImplementation(b.repairCache);
@@ -319,6 +337,65 @@ describe("store with two independent revision-aware cloud adapters", () => {
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
   }
+
+  it.each(["settings", "analyticsSettings", "notificationState", "tablePreferences"] as const)("retains changed-field intent for %s edits started during remote refresh", async (kind) => {
+    const preferences: TablePreferences = {
+      columnWidths: {}, filters: DEFAULT_APPLICATION_FILTERS, needsAttentionOnly: false,
+      searchQuery: "", sort: DEFAULT_SORT_STATE,
+      visibleApplicationColumns: DEFAULT_USER_SETTINGS.visibleApplicationColumns,
+    };
+    const { api, a, b } = await sessions(createSnapshot({ tablePreferences: preferences }));
+    const readEntered = deferred<void>();
+    const releaseRead = deferred<void>();
+    function heldRead<Value>(load: () => Promise<Value>) {
+      return async () => {
+        const old = await load();
+        readEntered.resolve(); await releaseRead.promise; return old;
+      };
+    }
+    let edit: () => Promise<boolean>;
+    let expected: object;
+    switch (kind) {
+      case "settings":
+        await a.saveSettings({ ...api.state.snapshot.settings, quickLocation: "Remote city" });
+        storage.getSettings.mockImplementationOnce(heldRead(b.getSettings));
+        edit = () => RenderStore().updateSettings({ defaultFollowUpPromptDays: 58 });
+        expected = { quickLocation: "Remote city", defaultFollowUpPromptDays: 58 };
+        break;
+      case "analyticsSettings":
+        await a.saveAnalyticsSettings({ ...api.state.snapshot.analyticsSettings, includeArchived: true });
+        storage.getAnalyticsSettings.mockImplementationOnce(heldRead(b.getAnalyticsSettings));
+        edit = () => RenderStore().updateAnalyticsSettings({ enabled: true });
+        expected = { includeArchived: true, enabled: true };
+        break;
+      case "notificationState":
+        await a.saveNotificationState({ ...api.state.snapshot.notificationState, lastOpenedAt: application.createdAt });
+        storage.getNotificationState.mockImplementationOnce(heldRead(b.getNotificationState));
+        edit = () => RenderStore().dismissNotification("local-notification");
+        expected = { lastOpenedAt: application.createdAt, dismissedNotificationIds: ["local-notification"] };
+        break;
+      case "tablePreferences":
+        await a.saveTablePreferences({ ...preferences, searchQuery: "Remote search" });
+        storage.getTablePreferences.mockImplementationOnce(heldRead(b.getTablePreferences));
+        edit = () => RenderStore().updateTablePreferences({ needsAttentionOnly: true });
+        expected = { searchQuery: "Remote search", needsAttentionOnly: true };
+        break;
+    }
+    const fetchEntered = deferred<void>();
+    const fetched = deferred<CloudStateEnvelope>();
+    vi.spyOn(api, "getState").mockImplementationOnce(() => { fetchEntered.resolve(); return fetched.promise; });
+    RenderStore().retryStorage(); RenderStore();
+    await fetchEntered.promise;
+    const editing = edit();
+    await readEntered.promise;
+    fetched.resolve(structuredClone(api.state));
+    await vi.waitFor(() => expect(storage.refresh).toHaveResolvedTimes(1));
+    RenderStore();
+    releaseRead.resolve();
+    expect(await editing).toBe(true);
+    expect(api.state.snapshot[kind]).toMatchObject(expected);
+    expect(RenderStore()[kind]).toMatchObject(expected);
+  });
 
   it("retains multiple saved settings and sees remote edits on retry after cache recovery", async () => {
     const { api, a, cache } = await sessions();

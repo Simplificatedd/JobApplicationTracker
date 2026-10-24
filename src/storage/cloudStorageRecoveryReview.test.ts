@@ -4,6 +4,8 @@ import { createTestStorageAdapter } from "../test/indexedDb";
 import { RevisionApi } from "../test/revisionApi";
 import { createCloudStorageAdapter } from "./cloudStorageAdapter";
 import { CloudApiError, type CloudStateEnvelope } from "./cloudApi";
+import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "../features/applications/applicationFilters";
+import type { TablePreferences } from "../types/tablePreferences";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -69,5 +71,39 @@ describe("unverified remote state during recovery", () => {
     expect(adapter.getCurrentSnapshot()).toEqual(before);
     expect(write).not.toHaveBeenCalled();
     expect(adapter.getCacheWarning()).toBeNull();
+  });
+});
+
+describe("explicit preference baselines across refresh", () => {
+  it("retains same-field conflict detection against the caller's original settings", async () => {
+    const api = new RevisionApi(snapshot());
+    const adapter = createCloudStorageAdapter({ api, cache: createTestStorageAdapter() });
+    await adapter.initialize();
+    const before = await adapter.getSettings();
+    api.state.revision++;
+    api.state.snapshot = { ...api.state.snapshot, settings: { ...before, defaultFollowUpPromptDays: 60 } };
+    await adapter.refresh();
+    const save = vi.spyOn(api, "saveState");
+    await expect(adapter.saveSettings({ ...before, defaultFollowUpPromptDays: 42 }, before)).rejects.toThrow(/changed in another session/);
+    expect(save).not.toHaveBeenCalled();
+    expect(adapter.getCurrentSnapshot().settings.defaultFollowUpPromptDays).toBe(60);
+  });
+
+  it("treats an explicitly empty table baseline as an observed absence", async () => {
+    const api = new RevisionApi(snapshot());
+    const adapter = createCloudStorageAdapter({ api, cache: createTestStorageAdapter() });
+    await adapter.initialize();
+    expect(await adapter.getTablePreferences()).toBeNull();
+    const remote: TablePreferences = {
+      columnWidths: {}, filters: DEFAULT_APPLICATION_FILTERS, needsAttentionOnly: false,
+      searchQuery: "Remote search", sort: DEFAULT_SORT_STATE, visibleApplicationColumns: ["jobTitle"],
+    };
+    api.state.revision++;
+    api.state.snapshot = { ...api.state.snapshot, tablePreferences: remote };
+    await adapter.refresh();
+    const save = vi.spyOn(api, "saveState");
+    await expect(adapter.saveTablePreferences({ ...remote, searchQuery: "Local search" }, null)).rejects.toThrow(/changed in another session/);
+    expect(save).not.toHaveBeenCalled();
+    expect(adapter.getCurrentSnapshot().tablePreferences).toEqual(remote);
   });
 });
