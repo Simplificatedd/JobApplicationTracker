@@ -379,7 +379,8 @@ export function createCloudStorageAdapter({
       return result;
     } catch (error) {
       assertActive(generation);
-      if (error instanceof CloudApiError && error.status === 412) {
+      if (error instanceof CloudApiError && (error.status === 412 ||
+        (account && (error.status === 401 || error.status === 403)))) {
         accountChanged();
       }
       throw error;
@@ -390,7 +391,7 @@ export function createCloudStorageAdapter({
     if (accountIdentityChanged) {
       throw new Error("Signed-in account changed. Reload the tracker.");
     }
-    const current = await api.getSession();
+    const current = await cloudRequest(api.getSession());
     assertActive();
     if (!current.id || !current.email) {
       throw new Error("The signed-in account has no verified identity.");
