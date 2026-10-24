@@ -82,7 +82,9 @@ export function createIndexedDbStorageAdapter(
 
   function getDatabase() {
     if (!databasePromise) {
-      databasePromise = openDatabase(databaseName, options.indexedDb ?? globalThis.indexedDB)
+      databasePromise = openDatabase(databaseName, options.indexedDb ?? globalThis.indexedDB, () => {
+        databasePromise = null;
+      })
         .catch((error) => {
           // A temporary browser-storage failure must not poison later cache repair.
           databasePromise = null;
@@ -742,8 +744,9 @@ export function createIndexedDbStorageAdapter(
 
 export const indexedDbStorageAdapter = createIndexedDbStorageAdapter();
 
-function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
+function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined, onClosed: () => void) {
   return new Promise<IDBDatabase>((resolve, reject) => {
+    let abandoned = false;
     if (!indexedDb) {
       reject(new Error("IndexedDB is not available in this browser."));
       return;
@@ -752,6 +755,7 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     const request = indexedDb.open(databaseName, TRACKER_DB_VERSION);
 
     request.onerror = () => {
+      abandoned = true;
       reject(
         request.error ??
           new Error("The local tracker database could not be opened."),
@@ -759,6 +763,7 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     };
 
     request.onblocked = () => {
+      abandoned = true;
       reject(
         new Error(
           "The local tracker database is blocked by another open tracker tab.",
@@ -767,14 +772,24 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     };
 
     request.onupgradeneeded = (event) => {
+      if (abandoned) {
+        request.transaction?.abort();
+        return;
+      }
       upgradeDatabase(request.result, event.oldVersion, request.transaction);
     };
 
     request.onsuccess = () => {
       const database = request.result;
+      // A blocked open can still complete after its caller has already retried.
+      if (abandoned) {
+        database.close();
+        return;
+      }
 
       database.onversionchange = () => {
         database.close();
+        onClosed();
       };
 
       resolve(database);
