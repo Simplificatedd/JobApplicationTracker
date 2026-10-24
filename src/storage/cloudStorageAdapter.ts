@@ -234,6 +234,8 @@ function removeRecords<T extends { id: string }>(
 }
 
 export interface CloudStorageAdapter extends StorageAdapter {
+  // Revalidate remote state after pending saves; never replay startup migration.
+  refresh(): Promise<StorageSnapshot>;
   getAccount(): CloudAccount | null;
   getCacheWarning(): string | null;
   subscribeCacheWarning(listener: (warning: string | null) => void): () => void;
@@ -586,6 +588,23 @@ export function createCloudStorageAdapter({
       if (!initializePromise) throw new Error("Cloud storage has not been initialized.");
       const current = await ensureInitialized();
       await refreshCache(current);
+    });
+  }
+
+  async function refresh() {
+    return queueMutation(async () => {
+      // Retry unfinished startup normally. A completed startup stays memoized,
+      // keeping migration separate from subsequent remote reads.
+      await initialize();
+      const remote = await cloudRequest(api.getState(accountId()));
+      await verifyAccount();
+      if (!remote || !cloudState || remote.revision < cloudState.revision) {
+        throw new Error("Current cloud state could not be verified. Reload the tracker and inspect the data before retrying.");
+      }
+      const current = activeCloudState(remote);
+      cloudState = current;
+      await refreshCache(current);
+      return getCurrentSnapshot();
     });
   }
 
@@ -955,6 +974,7 @@ export function createCloudStorageAdapter({
 
   return {
     initialize: guarded(initialize),
+    refresh: guarded(refresh),
     commitMutation: guarded(commitMutation),
     listApplications: guarded(listApplications),
     getApplication: guarded(getApplication),
