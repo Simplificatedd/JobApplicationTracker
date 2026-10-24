@@ -580,6 +580,8 @@ export function createCloudStorageAdapter({
   async function repairCache() {
     // Share the write queue so an older repair cannot overwrite a later commit.
     await queueMutation(async () => {
+      // Repair may wait for startup, but must never initiate its cloud migration.
+      if (!initializePromise) throw new Error("Cloud storage has not been initialized.");
       const current = await ensureInitialized();
       await refreshCache(current);
     });

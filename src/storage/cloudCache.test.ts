@@ -18,6 +18,16 @@ async function setup() {
 }
 
 describe("authoritative cloud snapshots with a degraded browser cache", () => {
+  it("does not initialize or migrate cloud data when repair is requested before startup", async () => {
+    const api = new RevisionApi(snapshot());
+    const fetch = vi.spyOn(api, "getState");
+    const save = vi.spyOn(api, "saveState");
+    const adapter = createCloudStorageAdapter({ api, cache: createTestStorageAdapter() });
+    await expect(adapter.repairCache()).rejects.toThrow("has not been initialized");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("reopens a temporarily unavailable cache and repairs the latest confirmed state", async () => {
     const api = new RevisionApi(snapshot());
     const indexedDb = new IDBFactory();
