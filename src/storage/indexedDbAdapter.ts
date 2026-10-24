@@ -57,6 +57,7 @@ interface StorageMeta {
 const SETTINGS_KEY = "userSettings";
 const TABLE_PREFERENCES_KEY = "tablePreferences";
 const STORAGE_META_KEY = "storageMeta";
+const CLOUD_CACHE_REVISION_KEY = "cloudCacheRevision";
 const ANALYTICS_SETTINGS_KEY = "analyticsSettings";
 const NOTIFICATION_STATE_KEY = "notificationState";
 
@@ -462,8 +463,29 @@ export function createIndexedDbStorageAdapter(
     return getAll<ResumeBlobRecord>(await getDatabase(), "resumeFiles");
   }
 
-  async function saveResumeFile(storageKey: string, file: Blob) {
-    await putRecord(await getDatabase(), "resumeFiles", { storageKey, file });
+  async function acceptsCacheRevision(
+    transaction: IDBTransaction, revision: number | undefined, done: Promise<void>,
+  ) {
+    if (revision === undefined) return true;
+    try {
+      const cached = await requestToPromise<StoredValue<number> | undefined>(
+        transaction.objectStore("settings").get(CLOUD_CACHE_REVISION_KEY),
+      );
+      return !cached || cached.value <= revision;
+    } catch (error) {
+      await done.catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function saveResumeFile(storageKey: string, file: Blob, cacheRevision?: number) {
+    const database = await getDatabase();
+    const transaction = database.transaction(["settings", "resumeFiles"], "readwrite");
+    const done = transactionDone(transaction);
+    if (await acceptsCacheRevision(transaction, cacheRevision, done)) {
+      transaction.objectStore("resumeFiles").put({ storageKey, file });
+    }
+    await done;
   }
 
   async function getResumeFile(storageKey: string) {
@@ -589,6 +611,7 @@ export function createIndexedDbStorageAdapter(
   async function importSnapshot(
     snapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
+    cacheRevision?: number,
   ) {
     const database = await getDatabase();
     const transaction = database.transaction(
@@ -607,6 +630,13 @@ export function createIndexedDbStorageAdapter(
       ],
       "readwrite",
     );
+    const done = transactionDone(transaction);
+    // The revision check and replacement share one transaction across connections.
+    // A stale tab must not undo another tab's newer cache, including deletions.
+    if (!await acceptsCacheRevision(transaction, cacheRevision, done)) {
+      await done;
+      return;
+    }
 
     for (const storeName of transaction.objectStoreNames) {
       transaction.objectStore(storeName).clear();
@@ -652,7 +682,10 @@ export function createIndexedDbStorageAdapter(
       } satisfies StorageMeta,
     });
 
-    await transactionDone(transaction);
+    if (cacheRevision !== undefined) {
+      transaction.objectStore("settings").put({ key: CLOUD_CACHE_REVISION_KEY, value: cacheRevision });
+    }
+    await done;
   }
 
   return {
