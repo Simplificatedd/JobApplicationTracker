@@ -497,7 +497,10 @@ export function createCloudStorageAdapter({
     // for that work too, so a late startup import cannot overwrite a newer cache.
     if (initializePromise) {
       await initializePromise;
-    } else if (!cloudState) {
+    } else {
+      // A failed migration may leave normalized, unacknowledged cloudState.
+      // It is not a completed startup: finish initialization before allowing
+      // operations that could race a later startup read or migration.
       await initialize();
     }
 
