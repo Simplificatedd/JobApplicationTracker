@@ -235,6 +235,9 @@ function removeRecords<T extends { id: string }>(
 
 export interface CloudStorageAdapter extends StorageAdapter {
   getAccount(): CloudAccount | null;
+  getCacheWarning(): string | null;
+  subscribeCacheWarning(listener: (warning: string | null) => void): () => void;
+  repairCache(): Promise<void>;
   // Last acknowledged server state, for synchronous UI publication after a
   // verified operation. This does not fetch, repair the cache, or rerun startup.
   getCurrentSnapshot(): StorageSnapshot;
@@ -270,6 +273,39 @@ export function createCloudStorageAdapter({
   let accountIdentityChanged = false;
   let accountGeneration = 0;
   let mutationQueue = Promise.resolve();
+  let cacheWarning: string | null = null;
+  const cacheListeners = new Set<(warning: string | null) => void>();
+
+  function getCacheWarning() {
+    assertActive();
+    return cacheWarning;
+  }
+
+  function subscribeCacheWarning(listener: (warning: string | null) => void) {
+    cacheListeners.add(listener);
+    return () => { cacheListeners.delete(listener); };
+  }
+
+  function setCacheWarning(warning: string | null) {
+    if (cacheWarning === warning) return;
+    cacheWarning = warning;
+    for (const listener of cacheListeners) listener(warning);
+  }
+
+  async function tryCache<T>(operation: () => Promise<T>) {
+    const generation = accountGeneration;
+    assertActive(generation);
+    try {
+      const value = await operation();
+      assertActive(generation);
+      return { value };
+    } catch {
+      // Account invalidation is authoritative, even if detected during local I/O.
+      assertActive(generation);
+      setCacheWarning("Browser cache is unavailable. Cloud data remains authoritative; confirmed saves do not need to be repeated.");
+      return undefined;
+    }
+  }
 
   function getAccount() {
     return account;
@@ -283,7 +319,7 @@ export function createCloudStorageAdapter({
 
   function activeCache() {
     assertActive();
-    if (!cache) throw new Error("Account storage has not been initialized.");
+    cache ??= injectedCache ?? cacheForAccount(accountId());
     return cache;
   }
 
@@ -382,7 +418,6 @@ export function createCloudStorageAdapter({
     const verified = await verifyAccount();
     assertActive();
     account = verified;
-    cache = injectedCache ?? cacheForAccount(account.id);
     const remoteState = await cloudRequest(api.getState(accountId()));
     assertActive();
 
@@ -514,21 +549,34 @@ export function createCloudStorageAdapter({
     snapshot: StorageSnapshot,
     addedFiles: readonly ResumeBlobRecord[] = [],
   ) {
-    const currentFiles = await activeCache().listResumeFiles();
-    const filesByKey = new Map(
-      [...currentFiles, ...addedFiles].map((record) => [record.storageKey, record]),
-    );
-    const referencedKeys = new Set(
-      [
-        ...snapshot.resumes,
-        ...(snapshot.coverLetters ?? []),
-      ].map((document) => document.storageKey),
-    );
-    const retainedFiles = [...filesByKey.values()].filter((record) =>
-      referencedKeys.has(record.storageKey),
-    );
+    const repaired = await tryCache(async () => {
+      // After any cache failure, replace rather than trust potentially stale bytes.
+      // Missing cached documents can be downloaded from the authoritative file API.
+      const currentFiles = cacheWarning ? [] : await activeCache().listResumeFiles();
+      const filesByKey = new Map(
+        [...currentFiles, ...addedFiles].map((record) => [record.storageKey, record]),
+      );
+      const referencedKeys = new Set(
+        [
+          ...snapshot.resumes,
+          ...(snapshot.coverLetters ?? []),
+        ].map((document) => document.storageKey),
+      );
+      const retainedFiles = [...filesByKey.values()].filter((record) =>
+        referencedKeys.has(record.storageKey),
+      );
 
-    await activeCache().importSnapshot(snapshot, retainedFiles);
+      await activeCache().importSnapshot(snapshot, retainedFiles);
+    });
+    if (repaired) setCacheWarning(null);
+  }
+
+  async function repairCache() {
+    // Share the write queue so an older repair cannot overwrite a later commit.
+    await queueMutation(async () => {
+      const current = await ensureInitialized();
+      await refreshCache(current.snapshot);
+    });
   }
 
   async function commitMutation(mutation: StorageMutation) {
@@ -935,6 +983,9 @@ export function createCloudStorageAdapter({
     exportSnapshot: guarded(exportSnapshot),
     importSnapshot: guarded(importSnapshot),
     getAccount,
+    getCacheWarning,
+    subscribeCacheWarning,
+    repairCache: guarded(repairCache),
     getCurrentSnapshot,
   };
 }
