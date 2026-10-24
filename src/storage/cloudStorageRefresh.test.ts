@@ -51,6 +51,22 @@ describe("current state after memoized startup", () => {
 });
 
 describe("explicit remote refresh", () => {
+  it("uses new remote state after first-login local storage initialization fails", async () => {
+    const api = new RevisionApi(snapshot({ applications: [], dataVersion: 3, assessments: [] }));
+    vi.spyOn<CloudApiClient, "getState">(api, "getState").mockResolvedValueOnce(null);
+    const cache = createTestStorageAdapter();
+    vi.spyOn(cache, "initialize").mockRejectedValueOnce(new Error("IndexedDB initialization failed"));
+    const save = vi.spyOn(api, "saveState");
+    const confirm = vi.fn(() => true);
+    const adapter = createCloudStorageAdapter({ api, cache, confirmLegacyMigration: confirm });
+    await expect(adapter.initialize()).rejects.toThrow("IndexedDB initialization failed");
+    api.state.revision++;
+    api.state.snapshot.settings.defaultFollowUpPromptDays = 96;
+    expect((await adapter.refresh()).settings.defaultFollowUpPromptDays).toBe(96);
+    expect(save).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it.each([401, 403, "account switch"] as const)("invalidates a pending refresh after %s without publishing or caching its result", async (failure) => {
     const { api, cache } = await setup();
     const changed = vi.fn();
