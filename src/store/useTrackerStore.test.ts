@@ -34,6 +34,7 @@ const storage = vi.hoisted(() => ({
   getSettings: vi.fn(), saveSettings: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
+  getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
 import { useTrackerStore } from "./useTrackerStore";
@@ -78,6 +79,9 @@ beforeEach(() => {
   storage.listCoverLetterMetadata.mockResolvedValue([]);
   storage.listContacts.mockResolvedValue([]);
   storage.deleteApplication.mockResolvedValue(undefined);
+  storage.getCacheWarning.mockReturnValue(null);
+  storage.subscribeCacheWarning.mockReturnValue(() => {});
+  storage.repairCache.mockResolvedValue(undefined);
 });
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); vi.unstubAllGlobals(); });
 
@@ -86,6 +90,15 @@ describe("store account invalidation", () => {
     RenderStore(); await flush();
     expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(99);
     expect(RenderStore().cloudAccountEmail).toBe("a@example.edu");
+  });
+
+  it("hydrates cloud data with a separate cache warning", async () => {
+    storage.getCacheWarning.mockReturnValue("Browser cache is unavailable. Confirmed saves do not need to be repeated.");
+    RenderStore(); await flush();
+    expect(RenderStore().isStorageLoading).toBe(false);
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(99);
+    expect(RenderStore().cacheWarning).toContain("Browser cache is unavailable");
+    expect(RenderStore().storageError).toBeNull();
   });
 
   it("cannot hydrate from an initialization continuation after the account event", async () => {
@@ -227,6 +240,12 @@ describe("store with two independent revision-aware cloud adapters", () => {
     storage.listResumeMetadata.mockImplementation(b.listResumeMetadata);
     storage.listCoverLetterMetadata.mockImplementation(b.listCoverLetterMetadata);
     storage.listContacts.mockImplementation(b.listContacts);
+    storage.deleteApplication.mockImplementation(b.deleteApplication);
+    storage.getSettings.mockImplementation(b.getSettings);
+    storage.saveSettings.mockImplementation(b.saveSettings);
+    storage.getCacheWarning.mockImplementation(b.getCacheWarning);
+    storage.subscribeCacheWarning.mockImplementation(b.subscribeCacheWarning);
+    storage.repairCache.mockImplementation(b.repairCache);
     RenderStore();
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
@@ -241,6 +260,78 @@ describe("store with two independent revision-aware cloud adapters", () => {
     expect(RenderStore().applications[0]).toMatchObject({ company: "A company", notes: "B notes" });
     expect(b.getCurrentSnapshot().applications).toEqual(api.state.snapshot.applications);
     expect((await cache.exportSnapshot()).applications).toMatchObject(api.state.snapshot.applications);
+  });
+
+  it("publishes confirmed creates, rebased edits and deletes while showing cache degradation separately", async () => {
+    const { api, a, b, cache, store } = await sessions();
+    const refresh = vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache full"));
+    const save = vi.spyOn(api, "saveState");
+    await a.updateApplication({ ...a.getCurrentSnapshot().applications[0], company: "A company" });
+    expect((await store.updateApplication(application.id, { notes: "B notes" })).ok).toBe(true);
+    expect(RenderStore().applications[0]).toMatchObject({ company: "A company", notes: "B notes" });
+    expect(RenderStore().cacheWarning).toContain("Browser cache is unavailable");
+    expect(RenderStore().storageError).toBeNull();
+    const result = await RenderStore().createApplication({ ...application, company: "Created once" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("Expected confirmed create");
+    expect(RenderStore().applications).toHaveLength(2);
+    expect((await RenderStore().deleteApplication(result.value.id)).ok).toBe(true);
+    expect(RenderStore().applications).toEqual(b.getCurrentSnapshot().applications);
+    expect(RenderStore().applications).toHaveLength(1);
+    const calls = save.mock.calls.length;
+    await RenderStore().repairCache();
+    expect(RenderStore().cacheWarning).not.toBeNull();
+    refresh.mockRestore();
+    await RenderStore().repairCache();
+    expect(save).toHaveBeenCalledTimes(calls);
+    expect(RenderStore().cacheWarning).toBeNull();
+    expect(RenderStore().storageError).toBeNull();
+    expect(RenderStore().applications).toEqual(api.state.snapshot.applications);
+  });
+
+  it("keeps settings saves successful while caching is unavailable", async () => {
+    const { api, cache } = await sessions();
+    vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache full"));
+    expect(await RenderStore().updateSettings({ defaultFollowUpPromptDays: 42 })).toBe(true);
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(42);
+    expect(api.state.snapshot.settings.defaultFollowUpPromptDays).toBe(42);
+    expect(RenderStore().cacheWarning).not.toBeNull();
+    expect(RenderStore().storageError).toBeNull();
+  });
+
+  it.each(["Cloud write rejected", "The save outcome could not be confirmed. Reload the tracker before retrying."])("preserves cloud errors and displayed data during cache repair: %s", async (message) => {
+    const { api, cache } = await sessions();
+    const refresh = vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache full"));
+    expect((await RenderStore().updateApplication(application.id, { notes: "Confirmed" })).ok).toBe(true);
+    vi.spyOn(api, "saveState").mockRejectedValue(new Error(message));
+    expect((await RenderStore().updateApplication(application.id, { notes: "Rejected" })).ok).toBe(false);
+    expect(RenderStore().storageError).toContain(message);
+    refresh.mockRestore();
+    await RenderStore().repairCache();
+    expect(RenderStore().applications[0].notes).toBe("Confirmed");
+    expect(RenderStore().storageError).toContain(message);
+    expect(RenderStore().cacheWarning).toBeNull();
+  });
+
+  it("blocks late cache warning publication and repair after account invalidation", async () => {
+    const { api, cache } = await sessions();
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    vi.spyOn(cache, "importSnapshot").mockImplementation(() => {
+      entered.resolve();
+      return held.promise.then(() => { throw new Error("Cache full"); });
+    });
+    const pending = RenderStore().updateApplication(application.id, { notes: "A notes" });
+    await entered.promise;
+    invalidate();
+    held.resolve();
+    expect((await pending).ok).toBe(false);
+    expect(RenderStore().applications).toEqual([]);
+    expect(RenderStore().cacheWarning).toBeNull();
+    expect(RenderStore().storageError).toContain("Signed-in account changed");
+    const revision = api.state.revision;
+    await RenderStore().repairCache();
+    expect(api.state.revision).toBe(revision);
   });
 
   it("rejects same-field conflicts visibly, preserves the draft baseline, and never replays a rejected edit", async () => {

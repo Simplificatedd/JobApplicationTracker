@@ -108,7 +108,7 @@ export interface StorageAdapter {
   updateResumeMetadata(resume: ResumeMetadata): Promise<void>;
   deleteResumeMetadata(id: string): Promise<void>;
   listResumeFiles(): Promise<ResumeBlobRecord[]>;
-  saveResumeFile(storageKey: string, file: Blob): Promise<void>;
+  saveResumeFile(storageKey: string, file: Blob, cacheRevision?: number): Promise<void>;
   getResumeFile(storageKey: string): Promise<Blob | undefined>;
   deleteResumeFile(storageKey: string): Promise<void>;
   clearResumeFiles(): Promise<void>;
@@ -131,5 +131,7 @@ export interface StorageAdapter {
   importSnapshot(
     snapshot: StorageSnapshot,
     resumeFiles?: ResumeBlobRecord[],
+    // Cloud caches must atomically reject writes older than their stored revision.
+    cacheRevision?: number,
   ): Promise<void>;
 }

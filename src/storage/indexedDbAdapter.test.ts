@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
-import { TRACKER_DB_VERSION } from "./indexedDbAdapter";
+import { createIndexedDbStorageAdapter, TRACKER_DB_VERSION } from "./indexedDbAdapter";
 import { DEFAULT_USER_SETTINGS } from "../lib/domain";
 import { TRACKER_DATA_VERSION } from "./StorageAdapter";
 import type {
@@ -88,6 +88,45 @@ const coverLetter: CoverLetterMetadata = {
 };
 
 describe("indexedDbStorageAdapter", () => {
+  it("reopens after another tab deletes the database and closes this connection", async () => {
+    const indexedDb = new IDBFactory();
+    const databaseName = "cache-cleared-in-another-tab";
+    const adapter = createTestStorageAdapter({ indexedDb, databaseName });
+    await adapter.initialize();
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDb.deleteDatabase(databaseName);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    await expect(adapter.initialize()).resolves.toMatchObject({ applications: [] });
+  });
+
+  it("closes a database that opens after its blocked request was already rejected", async () => {
+    const indexedDb = new IDBFactory();
+    const close = vi.fn();
+    const request = { result: { close } } as unknown as IDBOpenDBRequest;
+    vi.spyOn(indexedDb, "open").mockReturnValueOnce(request);
+    const adapter = createTestStorageAdapter({ indexedDb });
+    const pending = adapter.initialize();
+    request.onblocked!.call(request, new Event("blocked") as IDBVersionChangeEvent);
+    await expect(pending).rejects.toThrow("blocked by another open tracker tab");
+    request.onsuccess!.call(request, new Event("success"));
+    expect(close).toHaveBeenCalledTimes(1);
+    await expect(adapter.initialize()).resolves.toMatchObject({ applications: [] });
+  });
+
+  it("can reopen storage after the browser makes IndexedDB available again", async () => {
+    vi.stubGlobal("indexedDB", undefined);
+    const adapter = createIndexedDbStorageAdapter();
+    try {
+      await expect(adapter.initialize()).rejects.toThrow("IndexedDB is not available");
+      vi.stubGlobal("indexedDB", new IDBFactory());
+      await expect(adapter.initialize()).resolves.toMatchObject({ applications: [] });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([4, TRACKER_DB_VERSION])(
     "repairs stale metadata in database version %s without changing the seed time",
     async (version) => {

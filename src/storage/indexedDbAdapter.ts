@@ -57,6 +57,7 @@ interface StorageMeta {
 const SETTINGS_KEY = "userSettings";
 const TABLE_PREFERENCES_KEY = "tablePreferences";
 const STORAGE_META_KEY = "storageMeta";
+const CLOUD_CACHE_REVISION_KEY = "cloudCacheRevision";
 const ANALYTICS_SETTINGS_KEY = "analyticsSettings";
 const NOTIFICATION_STATE_KEY = "notificationState";
 
@@ -78,11 +79,17 @@ export function createIndexedDbStorageAdapter(
 ): StorageAdapter {
   let databasePromise: Promise<IDBDatabase> | null = null;
   const databaseName = options.databaseName ?? TRACKER_DB_NAME;
-  const indexedDb = options.indexedDb ?? globalThis.indexedDB;
 
   function getDatabase() {
     if (!databasePromise) {
-      databasePromise = openDatabase(databaseName, indexedDb);
+      databasePromise = openDatabase(databaseName, options.indexedDb ?? globalThis.indexedDB, () => {
+        databasePromise = null;
+      })
+        .catch((error) => {
+          // A temporary browser-storage failure must not poison later cache repair.
+          databasePromise = null;
+          throw error;
+        });
     }
 
     return databasePromise;
@@ -458,8 +465,29 @@ export function createIndexedDbStorageAdapter(
     return getAll<ResumeBlobRecord>(await getDatabase(), "resumeFiles");
   }
 
-  async function saveResumeFile(storageKey: string, file: Blob) {
-    await putRecord(await getDatabase(), "resumeFiles", { storageKey, file });
+  async function acceptsCacheRevision(
+    transaction: IDBTransaction, revision: number | undefined, done: Promise<void>,
+  ) {
+    if (revision === undefined) return true;
+    try {
+      const cached = await requestToPromise<StoredValue<number> | undefined>(
+        transaction.objectStore("settings").get(CLOUD_CACHE_REVISION_KEY),
+      );
+      return !cached || cached.value <= revision;
+    } catch (error) {
+      await done.catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async function saveResumeFile(storageKey: string, file: Blob, cacheRevision?: number) {
+    const database = await getDatabase();
+    const transaction = database.transaction(["settings", "resumeFiles"], "readwrite");
+    const done = transactionDone(transaction);
+    if (await acceptsCacheRevision(transaction, cacheRevision, done)) {
+      transaction.objectStore("resumeFiles").put({ storageKey, file });
+    }
+    await done;
   }
 
   async function getResumeFile(storageKey: string) {
@@ -585,6 +613,7 @@ export function createIndexedDbStorageAdapter(
   async function importSnapshot(
     snapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
+    cacheRevision?: number,
   ) {
     const database = await getDatabase();
     const transaction = database.transaction(
@@ -603,6 +632,13 @@ export function createIndexedDbStorageAdapter(
       ],
       "readwrite",
     );
+    const done = transactionDone(transaction);
+    // The revision check and replacement share one transaction across connections.
+    // A stale tab must not undo another tab's newer cache, including deletions.
+    if (!await acceptsCacheRevision(transaction, cacheRevision, done)) {
+      await done;
+      return;
+    }
 
     for (const storeName of transaction.objectStoreNames) {
       transaction.objectStore(storeName).clear();
@@ -648,7 +684,10 @@ export function createIndexedDbStorageAdapter(
       } satisfies StorageMeta,
     });
 
-    await transactionDone(transaction);
+    if (cacheRevision !== undefined) {
+      transaction.objectStore("settings").put({ key: CLOUD_CACHE_REVISION_KEY, value: cacheRevision });
+    }
+    await done;
   }
 
   return {
@@ -705,8 +744,9 @@ export function createIndexedDbStorageAdapter(
 
 export const indexedDbStorageAdapter = createIndexedDbStorageAdapter();
 
-function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
+function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined, onClosed: () => void) {
   return new Promise<IDBDatabase>((resolve, reject) => {
+    let abandoned = false;
     if (!indexedDb) {
       reject(new Error("IndexedDB is not available in this browser."));
       return;
@@ -715,6 +755,7 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     const request = indexedDb.open(databaseName, TRACKER_DB_VERSION);
 
     request.onerror = () => {
+      abandoned = true;
       reject(
         request.error ??
           new Error("The local tracker database could not be opened."),
@@ -722,6 +763,7 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     };
 
     request.onblocked = () => {
+      abandoned = true;
       reject(
         new Error(
           "The local tracker database is blocked by another open tracker tab.",
@@ -730,14 +772,24 @@ function openDatabase(databaseName: string, indexedDb: IDBFactory | undefined) {
     };
 
     request.onupgradeneeded = (event) => {
+      if (abandoned) {
+        request.transaction?.abort();
+        return;
+      }
       upgradeDatabase(request.result, event.oldVersion, request.transaction);
     };
 
     request.onsuccess = () => {
       const database = request.result;
+      // A blocked open can still complete after its caller has already retried.
+      if (abandoned) {
+        database.close();
+        return;
+      }
 
       database.onversionchange = () => {
         database.close();
+        onClosed();
       };
 
       resolve(database);
