@@ -210,7 +210,7 @@ function delay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function isCloudStateEnvelope(value: unknown): value is CloudStateEnvelope {
+export function isCloudStateEnvelope(value: unknown): value is CloudStateEnvelope {
   if (
     !isRecord(value) || !Number.isInteger(value.revision) ||
     typeof value.revision !== "number" || value.revision < 1 ||

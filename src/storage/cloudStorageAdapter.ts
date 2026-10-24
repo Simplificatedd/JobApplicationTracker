@@ -28,6 +28,7 @@ import {
   cloudApiClient,
   CloudApiError,
   CloudRevisionConflictError,
+  isCloudStateEnvelope,
   type CloudAccount,
   type CloudApiClient,
   type CloudStateEnvelope,
@@ -1058,6 +1059,11 @@ function hasUserData(
 }
 
 function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
+  // Reuse the protocol's envelope check before trusting revisions, publishing
+  // acknowledged state or writing any server response into the browser cache.
+  if (!isCloudStateEnvelope(state)) {
+    throw new Error("Cloud storage returned invalid state. Reload the tracker and inspect the data before retrying.");
+  }
   return {
     ...state,
     snapshot: normalizeSnapshot(state.snapshot),

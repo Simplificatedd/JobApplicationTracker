@@ -48,3 +48,26 @@ describe("initialization after partial startup failure", () => {
     expect((await cache.exportSnapshot()).settings.defaultFollowUpPromptDays).toBe(42);
   });
 });
+
+describe("unverified remote state during recovery", () => {
+  it.each([
+    ["missing revision", { revision: undefined }],
+    ["string revision", { revision: "99" }],
+    ["fractional revision", { revision: 99.5 }],
+    ["missing timestamp", { updatedAt: undefined }],
+    ["invalid notification state", { snapshot: snapshot({ notificationState: null as never }) }],
+    ["invalid analytics settings", { snapshot: snapshot({ analyticsSettings: [] as never }) }],
+  ])("rejects %s without changing acknowledged state or cache", async (_name, patch) => {
+    const api = new RevisionApi(snapshot());
+    const cache = createTestStorageAdapter();
+    const adapter = createCloudStorageAdapter({ api, cache });
+    await adapter.initialize();
+    const before = adapter.getCurrentSnapshot();
+    const write = vi.spyOn(cache, "importSnapshot");
+    vi.spyOn(api, "getState").mockResolvedValueOnce({ ...api.state, ...patch } as unknown as CloudStateEnvelope);
+    await expect(adapter.refresh()).rejects.toThrow();
+    expect(adapter.getCurrentSnapshot()).toEqual(before);
+    expect(write).not.toHaveBeenCalled();
+    expect(adapter.getCacheWarning()).toBeNull();
+  });
+});
