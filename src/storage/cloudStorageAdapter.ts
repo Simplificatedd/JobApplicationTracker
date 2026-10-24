@@ -410,9 +410,11 @@ export function createCloudStorageAdapter({
         throw error;
       });
     }
-    const snapshot = await initializePromise;
+    await initializePromise;
     await verifyAccount();
-    return snapshot;
+    // Startup is memoized, but its snapshot is not a current-state read. Saves
+    // may have advanced the acknowledged state while this caller was waiting.
+    return getCurrentSnapshot();
   }
 
   async function initializeNow() {
