@@ -8,25 +8,42 @@ import { StorageConflictError } from "../storage/mutationRebase";
 import type { StorageSnapshot } from "../storage/StorageAdapter";
 
 // A small hook host lets these tests control promise/event ordering without a
-// browser or network. State and refs persist across renders; effects run once.
-const host = vi.hoisted(() => ({ cursor: 0, slots: [] as unknown[], effects: [] as (() => unknown)[] }));
+// browser or network. State, refs and memoized callbacks persist across renders;
+// dependency changes run effect cleanup before the replacement effect.
+const host = vi.hoisted(() => ({ cursor: 0, slots: [] as unknown[], effects: [] as (() => unknown)[], setters: new Map<number, (value: unknown) => void>() }));
 vi.mock("react", () => ({
   useState(initial: unknown) {
     const slot = host.cursor++;
     if (!(slot in host.slots)) host.slots[slot] = typeof initial === "function" ? initial() : initial;
-    return [host.slots[slot], (value: unknown) => {
+    if (!host.setters.has(slot)) host.setters.set(slot, (value: unknown) => {
       host.slots[slot] = typeof value === "function" ? value(host.slots[slot]) : value;
-    }];
+    });
+    return [host.slots[slot], host.setters.get(slot)];
   },
   useRef(initial: unknown) {
     const slot = host.cursor++;
     if (!(slot in host.slots)) host.slots[slot] = { current: initial };
     return host.slots[slot];
   },
-  useCallback(callback: unknown) { return callback; },
-  useEffect(effect: () => unknown) {
+  useCallback(callback: unknown, deps: unknown[]) {
     const slot = host.cursor++;
-    if (!(slot in host.slots)) { host.slots[slot] = true; host.effects.push(effect); }
+    const previous = host.slots[slot] as { callback: unknown; deps: unknown[] } | undefined;
+    if (!previous || deps.some((dep, i) => !Object.is(dep, previous.deps[i]))) host.slots[slot] = { callback, deps };
+    return (host.slots[slot] as { callback: unknown }).callback;
+  },
+  useEffect(effect: () => unknown, deps: unknown[]) {
+    const slot = host.cursor++;
+    const previous = host.slots[slot] as { deps: unknown[]; cleanup?: () => void } | undefined;
+    if (previous && deps.every((dep, i) => Object.is(dep, previous.deps[i]))) return;
+    const state: { deps: unknown[]; cleanup?: () => void } = { deps };
+    host.slots[slot] = state;
+    host.effects.push(() => {
+      previous?.cleanup?.();
+      if (previous) previous.cleanup = undefined;
+      const cleanup = effect();
+      if (typeof cleanup === "function") state.cleanup = cleanup as () => void;
+      return () => { state.cleanup?.(); state.cleanup = undefined; };
+    });
   },
 }));
 const storage = vi.hoisted(() => ({
@@ -34,7 +51,7 @@ const storage = vi.hoisted(() => ({
   getSettings: vi.fn(), saveSettings: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
-  getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(),
+  getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(), refresh: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
 import { useTrackerStore } from "./useTrackerStore";
@@ -63,10 +80,11 @@ async function flush() { for (let i = 0; i < 12; i++) await Promise.resolve(); }
 function invalidate() { window.dispatchEvent(new Event("tracker-account-changed")); }
 
 beforeEach(() => {
-  host.slots = []; host.effects = []; host.cursor = 0;
+  host.slots = []; host.effects = []; host.cursor = 0; host.setters.clear();
   vi.stubGlobal("window", new EventTarget());
   vi.clearAllMocks();
   storage.initialize.mockResolvedValue(snapshot);
+  storage.refresh.mockResolvedValue(snapshot);
   storage.getAccount.mockReturnValue({ id: "A", email: "a@example.edu" });
   storage.commitMutation.mockResolvedValue(undefined);
   storage.getSettings.mockResolvedValue(snapshot.settings);
@@ -86,6 +104,56 @@ beforeEach(() => {
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); vi.unstubAllGlobals(); });
 
 describe("store account invalidation", () => {
+  it("retries an initial storage failure through remote refresh", async () => {
+    storage.initialize.mockRejectedValueOnce(new Error("Initial storage failure"));
+    RenderStore(); await flush();
+    expect(RenderStore().storageError).toBe("Initial storage failure");
+    RenderStore().retryStorage();
+    RenderStore(); await flush();
+    expect(storage.refresh).toHaveBeenCalledTimes(1);
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(99);
+    expect(RenderStore().storageError).toBeNull();
+    expect(RenderStore().isStorageLoading).toBe(false);
+  });
+
+  it("ignores an older retry completion after a later retry hydrates current state", async () => {
+    RenderStore(); await flush();
+    const old = deferred<StorageSnapshot>();
+    const latest = { ...snapshot, settings: { ...snapshot.settings, defaultFollowUpPromptDays: 71 } };
+    storage.refresh.mockReturnValueOnce(old.promise).mockResolvedValueOnce(latest);
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    storage.getCurrentSnapshot.mockReturnValue(latest);
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    old.resolve(snapshot); await flush();
+    // Finishing the predecessor must not publish any snapshot at all.
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(71);
+    expect(storage.getCurrentSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("publishes the current acknowledgement if a save follows the refresh response", async () => {
+    RenderStore(); await flush();
+    const latest = { ...snapshot, settings: { ...snapshot.settings, defaultFollowUpPromptDays: 72 } };
+    storage.refresh.mockImplementationOnce(async () => {
+      storage.getCurrentSnapshot.mockReturnValue(latest);
+      return snapshot;
+    });
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(72);
+  });
+
+  it("keeps loaded editors mounted and ignores pending retry results after logout", async () => {
+    RenderStore(); await flush();
+    const held = deferred<StorageSnapshot>();
+    storage.refresh.mockReturnValueOnce(held.promise);
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    expect(RenderStore().isStorageLoading).toBe(false);
+    invalidate(); held.resolve(snapshot); await flush();
+    expect(RenderStore().settings).toEqual(DEFAULT_USER_SETTINGS);
+    expect(RenderStore().storageError).toContain("Signed-in account changed");
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    expect(storage.refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("hydrates normally before invalidation", async () => {
     RenderStore(); await flush();
     expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(99);
@@ -233,6 +301,7 @@ describe("store with two independent revision-aware cloud adapters", () => {
     const b = createCloudStorageAdapter({ api, cache });
     await a.initialize();
     storage.initialize.mockImplementation(b.initialize);
+    storage.refresh.mockImplementation(b.refresh);
     storage.commitMutation.mockImplementation(b.commitMutation);
     storage.getCurrentSnapshot.mockImplementation(b.getCurrentSnapshot);
     storage.getApplication.mockImplementation(b.getApplication);
@@ -250,6 +319,79 @@ describe("store with two independent revision-aware cloud adapters", () => {
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
   }
+
+  it("retains multiple saved settings and sees remote edits on retry after cache recovery", async () => {
+    const { api, a, cache } = await sessions();
+    const failed = vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache unavailable"));
+    await RenderStore().updateSettings({ defaultFollowUpPromptDays: 42 });
+    await RenderStore().updateSettings({ defaultFollowUpPromptDays: 43 });
+    failed.mockRestore();
+    await RenderStore().repairCache();
+    await a.updateApplication({ ...a.getCurrentSnapshot().applications[0], company: "Remote edit" });
+    const save = vi.spyOn(api, "saveState");
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(RenderStore().applications[0].company).toBe("Remote edit"));
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(43);
+    expect(RenderStore().cacheWarning).toBeNull();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("preserves editor conflict and changed-field protections after refreshing remote state", async () => {
+    const { a, api } = await sessions();
+    const baseline = RenderStore().applications[0];
+    await a.updateApplication({ ...baseline, company: "Remote company" });
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(RenderStore().applications[0].company).toBe("Remote company"));
+    const conflict = await RenderStore().updateApplication(baseline.id, { company: "Stale local company" }, undefined, undefined, baseline);
+    expect(conflict.ok).toBe(false);
+    expect(api.state.snapshot.applications[0].company).toBe("Remote company");
+    expect((await RenderStore().updateApplication(baseline.id, { notes: "Unsubmitted local notes" }, undefined, undefined, baseline)).ok).toBe(true);
+    expect(RenderStore().applications[0]).toMatchObject({ company: "Remote company", notes: "Unsubmitted local notes" });
+    await a.refresh();
+    await a.deleteApplication(baseline.id);
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(RenderStore().applications).toEqual([]));
+    expect((await RenderStore().updateApplication(baseline.id, { notes: "Old deleted draft" }, undefined, undefined, baseline)).ok).toBe(false);
+    expect(api.state.snapshot.applications).toEqual([]);
+  });
+
+  it("waits for whole editor actions and queued settings saves before refresh hydration", async () => {
+    const { api, b } = await sessions();
+    const read = deferred<typeof application>();
+    storage.getApplication.mockReturnValueOnce(read.promise);
+    const edit = RenderStore().updateApplication(application.id, { notes: "Pending local edit" });
+    const first = RenderStore().updateSettings({ defaultFollowUpPromptDays: 44 });
+    const second = RenderStore().updateSettings({ defaultFollowUpPromptDays: 45 });
+    const fetch = vi.spyOn(api, "getState");
+    RenderStore().retryStorage(); RenderStore(); await flush();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(RenderStore().isStorageLoading).toBe(false);
+    read.resolve(b.getCurrentSnapshot().applications[0]);
+    expect((await edit).ok).toBe(true);
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+    await vi.waitFor(() => expect(storage.refresh).toHaveResolvedTimes(1));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(RenderStore().applications[0].notes).toBe("Pending local edit");
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(45);
+  });
+
+  it("preserves displayed state on a refresh failure and retries with newer committed state", async () => {
+    const { api } = await sessions();
+    await RenderStore().updateSettings({ defaultFollowUpPromptDays: 46 });
+    vi.spyOn(api, "getState").mockRejectedValueOnce(new Error("Cloud read failed"));
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(RenderStore().storageError).toBe("Cloud read failed"));
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(46);
+    expect(RenderStore().isStorageLoading).toBe(false);
+    expect(RenderStore().cacheWarning).toBeNull();
+    await RenderStore().updateSettings({ defaultFollowUpPromptDays: 47 });
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(storage.refresh).toHaveResolvedTimes(1));
+    expect(storage.refresh).toHaveBeenCalledTimes(2);
+    expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(47);
+    expect(RenderStore().storageError).toBeNull();
+  });
 
   it("reconciles real conflict retries into the rendered store and browser cache", async () => {
     const { api, a, b, cache, store } = await sessions();
