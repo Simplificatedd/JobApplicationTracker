@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ChevronDown,
   Download,
   Eye,
   FileText,
@@ -9,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -108,6 +109,8 @@ export function ResumesPage({
   const [uploadError, setUploadError] = useState("");
   const [uploadMessage, setUploadMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [showUploadDetails, setShowUploadDetails] = useState(false);
+  const uploadDetailsId = useId();
   const [pendingDuplicate, setPendingDuplicate] = useState<{
     duplicateOf: ResumeMetadata;
     file: File;
@@ -196,8 +199,14 @@ export function ResumesPage({
   return (
     <div className="space-y-5">
       <section className="surface-panel rounded-lg p-4 sm:p-5">
+        {/* On phones the panel is just Upload plus a toggle for the optional
+            name and version; the file input stays in the page for both
+            Upload buttons and reappears if it receives keyboard focus. */}
         <div className="grid gap-3 md:grid-cols-[1.2fr_0.9fr_0.9fr_auto]">
-          <Field label="File">
+          <Field
+            className="max-sm:sr-only max-sm:focus-within:not-sr-only"
+            label="File"
+          >
             <input
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="field-control"
@@ -207,7 +216,11 @@ export function ResumesPage({
               type="file"
             />
           </Field>
-          <Field label="Display Name">
+          <Field
+            className={showUploadDetails ? "" : "max-sm:hidden"}
+            id={`${uploadDetailsId}-name`}
+            label="Display Name"
+          >
             <input
               className="field-control"
               onChange={(event) => setDisplayName(event.target.value)}
@@ -216,7 +229,11 @@ export function ResumesPage({
               value={displayName}
             />
           </Field>
-          <Field label="Version">
+          <Field
+            className={showUploadDetails ? "" : "max-sm:hidden"}
+            id={`${uploadDetailsId}-version`}
+            label="Version"
+          >
             <input
               className="field-control"
               onChange={(event) => setVersionLabel(event.target.value)}
@@ -233,6 +250,20 @@ export function ResumesPage({
           >
             <Upload aria-hidden="true" size={16} />
             {isUploading ? "Checking..." : "Upload"}
+          </button>
+          <button
+            aria-controls={`${uploadDetailsId}-name ${uploadDetailsId}-version`}
+            aria-expanded={showUploadDetails}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 sm:hidden"
+            onClick={() => setShowUploadDetails((current) => !current)}
+            type="button"
+          >
+            <ChevronDown
+              aria-hidden="true"
+              className={`transition ${showUploadDetails ? "rotate-180" : ""}`}
+              size={16}
+            />
+            {showUploadDetails ? "Hide name and version" : "Add name and version"}
           </button>
         </div>
         {uploadError || actionError ? (
@@ -785,13 +816,17 @@ function SaveError({ message }: { message: string }) {
 
 function Field({
   children,
+  className = "",
+  id,
   label,
 }: {
   children: React.ReactNode;
+  className?: string;
+  id?: string;
   label: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`} id={id}>
       <span className="mb-1.5 block text-sm font-medium text-foreground">
         {label}
       </span>

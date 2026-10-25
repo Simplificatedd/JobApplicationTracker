@@ -83,3 +83,27 @@ describe("document library layouts", () => {
     expect(countMatches(markup, 'aria-label="Download cover letter"')).toBe(2);
   });
 });
+
+describe("document upload panel on phones", () => {
+  it("folds the optional name and version behind a collapsed toggle below sm", () => {
+    const markup = renderPage();
+
+    expect(markup).toMatch(
+      /<button aria-controls="[^"]+-name [^"]+-version" aria-expanded="false" class="[^"]*\bsm:hidden\b[^"]*"[^>]*>.*Add name and version<\/button>/,
+    );
+    expect(markup).toMatch(/<label class="block max-sm:hidden" id="[^"]+-name">/);
+    expect(markup).toMatch(/<label class="block max-sm:hidden" id="[^"]+-version">/);
+  });
+
+  it("keeps the file input in the page for the Upload buttons, revealed on keyboard focus", () => {
+    const markup = renderPage();
+
+    expect(markup).toContain(
+      '<label class="block max-sm:sr-only max-sm:focus-within:not-sr-only">',
+    );
+    expect(markup).toContain('id="resume-upload-file-input"');
+    expect(renderPage({ documentKind: "cover letter" })).toContain(
+      'id="cover-letter-upload-file-input"',
+    );
+  });
+});
