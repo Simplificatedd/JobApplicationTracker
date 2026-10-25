@@ -112,6 +112,7 @@ export function AppShell({
       : currentView === "coverLetters"
         ? "Upload cover letter"
         : "Add job";
+  const shortAddLabel = isDocumentLibrary ? "Upload" : addLabel;
   const PrimaryActionIcon = isDocumentLibrary ? Upload : Plus;
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
@@ -263,20 +264,20 @@ export function AppShell({
         ) : null}
 
         <main className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-6 xl:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:py-4 lg:px-6 xl:px-8">
+            <div className="flex items-center justify-between gap-3">
               <div
                 className={`flex min-w-0 items-center gap-3 pl-12 ${headerTitlePadding}`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm text-muted">Workspace</p>
-                  <h1 className="truncate text-2xl font-semibold text-foreground">
+                  <p className="hidden text-sm text-muted sm:block">Workspace</p>
+                  <h1 className="truncate text-xl font-semibold text-foreground sm:text-2xl">
                     {pageTitle[currentView]}
                   </h1>
                 </div>
               </div>
 
-              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+              <div className="flex shrink-0 items-center justify-end gap-2">
                 {enableNotificationBell ? (
                   <div className="hidden lg:block">
                     <NotificationBell
@@ -293,12 +294,14 @@ export function AppShell({
                 ) : null}
                 {showAddButton ? (
                   <button
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700"
+                    aria-label={addLabel}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 sm:px-4"
                     onClick={onPrimaryAction}
                     type="button"
                   >
                     <PrimaryActionIcon aria-hidden="true" size={18} />
-                    <span>{addLabel}</span>
+                    <span className="sm:hidden">{shortAddLabel}</span>
+                    <span className="hidden sm:inline">{addLabel}</span>
                   </button>
                 ) : null}
               </div>
