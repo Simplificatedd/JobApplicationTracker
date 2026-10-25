@@ -89,7 +89,7 @@ export function MultiSeriesChart({
         return (
           <button
             aria-pressed={!isHidden}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition ${
+            className={`touch-target inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition ${
               isHidden
                 ? "border-border text-muted line-through"
                 : "border-border bg-surface text-foreground hover:bg-slate-50"

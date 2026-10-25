@@ -106,7 +106,7 @@ export function FollowUpCell({
         aria-expanded={isEditing}
         aria-haspopup="dialog"
         aria-label="Quick edit follow-up"
-        className="group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
+        className="touch-target group flex w-full min-w-0 items-start justify-between gap-2 rounded-md text-left"
         onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
@@ -222,7 +222,7 @@ export function FollowUpAutoResetCell({
         aria-expanded={isEditing}
         aria-haspopup="dialog"
         aria-label="Quick edit follow-up auto-reset"
-        className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+        className="touch-target group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
         onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
@@ -292,7 +292,7 @@ export function InterviewCell({
         aria-expanded={isEditing}
         aria-haspopup="dialog"
         aria-label="Quick edit scheduled date and time"
-        className="group flex w-full min-w-0 max-w-full gap-2 overflow-hidden rounded-md text-left"
+        className="touch-target group flex w-full min-w-0 max-w-full gap-2 rounded-md text-left"
         onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
@@ -366,7 +366,7 @@ export function StatusQuickEditCell({
         aria-expanded={isEditing}
         aria-haspopup="dialog"
         aria-label="Quick edit status"
-        className="group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
+        className="touch-target group flex w-full min-w-0 items-center justify-between gap-2 rounded-md text-left"
         onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
         type="button"
@@ -574,7 +574,7 @@ export function ContactsButton({
 }) {
   return (
     <button
-      className="inline-flex h-9 max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
+      className="touch-target inline-flex h-9 max-w-full items-center justify-center gap-1.5 justify-self-start rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
       onClick={onClick}
       type="button"
     >

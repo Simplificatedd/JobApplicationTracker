@@ -69,6 +69,16 @@
     outline: none;
     box-shadow: var(--focus-ring);
   }
+
+  /* iOS zooms into focused fields under 16px, so text entry stays at 16px
+     on touch screens. Utilities set smaller sizes, hence the !important. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+    select,
+    textarea {
+      font-size: 1rem !important;
+    }
+  }
 }
 
 @layer components {
@@ -82,11 +92,12 @@
   }
 
   .applications-toolbar-controls {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .applications-primary-filter,
-  .applications-toolbar-reset {
+  .applications-toolbar-reset,
+  .applications-toolbar-footer {
     display: none;
   }
 
@@ -97,6 +108,14 @@
 
     .applications-toolbar-reset {
       display: inline-flex;
+    }
+
+    .applications-toolbar-footer {
+      display: flex;
+    }
+
+    .applications-toolbar-columns-inline {
+      display: none;
     }
   }
 
@@ -112,6 +131,33 @@
 
     .applications-primary-filter {
       display: block;
+    }
+  }
+
+  /* Narrow application cards list fields as label/value rows; wider cards
+     pair stacked fields. Same container-query approach as the toolbar. */
+  .application-card {
+    container-type: inline-size;
+  }
+
+  .application-card-field {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.75rem;
+  }
+
+  @container (min-width: 30rem) {
+    .application-card-fields {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .application-card-field {
+      display: block;
+    }
+
+    .application-card-field-label {
+      margin-bottom: 0.25rem;
     }
   }
 
@@ -142,7 +188,33 @@
     color: var(--color-foreground);
   }
 
+  /* Gives compact controls a 44px hit area on touch screens without changing
+     how they look. Positioned utilities such as `absolute` still win. */
+  .touch-target {
+    position: relative;
+  }
+
+  @media (pointer: coarse) {
+    .icon-button {
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+    }
+
+    .touch-target::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
+  }
+
   .modal-overlay {
+    /* Overlays are pinned to the viewport, so they must not pick up
+       space-y-* margins from the stack they happen to be rendered in. */
+    margin: 0 !important;
     background: rgba(15, 23, 42, 0.48);
     backdrop-filter: blur(6px);
   }

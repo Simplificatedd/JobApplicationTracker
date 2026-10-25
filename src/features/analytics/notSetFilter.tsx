@@ -66,7 +66,7 @@ export function NotSetToggle({
   return (
     <button
       aria-pressed={includeNotSet}
-      className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-xs font-medium transition hover:bg-slate-50 ${
+      className={`touch-target inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 text-xs font-medium transition hover:bg-slate-50 ${
         includeNotSet ? "text-foreground" : "text-muted"
       }`}
       onClick={() => onChange(!includeNotSet)}

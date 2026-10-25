@@ -15,8 +15,11 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useEffect,
+  useRef,
   useState,
 } from "react";
+import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { APP_NAME } from "../lib/constants";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
@@ -110,6 +113,7 @@ export function AppShell({
       : currentView === "coverLetters"
         ? "Upload cover letter"
         : "Add job";
+  const shortAddLabel = isDocumentLibrary ? "Upload" : addLabel;
   const PrimaryActionIcon = isDocumentLibrary ? Upload : Plus;
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
@@ -127,9 +131,28 @@ export function AppShell({
     : isNavigationHidden
       ? "Show side navigation"
       : "Hide side navigation";
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const sideNavigationStyle = {
     "--side-navigation-width": `${sideNavigationWidth}px`,
   } as CSSProperties;
+
+  // Publish the sticky header's height so page-level sticky elements, such
+  // as the Settings section strip, can sit directly beneath it.
+  useEffect(() => {
+    const header = headerRef.current;
+
+    if (!header) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() =>
+      setHeaderHeight(header.offsetHeight),
+    );
+    observer.observe(header);
+
+    return () => observer.disconnect();
+  }, []);
 
   function resizeSideNavigation(nextWidth: number) {
     setSideNavigationWidth(
@@ -162,24 +185,27 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="min-h-dvh bg-background text-foreground"
+      style={{ "--app-header-height": `${headerHeight}px` } as CSSProperties}
+    >
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
-        className="icon-button fixed left-4 top-4 z-50 bg-surface shadow-sm"
+        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
       >
         <ToggleIcon aria-hidden="true" size={18} />
       </button>
       <div
-        className={`app-container flex min-h-screen min-w-0 flex-col ${
+        className={`app-container flex min-h-dvh min-w-0 flex-col ${
           isTopNavigation ? "" : "xl:flex-row"
         }`}
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
-            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
             style={sideNavigationStyle}
           >
             <div className="flex items-center justify-between gap-3 xl:block">
@@ -261,20 +287,23 @@ export function AppShell({
         ) : null}
 
         <main className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-6 xl:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <header
+            className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:py-4 lg:px-6 xl:px-8"
+            ref={headerRef}
+          >
+            <div className="flex items-center justify-between gap-3">
               <div
                 className={`flex min-w-0 items-center gap-3 pl-12 ${headerTitlePadding}`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm text-muted">Workspace</p>
-                  <h1 className="truncate text-2xl font-semibold text-foreground">
+                  <p className="hidden text-sm text-muted sm:block">Workspace</p>
+                  <h1 className="truncate text-xl font-semibold text-foreground sm:text-2xl">
                     {pageTitle[currentView]}
                   </h1>
                 </div>
               </div>
 
-              <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+              <div className="flex shrink-0 items-center justify-end gap-2">
                 {enableNotificationBell ? (
                   <div className="hidden lg:block">
                     <NotificationBell
@@ -291,12 +320,14 @@ export function AppShell({
                 ) : null}
                 {showAddButton ? (
                   <button
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700"
+                    aria-label={addLabel}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 sm:px-4"
                     onClick={onPrimaryAction}
                     type="button"
                   >
                     <PrimaryActionIcon aria-hidden="true" size={18} />
-                    <span>{addLabel}</span>
+                    <span className="sm:hidden">{shortAddLabel}</span>
+                    <span className="hidden sm:inline">{addLabel}</span>
                   </button>
                 ) : null}
               </div>
@@ -380,23 +411,29 @@ function NavigationButtons({
   layout: "side" | "top";
   onViewChange: (view: ViewKey) => void;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useScrollActiveIntoView(navRef, currentView);
+  // Below xl the side navigation becomes one scrolling row, like top mode,
+  // so it costs a single row of height on phones and tablets. Scrolling rows
+  // clip their content, so p-1 (offset by -m-1) leaves room for focus rings.
   const navClass =
     layout === "top"
-      ? "flex min-w-0 basis-full flex-1 gap-2 overflow-x-auto sm:basis-auto"
-      : "mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:mt-8 xl:grid-cols-1";
+      ? "-m-1 flex min-w-0 basis-full flex-1 gap-2 overflow-x-auto p-1 sm:basis-auto"
+      : "-mx-1 mt-2 flex min-w-0 gap-2 overflow-x-auto p-1 xl:mx-0 xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0";
 
   return (
-    <nav aria-label="Primary navigation" className={navClass}>
+    <nav aria-label="Primary navigation" className={navClass} ref={navRef}>
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = item.key === currentView;
         const buttonLayout =
           layout === "top"
             ? "shrink-0 justify-center"
-            : "justify-center xl:justify-start";
+            : "shrink-0 justify-center xl:shrink xl:justify-start";
 
         return (
           <button
+            aria-current={isActive ? "page" : undefined}
             className={`flex h-11 min-w-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${buttonLayout} ${
               isActive
                 ? "bg-primary text-primary-foreground"

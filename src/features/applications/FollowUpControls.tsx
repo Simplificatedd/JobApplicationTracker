@@ -78,7 +78,7 @@ export function FollowUpScheduleControls({
           <div className="flex flex-wrap gap-1.5">
             {FOLLOW_UP_DATE_PRESETS.map((days) => (
               <button
-                className="rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-foreground hover:bg-slate-50"
+                className="touch-target rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-foreground hover:bg-slate-50"
                 key={days}
                 onClick={() => applyDuration(days)}
                 type="button"
@@ -99,7 +99,7 @@ export function FollowUpScheduleControls({
               value={customDays}
             />
             <button
-              className="h-9 shrink-0 rounded-md border border-border bg-white px-3 text-xs font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="touch-target h-9 shrink-0 rounded-md border border-border bg-white px-3 text-xs font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canApplyCustomDays}
               onClick={() => applyDuration(parsedCustomDays)}
               type="button"
@@ -185,7 +185,7 @@ export function FollowUpAutoResetControls({
           <div className="flex flex-wrap gap-1.5">
             {FOLLOW_UP_AUTO_RESET_PRESETS.map((days) => (
               <button
-                className="rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-foreground hover:bg-slate-50"
+                className="touch-target rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-foreground hover:bg-slate-50"
                 key={days}
                 onClick={() => onPromptDaysChange(String(days))}
                 type="button"

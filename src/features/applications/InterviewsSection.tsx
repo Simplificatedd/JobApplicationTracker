@@ -297,7 +297,7 @@ function InterviewCard({
       </div>
       {!application.archivedAt ? (
         <button
-          className="mt-3 min-h-8 rounded-md border border-border px-2 text-xs font-semibold"
+          className="touch-target mt-3 min-h-8 rounded-md border border-border px-2 text-xs font-semibold"
           onClick={() => void onConvert()}
           type="button"
         >

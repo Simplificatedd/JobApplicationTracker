@@ -61,7 +61,7 @@ export function ContactsPanel({
 
   const panelClass =
     displayMode === "modal"
-      ? "mx-auto my-auto h-auto max-h-[88vh] w-full max-w-2xl rounded-lg"
+      ? "mx-auto my-auto h-auto max-h-[88dvh] w-full max-w-2xl rounded-lg"
       : "ml-auto h-full w-full max-w-xl sm:rounded-l-lg";
 
   async function addContact() {

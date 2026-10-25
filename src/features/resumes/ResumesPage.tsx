@@ -180,6 +180,19 @@ export function ResumesPage({
     }
   }
 
+  function getDocumentItemProps(resume: ResumeMetadata): DocumentItemProps {
+    return {
+      documentLabel: documentKind,
+      isWorking: workingResumeId === resume.id,
+      linkedCount: linkedCounts.get(resume.id) ?? 0,
+      onDelete: () => confirmDelete(resume),
+      onDownload: () => downloadResume(resume),
+      onPreview: () => previewResume(resume),
+      onUpdate: (input, original) => onUpdateResume(resume.id, input, original),
+      resume,
+    };
+  }
+
   return (
     <div className="space-y-5">
       <section className="surface-panel rounded-lg p-4 sm:p-5">
@@ -238,7 +251,18 @@ export function ResumesPage({
         />
       ) : (
         <section className="surface-panel overflow-hidden rounded-lg">
-          <div className="overflow-x-auto">
+          {/* Cards below xl and the table from xl, as on the Applications page. */}
+          <div className="grid gap-3 p-3 lg:grid-cols-2 xl:hidden">
+            {resumes.map((resume) => (
+              <ResumeCard
+                {...getDocumentItemProps(resume)}
+                key={resume.id}
+              />
+            ))}
+          </div>
+          {/* relative keeps absolutely positioned descendants, such as sr-only
+              labels, inside the scroll box instead of widening the page. */}
+          <div className="relative hidden overflow-x-auto xl:block">
             <table className="min-w-[1120px] table-fixed text-left">
               <thead className="border-b border-border bg-slate-50 text-xs font-semibold uppercase text-muted">
                 <tr>
@@ -258,15 +282,8 @@ export function ResumesPage({
               <tbody className="divide-y divide-border">
                 {resumes.map((resume) => (
                   <ResumeRow
-                    documentLabel={documentKind}
-                    isWorking={workingResumeId === resume.id}
+                    {...getDocumentItemProps(resume)}
                     key={resume.id}
-                    linkedCount={linkedCounts.get(resume.id) ?? 0}
-                    onDelete={() => confirmDelete(resume)}
-                    onDownload={() => downloadResume(resume)}
-                    onPreview={() => previewResume(resume)}
-                    onUpdate={(input, original) => onUpdateResume(resume.id, input, original)}
-                    resume={resume}
                   />
                 ))}
               </tbody>
@@ -348,16 +365,7 @@ function DuplicateResumeDialog({
   );
 }
 
-function ResumeRow({
-  documentLabel,
-  isWorking,
-  linkedCount,
-  onDelete,
-  onDownload,
-  onPreview,
-  onUpdate,
-  resume,
-}: {
+interface DocumentItemProps {
   documentLabel: "cover letter" | "resume";
   isWorking: boolean;
   linkedCount: number;
@@ -366,17 +374,39 @@ function ResumeRow({
   onPreview: () => void;
   onUpdate: (input: ResumeMetadataUpdate, expectedDocument?: ResumeMetadata) => Promise<MutationResult>;
   resume: ResumeMetadata;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [editBase, setEditBase] = useState(() => structuredClone(resume));
-  const [draft, setDraft] = useState({
+}
+
+function getDocumentDraft(resume: ResumeMetadata) {
+  return {
     displayName: resume.displayName,
     downloadFileName: resume.downloadFileName,
     notes: resume.notes ?? "",
     versionLabel: resume.versionLabel ?? "",
-  });
+  };
+}
+
+type DocumentDraft = ReturnType<typeof getDocumentDraft>;
+
+// Edit state shared by the table row and the card for one document.
+function useDocumentMetadataEditor(
+  resume: ResumeMetadata,
+  onUpdate: DocumentItemProps["onUpdate"],
+) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [editBase, setEditBase] = useState(() => structuredClone(resume));
+  const [draft, setDraft] = useState(() => getDocumentDraft(resume));
+
+  function updateDraft(field: keyof DocumentDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function startEditing() {
+    setEditBase(structuredClone(resume));
+    setDraft(getDocumentDraft(resume));
+    setIsEditing(true);
+  }
 
   async function save() {
     setIsSaving(true);
@@ -393,14 +423,34 @@ function ResumeRow({
   }
 
   function cancel() {
-    setDraft({
-      displayName: resume.displayName,
-      downloadFileName: resume.downloadFileName,
-      notes: resume.notes ?? "",
-      versionLabel: resume.versionLabel ?? "",
-    });
+    setDraft(getDocumentDraft(resume));
     setIsEditing(false);
   }
+
+  return {
+    cancel,
+    draft,
+    isEditing,
+    isSaving,
+    save,
+    saveError,
+    startEditing,
+    updateDraft,
+  };
+}
+
+function ResumeRow({
+  documentLabel,
+  isWorking,
+  linkedCount,
+  onDelete,
+  onDownload,
+  onPreview,
+  onUpdate,
+  resume,
+}: DocumentItemProps) {
+  const editor = useDocumentMetadataEditor(resume, onUpdate);
+  const { draft, isEditing } = editor;
 
   return (
     <tr className="text-sm text-foreground">
@@ -411,10 +461,7 @@ function ResumeRow({
               aria-label="Display name"
               className="field-control"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  displayName: event.target.value,
-                }))
+                editor.updateDraft("displayName", event.target.value)
               }
               value={draft.displayName}
             />
@@ -422,10 +469,7 @@ function ResumeRow({
               aria-label="Version label"
               className="field-control"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  versionLabel: event.target.value,
-                }))
+                editor.updateDraft("versionLabel", event.target.value)
               }
               placeholder="Version label"
               value={draft.versionLabel}
@@ -448,10 +492,7 @@ function ResumeRow({
               aria-label={`${documentLabel} notes`}
               className="field-control min-h-20 resize-y"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  notes: event.target.value,
-                }))
+                editor.updateDraft("notes", event.target.value)
               }
               placeholder="Notes"
               value={draft.notes}
@@ -471,10 +512,7 @@ function ResumeRow({
           <input
             className="field-control"
             onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                downloadFileName: event.target.value,
-              }))
+              editor.updateDraft("downloadFileName", event.target.value)
             }
             value={draft.downloadFileName}
           />
@@ -485,15 +523,7 @@ function ResumeRow({
       <Td muted>{resume.fileExtension.toUpperCase()}</Td>
       <Td muted>{formatFileSize(resume.fileSize)}</Td>
       <Td>
-        <span
-          className={`rounded-md px-2 py-1 text-xs font-semibold ${
-            resume.fileSize > 0
-              ? "bg-green-50 text-success"
-              : "bg-amber-50 text-warning"
-          }`}
-        >
-          {resume.fileSize > 0 ? "Stored" : "Metadata"}
-        </span>
+        <StorageBadge resume={resume} />
       </Td>
       <Td muted>{formatDate(resume.uploadedAt)}</Td>
       <Td muted>{formatUpdatedAt(resume.updatedAt)}</Td>
@@ -501,68 +531,252 @@ function ResumeRow({
       <Td muted>{linkedCount}</Td>
       <Td>
         <div className="flex items-center gap-1">
-          {isEditing ? (
-            <>
-              <IconAction disabled={isSaving} label="Save metadata" onClick={save}>
-                <Save aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction disabled={isSaving} label="Cancel edit" onClick={cancel}>
-                <X aria-hidden="true" size={16} />
-              </IconAction>
-            </>
-          ) : (
-            <>
-              <IconAction
-                disabled={isWorking}
-                label={
-                  resume.fileExtension === "pdf"
-                    ? `Preview ${documentLabel}`
-                    : `Download ${documentLabel}`
-                }
-                onClick={onPreview}
-              >
-                <Eye aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                disabled={isWorking}
-                label={`Download ${documentLabel}`}
-                onClick={onDownload}
-              >
-                <Download aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                label="Edit metadata"
-                onClick={() => {
-                  setEditBase(structuredClone(resume));
-                  setDraft({
-                    displayName: resume.displayName,
-                    downloadFileName: resume.downloadFileName,
-                    notes: resume.notes ?? "",
-                    versionLabel: resume.versionLabel ?? "",
-                  });
-                  setIsEditing(true);
-                }}
-              >
-                <Pencil aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                label={`Delete ${documentLabel}`}
-                onClick={onDelete}
-                tone="danger"
-              >
-                <Trash2 aria-hidden="true" size={16} />
-              </IconAction>
-            </>
-          )}
+          <DocumentActions
+            documentLabel={documentLabel}
+            editor={editor}
+            isWorking={isWorking}
+            onDelete={onDelete}
+            onDownload={onDownload}
+            onPreview={onPreview}
+            resume={resume}
+          />
         </div>
-        {saveError ? (
-          <p className="mt-2 text-xs font-medium text-destructive" role="alert">
-            {saveError}
-          </p>
-        ) : null}
+        <SaveError message={editor.saveError} />
       </Td>
     </tr>
   );
+}
+
+function ResumeCard({
+  documentLabel,
+  isWorking,
+  linkedCount,
+  onDelete,
+  onDownload,
+  onPreview,
+  onUpdate,
+  resume,
+}: DocumentItemProps) {
+  const editor = useDocumentMetadataEditor(resume, onUpdate);
+  const { draft, isEditing } = editor;
+
+  return (
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground">
+      {isEditing ? (
+        <div className="grid gap-3">
+          <Field label="Display name">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("displayName", event.target.value)
+              }
+              value={draft.displayName}
+            />
+          </Field>
+          <Field label="Version label">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("versionLabel", event.target.value)
+              }
+              value={draft.versionLabel}
+            />
+          </Field>
+          <Field label="Download name">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("downloadFileName", event.target.value)
+              }
+              value={draft.downloadFileName}
+            />
+          </Field>
+          <Field label="Notes">
+            <textarea
+              className="field-control min-h-20 resize-y"
+              onChange={(event) =>
+                editor.updateDraft("notes", event.target.value)
+              }
+              value={draft.notes}
+            />
+          </Field>
+          <p className="break-words text-xs text-muted">
+            Original file: {resume.originalFileName}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words font-semibold">{resume.displayName}</p>
+              <p className="mt-1 truncate text-xs text-muted">
+                {resume.versionLabel || "No version label"}
+              </p>
+            </div>
+            <StorageBadge resume={resume} />
+          </div>
+          {resume.notes ? (
+            <p className="mt-2 line-clamp-2 text-xs text-muted">{resume.notes}</p>
+          ) : null}
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-3 text-xs">
+            <DocumentMeta isWide label="Original file">
+              {resume.originalFileName}
+            </DocumentMeta>
+            <DocumentMeta isWide label="Download name">
+              {resume.downloadFileName}
+            </DocumentMeta>
+            <DocumentMeta label="Type">
+              {resume.fileExtension.toUpperCase()} · {formatFileSize(resume.fileSize)}
+            </DocumentMeta>
+            <DocumentMeta label="Linked">{linkedCount}</DocumentMeta>
+            <DocumentMeta label="Uploaded">{formatDate(resume.uploadedAt)}</DocumentMeta>
+            <DocumentMeta label="Updated">{formatUpdatedAt(resume.updatedAt)}</DocumentMeta>
+            <DocumentMeta isWide label="Last used">
+              {resume.lastUsedAt ? formatUpdatedAt(resume.lastUsedAt) : "Unused"}
+            </DocumentMeta>
+          </dl>
+        </>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <DocumentActions
+          documentLabel={documentLabel}
+          editor={editor}
+          isWorking={isWorking}
+          onDelete={onDelete}
+          onDownload={onDownload}
+          onPreview={onPreview}
+          resume={resume}
+          showLabels
+        />
+      </div>
+      <SaveError message={editor.saveError} />
+    </article>
+  );
+}
+
+function DocumentMeta({
+  children,
+  isWide = false,
+  label,
+}: {
+  children: React.ReactNode;
+  isWide?: boolean;
+  label: string;
+}) {
+  return (
+    <div className={`min-w-0 ${isWide ? "col-span-2" : ""}`}>
+      <dt className="font-semibold uppercase tracking-[0.08em] text-muted">
+        {label}
+      </dt>
+      <dd className="mt-0.5 break-words text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+function DocumentActions({
+  documentLabel,
+  editor,
+  isWorking,
+  onDelete,
+  onDownload,
+  onPreview,
+  resume,
+  showLabels = false,
+}: Pick<
+  DocumentItemProps,
+  "documentLabel" | "isWorking" | "onDelete" | "onDownload" | "onPreview" | "resume"
+> & {
+  editor: ReturnType<typeof useDocumentMetadataEditor>;
+  showLabels?: boolean;
+}) {
+  if (editor.isEditing) {
+    return (
+      <>
+        <IconAction
+          disabled={editor.isSaving}
+          label="Save metadata"
+          onClick={() => void editor.save()}
+          shortLabel={editor.isSaving ? "Saving..." : "Save"}
+          showLabel={showLabels}
+        >
+          <Save aria-hidden="true" size={16} />
+        </IconAction>
+        <IconAction
+          disabled={editor.isSaving}
+          label="Cancel edit"
+          onClick={editor.cancel}
+          shortLabel="Cancel"
+          showLabel={showLabels}
+        >
+          <X aria-hidden="true" size={16} />
+        </IconAction>
+      </>
+    );
+  }
+
+  const canPreview = resume.fileExtension === "pdf";
+
+  return (
+    <>
+      <IconAction
+        disabled={isWorking}
+        label={canPreview ? `Preview ${documentLabel}` : `Download ${documentLabel}`}
+        onClick={onPreview}
+        shortLabel={canPreview ? "Preview" : "Open"}
+        showLabel={showLabels}
+      >
+        <Eye aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        disabled={isWorking}
+        label={`Download ${documentLabel}`}
+        onClick={onDownload}
+        shortLabel="Download"
+        showLabel={showLabels}
+      >
+        <Download aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        label="Edit metadata"
+        onClick={editor.startEditing}
+        shortLabel="Edit"
+        showLabel={showLabels}
+      >
+        <Pencil aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        label={`Delete ${documentLabel}`}
+        onClick={onDelete}
+        shortLabel="Delete"
+        showLabel={showLabels}
+        tone="danger"
+      >
+        <Trash2 aria-hidden="true" size={16} />
+      </IconAction>
+    </>
+  );
+}
+
+function StorageBadge({ resume }: { resume: ResumeMetadata }) {
+  return (
+    <span
+      className={`rounded-md px-2 py-1 text-xs font-semibold ${
+        resume.fileSize > 0
+          ? "bg-green-50 text-success"
+          : "bg-amber-50 text-warning"
+      }`}
+    >
+      {resume.fileSize > 0 ? "Stored" : "Metadata"}
+    </span>
+  );
+}
+
+function SaveError({ message }: { message: string }) {
+  return message ? (
+    <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+      {message}
+    </p>
+  ) : null;
 }
 
 function Field({
@@ -608,28 +822,37 @@ function IconAction({
   disabled = false,
   label,
   onClick,
+  shortLabel,
+  showLabel = false,
   tone = "neutral",
 }: {
   children: React.ReactNode;
   disabled?: boolean;
   label: string;
   onClick: () => void;
+  shortLabel: string;
+  showLabel?: boolean;
   tone?: "danger" | "neutral";
 }) {
   return (
     <button
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border ${
+      aria-label={label}
+      className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
+        showLabel ? "px-3 text-sm font-semibold" : "w-9"
+      } ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"
-          : "text-muted hover:bg-slate-50 hover:text-foreground"
+          : showLabel
+            ? "text-foreground hover:bg-slate-50"
+            : "text-muted hover:bg-slate-50 hover:text-foreground"
       } disabled:cursor-not-allowed disabled:opacity-50`}
       disabled={disabled}
       onClick={onClick}
-      title={label}
+      title={showLabel ? undefined : label}
       type="button"
     >
       {children}
-      <span className="sr-only">{label}</span>
+      {showLabel ? <span>{shortLabel}</span> : null}
     </button>
   );
 }

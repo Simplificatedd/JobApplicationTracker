@@ -502,7 +502,7 @@ export function AssessmentsSection({
                   <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                     {link ? (
                       <a
-                        className="inline-flex min-h-8 items-center gap-1 rounded-md border border-border px-2 text-primary"
+                        className="touch-target inline-flex min-h-8 items-center gap-1 rounded-md border border-border px-2 text-primary"
                         href={link}
                         target="_blank"
                         rel="noreferrer"
@@ -515,7 +515,7 @@ export function AssessmentsSection({
                       <>
                         {canSubmit ? (
                           <button
-                            className="min-h-8 rounded-md border border-border px-2"
+                            className="touch-target min-h-8 rounded-md border border-border px-2"
                             disabled={busy || Boolean(draft)}
                             onClick={() => void markSubmitted(assessment)}
                             type="button"
@@ -524,7 +524,7 @@ export function AssessmentsSection({
                           </button>
                         ) : null}
                         <button
-                          className="min-h-8 rounded-md border border-border px-2"
+                          className="touch-target min-h-8 rounded-md border border-border px-2"
                           disabled={busy || Boolean(draft)}
                           onClick={() => edit(assessment, true)}
                           type="button"

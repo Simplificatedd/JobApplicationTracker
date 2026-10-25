@@ -476,7 +476,7 @@ export function AddApplicationModal({
       onMouseDown={requestCloseFromBackdrop}
       role="dialog"
     >
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+      <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <h2
             className="text-lg font-semibold text-foreground"

@@ -17,6 +17,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useScrollActiveIntoView } from "../../hooks/useScrollActiveIntoView";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
@@ -196,7 +197,7 @@ export function SettingsPage({
               </div>
             </div>
             <a
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
               href="/cdn-cgi/access/logout"
             >
               <LogOut aria-hidden="true" size={16} />
@@ -278,7 +279,7 @@ export function SettingsPage({
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
-                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isImportingBackup}
                     onClick={importBackup}
                     type="button"
@@ -287,7 +288,7 @@ export function SettingsPage({
                     Replace cloud data
                   </button>
                   <button
-                    className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    className="touch-target h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
                     disabled={isImportingBackup}
                     onClick={clearBackupSelection}
                     type="button"
@@ -430,7 +431,7 @@ export function SettingsPage({
               />
               <div className="flex shrink-0 gap-2">
                 <button
-                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  className="touch-target h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
                   onClick={() =>
                     onUpdateSettings({
                       visibleApplicationColumns: APPLICATION_TABLE_COLUMNS.filter(
@@ -443,7 +444,7 @@ export function SettingsPage({
                   Show all
                 </button>
                 <button
-                  className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
+                  className="touch-target h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-slate-50"
                   onClick={() =>
                     onUpdateSettings({
                       visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
@@ -540,7 +541,7 @@ export function SettingsPage({
             {isConfirmingReset ? (
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                  className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
                   onClick={() => {
                     onResetSettings();
                     setIsConfirmingReset(false);
@@ -551,7 +552,7 @@ export function SettingsPage({
                   Confirm reset
                 </button>
                 <button
-                  className="h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                  className="touch-target h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
                   onClick={() => setIsConfirmingReset(false)}
                   type="button"
                 >
@@ -560,7 +561,7 @@ export function SettingsPage({
               </div>
             ) : (
               <button
-                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
+                className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
                 onClick={() => setIsConfirmingReset(true)}
                 type="button"
               >
@@ -719,10 +720,16 @@ function SettingsNav({
   activeSection: SettingsSectionId;
   onSelect: (id: SettingsSectionId) => void;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useScrollActiveIntoView(navRef, activeSection);
+
+  // Below lg the strip sticks under the page header so sections stay one tap
+  // away on long phone pages; from lg it is the existing sticky side column.
   return (
     <nav
       aria-label="Settings sections"
-      className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-28 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:pb-0"
+      className="sticky top-[var(--app-header-height,0px)] z-10 -mx-4 mb-5 flex gap-2 overflow-x-auto bg-background/95 px-4 py-2 backdrop-blur lg:top-28 lg:mx-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+      ref={navRef}
     >
       {SETTINGS_SECTIONS.map((section) => {
         const Icon = section.icon;
@@ -732,7 +739,7 @@ function SettingsNav({
         return (
           <a
             aria-current={isActive ? "true" : undefined}
-            className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+            className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
               isActive
                 ? `${accent.navActive} font-semibold`
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
@@ -783,7 +790,7 @@ function SettingsSection({
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className={`surface-panel relative scroll-mt-28 overflow-hidden rounded-lg ${
+      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
         id === "reset" ? "border-red-200" : ""
       }`}
       id={`settings-${id}`}
@@ -942,7 +949,7 @@ function ToggleButtonField({
         ].map((option) => (
           <button
             aria-checked={checked === option.isOn}
-            className={`h-8 rounded-md px-3 text-sm font-medium transition ${
+            className={`touch-target h-8 rounded-md px-3 text-sm font-medium transition ${
               checked === option.isOn
                 ? `bg-surface font-semibold shadow-sm ${accent.choice}`
                 : "text-muted hover:text-foreground"

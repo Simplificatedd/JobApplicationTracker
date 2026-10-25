@@ -284,7 +284,7 @@ export function ApplicationDetailPanel({
               </p>
             ) : null}
             <h2
-              className="mt-1 truncate text-xl font-semibold text-foreground"
+              className="mt-1 line-clamp-2 break-words text-xl font-semibold text-foreground sm:line-clamp-1"
               id="application-detail-title"
             >
               {application.jobTitle}
@@ -293,8 +293,9 @@ export function ApplicationDetailPanel({
           <div className="flex shrink-0 items-center gap-2">
             {isEditing ? (
               <>
+                {/* Phones use the labelled footer actions below instead. */}
                 <button
-                  className="icon-button"
+                  className="icon-button hidden sm:inline-flex"
                   disabled={isSaving}
                   onClick={saveChanges}
                   type="button"
@@ -305,7 +306,7 @@ export function ApplicationDetailPanel({
                   </span>
                 </button>
                 <button
-                  className="icon-button"
+                  className="icon-button hidden sm:inline-flex"
                   disabled={isSaving}
                   onClick={cancelEditing}
                   type="button"
@@ -332,7 +333,7 @@ export function ApplicationDetailPanel({
           </div>
         </header>
 
-        <div className="overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
             <EditForm
               coverLetterUploadError={coverLetterUploadError}
@@ -375,6 +376,26 @@ export function ApplicationDetailPanel({
             />
           )}
         </div>
+        {isEditing ? (
+          <footer className="flex justify-end gap-2 border-t border-border px-4 py-3 sm:hidden">
+            <button
+              className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+              disabled={isSaving}
+              onClick={cancelEditing}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+              disabled={isSaving}
+              onClick={saveChanges}
+              type="button"
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </button>
+          </footer>
+        ) : null}
         {isDiscardWarningOpen ? (
           <UnsavedChangesDialog
             body="Discard unsaved application edits and close details?"

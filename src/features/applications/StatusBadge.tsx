@@ -14,7 +14,7 @@ const toneClass = {
 export function StatusBadge({ status }: { status: ApplicationStatus }) {
   return (
     <span
-      className={`inline-flex max-w-full items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${toneClass[STATUS_TONE[status]]}`}
+      className={`inline-flex min-w-0 max-w-full items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${toneClass[STATUS_TONE[status]]}`}
     >
       <span className="truncate">{status}</span>
     </span>

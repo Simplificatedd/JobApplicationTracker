@@ -14,6 +14,10 @@ import {
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -23,6 +27,7 @@ import {
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
@@ -96,7 +101,7 @@ export function ApplicationsToolbar({
           />
           {searchQuery ? (
             <button
-              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
+              className="touch-target absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
               onClick={() => onSearchQueryChange?.("")}
               type="button"
             >
@@ -151,24 +156,24 @@ export function ApplicationsToolbar({
             <RotateCcw aria-hidden="true" size={16} />
             Reset
           </button>
+
+          {/* Narrow toolbars show Columns beside Filters instead of in a
+              footer row of its own. */}
+          <div className="applications-toolbar-columns-inline min-w-0">
+            <ColumnsButton
+              className="w-full"
+              hiddenColumnCount={hiddenColumnCount}
+              onClick={() => setIsColumnsOpen(true)}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end border-t border-border pt-3">
-        <button
-          aria-haspopup="dialog"
-          className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3">
+        <ColumnsButton
+          hiddenColumnCount={hiddenColumnCount}
           onClick={() => setIsColumnsOpen(true)}
-          type="button"
-        >
-          <Columns3 aria-hidden="true" size={16} />
-          <span className="truncate">Columns</span>
-          {hiddenColumnCount > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-              {hiddenColumnCount}
-            </span>
-          ) : null}
-        </button>
+        />
       </div>
 
       {isMoreFiltersOpen ? (
@@ -195,7 +200,34 @@ export function ApplicationsToolbar({
   );
 }
 
-function ColumnsModal({
+function ColumnsButton({
+  className = "",
+  hiddenColumnCount,
+  onClick,
+}: {
+  className?: string;
+  hiddenColumnCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-haspopup="dialog"
+      className={`inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 ${className}`}
+      onClick={onClick}
+      type="button"
+    >
+      <Columns3 aria-hidden="true" size={16} />
+      <span className="truncate">Columns</span>
+      {hiddenColumnCount > 0 ? (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+          {hiddenColumnCount}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+export function ColumnsModal({
   onChange,
   onClose,
   visibleApplicationColumns,
@@ -205,6 +237,7 @@ function ColumnsModal({
   visibleApplicationColumns: string[];
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
+  const idPrefix = useId();
   useEscapeKey(true, onClose);
 
   function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -237,7 +270,7 @@ function ColumnsModal({
       onMouseDown={closeFromBackdrop}
       role="dialog"
     >
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <h2
             className="min-w-0 truncate text-lg font-semibold text-foreground"
@@ -256,27 +289,37 @@ function ColumnsModal({
             const checked =
               !column.canHide || draftColumns.includes(column.id);
 
+            const checkboxId = `${idPrefix}-${column.id}`;
+
+            // The label names only the checkbox and stretches its hit area
+            // over the row; the info button sits outside it, painted above.
             return (
-              <label
-                className={`flex h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground ${
+              <div
+                className={`relative flex h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground ${
                   column.canHide ? "" : "opacity-70"
                 }`}
                 key={column.id}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate">{column.label}</span>
+                  <label
+                    className="truncate after:absolute after:inset-0 after:rounded-lg"
+                    htmlFor={checkboxId}
+                  >
+                    {column.label}
+                  </label>
                   <ColumnInfoTooltip columnId={column.id} />
                 </span>
                 <input
                   checked={checked}
                   className="h-4 w-4 shrink-0 rounded border-border text-primary"
                   disabled={!column.canHide}
+                  id={checkboxId}
                   onChange={(event) =>
                     updateColumn(column.id, event.target.checked)
                   }
                   type="checkbox"
                 />
-              </label>
+              </div>
             );
           })}
         </div>
@@ -326,20 +369,90 @@ function ColumnsModal({
   );
 }
 
+// Hover or keyboard focus shows the description on desktop; a tap toggles it
+// on touch screens, where neither hover nor focus-visible applies. It is
+// positioned against the viewport so the modal edge cannot clip it.
 function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
   const description = COLUMN_DESCRIPTIONS[columnId];
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isToggled, setIsToggled] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const isOpen = isHovered || isFocused || isToggled;
+
+  useLayoutEffect(() => {
+    const anchor = buttonRef.current?.getBoundingClientRect();
+    const tooltip = tooltipRef.current?.getBoundingClientRect();
+
+    if (!isOpen || !anchor || !tooltip) {
+      setPosition(null);
+      return;
+    }
+
+    setPosition(
+      getAnchoredMenuPosition({
+        anchor,
+        menuHeight: tooltip.height,
+        menuWidth: tooltip.width,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      }),
+    );
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function close() {
+      setIsHovered(false);
+      setIsToggled(false);
+    }
+
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [isOpen]);
 
   return (
-    <span
+    <button
+      aria-expanded={isToggled}
       aria-label={description}
-      className="group relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 focus-visible:text-foreground"
-      tabIndex={0}
+      className="touch-target inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 focus-visible:text-foreground"
+      onBlur={() => {
+        setIsFocused(false);
+        setIsToggled(false);
+      }}
+      onClick={() => setIsToggled((current) => !current)}
+      onFocus={(event) => setIsFocused(event.currentTarget.matches(":focus-visible"))}
+      onPointerEnter={(event) => setIsHovered(event.pointerType === "mouse")}
+      onPointerLeave={() => setIsHovered(false)}
+      ref={buttonRef}
+      type="button"
     >
       <Info aria-hidden="true" size={14} />
-      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-56 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs font-medium normal-case leading-5 text-foreground shadow-popover group-hover:block group-focus-visible:block">
-        {description}
-      </span>
-    </span>
+      {isOpen ? (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none fixed z-[60] w-56 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs font-medium normal-case leading-5 text-foreground shadow-popover ${
+            position ? "" : "invisible"
+          }`}
+          ref={tooltipRef}
+          style={position ?? { left: 0, top: 0 }}
+        >
+          {description}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -486,7 +599,7 @@ function MoreFiltersModal({
       onMouseDown={closeFromBackdrop}
       role="dialog"
     >
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <h2

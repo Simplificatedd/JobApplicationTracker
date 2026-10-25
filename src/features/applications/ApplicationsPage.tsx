@@ -281,7 +281,7 @@ export function ApplicationsPage({
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryMetric
           action={
             <CountScopeToggle
@@ -503,8 +503,8 @@ function SummaryMetric({
 
   return (
     <div className="surface-panel rounded-lg px-4 py-3">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className="truncate text-sm font-medium text-muted">{label}</p>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <p className="min-w-0 truncate text-sm font-medium text-muted">{label}</p>
         {action}
       </div>
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
@@ -535,7 +535,7 @@ function CountScopeToggle({
       {options.map((option) => (
         <button
           aria-pressed={scope === option.value}
-          className={`rounded px-2 py-0.5 text-xs font-semibold transition ${
+          className={`touch-target rounded px-2 py-0.5 text-xs font-semibold transition ${
             scope === option.value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
