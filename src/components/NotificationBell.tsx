@@ -446,7 +446,7 @@ function SmallActionButton({
   return (
     <button
       aria-label={label}
-      className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50"
+      className="touch-target inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50"
       onClick={onClick}
       title={label}
       type="button"

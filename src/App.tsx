@@ -133,7 +133,7 @@ function StorageErrorBanner({
         <p className="min-w-0">{message}</p>
       </div>
       <button
-        className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 font-semibold hover:bg-amber-100"
+        className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 font-semibold hover:bg-amber-100"
         onClick={onRetry}
         type="button"
       >

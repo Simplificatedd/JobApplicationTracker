@@ -216,7 +216,7 @@ export function AnalyticsPage({
             <button
               aria-controls={customizePanelId}
               aria-expanded={isCustomizing}
-              className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
                 isCustomizing
                   ? "border-primary bg-blue-50 text-primary"
                   : "border-border text-foreground hover:bg-slate-50"

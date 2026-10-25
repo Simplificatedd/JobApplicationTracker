@@ -535,7 +535,7 @@ function CountScopeToggle({
       {options.map((option) => (
         <button
           aria-pressed={scope === option.value}
-          className={`rounded px-2 py-0.5 text-xs font-semibold transition ${
+          className={`touch-target rounded px-2 py-0.5 text-xs font-semibold transition ${
             scope === option.value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"

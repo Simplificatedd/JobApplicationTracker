@@ -93,7 +93,7 @@ export function ChartCard({
           {views && views.length > 1 && currentView && nextView && CurrentIcon ? (
             <button
               aria-label={`${title}: showing ${currentView.label}. Switch to ${nextView.label}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface pl-2 pr-2.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-blue-50"
+              className="touch-target inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-surface pl-2 pr-2.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-blue-50"
               onClick={cycleView}
               title={`Switch to ${nextView.label}`}
               type="button"
@@ -313,7 +313,7 @@ export function HorizontalBarChart({
           </span>
           <button
             aria-expanded={isExpanded}
-            className="rounded-md px-2 py-1 font-semibold text-primary hover:bg-blue-50"
+            className="touch-target rounded-md px-2 py-1 font-semibold text-primary hover:bg-blue-50"
             onClick={() => setIsExpanded((current) => !current)}
             type="button"
           >

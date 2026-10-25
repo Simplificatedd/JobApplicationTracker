@@ -618,7 +618,7 @@ function IconAction({
 }) {
   return (
     <button
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border ${
+      className={`touch-target inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"
           : "text-muted hover:bg-slate-50 hover:text-foreground"

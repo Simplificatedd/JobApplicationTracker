@@ -96,7 +96,7 @@ export function ApplicationsToolbar({
           />
           {searchQuery ? (
             <button
-              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
+              className="touch-target absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
               onClick={() => onSearchQueryChange?.("")}
               type="button"
             >
