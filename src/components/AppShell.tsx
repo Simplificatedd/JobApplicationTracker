@@ -166,7 +166,7 @@ export function AppShell({
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
-        className="icon-button fixed left-4 top-4 z-50 bg-surface shadow-sm"
+        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
       >
