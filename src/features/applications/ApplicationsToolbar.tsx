@@ -14,6 +14,9 @@ import {
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -23,6 +26,7 @@ import {
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
@@ -353,20 +357,94 @@ function ColumnsModal({
   );
 }
 
+// Hover or keyboard focus shows the description on desktop; a tap toggles it
+// on touch screens, where neither hover nor focus-visible applies. It is
+// positioned against the viewport so the modal edge cannot clip it.
 function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
   const description = COLUMN_DESCRIPTIONS[columnId];
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isToggled, setIsToggled] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const isOpen = isHovered || isFocused || isToggled;
+
+  useLayoutEffect(() => {
+    const anchor = buttonRef.current?.getBoundingClientRect();
+    const tooltip = tooltipRef.current?.getBoundingClientRect();
+
+    if (!isOpen || !anchor || !tooltip) {
+      setPosition(null);
+      return;
+    }
+
+    setPosition(
+      getAnchoredMenuPosition({
+        anchor,
+        menuHeight: tooltip.height,
+        menuWidth: tooltip.width,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      }),
+    );
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function close() {
+      setIsHovered(false);
+      setIsToggled(false);
+    }
+
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [isOpen]);
 
   return (
-    <span
+    <button
+      aria-expanded={isToggled}
       aria-label={description}
-      className="group relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 focus-visible:text-foreground"
-      tabIndex={0}
+      className="touch-target inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100 hover:text-foreground focus-visible:bg-slate-100 focus-visible:text-foreground"
+      onBlur={() => {
+        setIsFocused(false);
+        setIsToggled(false);
+      }}
+      onClick={(event) => {
+        // Keep the tap from toggling the column checkbox in the same label.
+        event.preventDefault();
+        setIsToggled((current) => !current);
+      }}
+      onFocus={(event) => setIsFocused(event.currentTarget.matches(":focus-visible"))}
+      onPointerEnter={(event) => setIsHovered(event.pointerType === "mouse")}
+      onPointerLeave={() => setIsHovered(false)}
+      ref={buttonRef}
+      type="button"
     >
       <Info aria-hidden="true" size={14} />
-      <span className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-56 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs font-medium normal-case leading-5 text-foreground shadow-popover group-hover:block group-focus-visible:block">
-        {description}
-      </span>
-    </span>
+      {isOpen ? (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none fixed z-[60] w-56 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-surface px-3 py-2 text-left text-xs font-medium normal-case leading-5 text-foreground shadow-popover ${
+            position ? "" : "invisible"
+          }`}
+          ref={tooltipRef}
+          style={position ?? { left: 0, top: 0 }}
+        >
+          {description}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
