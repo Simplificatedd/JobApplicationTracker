@@ -34,22 +34,36 @@ describe("getScrollEdges", () => {
 });
 
 describe("getWheelScrollLeft", () => {
+  const wheel = (deltaY: number, deltaX = 0, cancelable = true) => ({
+    cancelable,
+    deltaX,
+    deltaY,
+  });
+
   it("turns a vertical wheel gesture into horizontal strip scrolling", () => {
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, 0, 120)).toBe(220);
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, 0, -60)).toBe(40);
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, wheel(120))).toBe(220);
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, wheel(-60))).toBe(40);
   });
 
   it("clamps to the strip's ends", () => {
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 350 }, 0, 120)).toBe(400);
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 30 }, 0, -120)).toBe(0);
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 350 }, wheel(120))).toBe(400);
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 30 }, wheel(-120))).toBe(0);
   });
 
   it("leaves the page to scroll at an end, for horizontal gestures, or when nothing overflows", () => {
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 400 }, 0, 120)).toBeNull();
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 0 }, 0, -120)).toBeNull();
-    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, 80, 20)).toBeNull();
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 400 }, wheel(120))).toBeNull();
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 0 }, wheel(-120))).toBeNull();
+    expect(getWheelScrollLeft({ ...strip, scrollLeft: 100 }, wheel(20, 80))).toBeNull();
     expect(
-      getWheelScrollLeft({ clientWidth: 300, scrollLeft: 0, scrollWidth: 300 }, 0, 120),
+      getWheelScrollLeft({ clientWidth: 300, scrollLeft: 0, scrollWidth: 300 }, wheel(120)),
+    ).toBeNull();
+  });
+
+  it("does not move the strip for a non-cancelable wheel event, which scrolls the page anyway", () => {
+    // Browsers send these during a page scroll already under way or trackpad
+    // momentum. Moving the strip as well would scroll both at once.
+    expect(
+      getWheelScrollLeft({ ...strip, scrollLeft: 100 }, wheel(120, 0, false)),
     ).toBeNull();
   });
 });

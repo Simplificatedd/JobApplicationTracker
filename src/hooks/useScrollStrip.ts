@@ -1,6 +1,12 @@
 import { type RefObject, useEffect } from "react";
 import { getHorizontalScrollDelta } from "./useScrollActiveIntoView";
 
+interface WheelGesture {
+  cancelable: boolean;
+  deltaX: number;
+  deltaY: number;
+}
+
 interface StripMetrics {
   clientWidth: number;
   scrollLeft: number;
@@ -21,14 +27,20 @@ export function getScrollEdges({ clientWidth, scrollLeft, scrollWidth }: StripMe
 // The strip's next scroll position for a mostly vertical wheel gesture, or
 // null when the page should scroll instead: the gesture is horizontal, the
 // strip does not overflow, or it is already at the end being scrolled to.
+// Also null for a non-cancelable event (a page scroll already under way, or
+// trackpad momentum): the page will scroll regardless, so moving the strip
+// too would turn one gesture into two scrolls.
 export function getWheelScrollLeft(
   strip: StripMetrics,
-  deltaX: number,
-  deltaY: number,
+  { cancelable, deltaX, deltaY }: WheelGesture,
 ) {
   const maxScrollLeft = strip.scrollWidth - strip.clientWidth;
 
-  if (Math.abs(deltaY) <= Math.abs(deltaX) || maxScrollLeft <= 0) {
+  if (
+    !cancelable ||
+    Math.abs(deltaY) <= Math.abs(deltaX) ||
+    maxScrollLeft <= 0
+  ) {
     return null;
   }
 
@@ -65,11 +77,7 @@ export function useScrollStrip(
     }
 
     function scrollWithWheel(event: WheelEvent) {
-      const nextScrollLeft = getWheelScrollLeft(
-        element,
-        event.deltaX,
-        event.deltaY,
-      );
+      const nextScrollLeft = getWheelScrollLeft(element, event);
 
       if (nextScrollLeft === null) {
         return;
