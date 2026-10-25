@@ -180,6 +180,19 @@ export function ResumesPage({
     }
   }
 
+  function getDocumentItemProps(resume: ResumeMetadata): DocumentItemProps {
+    return {
+      documentLabel: documentKind,
+      isWorking: workingResumeId === resume.id,
+      linkedCount: linkedCounts.get(resume.id) ?? 0,
+      onDelete: () => confirmDelete(resume),
+      onDownload: () => downloadResume(resume),
+      onPreview: () => previewResume(resume),
+      onUpdate: (input, original) => onUpdateResume(resume.id, input, original),
+      resume,
+    };
+  }
+
   return (
     <div className="space-y-5">
       <section className="surface-panel rounded-lg p-4 sm:p-5">
@@ -238,9 +251,18 @@ export function ResumesPage({
         />
       ) : (
         <section className="surface-panel overflow-hidden rounded-lg">
+          {/* Cards below xl and the table from xl, as on the Applications page. */}
+          <div className="grid gap-3 p-3 lg:grid-cols-2 xl:hidden">
+            {resumes.map((resume) => (
+              <ResumeCard
+                {...getDocumentItemProps(resume)}
+                key={resume.id}
+              />
+            ))}
+          </div>
           {/* relative keeps absolutely positioned descendants, such as sr-only
               labels, inside the scroll box instead of widening the page. */}
-          <div className="relative overflow-x-auto">
+          <div className="relative hidden overflow-x-auto xl:block">
             <table className="min-w-[1120px] table-fixed text-left">
               <thead className="border-b border-border bg-slate-50 text-xs font-semibold uppercase text-muted">
                 <tr>
@@ -260,15 +282,8 @@ export function ResumesPage({
               <tbody className="divide-y divide-border">
                 {resumes.map((resume) => (
                   <ResumeRow
-                    documentLabel={documentKind}
-                    isWorking={workingResumeId === resume.id}
+                    {...getDocumentItemProps(resume)}
                     key={resume.id}
-                    linkedCount={linkedCounts.get(resume.id) ?? 0}
-                    onDelete={() => confirmDelete(resume)}
-                    onDownload={() => downloadResume(resume)}
-                    onPreview={() => previewResume(resume)}
-                    onUpdate={(input, original) => onUpdateResume(resume.id, input, original)}
-                    resume={resume}
                   />
                 ))}
               </tbody>
@@ -532,6 +547,132 @@ function ResumeRow({
   );
 }
 
+function ResumeCard({
+  documentLabel,
+  isWorking,
+  linkedCount,
+  onDelete,
+  onDownload,
+  onPreview,
+  onUpdate,
+  resume,
+}: DocumentItemProps) {
+  const editor = useDocumentMetadataEditor(resume, onUpdate);
+  const { draft, isEditing } = editor;
+
+  return (
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground">
+      {isEditing ? (
+        <div className="grid gap-3">
+          <Field label="Display name">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("displayName", event.target.value)
+              }
+              value={draft.displayName}
+            />
+          </Field>
+          <Field label="Version label">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("versionLabel", event.target.value)
+              }
+              value={draft.versionLabel}
+            />
+          </Field>
+          <Field label="Download name">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                editor.updateDraft("downloadFileName", event.target.value)
+              }
+              value={draft.downloadFileName}
+            />
+          </Field>
+          <Field label="Notes">
+            <textarea
+              className="field-control min-h-20 resize-y"
+              onChange={(event) =>
+                editor.updateDraft("notes", event.target.value)
+              }
+              value={draft.notes}
+            />
+          </Field>
+          <p className="break-words text-xs text-muted">
+            Original file: {resume.originalFileName}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="break-words font-semibold">{resume.displayName}</p>
+              <p className="mt-1 truncate text-xs text-muted">
+                {resume.versionLabel || "No version label"}
+              </p>
+            </div>
+            <StorageBadge resume={resume} />
+          </div>
+          {resume.notes ? (
+            <p className="mt-2 line-clamp-2 text-xs text-muted">{resume.notes}</p>
+          ) : null}
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-3 text-xs">
+            <DocumentMeta isWide label="Original file">
+              {resume.originalFileName}
+            </DocumentMeta>
+            <DocumentMeta isWide label="Download name">
+              {resume.downloadFileName}
+            </DocumentMeta>
+            <DocumentMeta label="Type">
+              {resume.fileExtension.toUpperCase()} · {formatFileSize(resume.fileSize)}
+            </DocumentMeta>
+            <DocumentMeta label="Linked">{linkedCount}</DocumentMeta>
+            <DocumentMeta label="Uploaded">{formatDate(resume.uploadedAt)}</DocumentMeta>
+            <DocumentMeta label="Updated">{formatUpdatedAt(resume.updatedAt)}</DocumentMeta>
+            <DocumentMeta isWide label="Last used">
+              {resume.lastUsedAt ? formatUpdatedAt(resume.lastUsedAt) : "Unused"}
+            </DocumentMeta>
+          </dl>
+        </>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <DocumentActions
+          documentLabel={documentLabel}
+          editor={editor}
+          isWorking={isWorking}
+          onDelete={onDelete}
+          onDownload={onDownload}
+          onPreview={onPreview}
+          resume={resume}
+          showLabels
+        />
+      </div>
+      <SaveError message={editor.saveError} />
+    </article>
+  );
+}
+
+function DocumentMeta({
+  children,
+  isWide = false,
+  label,
+}: {
+  children: React.ReactNode;
+  isWide?: boolean;
+  label: string;
+}) {
+  return (
+    <div className={`min-w-0 ${isWide ? "col-span-2" : ""}`}>
+      <dt className="font-semibold uppercase tracking-[0.08em] text-muted">
+        {label}
+      </dt>
+      <dd className="mt-0.5 break-words text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
+
 function DocumentActions({
   documentLabel,
   editor,
@@ -701,7 +842,9 @@ function IconAction({
       } ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"
-          : "text-muted hover:bg-slate-50 hover:text-foreground"
+          : showLabel
+            ? "text-foreground hover:bg-slate-50"
+            : "text-muted hover:bg-slate-50 hover:text-foreground"
       } disabled:cursor-not-allowed disabled:opacity-50`}
       disabled={disabled}
       onClick={onClick}
