@@ -238,7 +238,9 @@ export function ResumesPage({
         />
       ) : (
         <section className="surface-panel overflow-hidden rounded-lg">
-          <div className="overflow-x-auto">
+          {/* relative keeps absolutely positioned descendants, such as sr-only
+              labels, inside the scroll box instead of widening the page. */}
+          <div className="relative overflow-x-auto">
             <table className="min-w-[1120px] table-fixed text-left">
               <thead className="border-b border-border bg-slate-50 text-xs font-semibold uppercase text-muted">
                 <tr>
