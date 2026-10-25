@@ -15,6 +15,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -226,7 +227,7 @@ function ColumnsButton({
   );
 }
 
-function ColumnsModal({
+export function ColumnsModal({
   onChange,
   onClose,
   visibleApplicationColumns,
@@ -236,6 +237,7 @@ function ColumnsModal({
   visibleApplicationColumns: string[];
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
+  const idPrefix = useId();
   useEscapeKey(true, onClose);
 
   function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
@@ -287,27 +289,37 @@ function ColumnsModal({
             const checked =
               !column.canHide || draftColumns.includes(column.id);
 
+            const checkboxId = `${idPrefix}-${column.id}`;
+
+            // The label names only the checkbox and stretches its hit area
+            // over the row; the info button sits outside it, painted above.
             return (
-              <label
-                className={`flex h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground ${
+              <div
+                className={`relative flex h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground ${
                   column.canHide ? "" : "opacity-70"
                 }`}
                 key={column.id}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate">{column.label}</span>
+                  <label
+                    className="truncate after:absolute after:inset-0 after:rounded-lg"
+                    htmlFor={checkboxId}
+                  >
+                    {column.label}
+                  </label>
                   <ColumnInfoTooltip columnId={column.id} />
                 </span>
                 <input
                   checked={checked}
                   className="h-4 w-4 shrink-0 rounded border-border text-primary"
                   disabled={!column.canHide}
+                  id={checkboxId}
                   onChange={(event) =>
                     updateColumn(column.id, event.target.checked)
                   }
                   type="checkbox"
                 />
-              </label>
+              </div>
             );
           })}
         </div>
@@ -420,11 +432,7 @@ function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
         setIsFocused(false);
         setIsToggled(false);
       }}
-      onClick={(event) => {
-        // Keep the tap from toggling the column checkbox in the same label.
-        event.preventDefault();
-        setIsToggled((current) => !current);
-      }}
+      onClick={() => setIsToggled((current) => !current)}
       onFocus={(event) => setIsFocused(event.currentTarget.matches(":focus-visible"))}
       onPointerEnter={(event) => setIsHovered(event.pointerType === "mouse")}
       onPointerLeave={() => setIsHovered(false)}
