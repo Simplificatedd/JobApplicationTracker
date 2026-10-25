@@ -187,6 +187,18 @@ describe("cloud snapshot storage budget", () => {
   it("retains a separate UTF-8 transport ceiling", () => {
     expect(() => parseSaveStateRequest("界".repeat(2_000_000))).toThrow("5 MiB transport limit");
   });
+
+  it("measures legacy defaults added by parsing before allowing persistence", async () => {
+    const raw = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES) as Partial<StorageSnapshot>;
+    delete raw.coverLetters;
+    raw.applications![0].notes += "x".repeat(MAX_CLOUD_SNAPSHOT_BYTES - utf8ByteLength(JSON.stringify(raw)));
+    expect(utf8ByteLength(JSON.stringify(raw))).toBe(MAX_CLOUD_SNAPSHOT_BYTES);
+    const input = parseSaveStateRequest(JSON.stringify({ baseRevision: null, snapshot: raw }));
+    const fake = new FakeD1Database();
+    const prepare = vi.spyOn(fake, "prepare");
+    await expect(saveCloudState(fake as unknown as D1Database, { id: "owner", email: "owner@example.edu" }, input)).rejects.toMatchObject({ status: 413 });
+    expect(prepare).not.toHaveBeenCalled();
+  });
 });
 
 describe("cloud state", () => {
