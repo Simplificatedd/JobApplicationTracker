@@ -1,4 +1,5 @@
 import { type RefObject, useEffect } from "react";
+import { getHorizontalScrollDelta } from "./useScrollActiveIntoView";
 
 interface StripMetrics {
   clientWidth: number;
@@ -40,8 +41,10 @@ export function getWheelScrollLeft(
 }
 
 // Drives the .scroll-strip style: marks the edges that hide more content so
-// they fade, and lets a mouse wheel scroll the strip, since its scrollbar is
-// hidden. Pass the item count so the hint updates when items change.
+// they fade, lets a mouse wheel scroll the strip, since its scrollbar is
+// hidden, and brings a keyboard-focused item fully clear of the fade, which
+// browsers skip for partly visible items. Pass the item count so the hint
+// updates when items change.
 export function useScrollStrip(
   stripRef: RefObject<HTMLElement | null>,
   itemCount: number,
@@ -76,17 +79,30 @@ export function useScrollStrip(
       element.scrollLeft = nextScrollLeft;
     }
 
+    function revealFocusedItem(event: FocusEvent) {
+      if (!(event.target instanceof HTMLElement)) {
+        return;
+      }
+
+      element.scrollLeft += getHorizontalScrollDelta(
+        element.getBoundingClientRect(),
+        event.target.getBoundingClientRect(),
+      );
+    }
+
     const resizeObserver = new ResizeObserver(updateEdges);
     resizeObserver.observe(element);
     [...element.children].forEach((child) => resizeObserver.observe(child));
     element.addEventListener("scroll", updateEdges, { passive: true });
     element.addEventListener("wheel", scrollWithWheel, { passive: false });
+    element.addEventListener("focusin", revealFocusedItem);
     updateEdges();
 
     return () => {
       resizeObserver.disconnect();
       element.removeEventListener("scroll", updateEdges);
       element.removeEventListener("wheel", scrollWithWheel);
+      element.removeEventListener("focusin", revealFocusedItem);
     };
   }, [itemCount, stripRef]);
 }
