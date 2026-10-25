@@ -714,19 +714,23 @@ function DocumentActions({
     );
   }
 
+  // Only PDFs open in a preview; for DOCX "preview" would be the same
+  // download as the Download action, so it is not offered twice.
   const canPreview = resume.fileExtension === "pdf";
 
   return (
     <>
-      <IconAction
-        disabled={isWorking}
-        label={canPreview ? `Preview ${documentLabel}` : `Download ${documentLabel}`}
-        onClick={onPreview}
-        shortLabel={canPreview ? "Preview" : "Open"}
-        showLabel={showLabels}
-      >
-        <Eye aria-hidden="true" size={16} />
-      </IconAction>
+      {canPreview ? (
+        <IconAction
+          disabled={isWorking}
+          label={`Preview ${documentLabel}`}
+          onClick={onPreview}
+          shortLabel="Preview"
+          showLabel={showLabels}
+        >
+          <Eye aria-hidden="true" size={16} />
+        </IconAction>
+      ) : null}
       <IconAction
         disabled={isWorking}
         label={`Download ${documentLabel}`}

@@ -59,13 +59,22 @@ describe("document library layouts", () => {
     expect(countMatches(markup, 'title="Delete resume"')).toBe(1);
   });
 
-  it("labels a DOCX's first action as opening it, since it cannot preview", () => {
+  it("offers DOCX files a single, accurately named Download instead of a duplicate Open", () => {
     const markup = renderPage({
       resumes: [{ ...resume, fileExtension: "docx" }],
     });
 
-    expect(markup).toContain("<span>Open</span>");
-    expect(markup).not.toContain("<span>Preview</span>");
+    expect(markup).not.toContain("<span>Open</span>");
+    expect(markup).not.toContain("Preview resume");
+    // One Download per layout (card and table), not two.
+    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
+  });
+
+  it("keeps Preview for PDFs, whose preview opens the file rather than downloading it", () => {
+    const markup = renderPage();
+
+    expect(countMatches(markup, 'aria-label="Preview resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
   });
 
   it("names the document kind on cover letter cards", () => {
