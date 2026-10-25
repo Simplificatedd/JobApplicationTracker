@@ -69,6 +69,16 @@
     outline: none;
     box-shadow: var(--focus-ring);
   }
+
+  /* iOS zooms into focused fields under 16px, so text entry stays at 16px
+     on touch screens. Utilities set smaller sizes, hence the !important. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+    select,
+    textarea {
+      font-size: 1rem !important;
+    }
+  }
 }
 
 @layer components {
@@ -140,6 +150,29 @@
     border-color: #b8c2d3;
     background: #f7f9fc;
     color: var(--color-foreground);
+  }
+
+  /* Gives compact controls a 44px hit area on touch screens without changing
+     how they look. Positioned utilities such as `absolute` still win. */
+  .touch-target {
+    position: relative;
+  }
+
+  @media (pointer: coarse) {
+    .icon-button {
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+    }
+
+    .touch-target::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
   }
 
   .modal-overlay {
