@@ -180,3 +180,28 @@ describe("application search results in the table", () => {
     },
   );
 });
+
+describe("applications page on narrow screens", () => {
+  it("pairs the summary metrics at every width below xl", () => {
+    expect(renderPage("")).toContain(
+      'class="grid grid-cols-2 gap-3 xl:grid-cols-4"',
+    );
+  });
+
+  it("renders compact cards that switch layout by container width", () => {
+    const html = renderPage("");
+
+    expect(html).toContain('class="grid gap-3 p-3 lg:grid-cols-2 xl:hidden"');
+    expect(html).toContain('class="application-card ');
+    expect(html).toContain('class="application-card-fields ');
+    expect(html).toContain('class="application-card-field min-w-0"');
+  });
+
+  it("offers Columns beside Filters as well as in the wide-toolbar footer", () => {
+    const html = renderPage("");
+
+    expect(html).toContain('class="applications-toolbar-columns-inline min-w-0"');
+    expect(html).toContain('class="applications-toolbar-footer ');
+    expect(html.match(/<span class="truncate">Columns<\/span>/g)).toHaveLength(2);
+  });
+});
