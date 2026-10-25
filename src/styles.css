@@ -92,11 +92,12 @@
   }
 
   .applications-toolbar-controls {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .applications-primary-filter,
-  .applications-toolbar-reset {
+  .applications-toolbar-reset,
+  .applications-toolbar-footer {
     display: none;
   }
 
@@ -107,6 +108,14 @@
 
     .applications-toolbar-reset {
       display: inline-flex;
+    }
+
+    .applications-toolbar-footer {
+      display: flex;
+    }
+
+    .applications-toolbar-columns-inline {
+      display: none;
     }
   }
 

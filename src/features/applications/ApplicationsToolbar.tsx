@@ -151,24 +151,24 @@ export function ApplicationsToolbar({
             <RotateCcw aria-hidden="true" size={16} />
             Reset
           </button>
+
+          {/* Narrow toolbars show Columns beside Filters instead of in a
+              footer row of its own. */}
+          <div className="applications-toolbar-columns-inline min-w-0">
+            <ColumnsButton
+              className="w-full"
+              hiddenColumnCount={hiddenColumnCount}
+              onClick={() => setIsColumnsOpen(true)}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end border-t border-border pt-3">
-        <button
-          aria-haspopup="dialog"
-          className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3">
+        <ColumnsButton
+          hiddenColumnCount={hiddenColumnCount}
           onClick={() => setIsColumnsOpen(true)}
-          type="button"
-        >
-          <Columns3 aria-hidden="true" size={16} />
-          <span className="truncate">Columns</span>
-          {hiddenColumnCount > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-              {hiddenColumnCount}
-            </span>
-          ) : null}
-        </button>
+        />
       </div>
 
       {isMoreFiltersOpen ? (
@@ -192,6 +192,33 @@ export function ApplicationsToolbar({
         />
       ) : null}
     </section>
+  );
+}
+
+function ColumnsButton({
+  className = "",
+  hiddenColumnCount,
+  onClick,
+}: {
+  className?: string;
+  hiddenColumnCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-haspopup="dialog"
+      className={`inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 ${className}`}
+      onClick={onClick}
+      type="button"
+    >
+      <Columns3 aria-hidden="true" size={16} />
+      <span className="truncate">Columns</span>
+      {hiddenColumnCount > 0 ? (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+          {hiddenColumnCount}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
