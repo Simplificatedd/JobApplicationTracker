@@ -7,6 +7,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_STATUSES } from "../../lib/constants";
 import {
   calculateFollowUpDueDate,
@@ -609,10 +610,14 @@ function SegmentedControl<Value extends string>({
   options: ReadonlyArray<{ label: string; value: Value }>;
   value: Value;
 }) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  useScrollStrip(stripRef, options.length);
+
   return (
     <div
       aria-label={label}
-      className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg border border-border bg-background p-1 touch:h-auto"
+      className="scroll-strip inline-flex h-9 max-w-full items-center rounded-lg border border-border bg-background p-1 touch:h-auto"
+      ref={stripRef}
       role="radiogroup"
     >
       {options.map((option) => (

@@ -161,6 +161,41 @@
     }
   }
 
+  /* Horizontally scrolling rows: navigation, the Settings section strip and
+     segmented controls. The scrollbar is hidden so the row has the same
+     height in every browser; useScrollStrip fades an edge that hides more
+     items and maps mouse-wheel scrolling onto the row. */
+  .scroll-strip {
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-padding-inline: 1.5rem;
+  }
+
+  .scroll-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-strip[data-fade-start="true"],
+  .scroll-strip[data-fade-end="true"] {
+    --strip-fade-start: 0px;
+    --strip-fade-end: 0px;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--strip-fade-start),
+      #000 calc(100% - var(--strip-fade-end)),
+      transparent
+    );
+  }
+
+  .scroll-strip[data-fade-start="true"] {
+    --strip-fade-start: 1.5rem;
+  }
+
+  .scroll-strip[data-fade-end="true"] {
+    --strip-fade-end: 1.5rem;
+  }
+
   .surface-panel {
     border: 1px solid var(--color-border);
     background: var(--color-surface);

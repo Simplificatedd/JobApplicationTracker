@@ -1,6 +1,7 @@
 import { type RefObject, useEffect } from "react";
 
-const EDGE_PADDING = 16;
+// Matches the .scroll-strip edge fade so the active item is never faded.
+const EDGE_PADDING = 24;
 
 interface HorizontalBounds {
   left: number;
@@ -8,7 +9,7 @@ interface HorizontalBounds {
 }
 
 // Returns how far a horizontal strip must scroll so the item is fully
-// visible, keeping a little padding so the item does not sit on the edge.
+// visible, keeping clear of the strip's faded edges.
 export function getHorizontalScrollDelta(
   container: HorizontalBounds,
   item: HorizontalBounds,

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useScrollActiveIntoView } from "../../hooks/useScrollActiveIntoView";
+import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
@@ -722,13 +723,14 @@ function SettingsNav({
 }) {
   const navRef = useRef<HTMLElement>(null);
   useScrollActiveIntoView(navRef, activeSection);
+  useScrollStrip(navRef, SETTINGS_SECTIONS.length);
 
   // Below lg the strip sticks under the page header so sections stay one tap
   // away on long phone pages; from lg it is the existing sticky side column.
   return (
     <nav
       aria-label="Settings sections"
-      className="sticky top-[var(--app-header-height,0px)] z-10 -mx-4 mb-5 flex gap-2 overflow-x-auto bg-background/95 px-4 py-2 backdrop-blur lg:top-28 lg:mx-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+      className="scroll-strip sticky top-[var(--app-header-height,0px)] z-10 -mx-4 mb-5 flex gap-2 bg-background/95 px-4 py-2 backdrop-blur lg:top-28 lg:mx-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
       ref={navRef}
     >
       {SETTINGS_SECTIONS.map((section) => {

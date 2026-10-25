@@ -10,10 +10,10 @@ describe("getHorizontalScrollDelta", () => {
   });
 
   it("scrolls forward past an item clipped on the right, with padding", () => {
-    expect(getHorizontalScrollDelta(strip, { left: 300, right: 420 })).toBe(77);
+    expect(getHorizontalScrollDelta(strip, { left: 300, right: 420 })).toBe(85);
   });
 
   it("scrolls back to an item clipped on the left, with padding", () => {
-    expect(getHorizontalScrollDelta(strip, { left: -50, right: 70 })).toBe(-82);
+    expect(getHorizontalScrollDelta(strip, { left: -50, right: 70 })).toBe(-90);
   });
 });
