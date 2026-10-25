@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { snapshotWithBytes } from "../../src/test/snapshotSize";
+import { MAX_CLOUD_SNAPSHOT_BYTES, utf8ByteLength } from "../../src/storage/snapshotSize";
 import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
@@ -129,6 +131,63 @@ class FakeD1Database {
     return new FakeD1Statement(this.rows, query);
   }
 }
+
+describe("cloud snapshot storage budget", () => {
+  it.each([-1, 0, 1])("guards the persisted snapshot at limit %+d before any D1 query", async (offset) => {
+    const fake = new FakeD1Database();
+    const prepare = vi.spyOn(fake, "prepare");
+    const input = parseSaveStateRequest(JSON.stringify({ baseRevision: null, snapshot: snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + offset) }));
+    const saving = saveCloudState(fake as unknown as D1Database, { id: "owner", email: "owner@example.edu" }, input);
+    if (offset <= 0) {
+      await expect(saving).resolves.toMatchObject({ revision: 1 });
+      expect(utf8ByteLength(fake.rows.get("owner")!.snapshot_json)).toBe(MAX_CLOUD_SNAPSHOT_BYTES + offset);
+    } else {
+      await expect(saving).rejects.toMatchObject({ status: 413, message: expect.stringContaining("1,900,000-byte") });
+      expect(prepare).not.toHaveBeenCalled();
+    }
+  });
+
+  it("preserves an existing row and revision when an oversized update is rejected", async () => {
+    const fake = new FakeD1Database();
+    const database = fake as unknown as D1Database;
+    const user = { id: "owner", email: "owner@example.edu" };
+    await saveCloudState(database, user, { baseRevision: null, snapshot: snapshot() });
+    const before = structuredClone(fake.rows.get(user.id));
+    const prepare = vi.spyOn(fake, "prepare");
+    await expect(saveCloudState(database, user, { baseRevision: 1, snapshot: snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + 1) })).rejects.toMatchObject({ status: 413 });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(fake.rows.get(user.id)).toEqual(before);
+  });
+
+  it.each([0, 1])("accounts for UTF-8 identity columns and conservative SQLite row overhead %+d", async (offset) => {
+    const fake = new FakeD1Database();
+    const prepare = vi.spyOn(fake, "prepare");
+    // 64 header bytes + 8 revision bytes + two 24-byte API timestamps.
+    const id = "界".repeat(30_000);
+    const email = "x".repeat(100_000 - 120 - utf8ByteLength(id) + offset);
+    const saving = saveCloudState(fake as unknown as D1Database, { id, email }, { baseRevision: null, snapshot: snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES) });
+    if (offset === 0) await expect(saving).resolves.toMatchObject({ revision: 1 });
+    else {
+      await expect(saving).rejects.toMatchObject({ status: 413, message: expect.stringContaining("account metadata") });
+      expect(prepare).not.toHaveBeenCalled();
+    }
+  });
+
+  it("separates HTTP JSON escaping/whitespace from compact stored snapshot bytes", async () => {
+    const fake = new FakeD1Database();
+    const data = snapshot("界".repeat(100_000));
+    const body = JSON.stringify({ baseRevision: null, snapshot: data }).replace(/界/g, "\\u754c") + " ".repeat(2_000_000);
+    expect(utf8ByteLength(body)).toBeGreaterThan(MAX_CLOUD_SNAPSHOT_BYTES);
+    const input = parseSaveStateRequest(body);
+    await saveCloudState(fake as unknown as D1Database, { id: "owner", email: "owner@example.edu" }, input);
+    expect(fake.rows.get("owner")!.snapshot_json).toBe(JSON.stringify(data));
+    expect(utf8ByteLength(fake.rows.get("owner")!.snapshot_json)).toBeLessThan(MAX_CLOUD_SNAPSHOT_BYTES);
+  });
+
+  it("retains a separate UTF-8 transport ceiling", () => {
+    expect(() => parseSaveStateRequest("界".repeat(2_000_000))).toThrow("5 MiB transport limit");
+  });
+});
 
 describe("cloud state", () => {
   it("rejects downgraded writes so older clients cannot overwrite migrated assessment data", async () => {
