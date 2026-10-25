@@ -35,7 +35,34 @@ The server enforces conservative application-level limits:
 - 10 MiB per resume file and 100 MiB of resumes per signed-in user.
 - 5 GiB of resume objects across the deployment.
 - 512 MiB of tracker snapshot JSON across the deployment.
+- 1,900,000 UTF-8 bytes of compact snapshot JSON per user/workspace save.
 - 100,000 R2 writes and 1,000,000 R2 reads per UTC calendar month.
+
+The snapshot limit includes all records, document metadata, unknown fields and
+JSON escaping. It excludes the HTTP envelope and document file bytes stored in
+R2; base64 files in a full backup do not count toward the snapshot limit.
+Restoring a backup checks the normalized snapshot before uploading its files.
+Backups can still be exported when existing cloud data is above the save limit;
+reduce the snapshot before saving or restoring it. Reads and backup formats are
+unchanged. Legacy snapshots that require a cloud migration must fit after
+normalization before startup can complete.
+
+Cloudflare documents a [2,000,000-byte D1 string/BLOB/row limit](https://developers.cloudflare.com/d1/platform/limits/).
+The snapshot policy leaves 100,000 bytes (5%) for other columns and row encoding.
+The server additionally checks actual UTF-8 identity fields, ISO timestamps,
+an eight-byte revision and a conservative 64-byte SQLite record header against
+the row ceiling. The header allowance follows SQLite's
+[record format](https://www.sqlite.org/fileformat2.html#record_format): six
+column serial-type varints and one header-length varint, each at most nine bytes.
+
+The API's separate 5 MiB request-body cap is a transport guard, not storage
+capacity. [Workers request limits](https://developers.cloudflare.com/workers/platform/limits/)
+depend on the account plan and start at 100 MB, so they cannot protect a D1 row.
+Platform constraints were checked on 2026-10-25. Oversized saves return HTTP 413
+with guidance to export a backup and reduce data. The client preflights the same
+snapshot policy; size failures do not advance revisions or write the cache and
+are never automatically retried. After a concurrency conflict, the merged
+snapshot is checked again before it can be sent.
 
 When an application budget is exhausted, the corresponding request fails
 closed instead of continuing to consume that resource. These safeguards do not
