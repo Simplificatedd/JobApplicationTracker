@@ -9,6 +9,8 @@ import {
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
 } from "../lib/domain";
+import { snapshotWithBytes } from "../test/snapshotSize";
+import { CLOUD_SNAPSHOT_SIZE_MESSAGE, MAX_CLOUD_SNAPSHOT_BYTES } from "./snapshotSize";
 
 const snapshot = {
   activities: [],
@@ -24,6 +26,37 @@ const snapshot = {
 };
 
 describe("cloud API client", () => {
+  it.each([-1, 0, 1])("validates stored snapshot bytes before network I/O at limit %+d", async (offset) => {
+    const data = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + offset);
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ revision: 4, snapshot, updatedAt: "now" }));
+    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
+    if (offset > 0) {
+      const error = await client.saveState(data, 3, "owner").catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(CloudApiError);
+      expect(error).not.toBeInstanceOf(CloudRevisionConflictError);
+      expect(error).toMatchObject({ status: 413, message: CLOUD_SNAPSHOT_SIZE_MESSAGE });
+      expect(fetcher).not.toHaveBeenCalled();
+    } else {
+      await client.saveState(data, 3, "owner");
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const body = String(fetcher.mock.calls[0][1]?.body);
+      const value = JSON.parse(body);
+      expect(new TextEncoder().encode(JSON.stringify(value.snapshot)).byteLength).toBe(MAX_CLOUD_SNAPSHOT_BYTES + offset);
+      expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(MAX_CLOUD_SNAPSHOT_BYTES);
+      expect(value.baseRevision).toBe(3);
+    }
+  });
+
+  it("surfaces server size rejections as permanent 413 failures without replay", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: CLOUD_SNAPSHOT_SIZE_MESSAGE }, { status: 413 }));
+    const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });
+    const error = await client.saveState(snapshot, 1, "owner").catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(CloudApiError);
+    expect(error).not.toBeInstanceOf(CloudRevisionConflictError);
+    expect(error).toMatchObject({ status: 413, message: CLOUD_SNAPSHOT_SIZE_MESSAGE });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("requires a verified stable identity and binds data requests to it", async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(Response.json({ email: "student@example.edu" }))
