@@ -15,8 +15,10 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useRef,
   useState,
 } from "react";
+import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { APP_NAME } from "../lib/constants";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
@@ -380,23 +382,28 @@ function NavigationButtons({
   layout: "side" | "top";
   onViewChange: (view: ViewKey) => void;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useScrollActiveIntoView(navRef, currentView);
+  // Below xl the side navigation becomes one scrolling row, like top mode,
+  // so it costs a single row of height on phones and tablets.
   const navClass =
     layout === "top"
       ? "flex min-w-0 basis-full flex-1 gap-2 overflow-x-auto sm:basis-auto"
-      : "mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:mt-8 xl:grid-cols-1";
+      : "mt-3 flex min-w-0 gap-2 overflow-x-auto xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible";
 
   return (
-    <nav aria-label="Primary navigation" className={navClass}>
+    <nav aria-label="Primary navigation" className={navClass} ref={navRef}>
       {items.map((item) => {
         const Icon = item.icon;
         const isActive = item.key === currentView;
         const buttonLayout =
           layout === "top"
             ? "shrink-0 justify-center"
-            : "justify-center xl:justify-start";
+            : "shrink-0 justify-center xl:shrink xl:justify-start";
 
         return (
           <button
+            aria-current={isActive ? "page" : undefined}
             className={`flex h-11 min-w-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${buttonLayout} ${
               isActive
                 ? "bg-primary text-primary-foreground"
