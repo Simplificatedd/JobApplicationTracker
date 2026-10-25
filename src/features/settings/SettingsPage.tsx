@@ -17,6 +17,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useScrollActiveIntoView } from "../../hooks/useScrollActiveIntoView";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
@@ -719,10 +720,16 @@ function SettingsNav({
   activeSection: SettingsSectionId;
   onSelect: (id: SettingsSectionId) => void;
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  useScrollActiveIntoView(navRef, activeSection);
+
+  // Below lg the strip sticks under the page header so sections stay one tap
+  // away on long phone pages; from lg it is the existing sticky side column.
   return (
     <nav
       aria-label="Settings sections"
-      className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-28 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:pb-0"
+      className="sticky top-[var(--app-header-height,0px)] z-10 -mx-4 mb-5 flex gap-2 overflow-x-auto bg-background/95 px-4 py-2 backdrop-blur lg:top-28 lg:mx-0 lg:mb-0 lg:flex-col lg:self-start lg:overflow-visible lg:bg-transparent lg:p-0 lg:backdrop-blur-none"
+      ref={navRef}
     >
       {SETTINGS_SECTIONS.map((section) => {
         const Icon = section.icon;
@@ -783,7 +790,7 @@ function SettingsSection({
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className={`surface-panel relative scroll-mt-28 overflow-hidden rounded-lg ${
+      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
         id === "reset" ? "border-red-200" : ""
       }`}
       id={`settings-${id}`}

@@ -15,6 +15,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -130,9 +131,28 @@ export function AppShell({
     : isNavigationHidden
       ? "Show side navigation"
       : "Hide side navigation";
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const sideNavigationStyle = {
     "--side-navigation-width": `${sideNavigationWidth}px`,
   } as CSSProperties;
+
+  // Publish the sticky header's height so page-level sticky elements, such
+  // as the Settings section strip, can sit directly beneath it.
+  useEffect(() => {
+    const header = headerRef.current;
+
+    if (!header) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() =>
+      setHeaderHeight(header.offsetHeight),
+    );
+    observer.observe(header);
+
+    return () => observer.disconnect();
+  }, []);
 
   function resizeSideNavigation(nextWidth: number) {
     setSideNavigationWidth(
@@ -165,7 +185,10 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
+    <div
+      className="min-h-dvh bg-background text-foreground"
+      style={{ "--app-header-height": `${headerHeight}px` } as CSSProperties}
+    >
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
@@ -264,7 +287,10 @@ export function AppShell({
         ) : null}
 
         <main className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:py-4 lg:px-6 xl:px-8">
+          <header
+            className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:py-4 lg:px-6 xl:px-8"
+            ref={headerRef}
+          >
             <div className="flex items-center justify-between gap-3">
               <div
                 className={`flex min-w-0 items-center gap-3 pl-12 ${headerTitlePadding}`}
