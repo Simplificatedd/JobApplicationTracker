@@ -109,7 +109,7 @@ export function NotificationBell({
       {isOpen ? (
         <div
           aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100vh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
+          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
           role="dialog"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border pb-3">

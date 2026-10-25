@@ -165,7 +165,7 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-dvh bg-background text-foreground">
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
@@ -176,13 +176,13 @@ export function AppShell({
         <ToggleIcon aria-hidden="true" size={18} />
       </button>
       <div
-        className={`app-container flex min-h-screen min-w-0 flex-col ${
+        className={`app-container flex min-h-dvh min-w-0 flex-col ${
           isTopNavigation ? "" : "xl:flex-row"
         }`}
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
-            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-screen xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
             style={sideNavigationStyle}
           >
             <div className="flex items-center justify-between gap-3 xl:block">

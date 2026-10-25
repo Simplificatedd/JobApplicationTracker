@@ -514,7 +514,7 @@ export function ApplicationsTable({
             </div>
           ) : null}
           <div
-            className="hidden max-h-[calc(100vh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
+            className="hidden max-h-[calc(100dvh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
             ref={tableViewportRef}
           >
             <table

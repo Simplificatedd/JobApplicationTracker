@@ -268,7 +268,7 @@ function ColumnsModal({
       onMouseDown={closeFromBackdrop}
       role="dialog"
     >
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <h2
             className="min-w-0 truncate text-lg font-semibold text-foreground"
@@ -591,7 +591,7 @@ function MoreFiltersModal({
       onMouseDown={closeFromBackdrop}
       role="dialog"
     >
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <h2
