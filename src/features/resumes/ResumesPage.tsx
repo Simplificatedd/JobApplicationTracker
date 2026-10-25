@@ -350,16 +350,7 @@ function DuplicateResumeDialog({
   );
 }
 
-function ResumeRow({
-  documentLabel,
-  isWorking,
-  linkedCount,
-  onDelete,
-  onDownload,
-  onPreview,
-  onUpdate,
-  resume,
-}: {
+interface DocumentItemProps {
   documentLabel: "cover letter" | "resume";
   isWorking: boolean;
   linkedCount: number;
@@ -368,17 +359,39 @@ function ResumeRow({
   onPreview: () => void;
   onUpdate: (input: ResumeMetadataUpdate, expectedDocument?: ResumeMetadata) => Promise<MutationResult>;
   resume: ResumeMetadata;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [editBase, setEditBase] = useState(() => structuredClone(resume));
-  const [draft, setDraft] = useState({
+}
+
+function getDocumentDraft(resume: ResumeMetadata) {
+  return {
     displayName: resume.displayName,
     downloadFileName: resume.downloadFileName,
     notes: resume.notes ?? "",
     versionLabel: resume.versionLabel ?? "",
-  });
+  };
+}
+
+type DocumentDraft = ReturnType<typeof getDocumentDraft>;
+
+// Edit state shared by the table row and the card for one document.
+function useDocumentMetadataEditor(
+  resume: ResumeMetadata,
+  onUpdate: DocumentItemProps["onUpdate"],
+) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [editBase, setEditBase] = useState(() => structuredClone(resume));
+  const [draft, setDraft] = useState(() => getDocumentDraft(resume));
+
+  function updateDraft(field: keyof DocumentDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function startEditing() {
+    setEditBase(structuredClone(resume));
+    setDraft(getDocumentDraft(resume));
+    setIsEditing(true);
+  }
 
   async function save() {
     setIsSaving(true);
@@ -395,14 +408,34 @@ function ResumeRow({
   }
 
   function cancel() {
-    setDraft({
-      displayName: resume.displayName,
-      downloadFileName: resume.downloadFileName,
-      notes: resume.notes ?? "",
-      versionLabel: resume.versionLabel ?? "",
-    });
+    setDraft(getDocumentDraft(resume));
     setIsEditing(false);
   }
+
+  return {
+    cancel,
+    draft,
+    isEditing,
+    isSaving,
+    save,
+    saveError,
+    startEditing,
+    updateDraft,
+  };
+}
+
+function ResumeRow({
+  documentLabel,
+  isWorking,
+  linkedCount,
+  onDelete,
+  onDownload,
+  onPreview,
+  onUpdate,
+  resume,
+}: DocumentItemProps) {
+  const editor = useDocumentMetadataEditor(resume, onUpdate);
+  const { draft, isEditing } = editor;
 
   return (
     <tr className="text-sm text-foreground">
@@ -413,10 +446,7 @@ function ResumeRow({
               aria-label="Display name"
               className="field-control"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  displayName: event.target.value,
-                }))
+                editor.updateDraft("displayName", event.target.value)
               }
               value={draft.displayName}
             />
@@ -424,10 +454,7 @@ function ResumeRow({
               aria-label="Version label"
               className="field-control"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  versionLabel: event.target.value,
-                }))
+                editor.updateDraft("versionLabel", event.target.value)
               }
               placeholder="Version label"
               value={draft.versionLabel}
@@ -450,10 +477,7 @@ function ResumeRow({
               aria-label={`${documentLabel} notes`}
               className="field-control min-h-20 resize-y"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  notes: event.target.value,
-                }))
+                editor.updateDraft("notes", event.target.value)
               }
               placeholder="Notes"
               value={draft.notes}
@@ -473,10 +497,7 @@ function ResumeRow({
           <input
             className="field-control"
             onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                downloadFileName: event.target.value,
-              }))
+              editor.updateDraft("downloadFileName", event.target.value)
             }
             value={draft.downloadFileName}
           />
@@ -487,15 +508,7 @@ function ResumeRow({
       <Td muted>{resume.fileExtension.toUpperCase()}</Td>
       <Td muted>{formatFileSize(resume.fileSize)}</Td>
       <Td>
-        <span
-          className={`rounded-md px-2 py-1 text-xs font-semibold ${
-            resume.fileSize > 0
-              ? "bg-green-50 text-success"
-              : "bg-amber-50 text-warning"
-          }`}
-        >
-          {resume.fileSize > 0 ? "Stored" : "Metadata"}
-        </span>
+        <StorageBadge resume={resume} />
       </Td>
       <Td muted>{formatDate(resume.uploadedAt)}</Td>
       <Td muted>{formatUpdatedAt(resume.updatedAt)}</Td>
@@ -503,68 +516,126 @@ function ResumeRow({
       <Td muted>{linkedCount}</Td>
       <Td>
         <div className="flex items-center gap-1">
-          {isEditing ? (
-            <>
-              <IconAction disabled={isSaving} label="Save metadata" onClick={save}>
-                <Save aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction disabled={isSaving} label="Cancel edit" onClick={cancel}>
-                <X aria-hidden="true" size={16} />
-              </IconAction>
-            </>
-          ) : (
-            <>
-              <IconAction
-                disabled={isWorking}
-                label={
-                  resume.fileExtension === "pdf"
-                    ? `Preview ${documentLabel}`
-                    : `Download ${documentLabel}`
-                }
-                onClick={onPreview}
-              >
-                <Eye aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                disabled={isWorking}
-                label={`Download ${documentLabel}`}
-                onClick={onDownload}
-              >
-                <Download aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                label="Edit metadata"
-                onClick={() => {
-                  setEditBase(structuredClone(resume));
-                  setDraft({
-                    displayName: resume.displayName,
-                    downloadFileName: resume.downloadFileName,
-                    notes: resume.notes ?? "",
-                    versionLabel: resume.versionLabel ?? "",
-                  });
-                  setIsEditing(true);
-                }}
-              >
-                <Pencil aria-hidden="true" size={16} />
-              </IconAction>
-              <IconAction
-                label={`Delete ${documentLabel}`}
-                onClick={onDelete}
-                tone="danger"
-              >
-                <Trash2 aria-hidden="true" size={16} />
-              </IconAction>
-            </>
-          )}
+          <DocumentActions
+            documentLabel={documentLabel}
+            editor={editor}
+            isWorking={isWorking}
+            onDelete={onDelete}
+            onDownload={onDownload}
+            onPreview={onPreview}
+            resume={resume}
+          />
         </div>
-        {saveError ? (
-          <p className="mt-2 text-xs font-medium text-destructive" role="alert">
-            {saveError}
-          </p>
-        ) : null}
+        <SaveError message={editor.saveError} />
       </Td>
     </tr>
   );
+}
+
+function DocumentActions({
+  documentLabel,
+  editor,
+  isWorking,
+  onDelete,
+  onDownload,
+  onPreview,
+  resume,
+  showLabels = false,
+}: Pick<
+  DocumentItemProps,
+  "documentLabel" | "isWorking" | "onDelete" | "onDownload" | "onPreview" | "resume"
+> & {
+  editor: ReturnType<typeof useDocumentMetadataEditor>;
+  showLabels?: boolean;
+}) {
+  if (editor.isEditing) {
+    return (
+      <>
+        <IconAction
+          disabled={editor.isSaving}
+          label="Save metadata"
+          onClick={() => void editor.save()}
+          shortLabel={editor.isSaving ? "Saving..." : "Save"}
+          showLabel={showLabels}
+        >
+          <Save aria-hidden="true" size={16} />
+        </IconAction>
+        <IconAction
+          disabled={editor.isSaving}
+          label="Cancel edit"
+          onClick={editor.cancel}
+          shortLabel="Cancel"
+          showLabel={showLabels}
+        >
+          <X aria-hidden="true" size={16} />
+        </IconAction>
+      </>
+    );
+  }
+
+  const canPreview = resume.fileExtension === "pdf";
+
+  return (
+    <>
+      <IconAction
+        disabled={isWorking}
+        label={canPreview ? `Preview ${documentLabel}` : `Download ${documentLabel}`}
+        onClick={onPreview}
+        shortLabel={canPreview ? "Preview" : "Open"}
+        showLabel={showLabels}
+      >
+        <Eye aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        disabled={isWorking}
+        label={`Download ${documentLabel}`}
+        onClick={onDownload}
+        shortLabel="Download"
+        showLabel={showLabels}
+      >
+        <Download aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        label="Edit metadata"
+        onClick={editor.startEditing}
+        shortLabel="Edit"
+        showLabel={showLabels}
+      >
+        <Pencil aria-hidden="true" size={16} />
+      </IconAction>
+      <IconAction
+        label={`Delete ${documentLabel}`}
+        onClick={onDelete}
+        shortLabel="Delete"
+        showLabel={showLabels}
+        tone="danger"
+      >
+        <Trash2 aria-hidden="true" size={16} />
+      </IconAction>
+    </>
+  );
+}
+
+function StorageBadge({ resume }: { resume: ResumeMetadata }) {
+  return (
+    <span
+      className={`rounded-md px-2 py-1 text-xs font-semibold ${
+        resume.fileSize > 0
+          ? "bg-green-50 text-success"
+          : "bg-amber-50 text-warning"
+      }`}
+    >
+      {resume.fileSize > 0 ? "Stored" : "Metadata"}
+    </span>
+  );
+}
+
+function SaveError({ message }: { message: string }) {
+  return message ? (
+    <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+      {message}
+    </p>
+  ) : null;
 }
 
 function Field({
@@ -610,28 +681,35 @@ function IconAction({
   disabled = false,
   label,
   onClick,
+  shortLabel,
+  showLabel = false,
   tone = "neutral",
 }: {
   children: React.ReactNode;
   disabled?: boolean;
   label: string;
   onClick: () => void;
+  shortLabel: string;
+  showLabel?: boolean;
   tone?: "danger" | "neutral";
 }) {
   return (
     <button
-      className={`touch-target inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border ${
+      aria-label={label}
+      className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
+        showLabel ? "px-3 text-sm font-semibold" : "w-9"
+      } ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"
           : "text-muted hover:bg-slate-50 hover:text-foreground"
       } disabled:cursor-not-allowed disabled:opacity-50`}
       disabled={disabled}
       onClick={onClick}
-      title={label}
+      title={showLabel ? undefined : label}
       type="button"
     >
       {children}
-      <span className="sr-only">{label}</span>
+      {showLabel ? <span>{shortLabel}</span> : null}
     </button>
   );
 }
