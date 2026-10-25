@@ -755,7 +755,7 @@ export function RowActionsMenu({
             >
         {application.archivedAt ? (
           <button
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
             onClick={() => {
               setIsOpen(false);
               onRestoreApplication(application.id);
@@ -768,7 +768,7 @@ export function RowActionsMenu({
           </button>
         ) : (
           <button
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
             onClick={() => {
               setIsOpen(false);
               onArchiveApplication(application.id);
@@ -802,7 +802,7 @@ export function RowActionsMenu({
         ) : null}
         {canDelete ? (
           <button
-            className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700"
+            className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700 touch:py-3"
             onClick={confirmDelete}
             role="menuitem"
             type="button"
@@ -855,7 +855,7 @@ function MenuButton({
 }) {
   return (
     <button
-      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50"
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
       onClick={onClick}
       role="menuitem"
       type="button"

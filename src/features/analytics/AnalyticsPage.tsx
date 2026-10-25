@@ -612,13 +612,13 @@ function SegmentedControl<Value extends string>({
   return (
     <div
       aria-label={label}
-      className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg border border-border bg-background p-1"
+      className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg border border-border bg-background p-1 touch:h-auto"
       role="radiogroup"
     >
       {options.map((option) => (
         <button
           aria-checked={option.value === value}
-          className={`h-full shrink-0 whitespace-nowrap rounded-md px-2.5 text-sm font-medium transition sm:px-3 ${
+          className={`h-full shrink-0 whitespace-nowrap rounded-md px-2.5 touch:h-11 text-sm font-medium transition sm:px-3 ${
             option.value === value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
