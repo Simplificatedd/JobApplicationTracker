@@ -1,5 +1,6 @@
 import type { StorageSnapshot } from "./StorageAdapter";
 import { MUTATION_PROTOCOL_HEADER, MUTATION_PROTOCOL_VERSION } from "./mutationProtocol";
+import { CloudSnapshotSizeError, serializeCloudSnapshot } from "./snapshotSize";
 
 export interface CloudAccount {
   id: string;
@@ -150,8 +151,15 @@ export function createCloudApiClient(
     },
 
     async saveState(snapshot, baseRevision, accountId) {
+      let snapshotJson: string;
+      try {
+        snapshotJson = serializeCloudSnapshot(snapshot).json;
+      } catch (error) {
+        if (error instanceof CloudSnapshotSizeError) throw new CloudApiError(error.message, 413);
+        throw error;
+      }
       const response = await request("/state", {
-        body: JSON.stringify({ baseRevision, snapshot }),
+        body: `{"baseRevision":${JSON.stringify(baseRevision)},"snapshot":${snapshotJson}}`,
         headers: { "Content-Type": "application/json", "X-Tracker-Account-Id": accountId },
         method: "PUT",
       });

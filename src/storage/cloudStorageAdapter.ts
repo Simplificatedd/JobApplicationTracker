@@ -11,6 +11,7 @@ import {
   migrateStageSnapshot,
 } from "../lib/assessments";
 import { normalizeStatusActivities } from "../lib/statusHistory";
+import { serializeCloudSnapshot } from "./snapshotSize";
 import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
@@ -475,6 +476,7 @@ export function createCloudStorageAdapter({
         localFiles = unownedFiles;
       }
     }
+    serializeCloudSnapshot(localSnapshot);
     await Promise.all(
       localFiles.map(({ file, storageKey }) =>
         cloudRequest(api.putResumeFile(storageKey, file, accountId())),
@@ -625,7 +627,10 @@ export function createCloudStorageAdapter({
     const initialized = await ensureInitialized();
     const base = captured ?? structuredClone(initialized.snapshot);
     const resumeFiles = [...(mutation.resumeFiles ?? [])];
-    applyStorageMutation(initialized.snapshot, mutation, base);
+    const proposed = applyStorageMutation(initialized.snapshot, mutation, base);
+    // Reject known-impossible document mutations before uploading their bytes.
+    // Ordinary state saves are measured once by the API client, including rebases.
+    if (resumeFiles.length) serializeCloudSnapshot(normalizeSnapshot(proposed));
 
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
@@ -968,6 +973,8 @@ export function createCloudStorageAdapter({
     resumeFiles: ResumeBlobRecord[] = [],
   ) {
     const before = structuredClone(await snapshot());
+    const normalized = normalizeSnapshot(importedSnapshot);
+    serializeCloudSnapshot(normalized);
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
         cloudRequest(api.putResumeFile(storageKey, file, accountId())),
@@ -977,7 +984,7 @@ export function createCloudStorageAdapter({
       if (!equalStoredValue(before, current)) {
         throw new StorageConflictError("Workspace changed in another session during restore.");
       }
-      return importedSnapshot;
+      return normalized;
     }, resumeFiles);
   }
 

@@ -6,7 +6,8 @@ import { RevisionApi } from "../test/revisionApi";
 import { snapshot as createSnapshot } from "../test/assessmentFixtures";
 import { StorageConflictError } from "../storage/mutationRebase";
 import type { StorageSnapshot } from "../storage/StorageAdapter";
-import type { CloudStateEnvelope } from "../storage/cloudApi";
+import { CloudApiError, type CloudStateEnvelope } from "../storage/cloudApi";
+import { CLOUD_SNAPSHOT_SIZE_MESSAGE } from "../storage/snapshotSize";
 import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "../features/applications/applicationFilters";
 import type { TablePreferences } from "../types/tablePreferences";
 
@@ -337,6 +338,23 @@ describe("store with two independent revision-aware cloud adapters", () => {
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
   }
+
+  it("reports size failures without changing displayed data, and retains repair/Retry responsibilities", async () => {
+    const { api, store } = await sessions();
+    const before = structuredClone(RenderStore().applications);
+    vi.spyOn(api, "saveState").mockRejectedValueOnce(new CloudApiError(CLOUD_SNAPSHOT_SIZE_MESSAGE, 413));
+    const result = await store.updateApplication(application.id, { notes: "Rejected edit" });
+    expect(result.ok).toBe(false);
+    expect(RenderStore().applications).toEqual(before);
+    expect(RenderStore().storageError).toBe(CLOUD_SNAPSHOT_SIZE_MESSAGE);
+    expect(RenderStore().cacheWarning).toBeNull();
+    await RenderStore().repairCache();
+    expect(RenderStore().storageError).toBe(CLOUD_SNAPSHOT_SIZE_MESSAGE);
+    RenderStore().retryStorage(); RenderStore();
+    await vi.waitFor(() => expect(storage.refresh).toHaveResolvedTimes(1));
+    expect(RenderStore().storageError).toBeNull();
+    expect(RenderStore().applications).toEqual(before);
+  });
 
   it.each(["settings", "analyticsSettings", "notificationState", "tablePreferences"] as const)("retains changed-field intent for %s edits started during remote refresh", async (kind) => {
     const preferences: TablePreferences = {
