@@ -612,7 +612,7 @@ function SegmentedControl<Value extends string>({
   return (
     <div
       aria-label={label}
-      className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg border border-border bg-background p-0.5"
+      className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-lg border border-border bg-background p-1"
       role="radiogroup"
     >
       {options.map((option) => (

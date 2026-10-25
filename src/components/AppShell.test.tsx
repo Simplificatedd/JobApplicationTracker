@@ -42,6 +42,19 @@ describe("AppShell responsive layout", () => {
     expect(navClass).not.toMatch(/(^| )grid-cols-2/);
   });
 
+  it.each(["side", "top"] as const)(
+    "pads the %s navigation row so focus rings are not clipped",
+    (navigationDisplayMode) => {
+      const navClass = classOf(
+        renderShell({ navigationDisplayMode }),
+        'aria-label="Primary navigation"',
+      );
+
+      expect(navClass).toContain("overflow-x-auto");
+      expect(navClass).toMatch(/(^| )p-1( |$)/);
+    },
+  );
+
   it("marks only the current page in the navigation", () => {
     const markup = renderShell({ currentView: "resumes" });
 
