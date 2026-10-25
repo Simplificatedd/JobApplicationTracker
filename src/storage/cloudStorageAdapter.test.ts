@@ -22,6 +22,7 @@ import {
   TRACKER_DATA_VERSION,
   type StorageSnapshot,
 } from "./StorageAdapter";
+import { CLOUD_SNAPSHOT_SIZE_MESSAGE } from "./snapshotSize";
 
 const application: Application = {
   company: "Example Co",
@@ -268,6 +269,27 @@ describe("account invalidation during pending work", () => {
     expect(save).toHaveBeenCalledTimes(1);
     expect(changed).toHaveBeenCalledTimes(1);
     expect(adapter.getAccount()).toBeNull();
+  });
+
+  it("prioritizes account invalidation over a late size rejection without caching or replay", async () => {
+    const { api, cache, adapter, invalidate } = setup();
+    await adapter.initialize();
+    const entered = deferred<void>();
+    let reject!: (error: Error) => void;
+    const response = new Promise<CloudStateEnvelope>((_, fail) => { reject = fail; });
+    const save = vi.spyOn(api, "saveState").mockImplementation(() => {
+      entered.resolve();
+      return response;
+    });
+    const cacheWrite = vi.spyOn(cache, "importSnapshot");
+    const pending = expect(adapter.updateApplication({ ...application, notes: "edit" })).rejects.toThrow("Signed-in account changed");
+    await entered.promise;
+    await invalidate();
+    reject(new CloudApiError(CLOUD_SNAPSHOT_SIZE_MESSAGE, 413));
+    await pending;
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(cacheWrite).not.toHaveBeenCalled();
+    expect(() => adapter.getCurrentSnapshot()).toThrow("Signed-in account changed");
   });
 });
 
