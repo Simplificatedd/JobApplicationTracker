@@ -642,3 +642,59 @@ describe("store with two independent revision-aware cloud adapters", () => {
     expect(api.state).toEqual(saved);
   });
 });
+
+describe("table preference saves", () => {
+  const saved: TablePreferences = {
+    columnWidths: { company: 180 },
+    filters: DEFAULT_APPLICATION_FILTERS,
+    needsAttentionOnly: false,
+    searchQuery: "",
+    sort: DEFAULT_SORT_STATE,
+    visibleApplicationColumns: ["jobTitle", "company"],
+  };
+
+  it("skips the save when nothing changed, even given fresh arrays and objects", async () => {
+    storage.getTablePreferences.mockResolvedValue(saved);
+    RenderStore(); await flush();
+
+    expect(await RenderStore().updateTablePreferences(structuredClone(saved))).toBe(true);
+    expect(storage.saveTablePreferences).not.toHaveBeenCalled();
+  });
+
+  it("still saves a real change", async () => {
+    storage.getTablePreferences.mockResolvedValue(saved);
+    RenderStore(); await flush();
+
+    expect(await RenderStore().updateTablePreferences({ needsAttentionOnly: true })).toBe(true);
+    expect(storage.saveTablePreferences).toHaveBeenCalledTimes(1);
+    expect(storage.saveTablePreferences.mock.calls[0][0]).toMatchObject({ needsAttentionOnly: true });
+  });
+
+  it("saves the first preferences when none are stored yet", async () => {
+    storage.getTablePreferences.mockResolvedValue(null);
+    RenderStore(); await flush();
+
+    expect(await RenderStore().updateTablePreferences(structuredClone(saved))).toBe(true);
+    expect(storage.saveTablePreferences).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles after one save when the page re-saves fresh copies after every publish", async () => {
+    // The Applications page persists whenever settings are republished, and
+    // each publish rebuilds visibleApplicationColumns, so it re-saves equal
+    // preferences with new identities. Previously each of these was written.
+    let stored: TablePreferences | null = saved;
+    storage.getTablePreferences.mockImplementation(async () => stored);
+    storage.saveTablePreferences.mockImplementation(async (next: TablePreferences) => {
+      stored = structuredClone(next);
+    });
+    RenderStore(); await flush();
+
+    const searched = { ...saved, searchQuery: "react" };
+    for (let republish = 0; republish < 5; republish++) {
+      await RenderStore().updateTablePreferences(structuredClone(searched));
+    }
+
+    expect(storage.saveTablePreferences).toHaveBeenCalledTimes(1);
+    expect(stored).toMatchObject({ searchQuery: "react" });
+  });
+});
