@@ -473,7 +473,7 @@ export function ApplicationsTable({
         </div>
       ) : (
         <>
-          <div className="grid gap-3 p-3 xl:hidden">
+          <div className="grid gap-3 p-3 lg:grid-cols-2 xl:hidden">
             {applications.map((application) => (
               <ApplicationCard
                 application={application}
@@ -1093,7 +1093,7 @@ function ApplicationCard({
   return (
     <article
       aria-label={`Open details for ${application.jobTitle}`}
-      className="cursor-pointer rounded-lg border border-border bg-surface px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="application-card cursor-pointer rounded-lg border border-border bg-surface px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       onClick={openFromCardClick}
       onKeyDown={openFromCardKeyDown}
       role="button"
@@ -1124,7 +1124,7 @@ function ApplicationCard({
         <DescriptionPreview description={application.jobDescription} />
       ) : null}
 
-      <div className="mt-4 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+      <div className="application-card-fields mt-4 grid gap-3 border-t border-border pt-3">
         {detailColumns.map((columnId) => {
           const column = APPLICATION_TABLE_COLUMNS.find(
             (currentColumn) => currentColumn.id === columnId,
@@ -1181,8 +1181,8 @@ function CardField({
   label: string;
 }) {
   return (
-    <div className="min-w-0">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+    <div className="application-card-field min-w-0">
+      <p className="application-card-field-label text-xs font-semibold uppercase tracking-[0.08em] text-muted">
         {label}
       </p>
       {children}
