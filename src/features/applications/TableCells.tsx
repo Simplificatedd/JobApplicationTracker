@@ -574,7 +574,7 @@ export function ContactsButton({
 }) {
   return (
     <button
-      className="touch-target inline-flex h-9 max-w-full items-center justify-center gap-1.5 rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
+      className="touch-target inline-flex h-9 max-w-full items-center justify-center gap-1.5 justify-self-start rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
       onClick={onClick}
       type="button"
     >

@@ -197,6 +197,14 @@ describe("applications page on narrow screens", () => {
     expect(html).toContain('class="application-card-field min-w-0"');
   });
 
+  it("keeps the contacts button at its natural width in card rows", () => {
+    // Card values stretch to their column so long text truncates; the
+    // contacts button opts out so it does not become a full-width bar.
+    expect(renderPage("")).toMatch(
+      /<button class="[^"]*\bjustify-self-start\b[^"]*"[^>]*><svg[^>]*lucide-message-square-text/,
+    );
+  });
+
   it("offers Columns beside Filters as well as in the wide-toolbar footer", () => {
     const html = renderPage("");
 
