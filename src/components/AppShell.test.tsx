@@ -37,7 +37,7 @@ describe("AppShell responsive layout", () => {
     const navClass = classOf(renderShell(), 'aria-label="Primary navigation"');
 
     expect(navClass).toContain("flex");
-    expect(navClass).toContain("overflow-x-auto");
+    expect(navClass).toContain("scroll-strip");
     expect(navClass).toContain("xl:grid");
     expect(navClass).not.toMatch(/(^| )grid-cols-2/);
   });
@@ -50,7 +50,7 @@ describe("AppShell responsive layout", () => {
         'aria-label="Primary navigation"',
       );
 
-      expect(navClass).toContain("overflow-x-auto");
+      expect(navClass).toContain("scroll-strip");
       expect(navClass).toMatch(/(^| )p-1( |$)/);
     },
   );

@@ -20,6 +20,7 @@ import {
   useState,
 } from "react";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
+import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
@@ -413,13 +414,14 @@ function NavigationButtons({
 }) {
   const navRef = useRef<HTMLElement>(null);
   useScrollActiveIntoView(navRef, currentView);
+  useScrollStrip(navRef, items.length);
   // Below xl the side navigation becomes one scrolling row, like top mode,
   // so it costs a single row of height on phones and tablets. Scrolling rows
   // clip their content, so p-1 (offset by -m-1) leaves room for focus rings.
   const navClass =
     layout === "top"
-      ? "-m-1 flex min-w-0 basis-full flex-1 gap-2 overflow-x-auto p-1 sm:basis-auto"
-      : "-mx-1 mt-2 flex min-w-0 gap-2 overflow-x-auto p-1 xl:mx-0 xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0";
+      ? "scroll-strip -m-1 flex min-w-0 basis-full flex-1 gap-2 p-1 sm:basis-auto"
+      : "scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0";
 
   return (
     <nav aria-label="Primary navigation" className={navClass} ref={navRef}>

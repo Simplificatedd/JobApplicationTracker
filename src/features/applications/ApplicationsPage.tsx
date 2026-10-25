@@ -503,8 +503,18 @@ function SummaryMetric({
 
   return (
     <div className="surface-panel rounded-lg px-4 py-3">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <p className="min-w-0 truncate text-sm font-medium text-muted">{label}</p>
+      {/* min-h matches the count scope toggle so paired metrics line up. */}
+      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        {/* The scope toggle already names the count on phones, where the
+            label would push it onto a second line, so the label is only
+            visually hidden there. */}
+        <p
+          className={`min-w-0 truncate text-sm font-medium text-muted ${
+            action ? "max-sm:sr-only" : ""
+          }`}
+        >
+          {label}
+        </p>
         {action}
       </div>
       <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>

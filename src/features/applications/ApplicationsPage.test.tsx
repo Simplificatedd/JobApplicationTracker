@@ -188,6 +188,14 @@ describe("applications page on narrow screens", () => {
     );
   });
 
+  it("keeps the scoped metric's label for screen readers but hides it beside the toggle on phones", () => {
+    const html = renderPage("");
+
+    expect(html).toMatch(/<p class="[^"]*\bmax-sm:sr-only\b[^"]*">Active<\/p>/);
+    // Metrics without a toggle keep their visible label at every width.
+    expect(html).toMatch(/<p class="min-w-0 truncate text-sm font-medium text-muted ">Needs attention<\/p>/);
+  });
+
   it("renders compact cards that switch layout by container width", () => {
     const html = renderPage("");
 
