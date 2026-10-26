@@ -2,17 +2,14 @@ import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
-  normalizeApplicationStatus,
 } from "../lib/domain";
 import {
   applyAssessmentUpdates,
   assertEquivalentInterviewSource,
   getNextAssessmentNumber,
-  migrateStageSnapshot,
 } from "../lib/assessments";
-import { normalizeStatusActivities } from "../lib/statusHistory";
 import { serializeCloudSnapshot } from "./snapshotSize";
-import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
+import { normalizeSnapshot } from "./normalizeSnapshot";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -40,7 +37,6 @@ import {
   TRACKER_DB_NAME,
 } from "./indexedDbAdapter";
 import {
-  TRACKER_DATA_VERSION,
   type ResumeBlobRecord,
   type StorageAdapter,
   type StorageMutation,
@@ -1080,37 +1076,4 @@ function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
     ...state,
     snapshot: normalizeSnapshot(state.snapshot),
   };
-}
-
-function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
-  if ((snapshot.dataVersion ?? 1) > TRACKER_DATA_VERSION)
-    throw new Error(
-      "This workspace uses a newer data format. Update the tracker before opening it.",
-    );
-  const hasLegacyOfferSemantics = (snapshot.dataVersion ?? 1) < 2;
-  const defaultFollowUpPromptDays = snapshot.settings.defaultFollowUpPromptDays;
-
-  return migrateStageSnapshot({
-    ...snapshot,
-    activities: normalizeStatusActivities(
-      snapshot.activities,
-      hasLegacyOfferSemantics,
-    ),
-    dataVersion: TRACKER_DATA_VERSION,
-    applications: snapshot.applications.map((application) => {
-      const migratedApplication = migrateLegacyFollowUpSchedule(
-        application,
-        defaultFollowUpPromptDays,
-      );
-
-      return {
-        ...migratedApplication,
-        status:
-          hasLegacyOfferSemantics && application.status === "Offered"
-            ? "Accepted"
-            : normalizeApplicationStatus(application.status),
-      };
-    }),
-    coverLetters: snapshot.coverLetters ?? [],
-  });
 }
