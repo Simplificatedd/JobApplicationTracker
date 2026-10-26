@@ -75,7 +75,7 @@ describe("backup restore persistence and failure boundaries", () => {
     const { api, adapter } = await setup();
     const doc = backupDocument("missing").metadata;
     await adapter.importSnapshot(snapshot({ resumes: [{ ...doc, fileSize: 0 }], applications: [{ ...application, resumeId: doc.id }] }));
-    expect(api.state.snapshot.resumes[0]).toEqual({ ...doc, fileSize: 0 });
+    expect(api.state.snapshot.resumes[0]).toEqual({ ...doc, fileSize: 0, storageKey: expect.stringMatching(/^restore-/) });
     expect(api.state.snapshot.applications[0].resumeId).toBe(doc.id);
   });
 

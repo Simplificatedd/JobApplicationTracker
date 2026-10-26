@@ -74,11 +74,14 @@ describe("full backup export/import contract", () => {
     await expect(createFullBackupFile({ snapshot: legacy, resumeFiles: [] })).rejects.toThrow("1,900,000-byte");
   });
 
-  it("reserves staging-key growth during preview before any restore can start", async () => {
+  it.each([false, true])("reserves staging-key growth before any restore (metadata only=%s)", async (metadataOnly) => {
     const doc = backupDocument("a");
+    if (metadataOnly) doc.metadata.fileSize = 0;
+    const resumeFiles = metadataOnly ? [] : [doc.payload];
     const data = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES, { ...normalized(), resumes: [doc.metadata] });
-    expect(() => serializeCloudSnapshot(remapRestoreFiles(data, [doc.payload]).snapshot)).toThrow("1,900,000-byte");
-    await expect(createFullBackupFile({ snapshot: data, resumeFiles: [doc.payload] })).rejects.toThrow("1,900,000-byte");
+    expect(() => serializeCloudSnapshot(remapRestoreFiles(data, resumeFiles).snapshot)).toThrow("1,900,000-byte");
+    await expect(createFullBackupFile({ snapshot: data, resumeFiles })).rejects.toThrow("1,900,000-byte");
+    await expect(parseBackupFile(await createBackupFile({ snapshot: data, resumeFiles }))).rejects.toThrow("1,900,000-byte");
   });
 
   it.each(["界", "😀", "\n", '"', "\\", "\u0000", "\ud800"])("counts UTF-8 and escaped JSON for %j", async (character) => {

@@ -9,7 +9,15 @@ export function remapRestoreFiles<T extends { storageKey: string }>(
   snapshot: StorageSnapshot,
   files: readonly T[],
 ) {
-  const keys = new Map(files.map(({ storageKey }) => [storageKey, `restore-${crypto.randomUUID()}`]));
+  // Metadata-only entries also need fresh identities: their historical keys
+  // may have been permanently retired by server cleanup. Include this growth
+  // in the same export/import snapshot-size preflight used for attached files.
+  const sourceKeys = new Set([
+    ...files.map(({ storageKey }) => storageKey),
+    ...[...snapshot.resumes, ...snapshot.coverLetters]
+      .filter((document) => document.fileSize === 0).map(({ storageKey }) => storageKey),
+  ]);
+  const keys = new Map([...sourceKeys].map((storageKey) => [storageKey, `restore-${crypto.randomUUID()}`]));
   const remap = <D extends { storageKey: string }>(document: D): D => ({
     ...document,
     storageKey: keys.get(document.storageKey) ?? document.storageKey,
