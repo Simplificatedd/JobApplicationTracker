@@ -61,9 +61,9 @@ describe("snapshot size checks before document uploads", () => {
 
   it("permits restores with large binary files when snapshot metadata fits", async () => {
     const { api, adapter } = await setup();
-    const file = new Blob(["x".repeat(MAX_CLOUD_SNAPSHOT_BYTES + 1)], { type: "application/pdf" });
+    const file = new Blob(["%PDF-", "x".repeat(MAX_CLOUD_SNAPSHOT_BYTES + 1)], { type: "application/pdf" });
     await adapter.importSnapshot({ ...adapter.getCurrentSnapshot(), resumes: [{ ...document, fileSize: file.size }] }, [{ storageKey: "file", file }]);
-    expect(api.files.get("file")?.size).toBe(file.size);
+    expect([...api.files.values()][0]?.size).toBe(file.size);
     expect(adapter.getCurrentSnapshot().resumes[0].id).toBe(document.id);
   });
 });

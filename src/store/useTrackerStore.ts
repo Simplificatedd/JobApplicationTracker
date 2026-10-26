@@ -28,6 +28,7 @@ import {
   blobToBase64,
   createApplicationsCsv,
   createBackupFile,
+  createFullBackupFile,
   getBackupImportPreview,
   parseBackupFile,
   type BackupImportPreview,
@@ -72,6 +73,7 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
+import { CloudApiError } from "../storage/cloudApi";
 import { assertRecordIdentity, equalStoredValue, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
@@ -156,6 +158,7 @@ export interface TrackerStore extends AssessmentActions {
   dismissNotification: (id: string) => Promise<boolean>;
   exportApplicationsCsv: () => Blob;
   exportFullBackup: () => Promise<Blob>;
+  exportRecoveryBackup: () => Promise<Blob>;
   getResumeFile: (id: string) => Promise<Blob>;
   getCoverLetterFile: (id: string) => Promise<Blob>;
   importFullBackup: (file: File) => Promise<void>;
@@ -1489,6 +1492,10 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("Resume metadata could not be found.");
     }
 
+    if (resume.fileSize === 0) {
+      throw new Error("This resume has metadata only; no file is attached.");
+    }
+
     const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
     if (!file) {
@@ -1506,6 +1513,10 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("Cover letter metadata could not be found.");
     }
 
+    if (coverLetter.fileSize === 0) {
+      throw new Error("This cover letter has metadata only; no file is attached.");
+    }
+
     const file = await cloudStorageAdapter.getResumeFile(coverLetter.storageKey);
 
     if (!file) {
@@ -1516,14 +1527,25 @@ export function useTrackerStore(): TrackerStore {
     return file;
   }
 
-  async function exportFullBackup() {
+  async function exportBackup(recovery: boolean) {
     const snapshot = await cloudStorageAdapter.exportSnapshot();
+    async function readFile(storageKey: string) {
+      try {
+        return await cloudStorageAdapter.getResumeFile(storageKey);
+      } catch (error) {
+        // A recovery archive may preserve metadata for unavailable bytes, but
+        // account/network failures must remain visible instead of hiding data.
+        if (recovery && error instanceof CloudApiError && error.status === 404) return undefined;
+        throw error;
+      }
+    }
     const resumeFileBackups = await Promise.all(
       snapshot.resumes.map(async (resume) => {
-        const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
+        if (resume.fileSize === 0) return null;
+        const file = await readFile(resume.storageKey);
 
         if (!file) {
-          if (resume.fileSize <= 0) {
+          if (recovery || resume.fileSize <= 0) {
             return null;
           }
 
@@ -1545,12 +1567,13 @@ export function useTrackerStore(): TrackerStore {
 
     const coverLetterFileBackups = await Promise.all(
       snapshot.coverLetters.map(async (coverLetter) => {
-        const file = await cloudStorageAdapter.getResumeFile(
+        if (coverLetter.fileSize === 0) return null;
+        const file = await readFile(
           coverLetter.storageKey,
         );
 
         if (!file) {
-          if (coverLetter.fileSize <= 0) {
+          if (recovery || coverLetter.fileSize <= 0) {
             return null;
           }
 
@@ -1571,8 +1594,14 @@ export function useTrackerStore(): TrackerStore {
     );
 
     assertAccountActive();
-    return createBackupFile({ coverLetterFiles, resumeFiles, snapshot });
+    const serialize = recovery ? createBackupFile : createFullBackupFile;
+    const file = await serialize({ coverLetterFiles, resumeFiles, snapshot });
+    assertAccountActive();
+    return file;
   }
+
+  const exportFullBackup = () => exportBackup(false);
+  const exportRecoveryBackup = () => exportBackup(true);
 
   async function previewBackupImport(file: File) {
     return getBackupImportPreview(await parseBackupFile(file));
@@ -1811,6 +1840,7 @@ export function useTrackerStore(): TrackerStore {
     dismissNotification: (...args) => trackAction(dismissNotification, ...args),
     exportApplicationsCsv,
     exportFullBackup,
+    exportRecoveryBackup,
     getCoverLetterFile,
     getResumeFile,
     importFullBackup: (...args) => trackAction(importFullBackup, ...args),

@@ -248,6 +248,7 @@ function renderView(
       cloudAccountEmail={tracker.cloudAccountEmail}
       onExportApplicationsCsv={tracker.exportApplicationsCsv}
       onExportFullBackup={tracker.exportFullBackup}
+      onExportRecoveryBackup={tracker.exportRecoveryBackup}
       onImportFullBackup={tracker.importFullBackup}
       onPreviewBackupImport={tracker.previewBackupImport}
       onResetSettings={tracker.resetSettings}

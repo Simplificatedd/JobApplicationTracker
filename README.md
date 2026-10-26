@@ -256,6 +256,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 | [Deployment guide](docs/deployment.md) | Every Cloudflare step in detail, login options, previews, and GitHub Actions deploys |
 | [Privacy, security, and limits](docs/privacy-and-security.md) | How sign-in and storage work, privacy notes, and usage guardrails |
 | [Data model](docs/data-model.md) | How follow-ups, statuses, deadlines, deletion, and resumes behave |
+| [Backups and recovery](docs/backups.md) | Restore limits, recovery archives, and oversized legacy-file extraction |
 | [Online assessments](docs/online-assessments.md) | How assessments work, plus their storage, migration, and backup compatibility |
 | [Troubleshooting](docs/troubleshooting.md) | Common deployment problems and fixes |
 

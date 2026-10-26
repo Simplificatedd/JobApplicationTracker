@@ -31,6 +31,9 @@ jobs:
       - name: Verify repository
         run: npm run check
 
+      - name: Test offline backup recovery
+        run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
+
   deploy:
     name: Deploy production
     if: >-

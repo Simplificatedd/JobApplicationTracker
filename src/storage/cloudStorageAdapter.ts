@@ -2,17 +2,16 @@ import {
   DEFAULT_ANALYTICS_SETTINGS,
   DEFAULT_NOTIFICATION_STATE,
   DEFAULT_USER_SETTINGS,
-  normalizeApplicationStatus,
+  normalizeUserSettings,
 } from "../lib/domain";
 import {
   applyAssessmentUpdates,
   assertEquivalentInterviewSource,
   getNextAssessmentNumber,
-  migrateStageSnapshot,
 } from "../lib/assessments";
-import { normalizeStatusActivities } from "../lib/statusHistory";
 import { serializeCloudSnapshot } from "./snapshotSize";
-import { migrateLegacyFollowUpSchedule } from "../lib/followUps";
+import { normalizeSnapshot } from "./normalizeSnapshot";
+import { validateRestoreFiles, remapRestoreFiles } from "./restoreFiles";
 import type { AnalyticsSettings } from "../types/analytics";
 import type {
   Activity,
@@ -40,7 +39,6 @@ import {
   TRACKER_DB_NAME,
 } from "./indexedDbAdapter";
 import {
-  TRACKER_DATA_VERSION,
   type ResumeBlobRecord,
   type StorageAdapter,
   type StorageMutation,
@@ -972,20 +970,80 @@ export function createCloudStorageAdapter({
     importedSnapshot: StorageSnapshot,
     resumeFiles: ResumeBlobRecord[] = [],
   ) {
+    // Capture caller-owned data before asynchronous work can change it.
+    importedSnapshot = structuredClone(importedSnapshot);
+    resumeFiles = resumeFiles.map((record) => ({ ...record }));
     const before = structuredClone(await snapshot());
-    const normalized = normalizeSnapshot(importedSnapshot);
+    const prepared = remapRestoreFiles(normalizeSnapshot({
+      ...importedSnapshot,
+      settings: normalizeUserSettings(importedSnapshot.settings),
+    }), resumeFiles);
+    const normalized = prepared.snapshot;
     serializeCloudSnapshot(normalized);
-    await Promise.all(
-      resumeFiles.map(({ file, storageKey }) =>
-        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
-      ),
-    );
-    await mutateSnapshot((current) => {
-      if (!equalStoredValue(before, current)) {
-        throw new StorageConflictError("Workspace changed in another session during restore.");
+    await validateRestoreFiles(normalized, prepared.files);
+    await queueMutation(async () => {
+      let current = await ensureInitialized();
+      const attempted: string[] = [];
+      let saveAttempted = false;
+      let definitelyRejected = false;
+      try {
+        if (!equalStoredValue(before, current.snapshot)) {
+          throw new StorageConflictError("Workspace changed in another session during restore.");
+        }
+        // Stop starting further uploads after failure. A lost response can
+        // still leave server work in flight; durable reconciliation is #126.
+        // Fresh, unadvertised keys protect all previously committed documents.
+        for (const { file, storageKey } of prepared.files) {
+          attempted.push(storageKey);
+          await cloudRequest(api.putResumeFile(storageKey, file, accountId()));
+        }
+        for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt++) {
+          if (!equalStoredValue(before, current.snapshot)) {
+            definitelyRejected = true;
+            throw new StorageConflictError("Workspace changed in another session during restore.");
+          }
+          try {
+            saveAttempted = true;
+            definitelyRejected = false;
+            const saved = activeCloudState(await cloudRequest(
+              api.saveState(normalized, current.revision, accountId()),
+            ));
+            cloudState = saved;
+            // Cache failure after an acknowledged commit remains a warning.
+            await refreshCache(saved, prepared.files);
+            return;
+          } catch (error) {
+            if (!(error instanceof CloudRevisionConflictError) || !error.current) {
+              // Network/5xx/invalid responses can hide a successful commit.
+              definitelyRejected = error instanceof CloudApiError &&
+                error.status >= 400 && error.status < 500;
+              throw error;
+            }
+            definitelyRejected = true;
+            current = activeCloudState(error.current);
+            cloudState = current;
+          }
+        }
+        throw new StorageConflictError("Cloud data changed repeatedly during restore. Preview the backup again before retrying.");
+      } catch (error) {
+        if (accountIdentityChanged) throw error;
+        // Never delete staged files after an ambiguous snapshot outcome: the
+        // server may already reference them. Durable reconciliation is #126.
+        if (!saveAttempted || definitelyRejected) {
+          const cleanup = await Promise.allSettled(attempted.map((key) =>
+            cloudRequest(api.deleteResumeFile(key, accountId())),
+          ));
+          assertActive();
+          if (cleanup.some((result) => result.status === "rejected")) {
+            throw Object.assign(new Error(`${error instanceof Error ? error.message : "Restore failed."} Some staged files could not be removed and may consume cloud quota. See docs/backups.md before retrying.`), { cause: error });
+          }
+        } else {
+          const retained = attempted.length ? " Staged files were retained to protect any committed restore." : "";
+          throw Object.assign(new Error(`${error instanceof Error ? error.message : "Restore failed."} The restore outcome is unconfirmed. Reload and inspect cloud data before retrying.${retained}`), { cause: error });
+        }
+        throw error;
       }
-      return normalized;
-    }, resumeFiles);
+    });
   }
 
   return {
@@ -1080,37 +1138,4 @@ function normalizeCloudState(state: CloudStateEnvelope): CloudStateEnvelope {
     ...state,
     snapshot: normalizeSnapshot(state.snapshot),
   };
-}
-
-function normalizeSnapshot(snapshot: StorageSnapshot): StorageSnapshot {
-  if ((snapshot.dataVersion ?? 1) > TRACKER_DATA_VERSION)
-    throw new Error(
-      "This workspace uses a newer data format. Update the tracker before opening it.",
-    );
-  const hasLegacyOfferSemantics = (snapshot.dataVersion ?? 1) < 2;
-  const defaultFollowUpPromptDays = snapshot.settings.defaultFollowUpPromptDays;
-
-  return migrateStageSnapshot({
-    ...snapshot,
-    activities: normalizeStatusActivities(
-      snapshot.activities,
-      hasLegacyOfferSemantics,
-    ),
-    dataVersion: TRACKER_DATA_VERSION,
-    applications: snapshot.applications.map((application) => {
-      const migratedApplication = migrateLegacyFollowUpSchedule(
-        application,
-        defaultFollowUpPromptDays,
-      );
-
-      return {
-        ...migratedApplication,
-        status:
-          hasLegacyOfferSemantics && application.status === "Offered"
-            ? "Accepted"
-            : normalizeApplicationStatus(application.status),
-      };
-    }),
-    coverLetters: snapshot.coverLetters ?? [],
-  });
 }

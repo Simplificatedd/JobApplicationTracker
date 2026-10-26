@@ -7,6 +7,10 @@ import { snapshot as createSnapshot } from "../test/assessmentFixtures";
 import { StorageConflictError } from "../storage/mutationRebase";
 import type { StorageSnapshot } from "../storage/StorageAdapter";
 import { CloudApiError, type CloudStateEnvelope } from "../storage/cloudApi";
+import { createBackupFile, parseBackupFile } from "../lib/backups";
+import { populatedBackup, backupFile } from "../test/backupFixtures";
+import { snapshotWithBytes } from "../test/snapshotSize";
+import { MAX_CLOUD_SNAPSHOT_BYTES } from "../storage/snapshotSize";
 import { CLOUD_SNAPSHOT_SIZE_MESSAGE } from "../storage/snapshotSize";
 import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "../features/applications/applicationFilters";
 import type { TablePreferences } from "../types/tablePreferences";
@@ -58,6 +62,7 @@ const storage = vi.hoisted(() => ({
   getTablePreferences: vi.fn(), saveTablePreferences: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
+  importSnapshot: vi.fn(), getResumeFile: vi.fn(),
   getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(), refresh: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
@@ -113,6 +118,8 @@ beforeEach(() => {
   storage.getCacheWarning.mockReturnValue(null);
   storage.subscribeCacheWarning.mockReturnValue(() => {});
   storage.repairCache.mockResolvedValue(undefined);
+  storage.importSnapshot.mockResolvedValue(undefined);
+  storage.getResumeFile.mockResolvedValue(undefined);
 });
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); vi.unstubAllGlobals(); });
 
@@ -334,6 +341,9 @@ describe("store with two independent revision-aware cloud adapters", () => {
     storage.getCacheWarning.mockImplementation(b.getCacheWarning);
     storage.subscribeCacheWarning.mockImplementation(b.subscribeCacheWarning);
     storage.repairCache.mockImplementation(b.repairCache);
+    storage.exportSnapshot.mockImplementation(b.exportSnapshot);
+    storage.importSnapshot.mockImplementation(b.importSnapshot);
+    storage.getResumeFile.mockImplementation(b.getResumeFile);
     RenderStore();
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
@@ -641,6 +651,100 @@ describe("store with two independent revision-aware cloud adapters", () => {
     expect((await store.updateApplication(application.id, { resumeId: document.id })).ok).toBe(false);
     expect(api.state).toEqual(saved);
   });
+
+  it("restores a parsed full backup into cloud and publishes all committed store collections despite cache failure", async () => {
+    const { api, cache, store } = await sessions();
+    vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache full"));
+    const file = backupFile(populatedBackup());
+    const preview = await store.previewBackupImport(file);
+    expect(preview).toMatchObject({ resumes: 1, coverLetters: 1, contacts: 1 });
+    await store.importFullBackup(file);
+    expect(RenderStore().applications).toEqual(api.state.snapshot.applications);
+    expect(RenderStore().resumes).toEqual(api.state.snapshot.resumes);
+    expect(RenderStore().coverLetters).toEqual(api.state.snapshot.coverLetters);
+    expect(RenderStore().contacts).toEqual(api.state.snapshot.contacts);
+    expect(RenderStore().cacheWarning).toContain("Browser cache is unavailable");
+  });
+
+  it("keeps displayed and committed data after restore upload failure", async () => {
+    const { api, store } = await sessions();
+    const displayed = RenderStore().applications;
+    const committed = structuredClone(api.state);
+    vi.spyOn(api, "putResumeFile").mockRejectedValue(new Error("Upload failed"));
+    await expect(store.importFullBackup(backupFile(populatedBackup()))).rejects.toThrow("Upload failed");
+    expect(RenderStore().applications).toEqual(displayed);
+    expect(api.state).toEqual(committed);
+  });
+
+  it("rejects invalid backups at preview and import without calling storage", async () => {
+    const { store } = await sessions();
+    const bad = populatedBackup(); bad.coverLetterFiles = [];
+    storage.importSnapshot.mockClear();
+    await expect(store.previewBackupImport(backupFile(bad))).rejects.toThrow("missing a stored cover letter");
+    await expect(store.importFullBackup(backupFile(bad))).rejects.toThrow("missing a stored cover letter");
+    expect(storage.importSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("keeps over-limit recovery export available while refusing to advertise a full backup", async () => {
+    const { store, b } = await sessions();
+    const large = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + 100, b.getCurrentSnapshot());
+    storage.exportSnapshot.mockResolvedValue(large);
+    await expect(store.exportFullBackup()).rejects.toThrow("1,900,000-byte");
+    const recovery = await store.exportRecoveryBackup();
+    const data = JSON.parse(await recovery.text());
+    expect(data.snapshot).toEqual(JSON.parse(JSON.stringify(large)));
+    await expect(parseBackupFile(recovery)).rejects.toThrow("1,900,000-byte");
+    expect((await createBackupFile({ snapshot: large, resumeFiles: [] })).size).toBe(recovery.size);
+  });
+
+
+  it("exports metadata-only legacy documents without attempting nonexistent cloud file downloads", async () => {
+    const backup = populatedBackup();
+    backup.snapshot.resumes[0].fileSize = 0;
+    backup.snapshot.coverLetters[0].fileSize = 0;
+    const { store } = await sessions(backup.snapshot);
+    storage.getResumeFile.mockClear();
+    const parsed = await parseBackupFile(await store.exportFullBackup());
+    expect(storage.getResumeFile).not.toHaveBeenCalled();
+    expect(parsed.resumeFiles).toEqual([]);
+    expect(parsed.coverLetterFiles).toEqual([]);
+    expect(parsed.snapshot.applications[0].resumeId).toBe(backup.snapshot.resumes[0].id);
+    expect(parsed.snapshot.applications[0].coverLetterId).toBe(backup.snapshot.coverLetters[0].id);
+  });
+
+  it.each(["not-found", "missing"])("preserves metadata in recovery archives when attachments are %s", async (kind) => {
+    const backup = populatedBackup();
+    const { store } = await sessions(backup.snapshot);
+    if (kind === "not-found") storage.getResumeFile.mockRejectedValue(new CloudApiError("Missing cloud file", 404));
+    else storage.getResumeFile.mockResolvedValue(undefined);
+    await expect(store.exportFullBackup()).rejects.toThrow();
+    const recovered = JSON.parse(await (await store.exportRecoveryBackup()).text());
+    expect(recovered.snapshot.resumes).toEqual(backup.snapshot.resumes);
+    expect(recovered.snapshot.coverLetters).toEqual(backup.snapshot.coverLetters);
+    expect(recovered.resumeFiles).toEqual([]);
+    expect(recovered.coverLetterFiles).toEqual([]);
+    await expect(parseBackupFile(backupFile(recovered))).rejects.toThrow("missing a stored resume file");
+  });
+
+  it.each([0, 401, 412, 500])("keeps recovery export account/network failures visible (%i)", async (status) => {
+    const { store } = await sessions(populatedBackup().snapshot);
+    storage.getResumeFile.mockRejectedValue(new CloudApiError("Cloud read failed", status));
+    await expect(store.exportRecoveryBackup()).rejects.toThrow("Cloud read failed");
+  });
+
+  it.each(["resume", "cover letter"])("does not download a retained same-key object for metadata-only %s entries", async (kind) => {
+    const backup = populatedBackup();
+    const document = kind === "resume" ? backup.snapshot.resumes[0] : backup.snapshot.coverLetters[0];
+    document.fileSize = 0;
+    const { api, store } = await sessions(backup.snapshot);
+    api.files.set(document.storageKey, new Blob(["%PDF-unrelated retained contents"], { type: document.mimeType }));
+    storage.getResumeFile.mockClear();
+    const download = kind === "resume" ? store.getResumeFile : store.getCoverLetterFile;
+    await expect(download(document.id)).rejects.toThrow("metadata only");
+    expect(storage.getResumeFile).not.toHaveBeenCalled();
+    expect(await api.files.get(document.storageKey)!.text()).toBe("%PDF-unrelated retained contents");
+  });
+
 });
 
 describe("table preference saves", () => {
@@ -697,4 +801,5 @@ describe("table preference saves", () => {
     expect(storage.saveTablePreferences).toHaveBeenCalledTimes(1);
     expect(stored).toMatchObject({ searchQuery: "react" });
   });
+
 });
