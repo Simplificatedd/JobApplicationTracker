@@ -1,7 +1,7 @@
 import { HttpError } from "./http";
 import type { AuthenticatedUser, CloudflareEnv } from "./types";
 import { reserveR2Operation } from "./usageBudgets";
-import { documentObjectKey, removeUnreferencedDocument } from "./documentLifecycle";
+import { DOCUMENT_GRACE_MS, documentObjectKey, removeUnreferencedDocument, rethrowDocumentConflict } from "./documentLifecycle";
 
 const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -47,6 +47,11 @@ function validateStorageKey(storageKey: string) {
   if (!STORAGE_KEY_PATTERN.test(storageKey)) {
     throw new HttpError(400, "The resume storage key is invalid.");
   }
+}
+
+async function hashDocument(bytes: ArrayBuffer) {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function getOwnedResumeObject(
@@ -104,6 +109,31 @@ export async function putResumeFile(
     throw new HttpError(400, "The uploaded resume contents do not match its type.");
   }
 
+  const hash = await hashDocument(bytes);
+  const existing = await getOwnedResumeObject(env.DB, user, storageKey);
+  if (existing) {
+    if (!["ready", "uploading"].includes(existing.lifecycle) ||
+      existing.file_size !== bytes.byteLength || existing.mime_type !== mimeType) {
+      throw new HttpError(409, "This document key cannot be replaced. Upload the document under a new key.");
+    }
+    let existingHash = existing.content_hash;
+    if (existingHash === null) {
+      // Legacy metadata did not record hashes. Verify bytes rather than trusting
+      // a same-size replacement or overwriting a committed legacy object.
+      await reserveR2Operation(env.DB, "read");
+      const stored = await env.RESUME_FILES.get(documentObjectKey(user, storageKey));
+      if (stored && stored.size === bytes.byteLength) existingHash = await hashDocument(await stored.arrayBuffer());
+    }
+    if (existingHash !== hash) throw new HttpError(409, "This document key already has different or unavailable contents. Upload under a new key.");
+    if (existing.lifecycle === "ready") {
+      const verified = await env.DB.prepare(`UPDATE resume_objects SET content_hash = ?
+        WHERE owner_id = ? AND storage_key = ? AND lifecycle = 'ready' RETURNING storage_key`)
+        .bind(hash, user.id, storageKey).first();
+      if (!verified) throw new HttpError(409, "Document cleanup has started. Upload under a new key.");
+      return { fileSize: bytes.byteLength, mimeType, storageKey };
+    }
+  }
+
   const [userUsage, totalUsage] = await Promise.all([
     env.DB.prepare(
       `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
@@ -131,20 +161,50 @@ export async function putResumeFile(
   await reserveR2Operation(env.DB, "write");
 
   const timestamp = new Date().toISOString();
-  await env.RESUME_FILES.put(documentObjectKey(user, storageKey), bytes, {
-    httpMetadata: { contentType: mimeType },
-  });
+  // Persist intent before touching R2. A worker can disappear at any subsequent
+  // await; this row remains discoverable without a browser's cooperation.
+  // Skip existing rows before INSERT triggers run: an identical concurrent retry
+  // may now be ready and referenced, even though our earlier read saw uploading.
   await env.DB.prepare(
     `INSERT INTO resume_objects
-      (owner_id, storage_key, mime_type, file_size, updated_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(owner_id, storage_key) DO UPDATE SET
-       mime_type = excluded.mime_type,
-       file_size = excluded.file_size,
-       updated_at = excluded.updated_at`,
+      (owner_id, storage_key, mime_type, file_size, updated_at, lifecycle, content_hash, cleanup_after)
+     SELECT ?, ?, ?, ?, ?, 'uploading', ?, ?
+     WHERE NOT EXISTS (SELECT 1 FROM resume_objects WHERE owner_id = ? AND storage_key = ?)
+     ON CONFLICT(owner_id, storage_key) DO NOTHING`,
   )
-    .bind(user.id, storageKey, mimeType, bytes.byteLength, timestamp)
-    .run();
+    .bind(user.id, storageKey, mimeType, bytes.byteLength, timestamp, hash, Date.now() + DOCUMENT_GRACE_MS, user.id, storageKey)
+    .run().catch(rethrowDocumentConflict);
+
+  const intent = await getOwnedResumeObject(env.DB, user, storageKey);
+  if (intent?.lifecycle === "ready" && intent.content_hash === hash && intent.mime_type === mimeType) {
+    return { fileSize: bytes.byteLength, mimeType, storageKey };
+  }
+  if (!intent || intent.lifecycle !== "uploading" || intent.content_hash !== hash || intent.mime_type !== mimeType) {
+    throw new HttpError(409, "The upload key is already in use or retired. Upload under a new key.");
+  }
+  const created = await env.RESUME_FILES.put(documentObjectKey(user, storageKey), bytes, {
+    httpMetadata: { contentType: mimeType }, onlyIf: { etagDoesNotMatch: "*" },
+  });
+  if (!created) {
+    // A lost PUT response may hide success; conditional retries may reuse only
+    // identical bytes. Unknown legacy objects are never overwritten.
+    await reserveR2Operation(env.DB, "read");
+    const stored = await env.RESUME_FILES.get(documentObjectKey(user, storageKey));
+    const storedHash = stored && stored.size === bytes.byteLength && await hashDocument(await stored.arrayBuffer());
+    if (storedHash !== hash) throw new HttpError(409, "Stored contents differ. Keep the original and upload under a new key.");
+  }
+  const ready = await env.DB.prepare(`UPDATE resume_objects SET lifecycle = 'ready'
+    WHERE owner_id = ? AND storage_key = ? AND content_hash = ? AND lifecycle IN ('uploading', 'ready')
+    RETURNING storage_key`).bind(user.id, storageKey, hash).first();
+  if (!ready) {
+    // A PUT can finish after deletion. Retain the retirement fence and make the
+    // next reconciliation retry immediately; periodic tombstones also cover a
+    // worker disappearing before this update.
+    await env.DB.prepare(`UPDATE resume_objects SET cleanup_after = ?
+      WHERE owner_id = ? AND storage_key = ? AND lifecycle IN ('deleting', 'deleted')`)
+      .bind(Date.now(), user.id, storageKey).run();
+    throw new HttpError(409, "The upload expired during cleanup. Upload under a new key.");
+  }
 
   return { fileSize: bytes.byteLength, mimeType, storageKey };
 }
