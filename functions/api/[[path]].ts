@@ -17,6 +17,7 @@ import {
   saveCloudState,
 } from "../lib/state";
 import type { CloudflareEnv } from "../lib/types";
+import { reconcileDocuments } from "../lib/documentLifecycle";
 import {
   MUTATION_PROTOCOL_ERROR,
   MUTATION_PROTOCOL_HEADER,
@@ -37,14 +38,19 @@ export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
     // Bind every data request to the identity the client used to choose its cache.
     // A stale tab must never write account A's snapshot after the Access cookie
     // changes to account B, even if that happens between two client requests.
-    if (route === "state" || route.startsWith("resume-files/")) {
+    if (route === "state" || route === "document-cleanup" || route.startsWith("resume-files/")) {
       if (context.request.headers.get("X-Tracker-Account-Id") !== user.id) {
         throw new HttpError(412, "Signed-in account changed. Reload the tracker.");
       }
-      if ((context.request.method === "PUT" || context.request.method === "DELETE") &&
+      if ((context.request.method === "PUT" || context.request.method === "DELETE" || context.request.method === "POST") &&
         context.request.headers.get(MUTATION_PROTOCOL_HEADER) !== MUTATION_PROTOCOL_VERSION) {
         throw new HttpError(426, MUTATION_PROTOCOL_ERROR);
       }
+    }
+
+    if (route === "document-cleanup") {
+      if (context.request.method !== "POST") throw new HttpError(405, "Use POST to retry document cleanup.");
+      return jsonResponse(await reconcileDocuments(context.env, user));
     }
 
     if (route === "state") {
