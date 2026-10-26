@@ -87,3 +87,53 @@ Missing attachments are omitted from recovery archives while their metadata is
 retained; such an archive will fail normal import until explicitly repaired.
 Authentication and network errors still abort export. Full backups always fail
 when an expected attachment is missing.
+
+For an old backup containing a document larger than 10 MiB, use the repository's
+Python 3 utility locally. It uses only the standard library and sends no data
+to any server. Give it a **new output directory**:
+
+```sh
+python3 -B scripts/recover_backup.py /path/to/original-backup.json /path/to/recovered
+```
+
+The utility validates payload decoding, recorded sizes and file signatures,
+extracts each PDF/DOCX under a safe generated filename, and writes a manifest
+mapping files to their document IDs and original names. It refuses existing
+output directories and never modifies the source. It also accepts legacy JSON
+archives above the app's 140 MiB import cap, subject to local memory capacity.
+It loads the JSON envelope in memory, but validates and extracts document bytes
+in bounded chunks rather than retaining every decoded attachment. All input
+validation completes before the new output directory is created; filesystem
+errors during writing can leave a partial output directory. Keep that directory
+for inspection or choose another new destination when retrying. The original
+backup remains unchanged. Preview of any generated copy is still required;
+extraction does not validate every tracker record or repair arbitrary schema errors.
+
+To recover tracker records and document associations immediately, explicitly
+request an attachment-free copy as well:
+
+```sh
+python3 -B scripts/recover_backup.py /path/to/original-backup.json /path/to/recovered --metadata-only
+```
+
+This creates `metadata-backup.json` alongside **all extracted original files**.
+The copy sets every document's `fileSize` to zero, removes all base64 payloads,
+and retains document IDs, names, notes, hashes, application links and original
+size/key values in recovery metadata. The copy intentionally excludes every
+attachment, including supported smaller files; it is not a full backup.
+Preview it in the tracker before restoring. Compress or split oversized PDFs
+outside the app to at most 10 MiB, upload supported replacement documents, and
+select them on the affected applications. Keep the extracted originals and
+archive until you have verified the restored records and replacement files.
+
+A snapshot above 1,900,000 bytes still needs explicit data reduction before
+import. Work on a copy: shorten long notes/job descriptions or remove unneeded
+applications together with their related activities, contacts, interviews and
+assessments. Preserve document links and contact counts. Preview validates the
+normalized result; the utility does not silently truncate records or notes.
+
+Recovery utility checks:
+
+```sh
+python3 -B -m unittest discover -s scripts -p 'test_*.py'
+```
