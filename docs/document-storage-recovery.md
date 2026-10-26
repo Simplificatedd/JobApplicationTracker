@@ -15,7 +15,7 @@ document mutations/restores. It does not replay uploads or snapshot saves, and
 **Repair browser cache** never invokes it. An acknowledged cloud save stays
 successful despite a cache or cleanup failure.
 
-Each request processes at most 25 due records and inventories at most 25 objects
+Each request processes at most 10 due records and inventories at most 10 objects
 under the authenticated owner's R2 prefix. Inventory progress is persisted in
 D1. Objects missing metadata receive a full 24-hour grace period from discovery;
 existing rows receive a full grace period when the migration is applied.

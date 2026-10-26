@@ -27,7 +27,7 @@ describe("document cleanup access boundary", () => {
     const response = await onRequest(context());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ removed: 0, failed: 0, pending: 0 });
-    expect(list).toHaveBeenCalledWith(expect.objectContaining({ prefix: "local%3Astudent%40example.edu/", limit: 25 }));
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ prefix: "local%3Astudent%40example.edu/", limit: 10 }));
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 });

@@ -3,7 +3,9 @@ import type { AuthenticatedUser, CloudflareEnv } from "./types";
 import { reserveR2Operation } from "./usageBudgets";
 
 export const DOCUMENT_GRACE_MS = 24 * 60 * 60 * 1000;
-const CLEANUP_BATCH_SIZE = 25;
+// Worst case: 3 calls per deletion, 1 per inventory registration, and 7 fixed
+// D1/R2 calls = 47. Leave room for authentication within the Free plan's 50.
+const CLEANUP_BATCH_SIZE = 10;
 // Bound owner parameters keep this set uncorrelated: parse the snapshot once
 // per query, rather than once for each candidate object.
 const DOCUMENT_REFERENCE_SQL = `storage_key IN (

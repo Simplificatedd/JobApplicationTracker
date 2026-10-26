@@ -251,12 +251,30 @@ describe("reference-safe deletion and reconciliation", () => {
 });
 
 describe("legacy inventory and owner boundaries", () => {
+  it("finishes cleanup and a full inventory page within the free invocation request budget", async () => {
+    for (let i = 0; i < 30; i++) await upload(`file-${i}`);
+    // Count actual D1/R2 calls, not SQL trigger statements. Leave headroom for
+    // authentication; exceeding the platform limit must fail this invocation.
+    let requests = 0;
+    const consume = () => { if (++requests > 49) throw new Error("Invocation request budget exhausted"); };
+    db.beforeQuery = consume;
+    r2.beforeDelete = async () => { consume(); };
+    const list = r2.list.bind(r2);
+    vi.spyOn(r2, "list").mockImplementation(async (options) => { consume(); return list(options); });
+    const result = await reconcileDocuments(env(), user, Date.now() + 2 * DOCUMENT_GRACE_MS);
+    expect(result.failed).toBe(0);
+    expect(result.removed).toBeGreaterThan(0);
+    expect(result.pending).toBe(30 - result.removed);
+    expect(requests).toBeLessThanOrEqual(49);
+  });
+
   it("bounds cleanup and reports the remaining backlog for subsequent retries", async () => {
     for (let i = 0; i < 30; i++) await upload(`file-${i}`);
     const future = Date.now() + 2 * DOCUMENT_GRACE_MS;
-    expect(await reconcileDocuments(env(), user, future)).toEqual({ removed: 25, failed: 0, pending: 5 });
-    expect(r2.files.size).toBe(5);
-    expect(await reconcileDocuments(env(), user, future)).toEqual({ removed: 5, failed: 0, pending: 0 });
+    expect(await reconcileDocuments(env(), user, future)).toEqual({ removed: 10, failed: 0, pending: 20 });
+    expect(r2.files.size).toBe(20);
+    expect(await reconcileDocuments(env(), user, future)).toEqual({ removed: 10, failed: 0, pending: 10 });
+    expect(await reconcileDocuments(env(), user, future)).toEqual({ removed: 10, failed: 0, pending: 0 });
     expect(r2.files.size).toBe(0);
   });
 
@@ -284,8 +302,9 @@ describe("legacy inventory and owner boundaries", () => {
     for (let i = 0; i < 30; i++) r2.files.set(objectKey(`file-${i}`), { bytes: new Uint8Array([1]), mime: "application/pdf", uploaded: new Date() });
     r2.files.set("other/private", { bytes: new Uint8Array([2]), mime: "application/pdf", uploaded: new Date(0) });
     const list = vi.spyOn(r2, "list");
-    expect(await reconcileDocuments(env(), user)).toMatchObject({ pending: 25 });
-    expect(db.sqlite.prepare("SELECT cursor FROM document_cleanup_scan").get()?.cursor).toBe("25");
+    expect(await reconcileDocuments(env(), user)).toMatchObject({ pending: 10 });
+    expect(db.sqlite.prepare("SELECT cursor FROM document_cleanup_scan").get()?.cursor).toBe("10");
+    expect(await reconcileDocuments(env(), user)).toMatchObject({ pending: 20 });
     expect(await reconcileDocuments(env(), user)).toMatchObject({ pending: 30 });
     expect(list.mock.calls.every(([options]) => options.prefix === `${encodeURIComponent(user.id)}/`)).toBe(true);
     expect(db.sqlite.prepare("SELECT COUNT(*) AS n FROM resume_objects").get()?.n).toBe(30);
