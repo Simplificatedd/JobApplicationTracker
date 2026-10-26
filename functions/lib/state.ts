@@ -6,6 +6,7 @@ import {
   utf8ByteLength,
 } from "../../src/storage/snapshotSize";
 import { HttpError } from "./http";
+import { hasValidDocumentReferences, rethrowDocumentConflict } from "./documentLifecycle";
 import type {
   AuthenticatedUser,
   CloudStateEnvelope,
@@ -84,7 +85,7 @@ export function parseSaveStateRequest(text: string): SaveStateRequest {
 
   value.snapshot.coverLetters ??= [];
 
-  if (!isStorageSnapshot(value.snapshot)) {
+  if (!isStorageSnapshot(value.snapshot) || !hasValidDocumentReferences(value.snapshot)) {
     throw new HttpError(400, "The cloud snapshot has an invalid shape.");
   }
 
@@ -168,7 +169,7 @@ export async function saveCloudState(
          VALUES (?, ?, 1, ?, ?, ?)`,
       )
       .bind(user.id, user.email, snapshotJson, timestamp, timestamp)
-      .run();
+      .run().catch(rethrowDocumentConflict);
 
     if ((result.meta.changes ?? 0) > 0) {
       return { revision: 1, snapshot: input.snapshot, updatedAt: timestamp };
@@ -189,7 +190,7 @@ export async function saveCloudState(
         input.baseRevision,
         input.snapshot.dataVersion ?? 1,
       )
-      .run();
+      .run().catch(rethrowDocumentConflict);
 
     if ((result.meta.changes ?? 0) > 0) {
       return {

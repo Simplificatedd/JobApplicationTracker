@@ -1,6 +1,7 @@
 import { HttpError } from "./http";
 import type { AuthenticatedUser, CloudflareEnv } from "./types";
 import { reserveR2Operation } from "./usageBudgets";
+import { documentObjectKey, removeUnreferencedDocument } from "./documentLifecycle";
 
 const DOCX_MIME_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -13,6 +14,8 @@ const STORAGE_KEY_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 interface ResumeObjectRow {
   file_size: number;
   mime_type: string;
+  lifecycle: string;
+  content_hash: string | null;
 }
 
 interface ResumeStorageBytesRow {
@@ -46,10 +49,6 @@ function validateStorageKey(storageKey: string) {
   }
 }
 
-function objectKey(user: AuthenticatedUser, storageKey: string) {
-  return `${encodeURIComponent(user.id)}/${storageKey}`;
-}
-
 async function getOwnedResumeObject(
   database: D1Database,
   user: AuthenticatedUser,
@@ -57,7 +56,7 @@ async function getOwnedResumeObject(
 ) {
   return database
     .prepare(
-      `SELECT mime_type, file_size FROM resume_objects
+      `SELECT mime_type, file_size, lifecycle, content_hash FROM resume_objects
        WHERE owner_id = ? AND storage_key = ?`,
     )
     .bind(user.id, storageKey)
@@ -109,14 +108,14 @@ export async function putResumeFile(
     env.DB.prepare(
       `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
        FROM resume_objects
-       WHERE owner_id = ? AND storage_key <> ?`,
+       WHERE owner_id = ? AND storage_key <> ? AND lifecycle <> 'deleted'`,
     )
       .bind(user.id, storageKey)
       .first<ResumeStorageBytesRow>(),
     env.DB.prepare(
       `SELECT COALESCE(SUM(file_size), 0) AS used_bytes
        FROM resume_objects
-       WHERE NOT (owner_id = ? AND storage_key = ?)`,
+       WHERE NOT (owner_id = ? AND storage_key = ?) AND lifecycle <> 'deleted'`,
     )
       .bind(user.id, storageKey)
       .first<ResumeStorageBytesRow>(),
@@ -132,7 +131,7 @@ export async function putResumeFile(
   await reserveR2Operation(env.DB, "write");
 
   const timestamp = new Date().toISOString();
-  await env.RESUME_FILES.put(objectKey(user, storageKey), bytes, {
+  await env.RESUME_FILES.put(documentObjectKey(user, storageKey), bytes, {
     httpMetadata: { contentType: mimeType },
   });
   await env.DB.prepare(
@@ -158,12 +157,12 @@ export async function getResumeFile(
   validateStorageKey(storageKey);
   const metadata = await getOwnedResumeObject(env.DB, user, storageKey);
 
-  if (!metadata) {
+  if (!metadata || metadata.lifecycle !== "ready") {
     throw new HttpError(404, "The resume file could not be found.");
   }
 
   await reserveR2Operation(env.DB, "read");
-  const object = await env.RESUME_FILES.get(objectKey(user, storageKey));
+  const object = await env.RESUME_FILES.get(documentObjectKey(user, storageKey));
 
   if (!object?.body) {
     throw new HttpError(404, "The resume file could not be found.");
@@ -184,16 +183,5 @@ export async function deleteResumeFile(
   storageKey: string,
 ) {
   validateStorageKey(storageKey);
-  const metadata = await getOwnedResumeObject(env.DB, user, storageKey);
-
-  if (!metadata) {
-    return;
-  }
-
-  await env.RESUME_FILES.delete(objectKey(user, storageKey));
-  await env.DB.prepare(
-    "DELETE FROM resume_objects WHERE owner_id = ? AND storage_key = ?",
-  )
-    .bind(user.id, storageKey)
-    .run();
+  await removeUnreferencedDocument(env, user, storageKey);
 }

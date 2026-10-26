@@ -6,7 +6,7 @@ function context(
   metadata: { file_size: number; mime_type: string } | null = null,
   getObject: () => Promise<unknown> = async () => null,
 ) {
-  const first = vi.fn(async () => metadata);
+  const first = vi.fn(async () => metadata && ({ ...metadata, lifecycle: "ready", content_hash: null }));
   const budget = vi.fn(async () => ({ operation_count: 1 }));
   const database = {
     prepare: (query: string) => ({
@@ -84,7 +84,7 @@ describe("resume GET success and access boundaries", () => {
           if (databaseFailure) throw new Error("private D1 failure details");
           if (query.includes("FROM resume_objects")) {
             return args[0] === owner && args[1] === "owned-file"
-              ? { file_size: 5, mime_type: "application/pdf" } : null;
+              ? { file_size: 5, mime_type: "application/pdf", lifecycle: "ready", content_hash: null } : null;
           }
           return exhausted ? null : { operation_count: 1 };
         } };
