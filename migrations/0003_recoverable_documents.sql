@@ -43,7 +43,14 @@ BEGIN
   UPDATE resume_objects SET cleanup_after = CASE WHEN storage_key IN (SELECT json_extract(doc.value, '$.storageKey') FROM json_each(NEW.snapshot_json, '$.resumes') AS doc
       UNION ALL
       SELECT json_extract(doc.value, '$.storageKey') FROM json_each(NEW.snapshot_json, '$.coverLetters') AS doc)
-    THEN NULL ELSE COALESCE(cleanup_after, unixepoch(NEW.updated_at) * 1000 + 86400000) END
+    THEN NULL
+    -- Migrated/inventoried live rows can still have their original deadline.
+    -- Losing their last authoritative reference always starts a full new grace.
+    WHEN storage_key IN (SELECT json_extract(doc.value, '$.storageKey') FROM json_each(OLD.snapshot_json, '$.resumes') AS doc
+      UNION ALL
+      SELECT json_extract(doc.value, '$.storageKey') FROM json_each(OLD.snapshot_json, '$.coverLetters') AS doc)
+    THEN unixepoch(NEW.updated_at) * 1000 + 86400000
+    ELSE COALESCE(cleanup_after, unixepoch(NEW.updated_at) * 1000 + 86400000) END
   WHERE owner_id = NEW.owner_id AND lifecycle = 'ready';
 END;
 

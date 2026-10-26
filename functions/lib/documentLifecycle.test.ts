@@ -160,6 +160,29 @@ describe("reference-safe deletion and reconciliation", () => {
     expect(r2.files.has(objectKey())).toBe(false);
   });
 
+  it.each(["migration", "inventory"])("restarts grace when removing a legacy reference with an expired %s deadline", async (source) => {
+    if (source === "migration") {
+      db.close();
+      db = new SqliteD1((sqlite) => {
+        sqlite.prepare("INSERT INTO resume_objects VALUES (?, 'file', 'application/pdf', 13, '2000-01-01')").run(user.id);
+        sqlite.prepare("INSERT INTO tracker_state VALUES (?, ?, 1, ?, '2000-01-01', '2000-01-01')")
+          .run(user.id, user.email, JSON.stringify(data()));
+      });
+      // The owner makes no snapshot writes during the initial migration grace.
+      db.sqlite.prepare("UPDATE resume_objects SET cleanup_after = ?").run(Date.now() - DOCUMENT_GRACE_MS);
+    } else {
+      await save(data());
+      r2.files.set(objectKey(), { bytes: new TextEncoder().encode("%PDF-original"), mime: "application/pdf", uploaded: new Date(0) });
+      await reconcileDocuments(env(), user, Date.now() - 2 * DOCUMENT_GRACE_MS);
+    }
+    await save(snapshot({ applications: [] }), 1);
+    const due = Number(row()?.cleanup_after);
+    expect(due).toBeGreaterThan(Date.now() + DOCUMENT_GRACE_MS - 2000);
+    const remove = vi.spyOn(r2, "delete");
+    await reconcileDocuments(env(), user);
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it("rejects a new reference after the deletion claim but before R2 deletion", async () => {
     await upload(); await save(snapshot({ applications: [] }));
     r2.beforeDelete = async () => {
