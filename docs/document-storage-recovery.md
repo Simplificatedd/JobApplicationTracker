@@ -24,6 +24,10 @@ key or zero-byte metadata. Reconciliation fails closed if document references
 cannot be verified. Keys outside the application's canonical key format require
 administrator inspection and are not automatically removed.
 
+The combined deletion/inventory path uses at most 47 D1/R2 calls, leaving room
+for authentication under the [Free invocation request limit](https://developers.cloudflare.com/workers/platform/limits/).
+D1 also limits [queries per invocation](https://developers.cloudflare.com/d1/platform/limits/).
+
 New uncommitted uploads receive a 24-hour deadline. Removing a live reference
 starts a fresh grace period. A snapshot reintroducing the key before cleanup
 claims it cancels cleanup. Explicit deletes/restore compensation may claim an
@@ -66,6 +70,13 @@ Existing rows become `ready`, with unknown hashes verified on their first retry.
 Backup schemas and snapshot data versions are unchanged.
 
 The release requires a write maintenance window:
+
+**Release is currently NO-GO until ingress denial and complete in-flight drain
+are demonstrated.** This repository has no application maintenance gate or
+active-request ledger. Follow the [release checklist](document-storage-release-checklist.md)
+for the Access boundary proposal, exact migration commands/queries, verification,
+failure scenarios and any prerequisite rollout. A frontend pause or fixed wait
+does not satisfy this requirement. No production controls were changed by review.
 
 1. Keep this PR unmerged until the release operator is ready. Merging to `main`
    triggers the repository's normal automatic production deployment; that workflow
