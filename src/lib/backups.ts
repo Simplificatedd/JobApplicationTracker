@@ -11,19 +11,22 @@ import type {
   Interview,
   ResumeMetadata,
 } from "../types/application";
-import { normalizeApplicationStatus } from "./domain";
-import { migrateLegacyFollowUpSchedule } from "./followUps";
+import { normalizeUserSettings } from "./domain";
 import {
   ASSESSMENT_TYPES,
   ASSESSMENT_PROGRESS,
   ASSESSMENT_RESULTS,
-  migrateStageSnapshot,
 } from "./assessments";
-import { normalizeStatusActivities } from "./statusHistory";
+import { normalizeSnapshot } from "../storage/normalizeSnapshot";
+import { serializeCloudSnapshot } from "../storage/snapshotSize";
+import { MAX_DOCUMENT_LIBRARY_BYTES, remapRestoreFiles } from "../storage/restoreFiles";
+import { MAX_RESUME_FILE_BYTES } from "./resumeFiles";
 
 export const BACKUP_SCHEMA_VERSION = 3;
 const LEGACY_BACKUP_SCHEMA_VERSION = 1;
-export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
+// 100 MiB of binary files expands to ~134 MiB in base64. Allow room for
+// snapshot metadata, payload keys, escaping and legacy pretty-printed JSON.
+export const MAX_BACKUP_FILE_BYTES = 140 * 1024 * 1024;
 const MAX_BACKUP_RECORDS_PER_COLLECTION = 50_000;
 
 export interface ResumeFileBackup {
@@ -77,6 +80,16 @@ export async function createBackupFile({
   });
 }
 
+// The raw serializer above also serves recovery exports, which deliberately
+// preserve data that may exceed today's restore constraints.
+export async function createFullBackupFile(options: Parameters<typeof createBackupFile>[0]) {
+  const raw = await createBackupFile(options);
+  const backup = await parseBackupFile(raw);
+  const file = new Blob([JSON.stringify(backup)], { type: "application/json" });
+  if (file.size > MAX_BACKUP_FILE_BYTES) throw new Error("Tracker backup exceeds the 140 MiB JSON limit.");
+  return file;
+}
+
 export async function blobToBase64(blob: Blob) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -107,9 +120,9 @@ export function base64ToBlob(dataBase64: string, mimeType: string) {
   return new Blob(chunks, { type: mimeType });
 }
 
-export async function parseBackupFile(file: File) {
+export async function parseBackupFile(file: Blob) {
   if (file.size > MAX_BACKUP_FILE_BYTES) {
-    throw new Error("Tracker backup files must be 100 MB or smaller.");
+    throw new Error("Tracker backup files must be 140 MiB or smaller. See docs/backups.md for recovery.");
   }
 
   let parsed: unknown;
@@ -127,35 +140,26 @@ export async function parseBackupFile(file: File) {
   }
 
   const backup = parsed as TrackerBackup;
-  const hasLegacyOfferSemantics =
-    backup.schemaVersion === LEGACY_BACKUP_SCHEMA_VERSION;
-
-  return {
+  const normalized = {
     ...backup,
     schemaVersion: BACKUP_SCHEMA_VERSION,
-    snapshot: migrateStageSnapshot({
+    snapshot: normalizeSnapshot({
       ...backup.snapshot,
-      activities: normalizeStatusActivities(
-        backup.snapshot.activities,
-        hasLegacyOfferSemantics,
-      ),
-      dataVersion: TRACKER_DATA_VERSION,
-      applications: backup.snapshot.applications.map((application) => {
-        const migratedApplication = migrateLegacyFollowUpSchedule(
-          application,
-          backup.snapshot.settings.defaultFollowUpPromptDays,
-        );
-
-        return {
-          ...migratedApplication,
-          status:
-            hasLegacyOfferSemantics && application.status === "Offered"
-              ? "Accepted"
-              : normalizeApplicationStatus(application.status),
-        };
-      }),
+      // Backup schema governs historical Offered semantics, even when the
+      // snapshot omitted its data version. Future versions were rejected above.
+      dataVersion: backup.schemaVersion === 1 ? 1 : 2,
+      settings: normalizeUserSettings(backup.snapshot.settings),
     }),
   } satisfies TrackerBackup;
+  // Migration can add fields, children and projections. Validate its output too.
+  const normalizedError = getBackupValidationError(normalized);
+  if (normalizedError) throw new Error(normalizedError);
+  // Fresh staging keys may be longer than a legacy key. Include that growth in
+  // preview/export validation so import cannot discover a new size failure.
+  serializeCloudSnapshot(remapRestoreFiles(normalized.snapshot, [
+    ...normalized.resumeFiles, ...normalized.coverLetterFiles,
+  ]).snapshot);
+  return normalized;
 }
 
 export function getBackupImportPreview(
@@ -272,8 +276,15 @@ function getBackupValidationError(value: unknown) {
     return "This backup file is missing required tracker data.";
   }
 
-  value.snapshot.coverLetters ??= [];
-  value.snapshot.assessments ??= [];
+  if (value.snapshot.dataVersion !== undefined &&
+    (!Number.isInteger(value.snapshot.dataVersion) ||
+      Number(value.snapshot.dataVersion) < 1 ||
+      Number(value.snapshot.dataVersion) > TRACKER_DATA_VERSION)) {
+    return "This backup file uses an unsupported tracker data version. Update the tracker before restoring.";
+  }
+
+  if (value.snapshot.coverLetters === undefined) value.snapshot.coverLetters = [];
+  if (value.snapshot.assessments === undefined) value.snapshot.assessments = [];
 
   if (!isStorageSnapshot(value.snapshot)) {
     return "This backup file is missing required tracker data.";
@@ -320,6 +331,10 @@ function getBackupValidationError(value: unknown) {
       return "This backup file contains invalid resume metadata.";
     }
 
+    if (resume.fileSize > MAX_RESUME_FILE_BYTES) {
+      return `Resume "${resume.displayName}" exceeds the 10 MiB file limit. See docs/backups.md for legacy recovery.`;
+    }
+
     resumeIds.add(resume.id);
 
     if (resumeStorageKeys.has(resume.storageKey)) {
@@ -338,9 +353,13 @@ function getBackupValidationError(value: unknown) {
       return "This backup file contains invalid cover letter metadata.";
     }
 
+    if (coverLetter.fileSize > MAX_RESUME_FILE_BYTES) {
+      return `Cover letter "${coverLetter.displayName}" exceeds the 10 MiB file limit. See docs/backups.md for legacy recovery.`;
+    }
+
     coverLetterIds.add(coverLetter.id);
 
-    if (coverLetterStorageKeys.has(coverLetter.storageKey)) {
+    if (coverLetterStorageKeys.has(coverLetter.storageKey) || resumeStorageKeys.has(coverLetter.storageKey)) {
       return "This backup file contains duplicate cover letter storage keys.";
     }
 
@@ -349,6 +368,11 @@ function getBackupValidationError(value: unknown) {
     if (coverLetter.fileSize > 0) {
       uploadedCoverLetterStorageKeys.add(coverLetter.storageKey);
     }
+  }
+
+  if ([...value.snapshot.resumes, ...value.snapshot.coverLetters]
+    .reduce((bytes, document) => bytes + document.fileSize, 0) > MAX_DOCUMENT_LIBRARY_BYTES) {
+    return "This backup file exceeds the 100 MiB document library limit.";
   }
 
   const applicationIds = new Set<string>();
@@ -786,7 +810,6 @@ function isResumeMetadata(value: unknown): value is ResumeMetadata {
     typeof value.fileSize === "number" &&
     Number.isInteger(value.fileSize) &&
     value.fileSize >= 0 &&
-    value.fileSize <= MAX_BACKUP_FILE_BYTES &&
     isNonBlankString(value.storageKey) &&
     isNonBlankString(value.contentHash) &&
     isOptionalString(value.versionLabel) &&
@@ -924,7 +947,7 @@ function decodeBase64(value: string) {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isNonBlankString(value: unknown): value is string {

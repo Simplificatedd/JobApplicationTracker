@@ -244,7 +244,7 @@ describe("parseBackupFile", () => {
     const file = createBackupFile(createSnapshot());
     Object.defineProperty(file, "size", { value: MAX_BACKUP_FILE_BYTES + 1 });
 
-    await expect(parseBackupFile(file)).rejects.toThrow("100 MB or smaller");
+    await expect(parseBackupFile(file)).rejects.toThrow("140 MiB or smaller");
   });
 
   it("rejects duplicate record IDs", async () => {
@@ -509,7 +509,7 @@ describe("parseBackupFile", () => {
     ).rejects.toThrow("inconsistent resume file data");
   });
 
-  it("restores legacy resume files above the new-upload size limit", async () => {
+  it("rejects legacy resume files above the upload limit during preview", async () => {
     const legacyPdf = `%PDF-${"a".repeat(MAX_RESUME_FILE_BYTES - 4)}`;
     const snapshot = createSnapshot({
       resumes: [
@@ -539,7 +539,7 @@ describe("parseBackupFile", () => {
           },
         ]),
       ),
-    ).resolves.toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+    ).rejects.toThrow("10 MiB file limit");
   });
 
   it("validates and restores cover letter metadata and files", async () => {
