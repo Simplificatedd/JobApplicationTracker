@@ -126,6 +126,7 @@ export interface TrackerStore extends AssessmentActions {
   applications: Application[];
   cloudAccountEmail: string | null;
   cacheWarning: string | null;
+  documentCleanupWarning: string | null;
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   interviews: Interview[];
@@ -134,6 +135,7 @@ export interface TrackerStore extends AssessmentActions {
   resumes: ResumeMetadata[];
   retryStorage: () => void;
   repairCache: () => Promise<void>;
+  retryDocumentCleanup: () => Promise<void>;
   settings: UserSettings;
   storageError: string | null;
   tablePreferences: TablePreferences | null;
@@ -234,6 +236,7 @@ export function useTrackerStore(): TrackerStore {
   );
   const [storageError, setStorageError] = useAccountState<string | null>(null, accountInvalidated);
   const [cacheWarning, setCacheWarning] = useAccountState<string | null>(null, accountInvalidated);
+  const [documentCleanupWarning, setDocumentCleanupWarning] = useAccountState<string | null>(null, accountInvalidated);
   const [storageRetryKey, setStorageRetryKey] = useState(0);
   const [tablePreferences, setTablePreferences] =
     useAccountState<TablePreferences | null>(null, accountInvalidated);
@@ -263,6 +266,7 @@ export function useTrackerStore(): TrackerStore {
       setTablePreferences(null);
       setStorageError("Signed-in account changed. Reload the tracker.");
       setCacheWarning(null);
+      setDocumentCleanupWarning(null);
       setIsStorageLoading(false);
       // Clear first, then permanently block publishers from this store instance.
       accountInvalidated.current = true;
@@ -270,6 +274,8 @@ export function useTrackerStore(): TrackerStore {
     window.addEventListener("tracker-account-changed", handleAccountChanged);
     const unsubscribeCacheWarning = cloudStorageAdapter.subscribeCacheWarning(setCacheWarning);
     setCacheWarning(cloudStorageAdapter.getCacheWarning());
+    const unsubscribeCleanupWarning = cloudStorageAdapter.subscribeDocumentCleanupWarning(setDocumentCleanupWarning);
+    setDocumentCleanupWarning(cloudStorageAdapter.getDocumentCleanupWarning());
 
     // Keep loaded editors mounted so retry cannot discard their unsaved drafts.
     if (!hasHydrated.current) setIsStorageLoading(true);
@@ -322,12 +328,13 @@ export function useTrackerStore(): TrackerStore {
       isActive = false;
       window.removeEventListener("tracker-account-changed", handleAccountChanged);
       unsubscribeCacheWarning();
+      unsubscribeCleanupWarning();
     };
   }, [
     storageRetryKey, setActivities, setAnalyticsSettings, setApplications,
     setAssessments, setCloudAccountEmail, setContacts, setCoverLetters,
     setInterviews, setNotificationState, setResumes, setSettings,
-    setTablePreferences, setStorageError, setIsStorageLoading, setCacheWarning,
+    setTablePreferences, setStorageError, setIsStorageLoading, setCacheWarning, setDocumentCleanupWarning,
   ]);
 
   function assertAccountActive() {
@@ -363,6 +370,12 @@ export function useTrackerStore(): TrackerStore {
       // failures such as account invalidation; keep the cloud error visible.
       setStorageError(getStorageErrorMessage(error));
     }
+  }
+
+  async function retryDocumentCleanup() {
+    if (accountInvalidated.current) return;
+    try { await cloudStorageAdapter.retryDocumentCleanup(); }
+    catch (error) { setStorageError(getStorageErrorMessage(error)); }
   }
 
   function runApplicationMutation<Value>(
@@ -1816,6 +1829,7 @@ export function useTrackerStore(): TrackerStore {
     applications,
     cloudAccountEmail,
     cacheWarning,
+    documentCleanupWarning,
     contacts,
     coverLetters,
     interviews,
@@ -1824,6 +1838,7 @@ export function useTrackerStore(): TrackerStore {
     resumes,
     retryStorage,
     repairCache,
+    retryDocumentCleanup,
     settings,
     storageError,
     tablePreferences,

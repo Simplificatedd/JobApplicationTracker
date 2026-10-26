@@ -4,6 +4,7 @@ import { snapshot, timestamp } from "./assessmentFixtures";
 
 // One revision-aware server shared by otherwise independent browser adapters.
 export class RevisionApi implements CloudApiClient {
+  async reconcileDocuments() { return { removed: 0, failed: 0, pending: 0 }; }
   state: CloudStateEnvelope;
   conflicts = 0;
   files = new Map<string, Blob>();

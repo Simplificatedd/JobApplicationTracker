@@ -29,6 +29,7 @@ export class CloudRevisionConflictError extends CloudApiError {
 }
 
 export interface CloudApiClient {
+  reconcileDocuments(accountId: string): Promise<{ removed: number; failed: number; pending: number }>;
   deleteResumeFile(storageKey: string, accountId: string): Promise<void>;
   getResumeFile(storageKey: string, accountId: string): Promise<Blob>;
   getSession(): Promise<CloudAccount>;
@@ -70,7 +71,7 @@ export function createCloudApiClient(
           credentials: "same-origin",
           headers: {
             Accept: "application/json",
-            ...(init.method === "PUT" || init.method === "DELETE"
+            ...(init.method === "PUT" || init.method === "DELETE" || init.method === "POST"
               ? { [MUTATION_PROTOCOL_HEADER]: MUTATION_PROTOCOL_VERSION } : {}),
             ...init.headers,
           },
@@ -126,6 +127,16 @@ export function createCloudApiClient(
   }
 
   return {
+    async reconcileDocuments(accountId) {
+      const response = await requireSuccess(await request("/document-cleanup", {
+        method: "POST", headers: { "X-Tracker-Account-Id": accountId },
+      }));
+      const result: unknown = await response.json();
+      if (!isRecord(result) || ![result.removed, result.failed, result.pending].every(
+        (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0,
+      )) throw new CloudApiError("Document cleanup could not be confirmed. Retry cleanup later.", 0);
+      return result as { removed: number; failed: number; pending: number };
+    },
     async getSession() {
       const response = await requireSuccess(await request("/session"));
       const account: unknown = await response.json();

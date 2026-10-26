@@ -26,6 +26,22 @@ const snapshot = {
 };
 
 describe("cloud API client", () => {
+  it("sends account/protocol headers for idempotent cleanup and preserves partial results", async () => {
+    const result = { removed: 2, failed: 1, pending: 3 };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(result));
+    const client = createCloudApiClient({ fetcher, retryDelays: [] });
+    expect(await client.reconcileDocuments("owner")).toEqual(result);
+    expect(fetcher).toHaveBeenCalledWith("/api/document-cleanup", expect.objectContaining({
+      method: "POST", credentials: "same-origin",
+      headers: expect.objectContaining({ "X-Tracker-Account-Id": "owner", "X-Tracker-Mutation-Protocol": "1" }),
+    }));
+  });
+
+  it.each([{}, { removed: 0, failed: -1, pending: 0 }, { removed: 0, failed: 0, pending: "0" }])("rejects unconfirmed cleanup results (%j)", async (result) => {
+    const client = createCloudApiClient({ fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json(result)), retryDelays: [] });
+    await expect(client.reconcileDocuments("owner")).rejects.toThrow("could not be confirmed");
+  });
+
   it.each([-1, 0, 1])("validates stored snapshot bytes before network I/O at limit %+d", async (offset) => {
     const data = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + offset);
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ revision: 4, snapshot, updatedAt: "now" }));

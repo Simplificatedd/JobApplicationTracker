@@ -84,6 +84,13 @@ export function App() {
           retryLabel="Repair browser cache"
         />
       ) : null}
+      {tracker.documentCleanupWarning ? (
+        <StorageErrorBanner
+          message={tracker.documentCleanupWarning}
+          onRetry={() => { void tracker.retryDocumentCleanup(); }}
+          retryLabel="Retry document cleanup"
+        />
+      ) : null}
       {tracker.isStorageLoading ? (
         <StorageLoading />
       ) : (

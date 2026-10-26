@@ -18,6 +18,7 @@ afterAll(() => vi.unstubAllGlobals());
 
 // Separate adapters retain separate revisions; all saves share the same server state.
 class RevisionApi implements CloudApiClient {
+  async reconcileDocuments() { return { removed: 0, failed: 0, pending: 0 }; }
   state: CloudStateEnvelope;
   conflicts = 0;
   files = new Map<string, Blob>();

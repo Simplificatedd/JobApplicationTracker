@@ -74,6 +74,7 @@ function createSnapshot(
 }
 
 class FakeCloudApi implements CloudApiClient {
+  async reconcileDocuments() { return { removed: 0, failed: 0, pending: 0 }; }
   account: CloudAccount = { id: "student-id", email: "student@example.edu" };
   files = new Map<string, Blob>();
   state: CloudStateEnvelope | null = null;

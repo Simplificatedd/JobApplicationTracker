@@ -245,6 +245,9 @@ export interface CloudStorageAdapter extends StorageAdapter {
   getCacheWarning(): string | null;
   subscribeCacheWarning(listener: (warning: string | null) => void): () => void;
   repairCache(): Promise<void>;
+  getDocumentCleanupWarning(): string | null;
+  subscribeDocumentCleanupWarning(listener: (warning: string | null) => void): () => void;
+  retryDocumentCleanup(): Promise<void>;
   // Last acknowledged server state, for synchronous UI publication after a
   // verified operation. This does not fetch, repair the cache, or rerun startup.
   getCurrentSnapshot(): StorageSnapshot;
@@ -282,6 +285,33 @@ export function createCloudStorageAdapter({
   let mutationQueue = Promise.resolve();
   let cacheWarning: string | null = null;
   const cacheListeners = new Set<(warning: string | null) => void>();
+  let documentCleanupWarning: string | null = null;
+  const cleanupListeners = new Set<(warning: string | null) => void>();
+
+  function getDocumentCleanupWarning() { assertActive(); return documentCleanupWarning; }
+  function subscribeDocumentCleanupWarning(listener: (warning: string | null) => void) {
+    cleanupListeners.add(listener);
+    return () => { cleanupListeners.delete(listener); };
+  }
+  function setDocumentCleanupWarning(warning: string | null) {
+    if (warning === documentCleanupWarning) return;
+    documentCleanupWarning = warning;
+    for (const listener of cleanupListeners) listener(warning);
+  }
+  async function checkDocumentCleanup() {
+    try {
+      const result = await cloudRequest(api.reconcileDocuments(accountId()));
+      setDocumentCleanupWarning(result.failed || result.pending
+        ? `Document cleanup is pending (${result.pending} files; ${result.failed} attempts failed). Saved cloud data is unchanged. Unreferenced files have a 24-hour grace period; retry cleanup later to continue.`
+        : null);
+    } catch (error) {
+      assertActive();
+      setDocumentCleanupWarning(`Document cleanup could not be confirmed. Saved cloud data is unchanged. Retry document cleanup. ${error instanceof Error ? error.message : ""}`);
+    }
+  }
+  async function retryDocumentCleanup() {
+    await queueMutation(async () => { await ensureInitialized(); await checkDocumentCleanup(); });
+  }
 
   function getCacheWarning() {
     assertActive();
@@ -412,7 +442,10 @@ export function createCloudStorageAdapter({
       throw new Error("Signed-in account changed. Reload the tracker.");
     }
     if (!initializePromise) {
-      initializePromise = initializeNow().catch((error) => {
+      initializePromise = initializeNow().then(async (snapshot) => {
+        await checkDocumentCleanup();
+        return snapshot;
+      }).catch((error) => {
         initializePromise = null;
         throw error;
       });
@@ -640,13 +673,18 @@ export function createCloudStorageAdapter({
       resumeFiles,
     );
 
-    await Promise.allSettled(
+    const cleanup = await Promise.allSettled(
       (mutation.deleteResumeFileKeys ?? []).map((storageKey) =>
         cloudRequest(api.deleteResumeFile(storageKey, accountId())),
       ),
     );
     if (accountIdentityChanged) {
       throw new Error("Signed-in account changed. Reload the tracker.");
+    }
+    if (cleanup.some((result) => result.status === "rejected")) {
+      setDocumentCleanupWarning("Cloud changes were saved, but document cleanup failed. Files may still consume quota. Retry document cleanup; do not repeat the saved change.");
+    } else if (resumeFiles.length || mutation.deleteResumeFileKeys?.length) {
+      await checkDocumentCleanup();
     }
   }
 
@@ -892,9 +930,14 @@ export function createCloudStorageAdapter({
         ...(await listResumeMetadata()),
         ...(await listCoverLetterMetadata()),
       ];
-      await Promise.allSettled(
+      const cleanup = await Promise.allSettled(
         documents.map((document) => cloudRequest(api.deleteResumeFile(document.storageKey, accountId()))),
       );
+      assertActive();
+      if (cleanup.some((result) => result.status === "rejected")) {
+        setDocumentCleanupWarning("Some documents could not be removed. Referenced files are protected. Retry document cleanup after removing their metadata.");
+        throw new Error("Some document deletions failed. Retry document cleanup; referenced files were retained.");
+      }
       await tryCache(() => activeCache().clearResumeFiles());
     });
   }
@@ -1011,6 +1054,7 @@ export function createCloudStorageAdapter({
             cloudState = saved;
             // Cache failure after an acknowledged commit remains a warning.
             await refreshCache(saved, prepared.files);
+            await checkDocumentCleanup();
             return;
           } catch (error) {
             if (!(error instanceof CloudRevisionConflictError) || !error.current) {
@@ -1035,6 +1079,7 @@ export function createCloudStorageAdapter({
           ));
           assertActive();
           if (cleanup.some((result) => result.status === "rejected")) {
+            setDocumentCleanupWarning("Restore cleanup is incomplete. Staged files may still consume quota. Retry document cleanup; committed files remain protected.");
             throw Object.assign(new Error(`${error instanceof Error ? error.message : "Restore failed."} Some staged files could not be removed and may consume cloud quota. See docs/backups.md before retrying.`), { cause: error });
           }
         } else {
@@ -1098,6 +1143,9 @@ export function createCloudStorageAdapter({
     importSnapshot: guarded(importSnapshot),
     getAccount,
     getCacheWarning,
+    getDocumentCleanupWarning,
+    subscribeDocumentCleanupWarning,
+    retryDocumentCleanup: guarded(retryDocumentCleanup),
     subscribeCacheWarning,
     repairCache: guarded(repairCache),
     getCurrentSnapshot,

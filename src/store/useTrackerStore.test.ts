@@ -63,6 +63,7 @@ const storage = vi.hoisted(() => ({
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
   importSnapshot: vi.fn(), getResumeFile: vi.fn(),
+  getDocumentCleanupWarning: vi.fn(), subscribeDocumentCleanupWarning: vi.fn(), retryDocumentCleanup: vi.fn(),
   getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(), refresh: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
@@ -115,6 +116,9 @@ beforeEach(() => {
   storage.listCoverLetterMetadata.mockResolvedValue([]);
   storage.listContacts.mockResolvedValue([]);
   storage.deleteApplication.mockResolvedValue(undefined);
+  storage.getDocumentCleanupWarning.mockReturnValue(null);
+  storage.subscribeDocumentCleanupWarning.mockReturnValue(() => {});
+  storage.retryDocumentCleanup.mockResolvedValue(undefined);
   storage.getCacheWarning.mockReturnValue(null);
   storage.subscribeCacheWarning.mockReturnValue(() => {});
   storage.repairCache.mockResolvedValue(undefined);
@@ -187,6 +191,26 @@ describe("store account invalidation", () => {
     expect(RenderStore().settings.defaultFollowUpPromptDays).toBe(99);
     expect(RenderStore().cacheWarning).toContain("Browser cache is unavailable");
     expect(RenderStore().storageError).toBeNull();
+  });
+
+  it("shows cleanup independently and retries without replaying saves or cache repair", async () => {
+    let publish!: (warning: string | null) => void;
+    storage.getDocumentCleanupWarning.mockReturnValue("Document cleanup is pending.");
+    storage.subscribeDocumentCleanupWarning.mockImplementation((listener) => { publish = listener; return () => {}; });
+    storage.retryDocumentCleanup.mockImplementation(async () => { publish(null); });
+    RenderStore(); await flush();
+    expect(RenderStore().documentCleanupWarning).toContain("pending");
+    expect(RenderStore().storageError).toBeNull();
+    expect(RenderStore().isStorageLoading).toBe(false);
+    await RenderStore().retryDocumentCleanup();
+    expect(RenderStore().documentCleanupWarning).toBeNull();
+    expect(storage.commitMutation).not.toHaveBeenCalled();
+    expect(storage.repairCache).not.toHaveBeenCalled();
+    invalidate();
+    publish("Late cleanup result");
+    await RenderStore().retryDocumentCleanup();
+    expect(RenderStore().documentCleanupWarning).toBeNull();
+    expect(storage.retryDocumentCleanup).toHaveBeenCalledTimes(1);
   });
 
   it("cannot hydrate from an initialization continuation after the account event", async () => {
@@ -341,6 +365,9 @@ describe("store with two independent revision-aware cloud adapters", () => {
     storage.getCacheWarning.mockImplementation(b.getCacheWarning);
     storage.subscribeCacheWarning.mockImplementation(b.subscribeCacheWarning);
     storage.repairCache.mockImplementation(b.repairCache);
+    storage.getDocumentCleanupWarning.mockImplementation(b.getDocumentCleanupWarning);
+    storage.subscribeDocumentCleanupWarning.mockImplementation(b.subscribeDocumentCleanupWarning);
+    storage.retryDocumentCleanup.mockImplementation(b.retryDocumentCleanup);
     storage.exportSnapshot.mockImplementation(b.exportSnapshot);
     storage.importSnapshot.mockImplementation(b.importSnapshot);
     storage.getResumeFile.mockImplementation(b.getResumeFile);
