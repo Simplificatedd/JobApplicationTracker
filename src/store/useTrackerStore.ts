@@ -72,7 +72,7 @@ import {
 } from "../lib/assessments";
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
-import { assertRecordIdentity, StorageConflictError } from "../storage/mutationRebase";
+import { assertRecordIdentity, equalStoredValue, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
   StorageMutation,
@@ -1708,6 +1708,17 @@ export function useTrackerStore(): TrackerStore {
           ...currentPreferences,
           ...input,
         } as TablePreferences;
+
+        // The Applications page saves whenever its preference inputs change,
+        // and every save republishes settings with fresh arrays (such as
+        // visibleApplicationColumns), which re-runs that save. Skipping
+        // unchanged preferences stops one save from triggering the next.
+        if (
+          currentPreferences &&
+          equalStoredValue(updatedTablePreferences, currentPreferences)
+        ) {
+          return true;
+        }
 
         return persistThenUpdate(
           cloudStorageAdapter.saveTablePreferences(updatedTablePreferences, currentPreferences),
