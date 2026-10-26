@@ -5,7 +5,7 @@ export const D1_MAX_ROW_BYTES = 2_000_000;
 export const MAX_CLOUD_SNAPSHOT_BYTES = D1_MAX_ROW_BYTES - 100_000;
 
 export const CLOUD_SNAPSHOT_SIZE_MESSAGE =
-  "Tracker data exceeds the 1,900,000-byte cloud limit. Export a full backup, then remove unneeded records or shorten long notes and job descriptions before saving again. Your existing cloud data was not changed.";
+  "Tracker data exceeds the 1,900,000-byte cloud limit. Export a recovery archive, then remove unneeded records or shorten long notes and job descriptions before saving again. Your existing cloud data was not changed.";
 
 const encoder = new TextEncoder();
 

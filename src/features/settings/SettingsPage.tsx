@@ -28,6 +28,7 @@ interface SettingsPageProps {
   cloudAccountEmail: string | null;
   onExportApplicationsCsv: () => Blob;
   onExportFullBackup: () => Promise<Blob>;
+  onExportRecoveryBackup: () => Promise<Blob>;
   onImportFullBackup: (file: File) => Promise<void>;
   onPreviewBackupImport: (file: File) => Promise<BackupImportPreview>;
   onResetSettings: () => void;
@@ -39,6 +40,7 @@ export function SettingsPage({
   cloudAccountEmail,
   onExportApplicationsCsv,
   onExportFullBackup,
+  onExportRecoveryBackup,
   onImportFullBackup,
   onPreviewBackupImport,
   onResetSettings,
@@ -67,16 +69,18 @@ export function SettingsPage({
     setImportInputKey((current) => current + 1);
   }
 
-  async function exportFullBackup() {
+  async function exportFullBackup(recovery = false) {
     setBackupError("");
     setBackupStatus("");
 
     try {
       downloadBlob(
-        await onExportFullBackup(),
-        `job-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`,
+        await (recovery ? onExportRecoveryBackup() : onExportFullBackup()),
+        `job-tracker-${recovery ? "recovery" : "backup"}-${new Date().toISOString().slice(0, 10)}.json`,
       );
-      setBackupStatus("Full backup exported.");
+      setBackupStatus(recovery
+        ? "Recovery archive exported. It preserves available data but may need repair before import. See docs/backups.md."
+        : "Full backup exported.");
     } catch (error) {
       setBackupError(getErrorMessage(error));
     }
@@ -226,7 +230,7 @@ export function SettingsPage({
               description="Everything, including files, as JSON. Use this to restore later."
               icon={FileDown}
               label="Full backup"
-              onClick={exportFullBackup}
+              onClick={() => exportFullBackup()}
             />
             <ExportTile
               accent="bg-sky-50 text-sky-600 group-hover:bg-sky-100"
@@ -235,6 +239,13 @@ export function SettingsPage({
               label="CSV export"
               onClick={exportCsv}
             />
+          </div>
+          <div className="pb-4 text-sm text-muted">
+            <p>Full backups support up to 100 MiB of documents, 10 MiB per file, and the cloud tracker-data limit. Restoring requires available cloud upload space.</p>
+            <button className="mt-2 font-semibold text-primary hover:underline" onClick={() => exportFullBackup(true)} type="button">
+              Export recovery archive
+            </button>
+            <p>Preserve data that exceeds restore limits for offline recovery. This archive may need repair before import.</p>
           </div>
           <div className="space-y-3 py-4">
             <SettingLabel

@@ -14,8 +14,10 @@ optimistic revisions, retry transient failures, and rebase a mutation when
 another session has written a newer revision.
 
 Use **Settings → Backup and export → Full backup** regularly. A full backup includes the tracker
-snapshot and stored document files as base64 data. Restoring a backup replaces the
-signed-in user's cloud data and refreshes the browser cache.
+snapshot and stored document files as base64 data, validated against the supported
+restore limits. Restoring a backup replaces the signed-in user's cloud data and
+refreshes the browser cache. See [Backups and recovery](backups.md) for limits,
+required upload space, failed-restore behavior and oversized legacy-file recovery.
 
 ## Privacy notes
 
@@ -42,8 +44,10 @@ The snapshot limit includes all records, document metadata, unknown fields and
 JSON escaping. It excludes the HTTP envelope and document file bytes stored in
 R2; base64 files in a full backup do not count toward the snapshot limit.
 Restoring a backup checks the normalized snapshot before uploading its files.
-Backups can still be exported when existing cloud data is above the save limit;
-reduce the snapshot before saving or restoring it. Reads and backup formats are
+Use **Export recovery archive** when existing cloud data is above the save limit;
+it preserves the data without claiming it can be restored unchanged. Reduce the
+snapshot before saving or restoring it. Full backup export and import check the
+same final normalized size. Reads and supported backup schema versions are
 unchanged. Legacy snapshots that require a cloud migration must fit after
 normalization before startup can complete.
 
