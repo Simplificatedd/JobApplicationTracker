@@ -6,6 +6,11 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
+    files: ["scripts/request-control.mjs"],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.node },
+  },
+  {
     ignores: [
       "coverage",
       "dist",

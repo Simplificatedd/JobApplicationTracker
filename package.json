@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "build:functions": "wrangler pages functions build functions --outdir .wrangler/functions-build --project-directory . --build-output-directory dist --compatibility-date 2026-09-22",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run build:functions",
-    "lint": "eslint src functions vite.config.ts tailwind.config.ts --max-warnings=0",
+    "lint": "eslint src functions vite.config.ts tailwind.config.ts --max-warnings=0 scripts/request-control.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
