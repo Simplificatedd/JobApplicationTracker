@@ -58,7 +58,7 @@ export interface BackupImportPreview {
   resumes: number;
 }
 
-export async function createBackupFile({
+function createBackup({
   coverLetterFiles = [],
   resumeFiles,
   snapshot,
@@ -67,15 +67,17 @@ export async function createBackupFile({
   resumeFiles: ResumeFileBackup[];
   snapshot: StorageSnapshot;
 }) {
-  const backup: TrackerBackup = {
+  return {
     coverLetterFiles,
     exportedAt: new Date().toISOString(),
     resumeFiles,
     schemaVersion: BACKUP_SCHEMA_VERSION,
     snapshot: { ...snapshot, assessments: snapshot.assessments ?? [] },
-  };
+  } satisfies TrackerBackup;
+}
 
-  return new Blob([JSON.stringify(backup, null, 2)], {
+export async function createBackupFile(options: Parameters<typeof createBackup>[0]) {
+  return new Blob([JSON.stringify(createBackup(options), null, 2)], {
     type: "application/json",
   });
 }
@@ -83,9 +85,24 @@ export async function createBackupFile({
 // The raw serializer above also serves recovery exports, which deliberately
 // preserve data that may exceed today's restore constraints.
 export async function createFullBackupFile(options: Parameters<typeof createBackupFile>[0]) {
-  const raw = await createBackupFile(options);
-  const backup = await parseBackupFile(raw);
-  const file = new Blob([JSON.stringify(backup)], { type: "application/json" });
+  const backup = normalizeBackup(createBackup(options));
+  const { resumeFiles, coverLetterFiles, ...header } = backup;
+  const parts: BlobPart[] = [JSON.stringify(header).slice(0, -1)];
+  // Keep payload strings as separate Blob parts instead of allocating an entire
+  // base64-filled JSON string, Blob, text copy and parsed copy during export.
+  for (const [name, files] of [["resumeFiles", resumeFiles], ["coverLetterFiles", coverLetterFiles]] as const) {
+    parts.push(`,"${name}":[`);
+    files.forEach(({ dataBase64, ...metadata }, index) => {
+      if (index) parts.push(",");
+      parts.push(JSON.stringify(metadata).slice(0, -1), ',"dataBase64":');
+      if (/[\t\n\f\r]/.test(dataBase64)) parts.push(JSON.stringify(dataBase64));
+      else parts.push('"', dataBase64, '"');
+      parts.push("}");
+    });
+    parts.push("]");
+  }
+  parts.push("}");
+  const file = new Blob(parts, { type: "application/json" });
   if (file.size > MAX_BACKUP_FILE_BYTES) throw new Error("Tracker backup exceeds the 140 MiB JSON limit.");
   return file;
 }
@@ -103,18 +120,24 @@ export async function blobToBase64(blob: Blob) {
 }
 
 export function base64ToBlob(dataBase64: string, mimeType: string) {
-  const binary = atob(dataBase64);
+  const encoded = compactBase64(dataBase64);
+  const firstPadding = encoded.indexOf("=");
+  if (firstPadding !== -1 && firstPadding < encoded.length - 2) {
+    throw new Error("Invalid base64 document payload.");
+  }
   const chunks: ArrayBuffer[] = [];
 
-  for (let index = 0; index < binary.length; index += 1024) {
-    const slice = binary.slice(index, index + 1024);
-    const bytes = new Uint8Array(slice.length);
+  // Encoded chunks align to groups of four. This bounds temporary decoded
+  // strings and avoids one Blob part and a copied buffer per 1 KiB of data.
+  for (let index = 0; index < encoded.length; index += 64 * 1024) {
+    const binary = atob(encoded.slice(index, index + 64 * 1024));
+    const bytes = new Uint8Array(binary.length);
 
-    for (let byteIndex = 0; byteIndex < slice.length; byteIndex += 1) {
-      bytes[byteIndex] = slice.charCodeAt(byteIndex);
+    for (let byteIndex = 0; byteIndex < binary.length; byteIndex += 1) {
+      bytes[byteIndex] = binary.charCodeAt(byteIndex);
     }
 
-    chunks.push(bytes.buffer.slice(0) as ArrayBuffer);
+    chunks.push(bytes.buffer);
   }
 
   return new Blob(chunks, { type: mimeType });
@@ -133,6 +156,10 @@ export async function parseBackupFile(file: Blob) {
     throw new Error("Choose a valid tracker backup JSON file.");
   }
 
+  return normalizeBackup(parsed);
+}
+
+function normalizeBackup(parsed: unknown): TrackerBackup {
   const validationError = getBackupValidationError(parsed);
 
   if (validationError) {
@@ -152,7 +179,8 @@ export async function parseBackupFile(file: Blob) {
     }),
   } satisfies TrackerBackup;
   // Migration can add fields, children and projections. Validate its output too.
-  const normalizedError = getBackupValidationError(normalized);
+  // Payload strings were checked above and are unchanged by normalization.
+  const normalizedError = getBackupValidationError(normalized, false);
   if (normalizedError) throw new Error(normalizedError);
   // Fresh staging keys may be longer than a legacy key. Include that growth in
   // preview/export validation so import cannot discover a new size failure.
@@ -241,7 +269,7 @@ export function createApplicationsCsv({
   return new Blob([csv], { type: "text/csv;charset=utf-8" });
 }
 
-function getBackupValidationError(value: unknown) {
+function getBackupValidationError(value: unknown, validateFileContents = true) {
   if (!isRecord(value)) {
     return "This backup file does not match the tracker backup schema.";
   }
@@ -481,13 +509,14 @@ function getBackupValidationError(value: unknown) {
       return "This backup file contains an unlinked resume file payload.";
     }
 
-    const decodedFile = decodeBase64(resumeFile.dataBase64);
+    const contents = validateFileContents ? inspectBase64(resumeFile.dataBase64) : undefined;
 
     if (
-      decodedFile === undefined ||
-      decodedFile.length !== resume.fileSize ||
+      (validateFileContents && (contents === undefined ||
+        contents.size !== resume.fileSize ||
+        !hasExpectedResumeSignature(contents.prefix, resume.fileExtension))) ||
       resumeFile.mimeType !== resume.mimeType ||
-      !hasExpectedResumeSignature(decodedFile, resume.fileExtension)
+      resume.fileSize === 0
     ) {
       return "This backup file contains inconsistent resume file data.";
     }
@@ -520,13 +549,14 @@ function getBackupValidationError(value: unknown) {
       return "This backup file contains an unlinked cover letter file payload.";
     }
 
-    const decodedFile = decodeBase64(coverLetterFile.dataBase64);
+    const contents = validateFileContents ? inspectBase64(coverLetterFile.dataBase64) : undefined;
 
     if (
-      decodedFile === undefined ||
-      decodedFile.length !== coverLetter.fileSize ||
+      (validateFileContents && (contents === undefined ||
+        contents.size !== coverLetter.fileSize ||
+        !hasExpectedResumeSignature(contents.prefix, coverLetter.fileExtension))) ||
       coverLetterFile.mimeType !== coverLetter.mimeType ||
-      !hasExpectedResumeSignature(decodedFile, coverLetter.fileExtension)
+      coverLetter.fileSize === 0
     ) {
       return "This backup file contains inconsistent cover letter file data.";
     }
@@ -938,12 +968,19 @@ function hasExpectedResumeSignature(
   return decodedFile.startsWith(expected);
 }
 
-function decodeBase64(value: string) {
-  try {
-    return atob(value);
-  } catch {
-    return undefined;
-  }
+function compactBase64(value: string) {
+  return /[\t\n\f\r ]/.test(value) ? value.replace(/[\t\n\f\r ]/g, "") : value;
+}
+
+function inspectBase64(value: string) {
+  const encoded = compactBase64(value);
+  const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+  const length = encoded.length - padding;
+  if (length % 4 === 1 || (padding && encoded.length % 4 !== 0) ||
+    /[^A-Za-z0-9+/]/.test(encoded.slice(0, length))) return undefined;
+  // Validate every character and the decoded length, but decode only the
+  // signature. Restore decodes the actual bytes later, once, in bounded chunks.
+  return { size: Math.floor(length * 3 / 4), prefix: atob(encoded.slice(0, Math.min(length, 8))) };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

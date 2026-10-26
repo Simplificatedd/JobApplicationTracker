@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { base64ToBlob, createBackupFile, createFullBackupFile, MAX_BACKUP_FILE_BYTES, parseBackupFile } from "./backups";
 import { backupDocument, backupFile, populatedBackup } from "../test/backupFixtures";
 import { snapshot } from "../test/assessmentFixtures";
@@ -162,6 +162,33 @@ describe("full backup export/import contract", () => {
     const parsed = await parseBackupFile(await createFullBackupFile(backup));
     expect(parsed.snapshot.resumes[0].storageKey).toBe("legacy/files/resume.pdf");
     expect(remapRestoreFiles(parsed.snapshot, parsed.resumeFiles).snapshot.resumes[0].storageKey).toMatch(/^restore-/);
+  });
+
+  it.each(["padded", "unpadded", "whitespace"])("preserves supported %s base64 while exporting and decoding in bounded pieces", async (variant) => {
+    const bytes = "%PDF-" + "x".repeat(100_001);
+    const document = backupDocument("chunked", bytes);
+    if (variant === "unpadded") document.payload.dataBase64 = document.payload.dataBase64.replace(/=+$/, "");
+    if (variant === "whitespace") document.payload.dataBase64 = document.payload.dataBase64.replace(/.{72}/g, "$&\n\t ");
+    const decode = globalThis.atob;
+    const bounded = vi.spyOn(globalThis, "atob").mockImplementation((value) => {
+      if (value.length > 64 * 1024) throw new Error("Unbounded document decode");
+      return decode(value);
+    });
+    try {
+      const parsed = await parseBackupFile(await createFullBackupFile({ snapshot: snapshot({ resumes: [document.metadata] }), resumeFiles: [document.payload] }));
+      expect(await base64ToBlob(parsed.resumeFiles[0].dataBase64, document.metadata.mimeType).text()).toBe(bytes);
+    } finally { bounded.mockRestore(); }
+  });
+
+  it.each(["A", "J===", "%PDF-", "JVBERi0=QUFB", "JVBE!i0="])("rejects malformed base64 %j during export and preview", async (encoded) => {
+    const backup = populatedBackup(); backup.resumeFiles[0].dataBase64 = encoded;
+    await expect(createFullBackupFile(backup)).rejects.toThrow("inconsistent resume file data");
+    await expect(parseBackupFile(backupFile(backup))).rejects.toThrow("inconsistent resume file data");
+  });
+
+  it("rejects padding before the final decode chunk", () => {
+    const encoded = "QUFB".repeat(16_383) + "QQ==" + "QUFB";
+    expect(() => base64ToBlob(encoded, "application/pdf")).toThrow();
   });
 
 });
