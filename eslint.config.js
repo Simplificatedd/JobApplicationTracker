@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    files: ["scripts/request-control.mjs"],
+    files: ["scripts/request-control.mjs", "scripts/test-request-admission.mjs"],
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },
