@@ -38,7 +38,7 @@ bootstrap and operational evidence.
 ## Verification and release boundary
 
 Main's existing baseline is 838 tests in 59 files. The independent prerequisite
-passes 890 tests in 62 files (52 admission/control/CLI cases), eight Python tests,
+passes 894 tests in 62 files (56 admission/control/CLI cases), eight Python tests,
 typechecking, lint, frontend and Functions builds. `npm ci` installed the exact
 lockfile into this worktree. Native local Cloudflare integration exercises only
 application 0001/0002 plus the separate control schema. Actual local Wrangler
@@ -49,3 +49,14 @@ retired-label defect, correction, coverage and remaining operational limits.
 Neither local validation nor GitHub CI establishes production bootstrap proof.
 No merge, deployment, remote migration, production configuration change or
 maintenance activation is part of this work. PR #166 remains open and NO-GO.
+
+## Final published-PR review follow-up
+
+Two additional focused commits extend the five original slices without rewriting
+history: final-review race/accounting tests, then the deployment/bootstrap preflight
+and recovery clarification with updated review evidence. The test commit changes
+only its two test files and passed typecheck, lint and the full check; documentation
+changes are separate. The original five commit sizes are 253, 418, 90, 141 and 493
+changed lines, each with one coherent purpose and associated tests where relevant.
+The full #166 compatibility check ran only in a disposable integration copy;
+#166's branch, published head and the original 25 files remain unchanged.

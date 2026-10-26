@@ -42,6 +42,63 @@ Read the [design and safety limits](request-admission-design.md) first.
   Control writes/index updates add D1 usage and latency; quota exhaustion or
   control unavailability rejects API requests rather than bypassing maintenance.
 
+## Independent deployment preflight — before bootstrap
+
+A closed, unverified prerequisite can be deployed independently of #166. It changes
+no application schema and does not require declaring old work drained first.
+It rejects new enrolled API traffic, so that traffic impact needs explicit release
+approval. Older uninstrumented requests may still exist after this deployment;
+`drained=false` remains mandatory until external coverage is established. This
+phase does not authorize maintenance on the application stores or reopening.
+
+Before an actual production deployment, record private evidence for every item:
+
+1. Identify the actual Pages project/account, deployment workflow and configuration
+   source. The checked-in `wrangler.example.jsonc` is only an example and is not
+   loaded by CI as production configuration. Main's workflow deploys after merge
+   and does not apply migrations; complete preflight before approving that merge.
+2. Verify the dedicated control database's actual resource ID is distinct from
+   application `DB`, and that the operator CLI and every enrolled production
+   deployment resolve `REQUEST_CONTROL_DB` to that same ID. Preserve its identity
+   and provenance. Never copy an attested control database to establish coverage
+   for another resource set. Previews must either be isolated from production
+   DB/R2 or join the same production admission boundary.
+3. Under separate migration authorization, apply only the reviewed control 0001
+   to that control ID through tracked migrations. No application migration,
+   especially 0003, is part of this rollout. The file's SHA-256 is
+   `00dcc190ea7c3a8a906cde0b6146f1d88a6d01f38c6bbc08366a942a482dcca1`.
+   Verify its migration marker, `PRAGMA quick_check`, all table columns/indexes,
+   and the exact two trigger definitions against the reviewed SQL. Schema version
+   1 alone cannot distinguish an earlier experimental file missing the permanent
+   deployment fence. If an earlier variant was applied, STOP for a reviewed
+   forward migration; never replay 0001 or delete its marker.
+4. Verify production binding/variable resolution preserves `DB`, `RESUME_FILES`,
+   `TEAM_DOMAIN` and `POLICY_AUD`, and adds the correct control ID plus a unique
+   immutable `REQUEST_CONTROL_DEPLOYMENT`. Reject example/local labels. Verify
+   production and preview overrides rather than assuming inheritance. A Wrangler
+   file, when used, is the [Pages configuration source of truth](https://developers.cloudflare.com/pages/functions/wrangler-configuration/);
+   confirm what the actual CI deployment will upload, not only dashboard values.
+5. Verify the deployment principal's resource permissions and the operator's D1
+   authorization, including their intended account/config. Browser Access identity
+   is not operator authorization. Local tests do not establish real IAM access.
+6. For a fresh resource, require revision 0, closed mode, null coverage/selected
+   label, zero receipts and empty deployment history. This is **unverified**, not
+   proof of old-work drain. For any existing resource, inspect its actual state;
+   do not reset it to force this fresh-state checklist to pass.
+7. After the separately authorized rollout, verify the actual serving source SHA,
+   immutable label/bindings, API 503 behavior and unchanged closed/unverified
+   control state. Verify application DB/R2 were not migrated or reset. Keep old
+   ingress and any outstanding old work explicitly unaccounted-for until bootstrap
+   evidence proves otherwise. Do not select a label, attest coverage or reopen as
+   part of this deployment-only verification.
+
+Missing resource/schema/binding/IAM/traffic-impact evidence is a deployment
+preflight NO-GO. Missing old-work coverage is a separate bootstrap NO-GO; it need
+not prevent this closed code rollout once deployment preflight is satisfied.
+This review inspected only local binding names: the local private config lacks
+`REQUEST_CONTROL_DB` and the deployment label. Actual production configuration,
+resource IDs and operator permissions remain unverified and unchanged.
+
 ## Operator interface and authentication
 
 Use Node 22.16+ with `--experimental-strip-types` and the pinned npm dependencies.
@@ -98,10 +155,11 @@ Before attestation, the authorized operator must:
    guarantee covering all previously admitted operations. Starting a log tail
    after the pause, seeing stable object counts, or using client disconnects is
    not proof. If the evidence is unavailable, remain unverified and STOP.
-3. Deploy the independently reviewed prerequisite on main, without application
-   migration 0003, under separately authorized release controls. Verify bindings,
-   handler coverage, mandatory 503 behavior and persistent control identity.
-   The old baseline may remain reachable only behind proven permanent denial.
+3. Verify the independently deployed prerequisite passed the deployment preflight
+   above, remains closed/unverified and uses the recorded control identity. If it
+   is not deployed yet, complete that separately approved phase first. The old
+   baseline may remain reachable only behind proven permanent denial. Deployment
+   completion itself is not evidence that its older invocations finished.
 4. Store the provider/ingress evidence and approvals in a private JSON record:
 
 ```json
@@ -158,6 +216,31 @@ cannot accidentally apply a previous cycle's close/reopen/select command. No ope
 
 If production lacks a defensible bootstrap proof, do not substitute the ledger's
 empty initial state or a local test result. Production readiness is not established.
+
+## Deployment failure and rollback
+
+If the prerequisite build/promotion fails, record which source SHA is actually
+serving; an unsuccessful deployment does not prove the old version stopped. Keep
+the control state and any existing ingress denial unchanged and make no drain
+claim. A missing/wrong binding produces API 503: correct it through a separately
+approved forward deployment rather than resetting the ledger or bypassing guards.
+Use a fresh immutable label for each replacement deployment and verify it again.
+
+Never restore uninstrumented main to production-store access as an availability
+workaround after bootstrap. It bypasses admission and invalidates coverage. An
+older instrumented release also cannot reuse a retired label: any reviewed code
+rollback needs a new label, the same control resource and the closed/drained
+selection procedure. Once an untracked writer escapes, edge-deny that writer and
+revoke coverage under separate authorization; receipt counts alone cannot repair
+its missing history. Obtain new external coverage/old-operation evidence before
+attesting again. Do not reopen merely because the control ledger is empty.
+
+This prerequisite applies no application migration, so it has no application
+schema rollback step. Preserve control schema, receipts and selection history.
+If the initial control migration fails, inspect its actual schema/marker before
+retrying the corrected file through the tracked runner. If any version already
+applied, stop for a reviewed forward migration instead of replaying or deleting
+markers. Never restore/replace the control database to recover availability.
 
 ## Failure behavior and recovery
 

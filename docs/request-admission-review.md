@@ -84,3 +84,53 @@ Production controls were not activated or changed. PR #166 stays open and NO-GO
 until this prerequisite is independently deployed and operationally verified with
 real ingress coverage and defensible bootstrap evidence. The
 [operator runbook](request-admission-operations.md) specifies those separate steps.
+
+## Final review of published PR #167
+
+The final independent pass started from published head `9dff4db` at unchanged
+main `1d1382b`. It reread every PR patch, the design/runbook and local commit
+rules. No new runtime correctness or security defect was reproduced within the
+stated deployment/operator trust boundary. The existing A → B → A regression,
+native two-release check and actual local Wrangler CLI still reject reuse.
+
+Four additional regression cases pass with the existing runtime:
+
+- Close after the admission INSERT commits but before its acknowledgement reaches
+  the wrapper, with both D1 and R2 handler variants. The receipt prevents false
+  drain before the handler has even started; admitted work then finishes safely.
+- A missing control receipt table rejects with 503 before any application work.
+- The 101st receipt is uncertain outside the 100-row sample. Total counts still
+  include it and refuse drain/reopen. Coverage revocation was also strengthened
+  to assert preservation of an actual active receipt.
+
+**Operations correction:** the earlier runbook bundled closed deployment with
+bootstrap proof and lacked a concrete production configuration/schema preflight.
+The revised runbook separates those phases, records the control migration digest
+and exact trigger verification requirement, checks real resource/binding/IAM and
+traffic-impact evidence, and explicitly forbids rolling back to an uninstrumented
+writer to regain availability. No runtime or migration change was necessary.
+
+| Decision | Recommendation and evidence still required |
+| --- | --- |
+| Reviewed code for a standalone closed/unverified rollout | **GO after deployment preflight.** No application schema change, #166 code or migration 0003 is needed. Old-work proof is not required just to install the closed prerequisite. |
+| Actual production deployment now | **NO-GO pending production preflight.** Production resource IDs/schema, serving configuration, deployment/operator IAM and traffic-impact approval were not verified. The inspected local config lacks the control binding and label; this does not establish dashboard production state. |
+| Operational bootstrap, reopening and trusting drain | **NO-GO.** Complete ingress inventory, permanent denial of old uninstrumented versions and defensible completion evidence for all old operations remain absent. A fresh empty ledger is not that evidence. |
+| PR #166 | **NO-GO and remain open.** First deploy this prerequisite, verify bootstrap coverage, and demonstrate a safe close/drain operationally before considering its separate release. |
+
+Final validation: `npm run check` passes **894 tests / 62 files**, typechecking,
+ESLint, frontend and Functions builds. Eight Python tests pass. Native local
+Cloudflare checks pass with application 0001/0002 only. A fresh local Wrangler
+cycle additionally verifies integrity, all control columns/indexes and both trigger
+definitions,
+late-failure rollback/marker rollback, corrected retry, tracked replay, stale
+commands, permanent label fencing and revocation preserving unresolved work.
+A disposable #166-plus-prerequisite source copy passes the full check with
+**957 tests / 66 files**, including its lifecycle schema in that copy only.
+These compatibility checks neither modify #166 nor authorize its release.
+
+All commits retain the configured user identity without attribution or history
+rewriting. The five original commits meet the one-responsibility/size guidance;
+the runtime slice keeps its required integration and tests together. Follow-up
+tests and operations documentation are separate commits. All 25 original files
+and their staged/untracked status remain byte-identical to the saved manifest.
+Production controls, configuration and remote migrations remain untouched.

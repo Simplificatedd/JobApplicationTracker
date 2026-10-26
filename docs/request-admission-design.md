@@ -109,8 +109,9 @@ new database or deleting rows to make status green is prohibited.
 The baseline example has DB/RESUME_FILES only; this prerequisite adds a separate
 control binding example. Main's existing CI can automatically deploy after merge.
 No actual production configuration has been changed or verified by this review.
-Deployment requires separate review, approval, control resource creation, coverage
-proof and approved reopening.
+Independent deployment requires separate resource/schema/binding and traffic-impact
+preflight, and leaves admission closed/unverified. Old-work coverage proof and
+approved reopening are later operational gates, not inferred from that deployment.
 
 Implementation and operator commands: [Operations](request-admission-operations.md).
 Main-based commit series: [Commit plan](request-admission-commit-plan.md).
