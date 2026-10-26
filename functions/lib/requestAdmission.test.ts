@@ -68,6 +68,29 @@ describe("guarded request lifetimes", () => {
     expect(f.status().drained).toBe(true);
     expect(binding === "DB" ? f.app.sqlite.prepare("SELECT COUNT(*) AS n FROM effects").get()?.n : f.remove.mock.calls.length).toBe(1);
   });
+  it.each(["DB", "RESUME_FILES"])("retains an admission committed before close while its acknowledgement is delayed (%s)", async (binding) => {
+    const inserted = deferred(), acknowledge = deferred();
+    const handler = vi.fn<PagesFunction<CloudflareEnv>>(async ({ env }) => {
+      if (binding === "DB") await env.DB.prepare("INSERT INTO effects VALUES ('admitted')").run();
+      else await env.RESUME_FILES.put("file", "bytes");
+      return new Response("done");
+    });
+    const f = fixture(handler);
+    const prepare = f.control.database.prepare.bind(f.control.database);
+    vi.spyOn(f.control.database, "prepare").mockImplementation((sql) => {
+      const statement = prepare(sql);
+      if (sql === ADMIT_REQUEST_SQL) {
+        const first = statement.first.bind(statement);
+        statement.first = async () => { const row = await first(); inserted.resolve(); await acknowledge.promise; return row; };
+      }
+      return statement;
+    });
+    const request = f.call(); await inserted.promise; f.close();
+    expect(handler).not.toHaveBeenCalled();
+    expect(f.status()).toMatchObject({ outstanding: 1, drained: false });
+    acknowledge.resolve(); expect(await (await request).text()).toBe("done");
+    expect(handler).toHaveBeenCalledOnce(); expect(f.status().drained).toBe(true);
+  });
   it("coordinates independent handlers/versions through the same durable database", async () => {
     const entered = deferred(), proceed = deferred();
     const a = fixture(async ({ env }) => { entered.resolve(); await proceed.promise; await env.RESUME_FILES.put("file", "bytes"); return new Response(); });
@@ -236,6 +259,13 @@ describe("guarded request lifetimes", () => {
     const handler = vi.fn(async () => new Response()); const f = fixture(handler);
     delete (f.env as Partial<CloudflareEnv>).REQUEST_CONTROL_DB;
     expect((await f.call()).status).toBe(503); expect(handler).not.toHaveBeenCalled();
+  });
+  it("rejects an unmigrated or damaged control database before invoking application work", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = vi.fn(async () => new Response()); const f = fixture(handler);
+    f.control.sqlite.exec("DROP TABLE request_receipts");
+    expect((await f.call()).status).toBe(503);
+    expect(handler).not.toHaveBeenCalled(); expect(f.put).not.toHaveBeenCalled();
   });
   it("rejects unsupported storage APIs and does not expose the raw control binding", async () => {
     const exec = vi.fn();

@@ -65,6 +65,17 @@ describe("durable request control and operator transitions", () => {
     expect(status(db)).toMatchObject({ outstanding: 2, uncertain: 1, drained: false });
     expect(change(db, "reopen", 1)).toBeUndefined();
   });
+  it("counts unresolved work beyond the bounded diagnostic sample", () => {
+    const db = createRequestControl();
+    for (let i = 0; i < 101; i++) db.sqlite.prepare(ADMIT_REQUEST_SQL).get(`request-${i}`, "version-a", i, "version-a");
+    db.sqlite.exec("UPDATE request_receipts SET state='uncertain' WHERE id='request-100'");
+    change(db, "close", 0);
+    const value = status(db);
+    expect(value).toMatchObject({ outstanding: 101, uncertain: 1, sampleOnly: true, drained: false });
+    expect(value.receipts).toHaveLength(100);
+    expect(value.receipts.every((row) => row.state === "active")).toBe(true);
+    expect(change(db, "reopen", 1)).toBeUndefined();
+  });
   it("refuses raw schema replay without resetting a closed gate or outstanding work", () => {
     const db = createRequestControl();
     db.sqlite.prepare(ADMIT_REQUEST_SQL).get("survivor", "version-a", 0, "version-a");
@@ -75,8 +86,9 @@ describe("durable request control and operator transitions", () => {
   });
   it("can revoke invalidated coverage and close admission without clearing any receipts", () => {
     const db = createRequestControl();
+    db.sqlite.prepare(ADMIT_REQUEST_SQL).get("still-active", "version-a", 0, "version-a");
     expect(db.sqlite.prepare(controlTransition("revoke-coverage", 0)).get()).toEqual({ revision: 1 });
-    expect(status(db)).toMatchObject({ mode: "closed", outstanding: 0, coverage_hash: null, drained: false });
+    expect(status(db)).toMatchObject({ mode: "closed", outstanding: 1, coverage_hash: null, drained: false });
     expect(change(db, "reopen", 1)).toBeUndefined();
   });
   it.each([null, {}, { schema_version: 2 }, { schema_version: 1, revision: -1 }])("never reports drain from unverifiable status (%j)", (row) => {
