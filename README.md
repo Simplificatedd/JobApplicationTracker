@@ -257,6 +257,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 | [Privacy, security, and limits](docs/privacy-and-security.md) | How sign-in and storage work, privacy notes, and usage guardrails |
 | [Data model](docs/data-model.md) | How follow-ups, statuses, deadlines, deletion, and resumes behave |
 | [Backups and recovery](docs/backups.md) | Restore limits, recovery archives, and oversized legacy-file extraction |
+| [Document storage recovery](docs/document-storage-recovery.md) | Durable uploads, reference-safe cleanup, retries, and migration requirements |
 | [Online assessments](docs/online-assessments.md) | How assessments work, plus their storage, migration, and backup compatibility |
 | [Troubleshooting](docs/troubleshooting.md) | Common deployment problems and fixes |
 

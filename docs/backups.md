@@ -23,6 +23,8 @@ missing or inconsistent; it never silently omits an attachment.
   and application associations are retained; a full backup cannot recover bytes
   that were never stored. Preview/download actions reject these entries without
   fetching a potentially unrelated retained object under the same storage key.
+  Restoring these entries assigns fresh keys too, so a previously retired key
+  cannot prevent metadata recovery. Their key growth is included in size preflight.
 
 The importer checks these rules during preview and again on import, before file
 uploads. A backup at the snapshot byte boundary can be much larger on disk due
@@ -37,8 +39,9 @@ files plus the staged files must fit the 100 MiB user quota.** Restoring a full
 100 MiB library is supported into an account with enough free upload capacity.
 A replacement restore near quota can fail safely even when its final library
 would fit. Do not delete live files to manufacture space before a restore.
-Durable orphan reconciliation, removal of superseded files, and replacement-quota
-accounting are tracked separately in issues #126 and #127.
+Durable cleanup of unreferenced files is described below. Atomic byte reservations
+and replacement-quota accounting remain issue #127; cleanup does not create
+temporary headroom for an in-progress replacement.
 
 ## Failed or interrupted restores
 
@@ -49,17 +52,28 @@ reuploading. Local writes wait for the restore's upload/commit operation.
 
 Before a snapshot write, or after a confirmed rejection/conflict, the client
 attempts to remove its newly staged files. A cleanup failure is reported and may
-leave quota occupied. Account changes stop further operations and cleanup; no
-request is redirected into another account.
+leave quota occupied. Account changes stop new client operations; each already
+authorized server request remains bound to its original account.
 
 A lost response, server error or invalid save response may hide a committed
 restore. In that case staged files are retained, because deleting them could
 break the committed snapshot. **Reload and inspect cloud data before retrying.**
-There is no cross-service transaction across D1 and R2. Unreferenced old files and
-staged files whose cleanup failed can continue to consume quota until #126's
-reconciliation support is available. Contact the deployment administrator for
-such quota failures; do not manually delete objects without checking current
-snapshot references and concurrent users.
+There is no cross-service transaction across D1 and R2. The server records uploads
+before writing file bytes. On account load, after successful document changes,
+and through **Retry document cleanup**, it checks persisted work against current
+cloud references. Automatically discovered unreferenced files have a **24-hour
+grace period**. Old files removed by a successful replacement snapshot receive a
+fresh grace period. Files referenced by a committed restore are retained even
+when its response was lost. An explicit compensating delete can remove an
+unreferenced staged file immediately.
+
+Cleanup runs in bounded batches while the account is active; no scheduled
+background worker is installed. Repeat cleanup or reload to continue a backlog.
+Failed cleanup is reported separately from a confirmed snapshot save. Do not
+repeat a successful restore just because its cleanup is pending. Retired keys
+remain fenced in D1 and are checked periodically to catch late PUT completion;
+neither old clients nor a stale backup can revive a retired key without uploading
+under a fresh key. See [Document storage recovery](document-storage-recovery.md).
 
 Once the cloud acknowledges a snapshot, browser-cache failure is shown as a
 separate warning and the restore succeeds. Cache repair does not replay the

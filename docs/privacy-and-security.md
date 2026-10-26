@@ -25,6 +25,9 @@ required upload space, failed-restore behavior and oversized legacy-file recover
 - No analytics service or third-party telemetry is used.
 - Resume attachment history is not tracked or included in analytics.
 - Uploaded resumes are stored in the private R2 binding and cached in IndexedDB.
+- [Document recovery](document-storage-recovery.md) persists upload/cleanup work,
+  protects committed references during deletion, and retries only within the
+  verified owner's account. Retired keys remain fenced against reuse.
 - Resume uploads are limited to 10 MiB per file and 100 MiB per signed-in user.
 - Server-side safety budgets stop resume storage above 5 GiB, tracker snapshots
   above 512 MiB, or more than 100,000 R2 writes and 1,000,000 R2 reads in one
