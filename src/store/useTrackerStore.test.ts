@@ -732,6 +732,19 @@ describe("store with two independent revision-aware cloud adapters", () => {
     await expect(store.exportRecoveryBackup()).rejects.toThrow("Cloud read failed");
   });
 
+  it.each(["resume", "cover letter"])("does not download a retained same-key object for metadata-only %s entries", async (kind) => {
+    const backup = populatedBackup();
+    const document = kind === "resume" ? backup.snapshot.resumes[0] : backup.snapshot.coverLetters[0];
+    document.fileSize = 0;
+    const { api, store } = await sessions(backup.snapshot);
+    api.files.set(document.storageKey, new Blob(["%PDF-unrelated retained contents"], { type: document.mimeType }));
+    storage.getResumeFile.mockClear();
+    const download = kind === "resume" ? store.getResumeFile : store.getCoverLetterFile;
+    await expect(download(document.id)).rejects.toThrow("metadata only");
+    expect(storage.getResumeFile).not.toHaveBeenCalled();
+    expect(await api.files.get(document.storageKey)!.text()).toBe("%PDF-unrelated retained contents");
+  });
+
 });
 
 describe("table preference saves", () => {

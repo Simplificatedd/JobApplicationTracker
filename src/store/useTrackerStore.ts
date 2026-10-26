@@ -1492,6 +1492,10 @@ export function useTrackerStore(): TrackerStore {
       throw new Error("Resume metadata could not be found.");
     }
 
+    if (resume.fileSize === 0) {
+      throw new Error("This resume has metadata only; no file is attached.");
+    }
+
     const file = await cloudStorageAdapter.getResumeFile(resume.storageKey);
 
     if (!file) {
@@ -1507,6 +1511,10 @@ export function useTrackerStore(): TrackerStore {
 
     if (!coverLetter) {
       throw new Error("Cover letter metadata could not be found.");
+    }
+
+    if (coverLetter.fileSize === 0) {
+      throw new Error("This cover letter has metadata only; no file is attached.");
     }
 
     const file = await cloudStorageAdapter.getResumeFile(coverLetter.storageKey);

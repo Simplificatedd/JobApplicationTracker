@@ -21,7 +21,8 @@ missing or inconsistent; it never silently omits an attachment.
   Base64 payloads and the backup envelope do not count toward this snapshot limit.
 - Zero-byte legacy metadata entries represent missing attachments. Their metadata
   and application associations are retained; a full backup cannot recover bytes
-  that were never stored.
+  that were never stored. Preview/download actions reject these entries without
+  fetching a potentially unrelated retained object under the same storage key.
 
 The importer checks these rules during preview and again on import, before file
 uploads. A backup at the snapshot byte boundary can be much larger on disk due
