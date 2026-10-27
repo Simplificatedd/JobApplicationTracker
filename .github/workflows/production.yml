@@ -35,7 +35,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production
+    environment: production-admission
     env:
       RELEASE_SHA: ${{ inputs.release_sha }}
       EXPECTED_DEPLOYMENT: ${{ inputs.expected_deployment }}
@@ -43,7 +43,7 @@ jobs:
       RELEASE_MODE: ${{ inputs.release_mode }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
       GITHUB_TOKEN: ${{ github.token }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.ADMISSION_CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
       PRODUCTION_PROJECT_ID: ${{ vars.PRODUCTION_PROJECT_ID }}
       PRODUCTION_APP_DATABASE_ID: ${{ vars.PRODUCTION_APP_DATABASE_ID }}
@@ -62,7 +62,7 @@ jobs:
       - run: npm ci
       - name: Verify approval, actual resources and closed control state
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
         run: node --experimental-strip-types scripts/production-preflight.mjs before
       - run: npm run check
       - run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
@@ -72,11 +72,11 @@ jobs:
         run: node scripts/prepare-pages-release.mjs
       - name: Recheck immediately before upload
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
         run: node --experimental-strip-types scripts/production-preflight.mjs ready
       - name: Deploy the approved closed release
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
           RELEASE_LABEL: ${{ steps.release.outputs.label }}
           WRANGLER_LOG_PATH: .wrangler/production-upload.log
         run: >-
@@ -86,7 +86,7 @@ jobs:
           --commit-message="Admission release $RELEASE_LABEL"
       - name: Verify actual promotion and unchanged control revision
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
         run: node --experimental-strip-types scripts/production-preflight.mjs after
       - name: Preserve release identity even when upload is ambiguous
         if: always()

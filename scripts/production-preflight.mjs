@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { CONTROL_STATUS_SQL, describeControlStatus } from '../functions/lib/requestControl.ts';
 import { verifyPreparedRelease } from './prepare-pages-release.mjs';
 
+export const RELEASE_ENVIRONMENT = 'production-admission';
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
   WHERE name NOT GLOB 'sqlite_*' AND NOT (type = 'table' AND name IN ('_cf_KV', '_cf_METADATA', 'd1_migrations'))
@@ -57,10 +59,21 @@ export function assertReleaseRequest(env) {
     env.GITHUB_ACTOR && env.GITHUB_TRIGGERING_ACTOR, 'Run/attempt and original/rerun actors are required.');
 }
 
-export function assertApprovalEnvironment(environment) {
-  const reviewers = environment.protection_rules?.find(rule => rule.type === 'required_reviewers');
-  requireCondition(reviewers?.reviewers?.length > 0 && reviewers.prevent_self_review === true,
-    'Production must have required reviewers with self-review disabled; environment naming alone is not approval.');
+export function assertApprovalEnvironment(environment, branches) {
+  const reviewers = Array.isArray(environment?.protection_rules)
+    ? environment.protection_rules.find(rule => rule?.type === 'required_reviewers') : undefined;
+  requireCondition(environment?.name === RELEASE_ENVIRONMENT && Number.isSafeInteger(environment.id) && environment.id > 0 &&
+    reviewers?.prevent_self_review === true && Array.isArray(reviewers.reviewers) && reviewers.reviewers.length > 0 &&
+    reviewers.reviewers.every(value => (value?.type === 'User' && typeof value.reviewer?.login === 'string' && value.reviewer.login.length > 0) ||
+      (value?.type === 'Team' && Number.isSafeInteger(value.reviewer?.id) && value.reviewer.id > 0)),
+  'The dedicated production environment must have identifiable required reviewers with self-review disabled.');
+  requireCondition(environment.can_admins_bypass === false,
+    'Administrator bypass must be explicitly disabled; an unavailable setting is not verified protection.');
+  requireCondition(environment.deployment_branch_policy?.protected_branches === false &&
+    environment.deployment_branch_policy.custom_branch_policies === true && branches?.total_count === 1 &&
+    Array.isArray(branches.branch_policies) && branches.branch_policies.length === 1 &&
+    branches.branch_policies[0]?.name === 'main' && branches.branch_policies[0].type === 'branch',
+  'Production requires exactly one explicit main branch rule; unrestricted, protected-only, wildcard and tag policies are refused.');
 }
 
 export function assertIndependentApproval(history, environment, env) {
@@ -115,7 +128,8 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
   async function api(origin, path, token, body) {
     requireCondition(Boolean(token), 'Missing API credential.');
     const response = await fetcher(`${origin}${path}`, { method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(30000),
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json',
+        ...(origin === 'https://api.github.com' ? { 'X-GitHub-Api-Version': '2022-11-28' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) });
     requireCondition(response.ok, `Preflight API denied or unavailable (${response.status}); readiness UNKNOWN.`);
     const data = await response.json();
@@ -123,8 +137,10 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
     return data;
   }
   const github = path => api('https://api.github.com', `/repos/${env.GITHUB_REPOSITORY}${path}`, env.GITHUB_TOKEN);
-  const environment = await github('/environments/production');
-  assertApprovalEnvironment(environment);
+  const environmentPath = `/environments/${RELEASE_ENVIRONMENT}`;
+  const environment = await github(environmentPath);
+  const branches = await github(`${environmentPath}/deployment-branch-policies?per_page=100&page=1`);
+  assertApprovalEnvironment(environment, branches);
   assertIndependentApproval(await github(`/actions/runs/${env.GITHUB_RUN_ID}/approvals`), environment, env);
   const branch = await github('/git/ref/heads/main');
   requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved since dispatch; obtain new approval for a new run.');
