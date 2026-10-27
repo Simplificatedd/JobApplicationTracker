@@ -1,5 +1,10 @@
 # Cloudflare deployment guide
 
+For this repository's existing Direct Upload production project, CI is
+validation-only. Follow the [deployment-safety prerequisite](production-deployment-prerequisite.md),
+not the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
+repository deployment tokens or historical reruns to publish production.
+
 Anyone can deploy an independent copy from a fork. A team or other group can
 also share one deployment. The app uses each person's verified sign-in to keep
 their tracker data and uploaded document files separate from everyone else's.
@@ -223,47 +228,16 @@ change production.
 
 ### Existing Direct Upload projects
 
-A Pages project created with Wrangler shows **Git Provider: No** and does not
-deploy when GitHub changes. The included CI workflow can safely add automatic
-deployment to an existing Direct Upload project.
+CI verifies source and builds; it does not publish, on either main pushes or
+manual CI dispatch. A merge can leave the live site on its previously approved
+source. Do not add repository-level deployment secrets or rerun a historical CI
+uploader to restore automatic deployment.
 
-Do not configure this workflow when the Pages project already shows a Git
-provider. Cloudflare's Git integration already deploys `main`, and enabling
-both methods would create duplicate deployments.
-
-For a Direct Upload project:
-
-1. In Cloudflare, open **My Profile → API Tokens → Create Token → Create
-   Custom Token**.
-2. Add only the **Account → Cloudflare Pages → Edit** permission.
-3. Under **Account Resources**, include only the account that owns the Pages
-   project. Create the token and copy it when Cloudflare displays it.
-4. Find the account ID in the Cloudflare dashboard. You can also run
-   `npx wrangler whoami` from the project folder.
-5. In the GitHub repository, open **Settings → Secrets and variables →
-   Actions → Secrets** and add:
-   - `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID.
-   - `CLOUDFLARE_API_TOKEN`: the token created above.
-6. Open the **Variables** tab on the same GitHub page and add:
-   - `CLOUDFLARE_PAGES_PROJECT`: the exact Pages **Project Name**.
-
-The project name is not necessarily the same as the public hostname. For
-example, a project named `job-application-tracker` may use a hostname such as
-`job-application-tracker-abc.pages.dev`. Copy the value from the **Project
-Name** column in `npx wrangler pages project list`, without `.pages.dev`.
-
-Forked repositories may initially have GitHub Actions disabled. If necessary,
-open the repository's **Actions** tab and enable workflows. After adding all
-three settings, open **Actions → CI → Run workflow**, select `main`, and run
-it once. The `verify` job must pass before `Deploy production` starts. Confirm
-the same commit appears under **Cloudflare → Workers & Pages → your project
-→ Deployments**.
-
-After activation, every push or merge to `main` is verified and deployed.
-Pull requests never deploy, missing configuration skips the deployment job,
-and a newer release cancels a superseded deployment to avoid unnecessary
-builds. Never commit or share the API token. Rotate it immediately if it is
-exposed.
+See the [deployment-safety prerequisite](production-deployment-prerequisite.md)
+for external credential retirement, direct-upload controls and the later guarded
+release integration. No replacement deployment workflow is enabled by this
+prerequisite. Native Git onboarding above is a separate path for independent
+forks and must not be added to this production project.
 
 For usage limits and pricing, see [privacy-and-security.md](privacy-and-security.md).
 If something does not work, see [troubleshooting.md](troubleshooting.md).
