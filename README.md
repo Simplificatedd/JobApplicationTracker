@@ -77,6 +77,10 @@ your own Cloudflare account where only the people you allow can sign in.
 
 ## 🚀 Quickstart: host your own private tracker
 
+Admission-enabled production requires the [approved release and bootstrap procedure](docs/request-admission-release-safeguards.md).
+It supersedes the automatic deployment/retry steps below and needs a separate
+control database; deploying the fresh closed gate interrupts cloud access.
+
 Deploy your own copy to **Cloudflare Pages** behind **Cloudflare Access**, so the
 site asks for a sign-in and only the email addresses you approve can open it.
 Personal use should fit within Cloudflare's free allowances.

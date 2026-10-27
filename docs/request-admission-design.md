@@ -107,8 +107,12 @@ new database or deleting rows to make status green is prohibited.
   policy restriction must also account for existing application tokens.
 
 The baseline example has DB/RESUME_FILES only; this prerequisite adds a separate
-control binding example. Main's existing CI can automatically deploy after merge.
-No actual production configuration has been changed or verified by this review.
+control binding example. The proposed [release safeguards](request-admission-release-safeguards.md)
+remove automatic production deployment, require independently configured approval,
+and compile a unique label into each production release. The live old workflow
+remains automatic until those changes are approved and merged. Read-only metadata
+inspection identified legacy writers and missing control infrastructure; no
+production configuration was changed, and bootstrap is still unverified.
 Independent deployment requires separate resource/schema/binding and traffic-impact
 preflight, and leaves admission closed/unverified. Old-work coverage proof and
 approved reopening are later operational gates, not inferred from that deployment.
