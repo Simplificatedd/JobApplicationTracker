@@ -1,5 +1,10 @@
 # Cloudflare deployment guide
 
+For this repository's existing Direct Upload production project, CI is
+validation-only. Follow the [deployment-safety prerequisite](https://github.com/Simplificatedd/JobApplicationTracker/blob/1411a23d45369631cfec073c2b72e2475f20cb62/docs/production-deployment-prerequisite.md),
+not the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
+repository deployment tokens or historical reruns to publish production.
+
 Anyone can deploy an independent copy from a fork. A team or other group can
 also share one deployment. The app uses each person's verified sign-in to keep
 their tracker data and uploaded document files separate from everyone else's.
@@ -231,7 +236,7 @@ Do not enable a second native Git deployment path for the same production stores
 Read [request admission operations](request-admission-operations.md) and
 [production release safeguards](request-admission-release-safeguards.md) before
 setting up that workflow. They specify the separate control database/migration,
-actual binding checks, protected production environment, least-privilege token
+actual binding checks, fresh protected `production-admission` environment, least-privilege token
 requirements, exact-SHA approval, immutable release identity and rollback limits.
 A named GitHub environment alone does not install required reviewers. The new
 preflight refuses an unprotected environment or missing production resources.
