@@ -9,9 +9,10 @@
     "build": "tsc -b && vite build",
     "build:functions": "wrangler pages functions build functions --outdir .wrangler/functions-build --project-directory . --build-output-directory dist --compatibility-date 2026-09-22",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run build:functions",
-    "lint": "eslint src functions vite.config.ts tailwind.config.ts scripts/request-control.mjs scripts/test-request-admission.mjs --max-warnings=0",
+    "lint": "eslint src functions vite.config.ts tailwind.config.ts scripts/*.mjs --max-warnings=0",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:production-release",
+    "test:production-release": "node --experimental-strip-types --test scripts/*release*.test.mjs",
     "test:admission-local": "node --experimental-strip-types scripts/test-request-admission.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false"
