@@ -60,3 +60,41 @@ changes are separate. The original five commit sizes are 253, 418, 90, 141 and 4
 changed lines, each with one coherent purpose and associated tests where relevant.
 The full #166 compatibility check ran only in a disposable integration copy;
 #166's branch, published head and the original 25 files remain unchanged.
+
+## Reviewed production-blocker follow-up
+
+The subsequent instruction authorizes three focused commits, push and a separate
+review PR, preserving the configured Git author/committer identity and adding no
+attribution trailers. It authorizes no production action or modification of #166
+or #167. Branch `fix/167-production-release-safeguards` starts at #167's `32cc519`;
+the follow-up targets that prerequisite branch because it imports its control
+modules. A future retarget/rebase to main requires the dependency's separate merge
+and another scope/CI review.
+
+1. **Add immutable Pages release builds and native regression tests.** Include
+   `prepare-pages-release.mjs`, its actual Pages/Miniflare regression, the npm test
+   gate, complete artifact integrity verification and necessary lint configuration.
+   Runtime routing/label tests stay with
+   their build mechanism; no new production dependency or schema change.
+2. **Gate production releases on approval and verified closed state.** Include
+   `production-preflight.mjs`, its validation/API failure/retry regressions,
+   `production.yml` and removal of the automatic deploy job from `ci.yml`.
+   The preflight and uploader stay together so no intermediate workflow deploys
+   without its checks. This inherently larger coherent slice includes complete
+   schema checks, source/artifact verification, rejection-history refusal and
+   configuration-path checks with their regressions. Build/native and
+   preflight/workflow tests are separate files.
+3. **Document reviewed production safeguards and recovery limits.** Include the
+   release-safeguards runbook, admission design/operations links, deployment guide
+   and README corrections, the independent findings and this plan. Keep private
+   resource IDs/evidence out of Git.
+
+Implementation slices were exported from the index, validated and reviewed before
+committing; the final deployed-snapshot correction passed the full check again.
+The build slice passed native release regression, lint and typecheck; the
+workflow/preflight slice passed the full check (894
+TypeScript and 14 Node tests), eight Python tests, native admission integration
+and Actionlint. Documentation gets relative-link, private-data and whitespace
+review separately. No dependency/lockfile or migration changes are included.
+These changes do not configure GitHub reviewers or production resources, prove
+old-work completion, modify #166/#127, or authorize any operational transition.

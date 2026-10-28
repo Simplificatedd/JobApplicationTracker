@@ -4,6 +4,9 @@ This prerequisite is reviewed on a separate branch based on main, without #166.
 Nothing here authorizes resource creation, a deployment, a traffic pause, a remote
 migration, or reopening. PR #166 remains unmerged and production remains NO-GO.
 Read the [design and safety limits](request-admission-design.md) first.
+The [release safeguards](request-admission-release-safeguards.md) describe the
+proposed manual approval workflow, compiled labels, legacy URL retirement options,
+live IAM gaps and ordered production setup. They are not active production settings.
 
 ## Resources and deployment contract
 
@@ -11,11 +14,12 @@ Read the [design and safety limits](request-admission-design.md) first.
   and anonymous receipts. Apply `control-migrations/0001_request_control.sql` to
   this database through tracked migrations. Never apply application migration
   0003 to it, or apply this control migration to the application DB.
-- Keep the existing application DB/R2/Access bindings unchanged. Set
-  `REQUEST_CONTROL_DEPLOYMENT` to a distinct immutable identifier for each serving
-  release (prefer its source SHA with a unique rollout suffix when redeploying).
-  Verify the deployed binding value and actual Pages deployment SHA before
-  selecting it. Never reuse a label for code with different storage behavior. Examples are placeholders, not real settings.
+- Keep the existing application DB/R2/Access bindings unchanged. The proposed
+  production workflow embeds a fresh `REQUEST_CONTROL_DEPLOYMENT` literal in each
+  uploaded Worker, overriding dashboard values. Verify its release manifest,
+  actual Pages SHA and response header before selecting it. Local/test deployments
+  use their explicit environment label. Never reuse a label or artifact, including
+  a rollback/retry; do not deploy production through an unwrapped alternate path.
 - All production aliases/deployments must share the same control database. New
   deployments without the binding/label/schema reject API requests with 503.
   Only the gate's selected deployment may admit requests. Durable selection
@@ -55,8 +59,9 @@ Before an actual production deployment, record private evidence for every item:
 
 1. Identify the actual Pages project/account, deployment workflow and configuration
    source. The checked-in `wrangler.example.jsonc` is only an example and is not
-   loaded by CI as production configuration. Main's workflow deploys after merge
-   and does not apply migrations; complete preflight before approving that merge.
+   loaded by CI as production configuration. The proposed workflow removes deploy
+   on merge and requires manual exact-SHA approval; the live old workflow remains
+   automatic until these changes are approved and merged. Neither applies migrations.
 2. Verify the dedicated control database's actual resource ID is distinct from
    application `DB`, and that the operator CLI and every enrolled production
    deployment resolve `REQUEST_CONTROL_DB` to that same ID. Preserve its identity
@@ -74,7 +79,8 @@ Before an actual production deployment, record private evidence for every item:
    forward migration; never replay 0001 or delete its marker.
 4. Verify production binding/variable resolution preserves `DB`, `RESUME_FILES`,
    `TEAM_DOMAIN` and `POLICY_AUD`, and adds the correct control ID plus a unique
-   immutable `REQUEST_CONTROL_DEPLOYMENT`. Reject example/local labels. Verify
+   immutable `REQUEST_CONTROL_DEPLOYMENT` in the prepared production Worker.
+   Reject example/local labels and unprepared uploads. Verify
    production and preview overrides rather than assuming inheritance. A Wrangler
    file, when used, is the [Pages configuration source of truth](https://developers.cloudflare.com/pages/functions/wrangler-configuration/);
    confirm what the actual CI deployment will upload, not only dashboard values.
@@ -95,9 +101,11 @@ Before an actual production deployment, record private evidence for every item:
 Missing resource/schema/binding/IAM/traffic-impact evidence is a deployment
 preflight NO-GO. Missing old-work coverage is a separate bootstrap NO-GO; it need
 not prevent this closed code rollout once deployment preflight is satisfied.
-This review inspected only local binding names: the local private config lacks
-`REQUEST_CONTROL_DB` and the deployment label. Actual production configuration,
-resource IDs and operator permissions remain unverified and unchanged.
+The private production preflight dated 2026-10-27 found the dedicated control
+database and binding absent. Existing production storage bindings were recorded,
+but Access coverage and CI token grants were not fully verified. Re-inspect before
+any authorized rollout. No production
+configuration was changed. See the release safeguards for the remaining gates.
 
 ## Operator interface and authentication
 
@@ -311,5 +319,6 @@ After a future prerequisite merge/deployment, integrate #166 with:
 
 Do not declare #166 production-ready until this prerequisite has been separately
 reviewed, deployed, bootstrap-verified and exercised against actual production
-routing. Earlier read-only Cloudflare metadata inspection failed authentication;
-this review uses repository/local resources. Production bootstrap remains unverified.
+routing. Read-only production metadata is now available; it does not establish
+bootstrap. Access organization inspection remains denied, and old-operation
+completion remains unverified.

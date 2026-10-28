@@ -229,15 +229,42 @@ change production.
 ### Existing Direct Upload projects
 
 CI verifies source and builds; it does not publish, on either main pushes or
-manual CI dispatch. A merge can leave the live site on its previously approved
-source. Do not add repository-level deployment secrets or rerun a historical CI
-uploader to restore automatic deployment.
+manual CI dispatch. #170 removed the automatic production upload jobs. A merge
+can leave the live site on its previously approved source. Do not add
+repository-level deployment secrets or rerun a historical CI uploader to restore
+automatic deployment. Historical workflow reruns and existing deployment
+credentials remain separate operational risks until their grants are retired.
 
 See the [deployment-safety prerequisite](production-deployment-prerequisite.md)
-for external credential retirement, direct-upload controls and the later guarded
-release integration. No replacement deployment workflow is enabled by this
-prerequisite. Native Git onboarding above is a separate path for independent
-forks and must not be added to this production project.
+for external credential retirement and direct-upload controls. That prerequisite
+introduced no replacement uploader. #168 separately introduces the manually
+dispatched **Approved production release** workflow for this existing Direct
+Upload project. A Pages project created with Wrangler shows **Git Provider: No**;
+do not enable a second native Git deployment path for the same production stores.
+The Git-integrated onboarding above is for independent forks, not this production
+project or the admission prerequisite rollout.
+
+Read [request admission operations](request-admission-operations.md) and
+[production release safeguards](request-admission-release-safeguards.md) before
+setting up that workflow. They specify the separate control database/migration,
+actual binding checks, fresh protected `production-admission` environment,
+least-privilege token requirements, exact-SHA approval, immutable release identity
+and rollback limits. A named GitHub environment alone does not install required
+reviewers. The preflight refuses an unprotected environment or missing production
+resources; inaccessible or ambiguous policy evidence must fail closed.
+
+CI still verifies pull requests and main pushes. Production requires an explicit
+main dispatch, independent environment approval and verified closed control state.
+The release workflow performs no migration, bootstrap attestation, label selection
+or reopening. Preparing or merging its code does not authorize a release. The
+fresh closed gate interrupts normal cloud application access; approve that impact
+before rollout. Never use dashboard Retry/rollback or an unwrapped manual upload
+to bypass the release identity procedure after bootstrap.
+
+Legacy immutable URLs and external writers require separate fencing. Denying new
+requests does not prove existing operations have finished, and an empty receipt
+ledger is not bootstrap or safe-drain proof. Obtain the separate completion
+evidence before bootstrap or reopening.
 
 For usage limits and pricing, see [privacy-and-security.md](privacy-and-security.md).
 If something does not work, see [troubleshooting.md](troubleshooting.md).
