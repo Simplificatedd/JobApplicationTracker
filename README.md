@@ -77,9 +77,22 @@ your own Cloudflare account where only the people you allow can sign in.
 
 ## 🚀 Quickstart: host your own private tracker
 
-Admission-enabled production requires the [approved release and bootstrap procedure](docs/request-admission-release-safeguards.md).
-It supersedes the automatic deployment/retry steps below and needs a separate
-control database; deploying the fresh closed gate interrupts cloud access.
+PRs #167 and #168 are merged. #170 removed automatic production uploads;
+ordinary CI validates only. The repository now provides a separate, manually
+dispatched, main-guarded workflow for future approved Direct Upload releases in
+[release safeguards and bootstrap prerequisites](docs/request-admission-release-safeguards.md).
+As of the 2026-10-28 read-only audit, production still serves pre-admission source
+`1d1382b`, and the separate control database/binding are absent. Source safeguards
+are not operational approval: deployment, bootstrap, reopening, safe drain and
+#166 remain **NO-GO**.
+
+The Git-connected steps below describe independent fork onboarding, not the
+existing production rollout. Current main additionally requires the separate
+control infrastructure and approved admission/bootstrap procedure; steps 1–7
+alone do not make an admission-enabled deployment usable. Native Git builds do
+not supply the reviewed immutable release label and approval path. Use the
+manual release build for admission-enabled production; another deployment path
+needs its own reviewed safeguards, not a reused dashboard label.
 
 Deploy your own copy to **Cloudflare Pages** behind **Cloudflare Access**, so the
 site asks for a sign-in and only the email addresses you approve can open it.
@@ -153,12 +166,13 @@ fork, and use these build settings:
 | Build output directory | `dist` |
 
 Deploy, then note your address, for example `https://<your-project>.pages.dev`.
-The site loads but cannot save or load data yet. That is expected until
-steps 4 to 7 are done.
+The site can load static assets while its API remains unavailable. Current main
+also requires the separate admission setup and approvals, beyond steps 4 to 7.
 
 > [!TIP]
-> Use **Connect to Git**, not Direct Upload. Every later push to `main` then
-> redeploys automatically.
+> For an independently managed Git-connected fork, later pushes can redeploy
+> automatically. Do not enable that path for the existing Direct Upload
+> production project or use it to bypass the admission release procedure.
 
 ### 4. Put the site behind Cloudflare Access
 
@@ -208,22 +222,27 @@ under **Variables and Secrets**.
 
 ### 7. Redeploy and check
 
-Bindings take effect on the next deployment. Open **Deployments**, retry the
-latest `main` deployment, then visit your site:
+For Git-connected fork onboarding, bindings take effect on a new deployment.
+Before expecting current main's API to work, complete the separate control and
+admission setup in the [operator runbook](docs/request-admission-operations.md).
+For the existing Direct Upload project, use only a separately approved manual
+release; dashboard Retry/rollback is not its admission rollout procedure.
+After the required setup and opening approvals, verify your independent site:
 
 - [ ] The site asks you to sign in before showing anything.
 - [ ] After signing in, **Settings** shows **Cloud sync is active** with your email.
 - [ ] A test application is still there after a refresh.
 - [ ] Delete the test application before you start using or sharing the site.
 
-🎉 **Done.** Your tracker is live at `https://<your-project>.pages.dev`, and only
-the emails in your Allow policy can open it.
+Only after those checks and admission approvals is the independent tracker
+ready at `https://<your-project>.pages.dev`. Access controls who can enter;
+it does not establish that old requests have drained.
 
 <details>
 <summary><strong>Going further</strong></summary>
 
 - Sign in with Google or your Cloudflare account instead of a PIN, protect
-  preview deployments, or deploy from GitHub Actions to an existing Direct
+  preview deployments, or prepare a guarded manual GitHub Actions release to a Direct
   Upload project: see the [full deployment guide](docs/deployment.md).
 - Something not working? Check [troubleshooting](docs/troubleshooting.md).
 
@@ -233,7 +252,8 @@ the emails in your Allow policy can open it.
 
 Use Node.js 22 (see `.nvmrc`). Local sign-in uses `LOCAL_DEV_AUTH_EMAIL`, which
 only works on `localhost`. The placeholder database ID in the example config is
-fine locally; you only need a real D1 ID to deploy.
+fine locally; production needs distinct verified application/control resources
+and separate rollout approval.
 
 ```bash
 nvm use
@@ -241,8 +261,16 @@ npm ci
 cp wrangler.example.jsonc wrangler.jsonc
 cp .dev.vars.example .dev.vars
 npx wrangler d1 migrations apply job-application-tracker --local
+npx wrangler d1 migrations apply REQUEST_CONTROL_DB --local
 npm run dev            # app + API at http://localhost:8788
 ```
+
+The local control ledger starts closed/unverified, so the API returns 503 until
+the [local-only operator setup](docs/request-admission-operations.md#initial-bootstrap-unavoidable-external-proof)
+is completed for your test configuration and its `local-prerequisite` label.
+Use `npm run test:admission-local` for an isolated synthetic demonstration; local
+test coverage is never production bootstrap evidence. Do not point local setup
+commands at production resources.
 
 `npm run dev:ui` starts only the Vite frontend for isolated UI work. Before
 committing or deploying, run the same gate as CI:
@@ -289,9 +317,12 @@ applications.
 <details>
 <summary><strong>How do I get updates?</strong></summary>
 
-Use **Sync fork** on your GitHub fork. Cloudflare Pages redeploys `main`
-automatically. If an update adds a database migration, run the migration
-command from step 2 again.
+For a Git-connected independent fork, **Sync fork** can trigger its native
+Pages deployment; review admission requirements before updating. For this
+repository's existing Direct Upload project, syncing or merging changes source
+only: production requires a separately approved manual release. Apply only
+separately reviewed migrations to their intended databases; admission control
+0001 is separate from application migrations, and #166 is not authorized.
 
 </details>
 

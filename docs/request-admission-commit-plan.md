@@ -2,8 +2,11 @@
 
 Follow the local `planning/CommitGuidelines.md`: one responsibility per
 commit, implementation with associated tests, and staged diff review before
-committing. This series starts at main `1d1382b`, without PR #166's lifecycle
-implementation or application migration 0003.
+committing. This historical series started at main `1d1382b`, without #166's
+lifecycle implementation or application migration 0003. #170, #167 and #168 are
+now merged; #171 is included through #168. Main CI passed 945 application tests,
+23 release tests and 11 Python tests. Earlier counts below describe their
+original review snapshots, not current production readiness.
 
 | Commit responsibility | Files and validation | Dependency |
 | --- | --- | --- |
@@ -21,23 +24,24 @@ slice was exported from the index and validated independently of unstaged files.
 
 ## Preservation and later #166 integration
 
-The original `fix/126-document-storage-recovery` worktree remains at `0dc9b66`
-with all 25 original modified/untracked files unchanged. A verified archive,
-SHA-256 manifest and tracked patch were also saved outside Git. The independent
-branch is `fix/126-request-admission-drain` in a separate worktree. No stash,
-reset, history rewrite, force push or PR #166 update is needed.
+The original prototype's 25 modified/untracked files were preserved in a
+verified external archive with a SHA-256 manifest, tracked patch and restoration
+instructions. The original worktree was subsequently cleaned under separate
+explicit approval and remains at #166's committed `0dc9b66`. The independent
+prerequisite was developed on `fix/126-request-admission-drain`, now merged.
+No history rewrite, force push or #166 update was needed.
 
 The two #166-only fixture adaptations (`functions/api/documentCleanup.test.ts`
-and `src/storage/documentRecovery.test.ts`) remain in the original worktree and
-are deliberately absent here. Main's original resume GET fixtures are retained;
-only control-env fields were added. Later #166 integration needs those fixtures,
+and `src/storage/documentRecovery.test.ts`) remain recoverable from that archive
+and are deliberately absent from main. Main's original resume GET fixtures are
+retained; only control-env fields were added. Later #166 integration needs those fixtures,
 the same wrapper/control database and a new never-before-selected release label.
 It also needs a separately reviewed release-checklist amendment using actual
 bootstrap and operational evidence.
 
 ## Verification and release boundary
 
-Main's existing baseline is 838 tests in 59 files. The independent prerequisite
+The original main baseline was 838 tests in 59 files. The independent prerequisite
 passes 894 tests in 62 files (56 admission/control/CLI cases), eight Python tests,
 typechecking, lint, frontend and Functions builds. `npm ci` installed the exact
 lockfile into this worktree. Native local Cloudflare integration exercises only
@@ -58,18 +62,20 @@ and recovery clarification with updated review evidence. The test commit changes
 only its two test files and passed typecheck, lint and the full check; documentation
 changes are separate. The original five commit sizes are 253, 418, 90, 141 and 493
 changed lines, each with one coherent purpose and associated tests where relevant.
-The full #166 compatibility check ran only in a disposable integration copy;
-#166's branch, published head and the original 25 files remain unchanged.
+The full #166 compatibility check ran only in a disposable integration copy.
+At that review, #166's branch/head and the original 25 files matched their
+preserved snapshots. Later approved archival cleanup is recorded above.
 
 ## Reviewed production-blocker follow-up
 
-The subsequent instruction authorizes three focused commits, push and a separate
+The subsequent instruction authorized three focused commits, push and a separate
 review PR, preserving the configured Git author/committer identity and adding no
 attribution trailers. It authorizes no production action or modification of #166
 or #167. Branch `fix/167-production-release-safeguards` starts at #167's `32cc519`;
 the follow-up targets that prerequisite branch because it imports its control
-modules. A future retarget/rebase to main requires the dependency's separate merge
-and another scope/CI review.
+modules. After #167 merged, a reviewed two-parent merge integrated updated main
+into #168, its base was retargeted to main, and #168 merged after another CI and
+scope review. This records completed source integration, not release approval.
 
 1. **Add immutable Pages release builds and native regression tests.** Include
    `prepare-pages-release.mjs`, its actual Pages/Miniflare regression, the npm test

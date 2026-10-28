@@ -106,13 +106,18 @@ new database or deleting rows to make status green is prohibited.
 - [Access sessions](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/session-management/):
   policy restriction must also account for existing application tokens.
 
-The baseline example has DB/RESUME_FILES only; this prerequisite adds a separate
-control binding example. The proposed [release safeguards](request-admission-release-safeguards.md)
-remove automatic production deployment, require independently configured approval,
-and compile a unique label into each production release. The live old workflow
-remains automatic until those changes are approved and merged. Read-only metadata
-inspection identified legacy writers and missing control infrastructure; no
-production configuration was changed, and bootstrap is still unverified.
+The original baseline example had DB/RESUME_FILES only; merged #167 added the
+separate control binding example and its P2 schema/history validation. #170
+removed automatic uploads from current CI. Merged #168, including #171's approval
+correction, supplies the [manual release safeguards](request-admission-release-safeguards.md)
+and compiles a unique label into each production release. A historical CI rerun
+still retains its old uploader; removing current automatic deployment does not
+retire those credentials.
+
+The 2026-10-28 read-only audit confirmed production still serves older source
+`1d1382b`, without the control database/binding. The new protected environment is
+also absent. These source merges performed no production rollout; deployment,
+bootstrap, reopening, safe drain and #166 remain NO-GO.
 Independent deployment requires separate resource/schema/binding and traffic-impact
 preflight, and leaves admission closed/unverified. Old-work coverage proof and
 approved reopening are later operational gates, not inferred from that deployment.

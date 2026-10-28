@@ -1,16 +1,22 @@
 # Production deployment-safety prerequisite
 
-This CI-only change targets main before admission PR #167. It removes the old
-production uploader, including manual CI dispatch, while retaining PR/main/manual
-validation, tests, typechecking, lint and builds. It adds no replacement deployer,
-admission code, binding, migration or credential. #166 remains separate and NO-GO.
+This page records the CI-only prerequisite merged as #170, before #167/#168.
+#170 removed the old production uploader, including upload through manual CI
+dispatch, while retaining PR/main/manual validation. It added no replacement
+deployer, admission code, binding, migration or credential.
 
-## What merging this change establishes
+#167 and #168 are now merged. Current CI remains validation-only; #168 separately
+added the manually dispatched, main-guarded production workflow described in
+[release safeguards](request-admission-release-safeguards.md). Source integration
+does not establish operational readiness. #166 remains separate and NO-GO.
 
-The new main workflow cannot upload to Pages. Merging #167 afterward must retain
-this validation-only workflow; inspect the effective merge tree, not just a green
-PR check. #167's current diff does not change CI, and #168 removes the same uploader,
-so this prerequisite is compatible with both. Test the final merged tree again.
+## What #170 established
+
+The CI workflow cannot upload to Pages. The subsequent #167/#168 merges retained
+its validation-only bytes; their successful main CI tested the integrated source.
+The separate production workflow has only manual dispatch and a main guard.
+Future integrations must preserve that separation; inspect the effective tree,
+not just a green PR check.
 
 This does not cancel jobs already running, rewrite historical workflow runs,
 revoke tokens or stop direct uploads. A historical CI rerun retains its old uploader
@@ -27,8 +33,9 @@ identifiers and responses belong in private operator evidence, not this document
 
 ## Required external settings: separate authorization
 
-No settings or credentials are changed by this PR. Before claiming historical or
-direct deployment paths are fenced, an authorized administrator must:
+No settings or credentials were changed by #170 or the #167/#168 code-only
+merges. Before claiming historical or direct deployment paths are fenced, an
+authorized administrator must:
 
 1. Inventory all queued/in-progress/historical release runs and principals with
    Pages write access: repository/organization/environment credentials, local
@@ -41,7 +48,7 @@ direct deployment paths are fenced, an authorized administrator must:
    automation. Removing a GitHub secret does not revoke a leaked or copied token;
    review the actual provider grant and authorize its retirement separately.
    Until then historical reruns and direct token holders remain possible writers.
-3. For the later reviewed #168 release path, create a fresh environment named
+3. For the merged #168 manual release path, create a fresh environment named
    `production-admission`. Never move the new token into historical `production`.
    Reserve fresh secret names `ADMISSION_PAGES_API_TOKEN` and
    `ADMISSION_CLOUDFLARE_ACCOUNT_ID` exclusively in the new environment. Do not
@@ -80,17 +87,14 @@ is a separate deployment path from GitHub Actions and must be checked live.
 
 ## Integration and release order
 
-1. Independently review/merge this prerequisite only. Its checks validate source;
-   no production artifact is uploaded by its workflow. External historical/direct
-   credential retirement remains a separate operational blocker.
-2. Review #167 against updated main. Confirm CI still has only its verification
-   job and no other automatic deployment path was introduced. Merging admission
-   code is not authorization to publish the initial closed gate.
-3. Integrate the isolated #168 follow-up: one manual release workflow, fresh
-   environment/secret references, strict policy/API validation, independent exact
-   SHA/run/attempt approval and unchanged quarantine/rejection protections.
-   Retarget/review #168 against the effective main as needed; do not merge an
-   unreviewed parent combination. Do not add another competing deployment workflow.
+1. **Completed in source:** #170 removed the automatic uploader. Its workflow
+   validated source only; historical/direct credential retirement remains external.
+2. **Completed in source:** #167 merged without changing validation-only CI.
+   This did not deploy the initial closed gate or authorize an outage.
+3. **Completed in source:** #168 merged with #171's approval correction, one manual
+   release workflow, fresh environment/secret references, exact SHA/run/attempt
+   approval and quarantine/rejection protections. No settings were installed or
+   release dispatched. Do not add a competing automatic deployment workflow.
 4. Only after external settings, resource/IAM verification and separate outage
    authorization, consider deploying #167/#168. Initial closed/unverified means
    normal API unavailability. Control provisioning/migration/bindings, bootstrap,

@@ -1,11 +1,13 @@
 # Operating the request admission prerequisite
 
-This prerequisite is reviewed on a separate branch based on main, without #166.
+The #167 admission prerequisite and #168 release safeguards are merged into main,
+without #166. #170 removed automatic production uploads; production.yml now
+provides a separate manually dispatched, main-guarded release path.
 Nothing here authorizes resource creation, a deployment, a traffic pause, a remote
 migration, or reopening. PR #166 remains unmerged and production remains NO-GO.
 Read the [design and safety limits](request-admission-design.md) first.
 The [release safeguards](request-admission-release-safeguards.md) describe the
-proposed manual approval workflow, compiled labels, legacy URL retirement options,
+implemented manual approval workflow, compiled labels, legacy URL retirement options,
 live IAM gaps and ordered production setup. They are not active production settings.
 
 ## Resources and deployment contract
@@ -14,7 +16,7 @@ live IAM gaps and ordered production setup. They are not active production setti
   and anonymous receipts. Apply `control-migrations/0001_request_control.sql` to
   this database through tracked migrations. Never apply application migration
   0003 to it, or apply this control migration to the application DB.
-- Keep the existing application DB/R2/Access bindings unchanged. The proposed
+- Keep the existing application DB/R2/Access bindings unchanged. The merged
   production workflow embeds a fresh `REQUEST_CONTROL_DEPLOYMENT` literal in each
   uploaded Worker, overriding dashboard values. Verify its release manifest,
   actual Pages SHA and response header before selecting it. Local/test deployments
@@ -59,9 +61,10 @@ Before an actual production deployment, record private evidence for every item:
 
 1. Identify the actual Pages project/account, deployment workflow and configuration
    source. The checked-in `wrangler.example.jsonc` is only an example and is not
-   loaded by CI as production configuration. The proposed workflow removes deploy
-   on merge and requires manual exact-SHA approval; the live old workflow remains
-   automatic until these changes are approved and merged. Neither applies migrations.
+   loaded by CI as production configuration. Current CI is validation-only;
+   the separate production workflow requires manual exact-SHA approval. Neither
+   applies migrations. Historical workflow reruns retain the old uploader and
+   remain a risk until their credentials are separately retired.
 2. Verify the dedicated control database's actual resource ID is distinct from
    application `DB`, and that the operator CLI and every enrolled production
    deployment resolve `REQUEST_CONTROL_DB` to that same ID. Preserve its identity
@@ -101,11 +104,12 @@ Before an actual production deployment, record private evidence for every item:
 Missing resource/schema/binding/IAM/traffic-impact evidence is a deployment
 preflight NO-GO. Missing old-work coverage is a separate bootstrap NO-GO; it need
 not prevent this closed code rollout once deployment preflight is satisfied.
-The private production preflight dated 2026-10-27 found the dedicated control
-database and binding absent. Existing production storage bindings were recorded,
-but Access coverage and CI token grants were not fully verified. Re-inspect before
-any authorized rollout. No production
-configuration was changed. See the release safeguards for the remaining gates.
+The 2026-10-28 read-only audit reconfirmed the dedicated control database/binding
+and production-admission environment are absent. Production still serves
+pre-admission source `1d1382b`, with its existing application storage bindings.
+Access coverage, deployment-token grants and old-work completion remain
+unverified. Re-inspect before any authorized rollout; no production configuration
+was changed. See the release safeguards for the remaining gates.
 
 ## Operator interface and authentication
 
@@ -183,11 +187,14 @@ Before attestation, the authorized operator must:
    Fabricated references, reuse after new untracked ingress appears, or an
    uninstrumented writer invalidate the guarantee. The digest stores no contents.
 
-For a fresh LOCAL database only, the initial revision is 0:
+For a fresh LOCAL database only, the initial revision is 0. The commands below
+use the example configuration's `local-prerequisite` label; substitute the actual
+local label if different. Production uses the compiled release manifest's label,
+never this example value, and requires separate authorization:
 
 ```sh
 node --experimental-strip-types scripts/request-control.mjs attest-coverage --config "$control_config" --local --persist-to "$control_state" --expect 0 --confirm ATTEST-COVERAGE:0 --evidence /absolute/private/path/to/coverage.json
-node --experimental-strip-types scripts/request-control.mjs select-deployment --config "$control_config" --local --persist-to "$control_state" --expect 1 --confirm SELECT-DEPLOYMENT:1 --deployment reviewed-release-sha
+node --experimental-strip-types scripts/request-control.mjs select-deployment --config "$control_config" --local --persist-to "$control_state" --expect 1 --confirm SELECT-DEPLOYMENT:1 --deployment local-prerequisite
 node --experimental-strip-types scripts/request-control.mjs reopen --config "$control_config" --local --persist-to "$control_state" --expect 2 --confirm REOPEN:2
 ```
 
@@ -295,14 +302,16 @@ These are local checks, not provider-wide crash/termination or production proofs
 
 ## Applying the prerequisite independently of #166
 
-This branch starts directly at main (`1d1382b`), with application migrations
-0001/0002 only. The implementation and full validation are independent of #166.
-The original uncommitted #166 workspace is preserved separately. The
+The original #167 branch started at main `1d1382b`. #167 and #168 are now merged,
+with application migrations 0001/0002 only; their implementation and validation
+remain independent of #166. The obsolete prototype and two unpublished fixture
+adaptations were archived before the approved original-worktree cleanup. The
 [commit plan](request-admission-commit-plan.md) identifies the focused series and
 the two fixture adaptations reserved for later #166 integration. The prerequisite
 adds `@types/node` as a development dependency for the new real SQLite/CLI tests.
 
-After a future prerequisite merge/deployment, integrate #166 with:
+Only after a separately authorized prerequisite deployment, verified bootstrap
+and demonstrated safe drain, consider #166 integration with:
 
 - The same `withRequestAdmission` wrapper around the whole API router. Its new
   cleanup route is covered automatically, without method-based exceptions.

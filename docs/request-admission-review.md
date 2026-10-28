@@ -1,5 +1,15 @@
 # Independent admission prerequisite review
 
+This is the historical review record of #167's original snapshots. #170, #167
+and #168 have since merged, including #171's approval correction and #167's P2
+schema/history correction. Historical findings and test counts below remain as
+recorded; current main CI passed 945 application, 23 release and 11 Python tests.
+The 2026-10-28 read-only audit still found older production source `1d1382b` and
+no control infrastructure. See [current release prerequisites](request-admission-release-safeguards.md).
+Deployment, bootstrap, reopening, safe drain and #166 remain **NO-GO**. Original
+prototype files and the two unpublished fixtures were archived before approved
+local cleanup; historical preservation statements below describe those reviews.
+
 The reviewed input was the uncommitted admission/drain prerequisite on
 `fix/126-document-storage-recovery` at `0dc9b66`. The independent branch starts at
 main `1d1382b`; it contains no document lifecycle implementation or application

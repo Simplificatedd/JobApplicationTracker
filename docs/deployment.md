@@ -1,17 +1,28 @@
 # Cloudflare deployment guide
 
-For this repository's existing Direct Upload production project, CI is
-validation-only. Follow the [deployment-safety prerequisite](production-deployment-prerequisite.md),
-not the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
+For this repository's existing Direct Upload production project, #170 made CI
+validation-only. #167 and #168 are now merged; the separate production workflow
+is manually dispatched and main-guarded. Follow the
+[release safeguards](request-admission-release-safeguards.md) and
+[credential-isolation prerequisite](production-deployment-prerequisite.md), not
+the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
 repository deployment tokens or historical reruns to publish production.
+
+The 2026-10-28 read-only audit confirmed production still serves pre-admission
+source `1d1382b`; the control database/binding and protected release environment
+are absent. Deployment, bootstrap, reopening, safe drain and #166 remain **NO-GO**.
 
 Anyone can deploy an independent copy from a fork. A team or other group can
 also share one deployment. The app uses each person's verified sign-in to keep
 their tracker data and uploaded document files separate from everyone else's.
 
-This guide connects Cloudflare Pages to GitHub. After the initial setup, updating
-the `main` branch automatically updates the live site. Work on another branch or
-pull request can receive a separate preview without changing the live site.
+The fork-onboarding sections below describe a separate Git-connected Pages
+project, where pushes may update that fork's live site and PRs may create
+previews. They do not establish admission readiness on current main or apply to
+the existing Direct Upload production project. Native Git builds do not implement
+the reviewed per-release label/approval mechanism. Admission-enabled production
+must use the guarded manual build or a separately reviewed equivalent; a static
+dashboard label must not be reused across automatic deployments.
 
 ## Before you start
 
@@ -106,8 +117,10 @@ command may open a browser window so you can approve access to Cloudflare.
 4. Start the deployment and note the production hostname, for example
    `your-project.pages.dev`.
 
-Use **Connect to Git**, not dashboard Direct Upload. The Git integration deploys
-the `functions/` API with the frontend and automatically deploys later pushes.
+For this independent fork-onboarding path, Git integration deploys the
+`functions/` API with the frontend and can automatically deploy later pushes.
+It is not a substitute for the separate admission setup and release controls.
+Do not connect the existing Direct Upload production project to this path.
 
 ## 4. Choose the Access login method
 
@@ -204,11 +217,14 @@ application's AUD. Do not point untrusted previews at production storage.
 
 ## 8. Redeploy and verify persistence
 
-Bindings and variables take effect only on a new deployment. In the Pages
-project's **Deployments** view, retry the latest `main` deployment, or push a new
-commit to `main`.
+For an independently managed Git-connected fork, bindings take effect on a new
+deployment. Current main also needs the separate control binding and
+[admission/bootstrap setup](request-admission-operations.md); the application
+bindings above alone cannot open its API. Do not use dashboard Retry or a push
+as the existing Direct Upload project's release procedure.
 
-Then verify the production URL in a normal browser window:
+After the independent deployment's required setup and opening approvals, verify
+its URL in a normal browser window:
 
 1. The site redirects to Cloudflare Access before showing the tracker.
 2. Sign in through the configured provider.
@@ -223,8 +239,9 @@ hosting provider, cannot be read automatically by the Cloudflare domain. Export
 a **Full backup** from the old origin and import it after signing in to the new
 deployment.
 
-Every later push to `main` deploys automatically. Pull-request previews do not
-change production.
+Only a separately configured Git-connected fork can deploy automatically on
+push. This repository's CI never publishes; the existing production project
+requires the guarded manual workflow below.
 
 ### Existing Direct Upload projects
 
@@ -237,7 +254,7 @@ credentials remain separate operational risks until their grants are retired.
 
 See the [deployment-safety prerequisite](production-deployment-prerequisite.md)
 for external credential retirement and direct-upload controls. That prerequisite
-introduced no replacement uploader. #168 separately introduces the manually
+introduced no replacement uploader. Merged #168 separately added the manually
 dispatched **Approved production release** workflow for this existing Direct
 Upload project. A Pages project created with Wrangler shows **Git Provider: No**;
 do not enable a second native Git deployment path for the same production stores.
