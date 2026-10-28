@@ -1,18 +1,22 @@
 # Production release safeguards and remaining blockers
 
-These repository changes prepare an independent #167 rollout. They authorize no
+The admission runtime (#167) and release safeguards (#168) are merged into main;
+#171's approval-policy correction is included through #168. They authorize no
 GitHub settings changes, Cloudflare writes, deployment, deletion, traffic controls,
 bootstrap attestation or reopening. #166 remains open and NO-GO; #127 is separate.
-This follow-up was originally stacked on #167 at `32cc519`, in branch
-`fix/167-production-release-safeguards`. Updated main now contains #167, including
-its P2 control-schema correction, and #170's validation-only CI. The prepared
-integration merges that main into this follow-up without rewriting its history.
-PR #168 still targets `fix/126-request-admission-drain` until separately authorized
-publication and retargeting to main; review the final diff and rerun CI then.
-Normal CI does not publish production. This follow-up adds a separate protected,
-manually dispatched release workflow; neither source integration nor its tests
-authorize a production release. The serving deployment remains a separate
-operational baseline requiring fresh verification before any rollout.
+Historically, #168 started on #167 at `32cc519`; #170 removed the automatic
+uploader before the subsequent #167/#168 code-only merges. Current CI is
+validation-only. The separate Approved production release workflow is manually
+dispatched and main-guarded, with #167's P2 control-schema correction retained.
+Neither the workflow's presence nor passing tests authorize a production release.
+
+The 2026-10-28 read-only audit confirmed production still serves older source
+`1d1382b`, with the same 40 deployments and no control database/binding.
+production-admission is absent; the legacy production environment has no required
+reviewers or branch restriction and allows admin bypass. Main is unprotected,
+and historical repository credential names remain. These dated observations are
+not installed protections or release approval. Deployment, bootstrap, reopening,
+safe drain and #166 remain **NO-GO**; reverify before any future rollout.
 
 ## Verified baseline and evidence limits
 
@@ -287,7 +291,7 @@ No parent runtime or application/control migration changes were needed. Upload l
 and inventory checks detect observed retry ambiguity; they do not manufacture a
 provider idempotency guarantee or exclude future privileged writers.
 
-## Local validation of the reviewed follow-up
+## Historical local validation of the initial follow-up
 
 - Full `npm run check`: 894 existing TypeScript tests in 62 files, 14 new Node
   release tests, typechecking, lint, frontend and Functions builds passed.
@@ -303,21 +307,22 @@ provider idempotency guarantee or exclude future privileged writers.
 - Actionlint v1.7.12 workflow validation (without optional ShellCheck) and whitespace
   checks passed. Existing frontend chunk-size and Node experimental notices remain.
 - Implementation slices were checked in isolated staged exports; the final
-  deployed-snapshot correction passed the full check again. Both parent
-  branch heads are unchanged; the original 25 files/status match their
-  preserved hashes. No new dependency, application/control migration or #166/#127
-  implementation change was introduced. Final-head CI and the three focused
+  deployed-snapshot correction passed the full check again. At that review both
+  parent branch heads were unchanged and the original 25 files/status matched
+  their preserved hashes; later approved archival cleanup is separate. No new
+  dependency, application/control migration or #166/#127 implementation change
+  was introduced. Final-head CI and the three focused
   commits are reported in the follow-up PR. No production write or operational
   transition was performed or authorized by this review.
 
 ## Deployment-safety prerequisite follow-up
 
-Integrate the CI-only [main prerequisite](https://github.com/Simplificatedd/JobApplicationTracker/blob/1411a23d45369631cfec073c2b72e2475f20cb62/docs/production-deployment-prerequisite.md)
-first, then review the effective #167/#168 merge tree. Neither main pushes nor CI
-manual dispatch may publish. This follow-up changes only the release credential
-references, environment/policy checks, associated tests and documentation. It
-preserves exact-attempt independent approval, rejection history, fresh labels,
-artifact identity, observed retry quarantine and closed-state checks.
+The CI-only [main prerequisite](production-deployment-prerequisite.md)
+was completed by #170 before the #167/#168 code-only merges. Neither main pushes
+nor CI manual dispatch publishes. #171's environment/policy follow-up is included
+in merged #168 and preserves exact-attempt independent approval, complete
+fail-closed approval history, fresh labels, artifact identity, observed retry
+quarantine and closed-state checks.
 
 The environment/branch-policy GETs use GitHub's versioned REST API and Actions Read.
 403/404, missing fields, unsupported settings, malformed rule counts and ambiguous
@@ -343,11 +348,10 @@ token before operational approval. Do not reinterpret omission as `branch`, gran
 administrative permissions, or bypass the guard to make deployment proceed.
 
 
-This follow-up is stacked on #168; the CI-only prerequisite is
+Historically, #171 was stacked on #168 and depended on the CI-only
 [PR #170](https://github.com/Simplificatedd/JobApplicationTracker/pull/170).
-Its test/runbook/troubleshooting files are deliberately not duplicated here.
-The runbook link is pinned to that reviewed source so it works before main
-integration. Keep those prerequisite files when integrating. Resolve the expected
-`docs/deployment.md` overlap by retaining its prerequisite notice and this
-follow-up's guarded manual-release instructions; never restore the old uploader
-or repository-token setup. CI itself merges cleanly and remains validation-only.
+Both follow-up and prerequisite are now integrated into main. The deployment-guide
+conflict was resolved by retaining the prerequisite notice, credential-retirement
+warnings and guarded manual-release instructions. The prerequisite files and
+relative runbook link are now available on main. Never restore the old uploader
+or repository-token setup; current CI remains validation-only.
