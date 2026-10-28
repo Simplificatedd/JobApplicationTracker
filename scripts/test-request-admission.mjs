@@ -81,10 +81,61 @@ try {
   const retired = await status();
   assert(await control.prepare(controlTransition('select-deployment', retired.revision, 'release-a')).first() === null, 'Retired release was selectable again');
   await transition('reopen');
+  // Damage/repair only these disposable stores. Exercise the actual upload API,
+  // not a mocked handler, and verify refusal before application metadata/R2 writes.
+  const definition = async name => (await control.prepare('SELECT sql FROM sqlite_schema WHERE name = ?').bind(name).first()).sql;
+  const historyDDL = await definition('request_deployments');
+  const receiptDDL = await definition('request_receipts');
+  const indexDDL = await definition('request_receipts_started_idx');
+  const selectionDDL = await definition('request_deployment_selection_guard');
+  const schemaFailures = [
+    ['missing-history', async () => { await control.prepare('DROP TABLE request_deployments').run(); }, async () => {
+      await control.prepare(historyDDL).run();
+      for (const label of ['release-a', 'release-b']) await control.prepare('INSERT INTO request_deployments VALUES (?)').bind(label).run();
+    }],
+    ['missing-selected-history', async () => { await control.prepare("DELETE FROM request_deployments WHERE deployment = 'release-b'").run(); }, async () => {
+      await control.prepare("INSERT INTO request_deployments VALUES ('release-b')").run();
+    }],
+    ['missing-selection-trigger', async () => { await control.prepare('DROP TRIGGER request_deployment_selection_guard').run(); }, async () => {
+      await control.prepare(selectionDDL).run();
+    }],
+    ['missing-index', async () => { await control.prepare('DROP INDEX request_receipts_started_idx').run(); }, async () => {
+      await control.prepare(indexDDL).run();
+    }],
+    ['missing-receipt-uniqueness', async () => {
+      await control.prepare('DROP TABLE request_receipts').run();
+      await control.prepare(receiptDDL.replace('id TEXT PRIMARY KEY', 'id TEXT')).run();
+      await control.prepare(indexDDL).run();
+    }, async () => {
+      await control.prepare('DROP TABLE request_receipts').run();
+      await control.prepare(receiptDDL).run(); await control.prepare(indexDDL).run();
+    }],
+    ['receipt-erasing-trigger', async () => {
+      await control.prepare('CREATE TRIGGER erase_receipt AFTER INSERT ON request_receipts BEGIN DELETE FROM request_receipts WHERE id = NEW.id; END').run();
+    }, async () => { await control.prepare('DROP TRIGGER erase_receipt').run(); }],
+  ];
+  for (const [name, damage, repair] of schemaFailures) {
+    const before = await app.prepare('SELECT COUNT(*) AS n FROM resume_objects').first();
+    await damage();
+    const denied = await releaseB.fetch(`http://localhost/api/resume-files/${name}`, { method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/pdf' }, body: '%PDF-must-not-be-written' });
+    assert(denied.status === 503, `${name}: damaged control schema admitted an actual upload`);
+    assert((await app.prepare('SELECT COUNT(*) AS n FROM resume_objects').first()).n === before.n &&
+      await bucket.get(`local%3Astudent%40example.edu/${name}`) === null, `${name}: application mutation escaped`);
+    await control.prepare("UPDATE request_gate SET mode = 'closed', revision = revision + 1").run();
+    let unknown = false;
+    try { await status(); } catch { unknown = true; }
+    assert(unknown, `${name}: incomplete schema produced verified status/drain`);
+    await repair();
+    assert((await status()).drained, `${name}: synthetic repair did not recover intact status`);
+    assert((await releaseB.fetch('http://localhost/api/session')).status === 503, `${name}: repair unexpectedly reopened admission`);
+    await transition('reopen');
+    assert((await releaseB.fetch('http://localhost/api/session')).status === 200, `${name}: valid schema did not recover`);
+  }
   assert((await releaseB.fetch('http://localhost/partial')).status === 200, 'Partial operation setup failed'); await transition('close');
   assert((await status()).uncertain === 1 && !(await status()).drained && await bucket.get('partial') !== null, 'Partial storage failure falsely drained');
   console.log(JSON.stringify({ localOnly: true, applicationMigrations: ['0001', '0002'], normalBindings: true, mainSessionUploadDownloadSnapshot: true, atomicCloseRace: true,
-    backgroundTracked: true, lateDispatchBlocked: true, retiredVersionDenied: true, partialFailureRetained: true, retiredLabelReuseDenied: true }));
+    backgroundTracked: true, lateDispatchBlocked: true, retiredVersionDenied: true, partialFailureRetained: true, retiredLabelReuseDenied: true, damagedSchemaUploadRefused: schemaFailures.length, invalidSchemaDrainUnknown: true, syntheticSchemaRepairPreservesClosure: true }));
 } finally {
   held.resolve(); reported.resolve();
   if (mf) await mf.dispose();

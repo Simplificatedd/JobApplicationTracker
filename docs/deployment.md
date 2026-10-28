@@ -1,7 +1,7 @@
 # Cloudflare deployment guide
 
 For this repository's existing Direct Upload production project, CI is
-validation-only. Follow the [deployment-safety prerequisite](https://github.com/Simplificatedd/JobApplicationTracker/blob/1411a23d45369631cfec073c2b72e2475f20cb62/docs/production-deployment-prerequisite.md),
+validation-only. Follow the [deployment-safety prerequisite](production-deployment-prerequisite.md),
 not the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
 repository deployment tokens or historical reruns to publish production.
 
@@ -228,29 +228,43 @@ change production.
 
 ### Existing Direct Upload projects
 
-A Pages project created with Wrangler shows **Git Provider: No**. For the
-admission-control prerequisite, production uses the manually dispatched
-**Approved production release** workflow, not automatic deploys on main pushes.
-Do not enable a second native Git deployment path for the same production stores.
+CI verifies source and builds; it does not publish, on either main pushes or
+manual CI dispatch. #170 removed the automatic production upload jobs. A merge
+can leave the live site on its previously approved source. Do not add
+repository-level deployment secrets or rerun a historical CI uploader to restore
+automatic deployment. Historical workflow reruns and existing deployment
+credentials remain separate operational risks until their grants are retired.
+
+See the [deployment-safety prerequisite](production-deployment-prerequisite.md)
+for external credential retirement and direct-upload controls. That prerequisite
+introduced no replacement uploader. #168 separately introduces the manually
+dispatched **Approved production release** workflow for this existing Direct
+Upload project. A Pages project created with Wrangler shows **Git Provider: No**;
+do not enable a second native Git deployment path for the same production stores.
+The Git-integrated onboarding above is for independent forks, not this production
+project or the admission prerequisite rollout.
 
 Read [request admission operations](request-admission-operations.md) and
 [production release safeguards](request-admission-release-safeguards.md) before
 setting up that workflow. They specify the separate control database/migration,
-actual binding checks, fresh protected `production-admission` environment, least-privilege token
-requirements, exact-SHA approval, immutable release identity and rollback limits.
-A named GitHub environment alone does not install required reviewers. The new
-preflight refuses an unprotected environment or missing production resources.
+actual binding checks, fresh protected `production-admission` environment,
+least-privilege token requirements, exact-SHA approval, immutable release identity
+and rollback limits. A named GitHub environment alone does not install required
+reviewers. The preflight refuses an unprotected environment or missing production
+resources; inaccessible or ambiguous policy evidence must fail closed.
 
 CI still verifies pull requests and main pushes. Production requires an explicit
 main dispatch, independent environment approval and verified closed control state.
-It performs no migration, bootstrap attestation, label selection or reopening.
-The fresh closed gate interrupts normal cloud application access; approve that
-impact before rollout. Never use dashboard Retry/rollback or an unwrapped manual
-upload to bypass the release identity procedure after bootstrap.
+The release workflow performs no migration, bootstrap attestation, label selection
+or reopening. Preparing or merging its code does not authorize a release. The
+fresh closed gate interrupts normal cloud application access; approve that impact
+before rollout. Never use dashboard Retry/rollback or an unwrapped manual upload
+to bypass the release identity procedure after bootstrap.
 
-The onboarding Git-integration steps above describe a different deployment path;
-they are not the production rollout procedure for the admission prerequisite.
-Legacy immutable URLs and old operations still need the separate bootstrap proof.
+Legacy immutable URLs and external writers require separate fencing. Denying new
+requests does not prove existing operations have finished, and an empty receipt
+ledger is not bootstrap or safe-drain proof. Obtain the separate completion
+evidence before bootstrap or reopening.
 
 For usage limits and pricing, see [privacy-and-security.md](privacy-and-security.md).
 If something does not work, see [troubleshooting.md](troubleshooting.md).

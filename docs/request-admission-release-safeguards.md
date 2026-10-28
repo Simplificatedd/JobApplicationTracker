@@ -3,12 +3,16 @@
 These repository changes prepare an independent #167 rollout. They authorize no
 GitHub settings changes, Cloudflare writes, deployment, deletion, traffic controls,
 bootstrap attestation or reopening. #166 remains open and NO-GO; #127 is separate.
-This follow-up is stacked on #167 at `32cc519`, in branch
-`fix/167-production-release-safeguards`; it depends on that prerequisite's runtime
-and control modules. Its PR targets `fix/126-request-admission-drain` for a focused
-diff. Any later retarget/rebase onto main needs review after #167's separate merge.
-Neither parent PR is modified. Existing production continues using its old
-workflow until a separately approved merge changes it.
+This follow-up was originally stacked on #167 at `32cc519`, in branch
+`fix/167-production-release-safeguards`. Updated main now contains #167, including
+its P2 control-schema correction, and #170's validation-only CI. The prepared
+integration merges that main into this follow-up without rewriting its history.
+PR #168 still targets `fix/126-request-admission-drain` until separately authorized
+publication and retargeting to main; review the final diff and rerun CI then.
+Normal CI does not publish production. This follow-up adds a separate protected,
+manually dispatched release workflow; neither source integration nor its tests
+authorize a production release. The serving deployment remains a separate
+operational baseline requiring fresh verification before any rollout.
 
 ## Verified baseline and evidence limits
 
@@ -264,7 +268,7 @@ legacy ingress and complete old-work evidence. #166: open and NO-GO.**
 Native local checks establish build/router/label/ledger behavior, not production
 Access enforcement, IAM write grants, provider termination or completion of old
 storage operations. The repository changes are ready for independent review;
-merge approval and the #167 dependency remain separate from operational readiness.
+approval of the integrated follow-up remains separate from operational readiness.
 
 ## Independent review and corrections
 
