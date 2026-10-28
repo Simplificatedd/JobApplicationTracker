@@ -30,7 +30,7 @@ You need:
 
 - A Cloudflare account with Pages, D1, R2, and Zero Trust available.
 - A GitHub account and a fork of this repository.
-- Node.js 22 and npm. Installing Node.js also installs npm.
+- Node.js 22.23.4 and its bundled npm 10.9.9, matching `.nvmrc` and `packageManager`.
 
 The guide uses a few service names that appear in the Cloudflare dashboard:
 
@@ -64,8 +64,8 @@ Access policy or an external sign-in provider for normal app users.
 1. On GitHub, select **Fork** to create your own copy of this repository.
 2. Clone or download that fork to your computer and open a terminal in its
    folder.
-3. If you use Node Version Manager, run `nvm use`. Otherwise, confirm
-   `node --version` reports Node.js 22.
+3. If you use Node Version Manager, run `nvm install` and `nvm use`. Confirm
+   `node --version` reports `v22.23.4` and `npm --version` reports `10.9.9`.
 4. Install the project and run its checks:
 
 ```bash

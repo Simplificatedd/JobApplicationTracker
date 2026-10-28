@@ -18,9 +18,9 @@
     "typecheck": "tsc -b --pretty false"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": "^22.23.4"
   },
-  "packageManager": "npm@10.9.2",
+  "packageManager": "npm@10.9.9",
   "dependencies": {
     "jose": "^6.2.12",
     "lucide-react": "^0.468.0",
