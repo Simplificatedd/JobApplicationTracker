@@ -113,7 +113,8 @@ was changed. See the release safeguards for the remaining gates.
 
 ## Operator interface and authentication
 
-Use Node 22.16+ with `--experimental-strip-types` and the pinned npm dependencies.
+Use Node 22.23.4 with its bundled npm 10.9.9, `--experimental-strip-types` and
+the pinned npm dependencies (see `.nvmrc`).
 The CLI uses `spawnSync` argument arrays, not shell interpolation. It addresses
 only `REQUEST_CONTROL_DB` from an explicitly chosen configuration. Operators
 need their own authenticated Wrangler/Cloudflare account with D1 permission;

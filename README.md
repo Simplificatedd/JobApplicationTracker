@@ -107,7 +107,7 @@ flowchart LR
 ```
 
 **You need:** a free [Cloudflare account](https://dash.cloudflare.com/sign-up), a
-GitHub account, and [Node.js 22](https://nodejs.org/).
+GitHub account, and [Node.js 22.23.4](https://nodejs.org/en/blog/release/v22.23.4) with npm 10.9.9 (see `.nvmrc`).
 
 > [!NOTE]
 > Cloudflare may ask you to add a payment method before it enables R2 or Zero
@@ -250,12 +250,14 @@ it does not establish that old requests have drained.
 
 ## 💻 Local development
 
-Use Node.js 22 (see `.nvmrc`). Local sign-in uses `LOCAL_DEV_AUTH_EMAIL`, which
+Use Node.js 22.23.4 and its bundled npm 10.9.9 (see `.nvmrc`).
+Local sign-in uses `LOCAL_DEV_AUTH_EMAIL`, which
 only works on `localhost`. The placeholder database ID in the example config is
 fine locally; production needs distinct verified application/control resources
 and separate rollout approval.
 
 ```bash
+nvm install
 nvm use
 npm ci
 cp wrangler.example.jsonc wrangler.jsonc
