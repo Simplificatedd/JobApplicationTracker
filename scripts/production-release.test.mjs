@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +19,8 @@ const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/ma
   CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32), CLOUDFLARE_PAGES_PROJECT: 'test-tracker',
   PRODUCTION_PROJECT_ID: '44444444-4444-4444-8444-444444444444', PRODUCTION_APP_DATABASE_ID: appId,
   PRODUCTION_CONTROL_DATABASE_ID: controlId, PRODUCTION_R2_BUCKET: 'test-resumes' };
-const approval = { id: 1234, protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'User', reviewer: { login: 'reviewer' } }] }] };
+const branches = { total_count: 1, branch_policies: [{ id: 1, name: 'main', type: 'branch' }] };
+const approval = { name: 'production-admission', can_admins_bypass: false, deployment_branch_policy: { protected_branches: false, custom_branch_policies: true }, id: 1234, protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'User', reviewer: { login: 'reviewer' } }] }] };
 const approved = { state: 'approved', comment: `${env.RELEASE_CONFIRMATION}:123:1`, user: { login: 'reviewer' }, environments: [{ id: approval.id }] };
 const config = { d1_databases: { DB: { id: appId }, REQUEST_CONTROL_DB: { id: controlId } },
   r2_buckets: { RESUME_FILES: { name: 'test-resumes' } }, env_vars: { TEAM_DOMAIN: { type: 'secret_text' }, POLICY_AUD: { type: 'secret_text' } },
@@ -69,10 +70,10 @@ test('Wrangler redirects and API overrides cannot silently change the production
 });
 
 test('an unprotected environment, self approval and production binding drift fail closed', () => {
-  assert.doesNotThrow(() => assertApprovalEnvironment(approval));
+  assert.doesNotThrow(() => assertApprovalEnvironment(approval, branches));
   for (const value of [{}, { protection_rules: [] }, { protection_rules: [{ type: 'required_reviewers', reviewers: [] }] },
     { protection_rules: [{ type: 'required_reviewers', reviewers: [{}], prevent_self_review: false }] }]) {
-    assert.throws(() => assertApprovalEnvironment(value));
+    assert.throws(() => assertApprovalEnvironment(value, branches));
   }
   assert.doesNotThrow(() => assertProductionProject(project, env));
   for (const override of [{ PRODUCTION_CONTROL_DATABASE_ID: appId }, { PRODUCTION_CONTROL_DATABASE_ID: 'bad' },
@@ -118,6 +119,7 @@ function controlSchema(change) {
 }
 
 function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, deny = false, stale = false, primary = true, deploymentOverride = {},
+  environment = approval, policies = branches, policyStatus = 200, history = [approved],
   schema = controlSchema(), migrations = [{ name: '0001_request_control.sql' }] } = {}) {
   const calls = [];
   const canonical = { id: '66666666-6666-4666-8666-666666666666', project_id: env.PRODUCTION_PROJECT_ID,
@@ -127,8 +129,9 @@ function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, d
   const fetcher = async (url, options) => {
     calls.push({ url, options });
     if (deny) return new Response('SENSITIVE RESPONSE MUST NOT BE LOGGED', { status: 403 });
-    if (url.endsWith('/environments/production')) return Response.json(approval);
-    if (url.endsWith('/approvals')) return Response.json([approved]);
+    if (url.endsWith('/environments/production-admission')) return Response.json(environment);
+    if (url.endsWith('/deployment-branch-policies?per_page=100&page=1')) return policyStatus === 200 ? Response.json(policies) : new Response('SENSITIVE RESPONSE MUST NOT BE LOGGED', { status: policyStatus });
+    if (url.endsWith('/approvals')) return Response.json(history);
     if (url.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: stale ? 'e'.repeat(40) : env.GITHUB_SHA } });
     if (url.includes('/deployments?')) {
       const firstPage = [canonical, ...Array.from({ length: 24 }, () => ({ deployment_trigger: { metadata: { commit_message: 'another release' } } }))];
@@ -150,7 +153,7 @@ test('preflight performs metadata GETs and only fixed read-only SELECTs; no tran
   const result = await preflightRelease(env, api);
   assert.equal(result.coverageVerified, false);
   assert.equal(result.drained, false);
-  assert.equal(api.calls.length, 5);
+  assert.equal(api.calls.length, 6);
   assert.equal(api.calls.filter(c => c.options.method === 'POST').length, 1);
   assert.ok(api.calls.every(c => c.options.redirect === 'error'));
   const denied = fakeApi({ deny: true });
@@ -212,4 +215,134 @@ test('unknown or repeated create attempts are quarantined even before duplicate 
   for (const log of ['', 'unrecognized log format', `${request}\n${request}\n`, `${request}/wrong-project\n`]) {
     assert.throws(() => assertSingleCreateAttempt(log, env), /quarantine/);
   }
+});
+
+test('dedicated approval policy rejects absent settings, admin bypass and malformed reviewer identities', () => {
+  for (const override of [{ can_admins_bypass: true }, { can_admins_bypass: undefined }, { name: 'production' },
+    { name: undefined }, { id: 0 }, { id: undefined }, { protection_rules: undefined }, { protection_rules: {} },
+    { protection_rules: [null] }, { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [null] }] },
+    { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{}] }] },
+    { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'Team', reviewer: {} }] }] }]) {
+    assert.throws(() => assertApprovalEnvironment({ ...approval, ...override }, branches));
+  }
+  assert.throws(() => assertApprovalEnvironment(null, branches));
+});
+
+test('only an explicit complete main-branch rule is accepted; protected-only is not main-only', () => {
+  for (const deployment_branch_policy of [null, undefined, {}, { protected_branches: true, custom_branch_policies: false },
+    { protected_branches: false, custom_branch_policies: false }]) {
+    assert.throws(() => assertApprovalEnvironment({ ...approval, deployment_branch_policy }, branches));
+  }
+  for (const policies of [undefined, null, {}, { total_count: 0, branch_policies: [] },
+    { ...branches, total_count: 101 }, { ...branches, total_count: undefined },
+    { total_count: 2, branch_policies: [branches.branch_policies[0], { name: '*', type: 'branch' }] },
+    ...[{ name: '*', type: 'branch' }, { name: 'other', type: 'branch' }, { name: 'main', type: 'tag' }, { name: 'main' }, null]
+      .map(rule => ({ total_count: 1, branch_policies: [rule] }))]) {
+    assert.throws(() => assertApprovalEnvironment(approval, policies));
+  }
+});
+
+test('unreadable or permissive policy stops before Cloudflare access without leaking responses', async () => {
+  for (const policyStatus of [403, 404, 500]) {
+    const api = fakeApi({ policyStatus });
+    await assert.rejects(preflightRelease(env, api), error => error.message.includes(String(policyStatus)) && !error.message.includes('SENSITIVE'));
+    assert.equal(api.calls.length, 2);
+    assert.ok(api.calls.every(call => call.options.method === 'GET' && call.url.startsWith('https://api.github.com/')));
+  }
+  for (const overrides of [{ policies: {} },
+    { policies: { total_count: 1, branch_policies: [{ id: 1, name: 'main' }] } }, { environment: { ...approval, can_admins_bypass: true } },
+    { environment: { ...approval, deployment_branch_policy: null } }]) {
+    const api = fakeApi(overrides);
+    await assert.rejects(preflightRelease(env, api));
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+});
+
+test('preflight reads the fresh environment and policy, never the historical environment', async () => {
+  const api = fakeApi();
+  await preflightRelease(env, api);
+  const github = api.calls.filter(call => call.url.startsWith('https://api.github.com/'));
+  assert.ok(github.some(call => call.url.endsWith('/environments/production-admission')));
+  assert.ok(github.some(call => call.url.endsWith('/environments/production-admission/deployment-branch-policies?per_page=100&page=1')));
+  assert.ok(github.every(call => call.options.headers['X-GitHub-Api-Version'] === '2022-11-28'));
+  assert.ok(!github.some(call => /\/environments\/production(?:\/|$)/.test(call.url)));
+});
+
+test('historical environment approval and another run or SHA never authorize the fresh release', async () => {
+  await assert.rejects(preflightRelease(env, fakeApi({ history: [{ ...approved, environments: [{ id: 999 }] }] })), /Independent/);
+  for (const override of [{ GITHUB_RUN_ID: '124' }, { GITHUB_RUN_ATTEMPT: '2' },
+    { RELEASE_CONFIRMATION: `DEPLOY-CLOSED:${'b'.repeat(40)}` }]) {
+    assert.throws(() => assertIndependentApproval([approved], approval, { ...env, ...override }));
+  }
+});
+
+test('the only release workflow reserves fresh secret names instead of resolving historical repository credentials', () => {
+  const release = readFileSync(join(repository, '.github/workflows/production.yml'), 'utf8');
+  assert.deepEqual(readdirSync(join(repository, '.github/workflows')).filter(name => /\.ya?ml$/.test(name)).sort(), ['ci.yml', 'production.yml']);
+  assert.match(release, /^ {4}environment: production-admission$/m);
+  const names = [...new Set([...release.matchAll(/secrets\.([A-Z_]+)/g)].map(match => match[1]))].sort();
+  assert.deepEqual(names, ['ADMISSION_CLOUDFLARE_ACCOUNT_ID', 'ADMISSION_PAGES_API_TOKEN']);
+  // Public credential references from main 1d1382b's historical CI. GitHub reruns
+  // retain those references; this models name resolution, not token revocation.
+  const historicalNames = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'];
+  const freshEnvironment = { ADMISSION_CLOUDFLARE_ACCOUNT_ID: 'synthetic-account', ADMISSION_PAGES_API_TOKEN: 'synthetic-new-token' };
+  assert.ok(historicalNames.every(name => !Object.hasOwn(freshEnvironment, name)));
+  const legacyRepository = { CLOUDFLARE_ACCOUNT_ID: 'synthetic-old-account', CLOUDFLARE_API_TOKEN: 'synthetic-old-token' };
+  assert.ok(names.every(name => !Object.hasOwn(legacyRepository, name)), 'No fallback to old repository names');
+  assert.equal(legacyRepository.CLOUDFLARE_API_TOKEN, 'synthetic-old-token', 'Existing historical credentials STILL require external retirement');
+});
+
+test('approval evidence rejects missing, empty or whitespace reviewer identities', async () => {
+  for (const login of [undefined, null, '', '   ', '\t\n', ' reviewer', 'reviewer ', 're viewer', 123]) {
+    const user = { login };
+    assert.throws(() => assertApprovalEnvironment({ ...approval, protection_rules: [{ type: 'required_reviewers',
+      prevent_self_review: true, reviewers: [{ type: 'User', reviewer: user }] }] }, branches), /identifiable/);
+    const api = fakeApi({ history: [{ ...approved, user }] });
+    await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+    assert.equal(api.calls.length, 3);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+});
+
+test('approval evidence validates every history record before trusting a matching approval', async () => {
+  for (const history of [null, {}, 'approved']) {
+    assert.throws(() => assertIndependentApproval(history, approval, env), /UNKNOWN/);
+  }
+  const malformed = [null, {}, { ...approved, state: undefined }, { ...approved, state: 'unknown' },
+    { ...approved, user: undefined }, { ...approved, user: null }, { ...approved, user: {} },
+    { ...approved, user: { login: '' } }, { ...approved, user: { login: '   ' } },
+    { ...approved, comment: undefined }, { ...approved, comment: null }];
+  for (const record of malformed) {
+    for (const history of [[approved, record], [record, approved]]) {
+      const api = fakeApi({ history });
+      await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+      assert.equal(api.calls.length, 3);
+      assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+    }
+  }
+});
+
+test('approval evidence cannot hide rejected or ambiguously scoped history entries', async () => {
+  const malformedScopes = [undefined, null, {}, [], [null], [{}], [{ id: String(approval.id) }],
+    [{ id: 0 }], [{ id: -1 }], [{ id: 1.5 }], [{ id: Number.MAX_SAFE_INTEGER + 1 }],
+    [{ id: approval.id }, { id: 'unknown' }]];
+  for (const state of ['approved', 'rejected']) {
+    for (const environments of malformedScopes) {
+      const record = { ...approved, state, environments };
+      for (const history of [[approved, record], [record, approved]]) {
+        const api = fakeApi({ history });
+        await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+        assert.equal(api.calls.length, 3);
+        assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+      }
+    }
+  }
+  for (const history of [[approved, { ...approved, state: 'rejected' }], [{ ...approved, state: 'rejected' }, approved]]) {
+    const api = fakeApi({ history });
+    await assert.rejects(preflightRelease(env, api), /Independent/);
+    assert.equal(api.calls.length, 3);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+  // Fully identified reviews of other environments do not change this gate.
+  await preflightRelease(env, fakeApi({ history: [approved, { ...approved, state: 'rejected', environments: [{ id: 999 }] }] }));
 });

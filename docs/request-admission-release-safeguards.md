@@ -133,20 +133,24 @@ builds and refuses to accept ambiguous creates as safely selectable releases.
 `ci.yml` verifies PRs/main but has no deployment job or Cloudflare credential.
 `production.yml` runs only on manual dispatch from main. It requires the exact
 current source SHA, current canonical UUID, expected control revision, release
-mode and `DEPLOY-CLOSED:FULL_SHA` confirmation. `production` must have nonempty
+mode and `DEPLOY-CLOSED:FULL_SHA` confirmation. `production-admission` must have nonempty
 required reviewers and prevent self-review; preflight reads the real GitHub
 environment and fails if these are absent. Configure independent reviewers and
 disable administrator bypass under separate authorization. It additionally reads
 the [run's actual review history](https://docs.github.com/en/rest/actions/workflow-runs#get-the-review-history-for-a-workflow-run).
-The reviewer must approve `production` with the exact comment
+The reviewer must approve `production-admission` with the exact comment
 `DEPLOY-CLOSED:FULL_SHA:RUN_ID:RUN_ATTEMPT` (the ID is in the run URL).
 Approval must come from someone other than both the original initiator and the
 rerun initiator. Missing/bypass/self approval or an earlier attempt's comment
 fails before upload. Every rerun needs fresh explicit approval; none is inferred
 from an old green run. Any rejected production review in the run history refuses
 the entire run, even if an approval also exists: use a new dispatch/run ID after
-rejection, not a rerun of that history. The API check does not claim to expose an
-unavailable administrator-bypass setting.
+rejection, not a rerun of that history. The API must explicitly report
+`can_admins_bypass=false`; missing visibility is
+UNKNOWN and refuses release. It must report custom branch policies and a complete
+branch-rule response containing exactly `main` of type `branch`. Null/unrestricted,
+protected-only, wildcard, tag and unreadable policies are refused. A protected-only
+policy is not main-only when the repository has no protected branches.
 
 Production runs serialize with `cancel-in-progress: false`. A new push does not
 cancel or deploy over an approved release. Main/source, canonical ID, live bindings
@@ -174,11 +178,18 @@ During maintenance, hold production approvals, prohibit other deployment paths
 and freeze operator transitions/direct writers. This serializes this workflow's
 releases; it is not a global platform lock. Cancel or reject historical queued
 runs before granting new credentials. A workflow from old history can still be
-rerun, and an administrator/direct token can bypass repository code. Scope the
-deployment token to the protected production environment, retire its repository
-copy/old grants only through an approved credential change, restrict environment
+rerun, and an administrator/direct token can bypass repository code. Use the fresh
+`production-admission` environment and fresh
+`ADMISSION_PAGES_API_TOKEN`/`ADMISSION_CLOUDFLARE_ACCOUNT_ID` secret names, never
+historical `production` or the old repository names. Review secret-name inventories
+and keep the new names absent at repository/organization scope to prevent fallback.
+Retire all old token grants/copies only through an approved credential change;
+otherwise historical reruns and direct uploads remain possible. Restrict environment
 deployment branches to main, protect workflow edits and disable native Git
-auto-deployment. These are external prerequisites, not settings installed by YAML.
+auto-deployment. Environments do not allowlist workflow files: independent review
+and protected trusted code are required; stronger isolation requires a separately
+reviewed protection app or credential broker. These are external prerequisites,
+not settings installed by YAML.
 
 ## Future setup and release order
 
@@ -186,10 +197,14 @@ All steps below require separate authorization. None was performed here.
 
 1. Approve the potentially indefinite cloud-app outage: the fresh gate returns
    503 for session startup and all API reads/writes. Static assets are not cloud
-   availability. Establish a cancellation owner and recovery decision before merge.
-2. Configure GitHub `production` reviewers/prevent-self-review, main-only branch
-   policy and no admin bypass. Put `CLOUDFLARE_ACCOUNT_ID` and
-   `CLOUDFLARE_API_TOKEN` in that protected environment. The deployment token needs
+   availability. Establish a cancellation owner and recovery decision before any
+   production deployment.
+2. Configure GitHub `production-admission` reviewers/prevent-self-review, exactly
+   one custom `main` branch rule (type `branch`) and no admin bypass. Put fresh
+   `ADMISSION_CLOUDFLARE_ACCOUNT_ID` and `ADMISSION_PAGES_API_TOKEN` secrets only in
+   that protected environment; never repository/organization scope or historical
+   `production`. The workflow maps them to Wrangler's ordinary process variables.
+   The deployment token needs
    Pages Write in the intended account and D1 Read for the control status SELECT;
    it needs neither Access edit nor D1 migration/R2 credentials. Review its actual
    token policy privately; successful GETs do not prove write permissions. The
@@ -290,3 +305,45 @@ provider idempotency guarantee or exclude future privileged writers.
   implementation change was introduced. Final-head CI and the three focused
   commits are reported in the follow-up PR. No production write or operational
   transition was performed or authorized by this review.
+
+## Deployment-safety prerequisite follow-up
+
+Integrate the CI-only [main prerequisite](https://github.com/Simplificatedd/JobApplicationTracker/blob/1411a23d45369631cfec073c2b72e2475f20cb62/docs/production-deployment-prerequisite.md)
+first, then review the effective #167/#168 merge tree. Neither main pushes nor CI
+manual dispatch may publish. This follow-up changes only the release credential
+references, environment/policy checks, associated tests and documentation. It
+preserves exact-attempt independent approval, rejection history, fresh labels,
+artifact identity, observed retry quarantine and closed-state checks.
+
+The environment/branch-policy GETs use GitHub's versioned REST API and Actions Read.
+403/404, missing fields, unsupported settings, malformed rule counts and ambiguous
+branch/tag types stop before any Cloudflare call. The settings are re-read at
+before/ready/after; they are point-in-time observations, not a platform lock.
+Maintainer CLI visibility does not prove the release job token can see every
+field; verify its actual GET responses before considering deployment. Do not grant
+broad administration/secret-read permissions just to bypass a denial.
+A privileged policy change after verification cannot be eliminated by this script.
+
+Fresh names prevent the reviewed workflow from resolving the existing historical
+repository secret names, but do not prove the new secret's scope or revoke old
+credentials. Authorized administrators must inventory actual names/grants and
+remove old access before claiming isolation. Never rerun historical workflow YAML
+as recovery. A source-only rollback should preserve CI deployment removal and
+fresh credential isolation; restore neither the old environment nor old uploader.
+
+
+GitHub's branch-policy response examples omit `type`. The guard deliberately
+refuses that response even if a sole rule is named `main`; it cannot distinguish
+a branch from a tag safely. Verify explicit type visibility with the actual job
+token before operational approval. Do not reinterpret omission as `branch`, grant
+administrative permissions, or bypass the guard to make deployment proceed.
+
+
+This follow-up is stacked on #168; the CI-only prerequisite is
+[PR #170](https://github.com/Simplificatedd/JobApplicationTracker/pull/170).
+Its test/runbook/troubleshooting files are deliberately not duplicated here.
+The runbook link is pinned to that reviewed source so it works before main
+integration. Keep those prerequisite files when integrating. Resolve the expected
+`docs/deployment.md` overlap by retaining its prerequisite notice and this
+follow-up's guarded manual-release instructions; never restore the old uploader
+or repository-token setup. CI itself merges cleanly and remains validation-only.

@@ -6,6 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { CONTROL_STATUS_SQL, describeControlStatus } from '../functions/lib/requestControl.ts';
 import { verifyPreparedRelease } from './prepare-pages-release.mjs';
 
+export const RELEASE_ENVIRONMENT = 'production-admission';
+
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
   WHERE name NOT GLOB 'sqlite_*' AND NOT (type = 'table' AND name IN ('_cf_KV', '_cf_METADATA', 'd1_migrations'))
@@ -13,6 +15,7 @@ export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
 export const RELEASE_STATUS_SQL = `SELECT *, (SELECT COUNT(*) FROM request_deployments) AS selection_count FROM (${CONTROL_STATUS_SQL})`;
 export const MIGRATION_STATUS_SQL = 'SELECT name FROM d1_migrations ORDER BY id';
 function requireCondition(condition, message) { if (!condition) throw new Error(message); }
+const identifiableLogin = value => typeof value === 'string' && value.length > 0 && !/\s/.test(value);
 
 export function assertDashboardConfiguration(root, env) {
   requireCondition(!['wrangler.json', 'wrangler.jsonc', 'wrangler.toml', '.wrangler/deploy/config.json'].some(name => existsSync(join(root, name))) &&
@@ -57,19 +60,37 @@ export function assertReleaseRequest(env) {
     env.GITHUB_ACTOR && env.GITHUB_TRIGGERING_ACTOR, 'Run/attempt and original/rerun actors are required.');
 }
 
-export function assertApprovalEnvironment(environment) {
-  const reviewers = environment.protection_rules?.find(rule => rule.type === 'required_reviewers');
-  requireCondition(reviewers?.reviewers?.length > 0 && reviewers.prevent_self_review === true,
-    'Production must have required reviewers with self-review disabled; environment naming alone is not approval.');
+export function assertApprovalEnvironment(environment, branches) {
+  const reviewers = Array.isArray(environment?.protection_rules)
+    ? environment.protection_rules.find(rule => rule?.type === 'required_reviewers') : undefined;
+  requireCondition(environment?.name === RELEASE_ENVIRONMENT && Number.isSafeInteger(environment.id) && environment.id > 0 &&
+    reviewers?.prevent_self_review === true && Array.isArray(reviewers.reviewers) && reviewers.reviewers.length > 0 &&
+    reviewers.reviewers.every(value => (value?.type === 'User' && identifiableLogin(value.reviewer?.login)) ||
+      (value?.type === 'Team' && Number.isSafeInteger(value.reviewer?.id) && value.reviewer.id > 0)),
+  'The dedicated production environment must have identifiable required reviewers with self-review disabled.');
+  requireCondition(environment.can_admins_bypass === false,
+    'Administrator bypass must be explicitly disabled; an unavailable setting is not verified protection.');
+  requireCondition(environment.deployment_branch_policy?.protected_branches === false &&
+    environment.deployment_branch_policy.custom_branch_policies === true && branches?.total_count === 1 &&
+    Array.isArray(branches.branch_policies) && branches.branch_policies.length === 1 &&
+    branches.branch_policies[0]?.name === 'main' && branches.branch_policies[0].type === 'branch',
+  'Production requires exactly one explicit main branch rule; unrestricted, protected-only, wildcard and tag policies are refused.');
 }
 
 export function assertIndependentApproval(history, environment, env) {
   const confirmation = `${env.RELEASE_CONFIRMATION}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`;
   const actors = [env.GITHUB_ACTOR, env.GITHUB_TRIGGERING_ACTOR].map(name => name.toLowerCase());
-  requireCondition(Array.isArray(history) && !history.some(review => review.state === 'rejected' &&
-    review.environments?.some(value => value.id === environment.id)) && Number.isSafeInteger(environment.id) && history.some(review =>
-    review.state === 'approved' && review.comment === confirmation && typeof review.user?.login === 'string' &&
-    !actors.includes(review.user.login.toLowerCase()) && review.environments?.some(value => value.id === environment.id)),
+  // An incomplete record cannot prove that a rejection concerned another
+  // environment. Validate the entire response before accepting any approval.
+  requireCondition(Array.isArray(history) && history.every(review => review &&
+    ['approved', 'rejected'].includes(review.state) && typeof review.comment === 'string' &&
+    identifiableLogin(review.user?.login) && Array.isArray(review.environments) && review.environments.length > 0 &&
+    review.environments.every(value => Number.isSafeInteger(value?.id) && value.id > 0)),
+  'Approval history is incomplete or ambiguous; readiness UNKNOWN.');
+  requireCondition(!history.some(review => review.state === 'rejected' &&
+    review.environments.some(value => value.id === environment.id)) && Number.isSafeInteger(environment.id) && history.some(review =>
+    review.state === 'approved' && review.comment === confirmation &&
+    !actors.includes(review.user.login.toLowerCase()) && review.environments.some(value => value.id === environment.id)),
   'Independent production approval for this exact run attempt is required; bypass/self/stale approvals are insufficient.');
 }
 
@@ -115,7 +136,8 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
   async function api(origin, path, token, body) {
     requireCondition(Boolean(token), 'Missing API credential.');
     const response = await fetcher(`${origin}${path}`, { method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(30000),
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json',
+        ...(origin === 'https://api.github.com' ? { 'X-GitHub-Api-Version': '2022-11-28' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) });
     requireCondition(response.ok, `Preflight API denied or unavailable (${response.status}); readiness UNKNOWN.`);
     const data = await response.json();
@@ -123,8 +145,10 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
     return data;
   }
   const github = path => api('https://api.github.com', `/repos/${env.GITHUB_REPOSITORY}${path}`, env.GITHUB_TOKEN);
-  const environment = await github('/environments/production');
-  assertApprovalEnvironment(environment);
+  const environmentPath = `/environments/${RELEASE_ENVIRONMENT}`;
+  const environment = await github(environmentPath);
+  const branches = await github(`${environmentPath}/deployment-branch-policies?per_page=100&page=1`);
+  assertApprovalEnvironment(environment, branches);
   assertIndependentApproval(await github(`/actions/runs/${env.GITHUB_RUN_ID}/approvals`), environment, env);
   const branch = await github('/git/ref/heads/main');
   requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved since dispatch; obtain new approval for a new run.');
