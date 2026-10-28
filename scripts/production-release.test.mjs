@@ -291,3 +291,58 @@ test('the only release workflow reserves fresh secret names instead of resolving
   assert.ok(names.every(name => !Object.hasOwn(legacyRepository, name)), 'No fallback to old repository names');
   assert.equal(legacyRepository.CLOUDFLARE_API_TOKEN, 'synthetic-old-token', 'Existing historical credentials STILL require external retirement');
 });
+
+test('approval evidence rejects missing, empty or whitespace reviewer identities', async () => {
+  for (const login of [undefined, null, '', '   ', '\t\n', ' reviewer', 'reviewer ', 're viewer', 123]) {
+    const user = { login };
+    assert.throws(() => assertApprovalEnvironment({ ...approval, protection_rules: [{ type: 'required_reviewers',
+      prevent_self_review: true, reviewers: [{ type: 'User', reviewer: user }] }] }, branches), /identifiable/);
+    const api = fakeApi({ history: [{ ...approved, user }] });
+    await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+    assert.equal(api.calls.length, 3);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+});
+
+test('approval evidence validates every history record before trusting a matching approval', async () => {
+  for (const history of [null, {}, 'approved']) {
+    assert.throws(() => assertIndependentApproval(history, approval, env), /UNKNOWN/);
+  }
+  const malformed = [null, {}, { ...approved, state: undefined }, { ...approved, state: 'unknown' },
+    { ...approved, user: undefined }, { ...approved, user: null }, { ...approved, user: {} },
+    { ...approved, user: { login: '' } }, { ...approved, user: { login: '   ' } },
+    { ...approved, comment: undefined }, { ...approved, comment: null }];
+  for (const record of malformed) {
+    for (const history of [[approved, record], [record, approved]]) {
+      const api = fakeApi({ history });
+      await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+      assert.equal(api.calls.length, 3);
+      assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+    }
+  }
+});
+
+test('approval evidence cannot hide rejected or ambiguously scoped history entries', async () => {
+  const malformedScopes = [undefined, null, {}, [], [null], [{}], [{ id: String(approval.id) }],
+    [{ id: 0 }], [{ id: -1 }], [{ id: 1.5 }], [{ id: Number.MAX_SAFE_INTEGER + 1 }],
+    [{ id: approval.id }, { id: 'unknown' }]];
+  for (const state of ['approved', 'rejected']) {
+    for (const environments of malformedScopes) {
+      const record = { ...approved, state, environments };
+      for (const history of [[approved, record], [record, approved]]) {
+        const api = fakeApi({ history });
+        await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
+        assert.equal(api.calls.length, 3);
+        assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+      }
+    }
+  }
+  for (const history of [[approved, { ...approved, state: 'rejected' }], [{ ...approved, state: 'rejected' }, approved]]) {
+    const api = fakeApi({ history });
+    await assert.rejects(preflightRelease(env, api), /Independent/);
+    assert.equal(api.calls.length, 3);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+  // Fully identified reviews of other environments do not change this gate.
+  await preflightRelease(env, fakeApi({ history: [approved, { ...approved, state: 'rejected', environments: [{ id: 999 }] }] }));
+});

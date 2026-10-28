@@ -15,6 +15,7 @@ export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
 export const RELEASE_STATUS_SQL = `SELECT *, (SELECT COUNT(*) FROM request_deployments) AS selection_count FROM (${CONTROL_STATUS_SQL})`;
 export const MIGRATION_STATUS_SQL = 'SELECT name FROM d1_migrations ORDER BY id';
 function requireCondition(condition, message) { if (!condition) throw new Error(message); }
+const identifiableLogin = value => typeof value === 'string' && value.length > 0 && !/\s/.test(value);
 
 export function assertDashboardConfiguration(root, env) {
   requireCondition(!['wrangler.json', 'wrangler.jsonc', 'wrangler.toml', '.wrangler/deploy/config.json'].some(name => existsSync(join(root, name))) &&
@@ -64,7 +65,7 @@ export function assertApprovalEnvironment(environment, branches) {
     ? environment.protection_rules.find(rule => rule?.type === 'required_reviewers') : undefined;
   requireCondition(environment?.name === RELEASE_ENVIRONMENT && Number.isSafeInteger(environment.id) && environment.id > 0 &&
     reviewers?.prevent_self_review === true && Array.isArray(reviewers.reviewers) && reviewers.reviewers.length > 0 &&
-    reviewers.reviewers.every(value => (value?.type === 'User' && typeof value.reviewer?.login === 'string' && value.reviewer.login.length > 0) ||
+    reviewers.reviewers.every(value => (value?.type === 'User' && identifiableLogin(value.reviewer?.login)) ||
       (value?.type === 'Team' && Number.isSafeInteger(value.reviewer?.id) && value.reviewer.id > 0)),
   'The dedicated production environment must have identifiable required reviewers with self-review disabled.');
   requireCondition(environment.can_admins_bypass === false,
@@ -79,10 +80,17 @@ export function assertApprovalEnvironment(environment, branches) {
 export function assertIndependentApproval(history, environment, env) {
   const confirmation = `${env.RELEASE_CONFIRMATION}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`;
   const actors = [env.GITHUB_ACTOR, env.GITHUB_TRIGGERING_ACTOR].map(name => name.toLowerCase());
-  requireCondition(Array.isArray(history) && !history.some(review => review.state === 'rejected' &&
-    review.environments?.some(value => value.id === environment.id)) && Number.isSafeInteger(environment.id) && history.some(review =>
-    review.state === 'approved' && review.comment === confirmation && typeof review.user?.login === 'string' &&
-    !actors.includes(review.user.login.toLowerCase()) && review.environments?.some(value => value.id === environment.id)),
+  // An incomplete record cannot prove that a rejection concerned another
+  // environment. Validate the entire response before accepting any approval.
+  requireCondition(Array.isArray(history) && history.every(review => review &&
+    ['approved', 'rejected'].includes(review.state) && typeof review.comment === 'string' &&
+    identifiableLogin(review.user?.login) && Array.isArray(review.environments) && review.environments.length > 0 &&
+    review.environments.every(value => Number.isSafeInteger(value?.id) && value.id > 0)),
+  'Approval history is incomplete or ambiguous; readiness UNKNOWN.');
+  requireCondition(!history.some(review => review.state === 'rejected' &&
+    review.environments.some(value => value.id === environment.id)) && Number.isSafeInteger(environment.id) && history.some(review =>
+    review.state === 'approved' && review.comment === confirmation &&
+    !actors.includes(review.user.login.toLowerCase()) && review.environments.some(value => value.id === environment.id)),
   'Independent production approval for this exact run attempt is required; bypass/self/stale approvals are insufficient.');
 }
 
