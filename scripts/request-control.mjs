@@ -24,7 +24,7 @@ try {
       values.local ? '--local' : '--remote', '--command', sql, '--json'];
     if (values['persist-to']) args.push('--persist-to', values['persist-to']);
     const result = spawnSync(fileURLToPath(new URL('../node_modules/.bin/wrangler', import.meta.url)), args, { encoding: 'utf8' });
-    if (result.status !== 0) throw new Error('Control query failed or outcome is unconfirmed. Inspect status; do not blindly repeat a transition.');
+    if (result.status !== 0) throw new Error('Control query failed or outcome is unconfirmed. Drain is UNKNOWN. Inspect status; do not blindly repeat a transition.');
     const output = JSON.parse(result.stdout);
     if (!Array.isArray(output) || output.length !== 1 || output[0].success !== true || !Array.isArray(output[0].results)) {
       throw new Error('Control response could not be verified. Drain is UNKNOWN.');
