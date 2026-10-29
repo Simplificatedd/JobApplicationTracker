@@ -1,10 +1,10 @@
-name: Approved production release
+name: Manual production release
 
 on:
   workflow_dispatch:
     inputs:
       release_sha:
-        description: Full current main SHA approved for this closed deployment
+        description: Full current main SHA selected for this closed deployment
         required: true
       expected_deployment:
         description: Current canonical Pages deployment UUID
@@ -18,7 +18,7 @@ on:
         options: [initial-closed, drained]
         required: true
       confirmation:
-        description: DEPLOY-CLOSED followed by a colon and the full approved SHA
+        description: DEPLOY-CLOSED followed by a colon and the full selected SHA
         required: true
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Verify approval, actual resources and closed control state
+      - name: Verify environment, actual resources and closed control state
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
         run: node --experimental-strip-types scripts/production-preflight.mjs before
@@ -74,7 +74,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
         run: node --experimental-strip-types scripts/production-preflight.mjs ready
-      - name: Deploy the approved closed release
+      - name: Deploy the selected closed release
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}
           RELEASE_LABEL: ${{ steps.release.outputs.label }}
