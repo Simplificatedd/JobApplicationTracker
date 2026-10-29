@@ -109,7 +109,8 @@ moved, obtain its new SHA. Do not weaken a check to get a green release.
 
 For upload error, timeout, cancellation, duplicate or failed post-check, stop new
 releases and preserve the closed state and logs/manifest. Cancellation cannot undo
-an upload. Inspect all candidate deployments and canonical/control state; quarantine
+an upload. To stop a running job, open its Actions run and choose **Cancel workflow**.
+Inspect all candidate deployments and canonical/control state; quarantine
 the ambiguous label. Never blindly retry or reuse its artifact/label.
 
 Prefer a forward fix. A code rollback uses a normal revert PR/current-main build
