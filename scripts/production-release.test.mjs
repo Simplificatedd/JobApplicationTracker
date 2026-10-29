@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { RELEASE_WORKFLOW, assertReleaseWorkflowContext, assertReleaseWorkflowRun } from './release-workflow-identity.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,11 +15,20 @@ const appId = '11111111-1111-4111-8111-111111111111', controlId = '22222222-2222
 const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40),
   RELEASE_SHA: 'a'.repeat(40), RELEASE_CONFIRMATION: `DEPLOY-CLOSED:${'a'.repeat(40)}`,
   EXPECTED_DEPLOYMENT: '33333333-3333-4333-8333-333333333333', CONTROL_REVISION: '0', RELEASE_MODE: 'initial-closed',
-  GITHUB_REPOSITORY: 'example/tracker', GITHUB_TOKEN: 'synthetic-github', CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare',
+  GITHUB_REPOSITORY: RELEASE_WORKFLOW.repository, GITHUB_REPOSITORY_ID: String(RELEASE_WORKFLOW.repositoryId),
+  GITHUB_REPOSITORY_OWNER_ID: String(RELEASE_WORKFLOW.ownerId),
+  GITHUB_WORKFLOW_REF: `${RELEASE_WORKFLOW.repository}/${RELEASE_WORKFLOW.path}@${RELEASE_WORKFLOW.ref}`, GITHUB_WORKFLOW_SHA: 'a'.repeat(40), GITHUB_TOKEN: 'synthetic-github', CLOUDFLARE_API_TOKEN: 'synthetic-cloudflare',
   GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1', GITHUB_ACTOR: 'initiator', GITHUB_TRIGGERING_ACTOR: 'rerunner',
   CLOUDFLARE_ACCOUNT_ID: 'b'.repeat(32), CLOUDFLARE_PAGES_PROJECT: 'test-tracker',
   PRODUCTION_PROJECT_ID: '44444444-4444-4444-8444-444444444444', PRODUCTION_APP_DATABASE_ID: appId,
   PRODUCTION_CONTROL_DATABASE_ID: controlId, PRODUCTION_R2_BUCKET: 'test-resumes' };
+const workflowRepository = { id: RELEASE_WORKFLOW.repositoryId, full_name: RELEASE_WORKFLOW.repository, fork: false,
+  owner: { id: RELEASE_WORKFLOW.ownerId, login: RELEASE_WORKFLOW.owner } };
+const workflowRun = { id: 123, run_attempt: 1, workflow_id: RELEASE_WORKFLOW.workflowId,
+  event: 'workflow_dispatch', head_branch: 'main', head_sha: env.GITHUB_SHA, path: RELEASE_WORKFLOW.path,
+  repository: workflowRepository, head_repository: workflowRepository,
+  actor: { login: env.GITHUB_ACTOR }, triggering_actor: { login: env.GITHUB_TRIGGERING_ACTOR } };
+const workflowDefinition = { id: RELEASE_WORKFLOW.workflowId, path: RELEASE_WORKFLOW.path, state: 'active' };
 const branches = { total_count: 1, branch_policies: [{ id: 1, name: 'main', type: 'branch' }] };
 const approval = { name: 'production-admission', can_admins_bypass: false, deployment_branch_policy: { protected_branches: false, custom_branch_policies: true }, id: 1234, protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'User', reviewer: { login: 'reviewer' } }] }] };
 const approved = { state: 'approved', comment: `${env.RELEASE_CONFIRMATION}:123:1`, user: { login: 'reviewer' }, environments: [{ id: approval.id }] };
@@ -120,6 +130,7 @@ function controlSchema(change) {
 
 function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, deny = false, stale = false, primary = true, deploymentOverride = {},
   environment = approval, policies = branches, policyStatus = 200, history = [approved],
+  run = workflowRun, workflow = workflowDefinition,
   schema = controlSchema(), migrations = [{ name: '0001_request_control.sql' }] } = {}) {
   const calls = [];
   const canonical = { id: '66666666-6666-4666-8666-666666666666', project_id: env.PRODUCTION_PROJECT_ID,
@@ -132,6 +143,8 @@ function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, d
     if (url.endsWith('/environments/production-admission')) return Response.json(environment);
     if (url.endsWith('/deployment-branch-policies?per_page=100&page=1')) return policyStatus === 200 ? Response.json(policies) : new Response('SENSITIVE RESPONSE MUST NOT BE LOGGED', { status: policyStatus });
     if (url.endsWith('/approvals')) return Response.json(history);
+    if (url.endsWith('/actions/runs/123/attempts/1')) return Response.json(run);
+    if (url.endsWith(`/actions/workflows/${RELEASE_WORKFLOW.workflowId}`)) return Response.json(workflow);
     if (url.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: stale ? 'e'.repeat(40) : env.GITHUB_SHA } });
     if (url.includes('/deployments?')) {
       const firstPage = [canonical, ...Array.from({ length: 24 }, () => ({ deployment_trigger: { metadata: { commit_message: 'another release' } } }))];
@@ -143,7 +156,8 @@ function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, d
       return Response.json({ success: true, result: [schema, migrations, [fresh]].map(results =>
         ({ success: true, results, meta: { rows_written: 0, served_by_primary: primary } })) });
     }
-    return Response.json({ success: true, result: { ...project, ...(promoted ? { canonical_deployment: canonical } : {}) } });
+    if (url.endsWith('/pages/projects/test-tracker')) return Response.json({ success: true, result: { ...project, ...(promoted ? { canonical_deployment: canonical } : {}) } });
+    throw new Error('Unexpected URL in local API fixture.');
   };
   return { calls, fetcher };
 }
@@ -153,7 +167,7 @@ test('preflight performs metadata GETs and only fixed read-only SELECTs; no tran
   const result = await preflightRelease(env, api);
   assert.equal(result.coverageVerified, false);
   assert.equal(result.drained, false);
-  assert.equal(api.calls.length, 6);
+  assert.equal(api.calls.length, 8);
   assert.equal(api.calls.filter(c => c.options.method === 'POST').length, 1);
   assert.ok(api.calls.every(c => c.options.redirect === 'error'));
   const denied = fakeApi({ deny: true });
@@ -345,4 +359,84 @@ test('approval evidence cannot hide rejected or ambiguously scoped history entri
   }
   // Fully identified reviews of other environments do not change this gate.
   await preflightRelease(env, fakeApi({ history: [approved, { ...approved, state: 'rejected', environments: [{ id: 999 }] }] }));
+});
+
+test('release workflow identity accepts only the designated workflow and documented main path forms', () => {
+  assert.doesNotThrow(() => assertReleaseWorkflowContext(env));
+  for (const path of [RELEASE_WORKFLOW.path, `${RELEASE_WORKFLOW.path}@main`, `${RELEASE_WORKFLOW.path}@refs/heads/main`]) {
+    assert.doesNotThrow(() => assertReleaseWorkflowRun(env, { ...workflowRun, path }, workflowDefinition));
+  }
+});
+
+test('workflow-provided identity cannot substitute a different repository, workflow ref or source', async () => {
+  const overrides = [
+    { GITHUB_REPOSITORY: 'untrusted/tracker' }, { GITHUB_REPOSITORY_ID: '42' }, { GITHUB_REPOSITORY_OWNER_ID: '42' },
+    { GITHUB_WORKFLOW_REF: `${RELEASE_WORKFLOW.repository}/.github/workflows/alternative.yml@refs/heads/main` },
+    { GITHUB_WORKFLOW_REF: `${RELEASE_WORKFLOW.repository}/${RELEASE_WORKFLOW.path}@refs/heads/old-release` },
+    { GITHUB_WORKFLOW_REF: `${RELEASE_WORKFLOW.repository}/${RELEASE_WORKFLOW.path}@refs/tags/main` },
+    { GITHUB_WORKFLOW_SHA: 'b'.repeat(40) }, { GITHUB_WORKFLOW_SHA: undefined }, { GITHUB_WORKFLOW_REF: undefined },
+    { GITHUB_REPOSITORY_ID: 1353415059 }, { GITHUB_RUN_ID: '9007199254740992' }, { GITHUB_RUN_ID: '0123' },
+    { GITHUB_RUN_ATTEMPT: '1/traversal' }, { GITHUB_ACTOR: {} }, { GITHUB_TRIGGERING_ACTOR: '  ' },
+    { GITHUB_REF: 'refs/pull/123/merge' }, { GITHUB_EVENT_NAME: 'pull_request_target' },
+  ];
+  for (const override of overrides) {
+    const api = fakeApi();
+    await assert.rejects(preflightRelease({ ...env, ...override }, api), /workflow identity/);
+    assert.equal(api.calls.length, 0, 'Malformed or unexpected context must fail before any API call');
+  }
+});
+
+test('GitHub attempt metadata rejects historical, alternative, forked or malformed workflow identity before provider access', async () => {
+  const repositoryOverrides = [
+    { id: 42 }, { full_name: 'other/tracker' }, { fork: true },
+    { owner: { id: 42, login: RELEASE_WORKFLOW.owner } },
+  ];
+  const runs = [
+    null, {}, [], 'untrusted metadata', { ...workflowRun, id: 124 }, { ...workflowRun, id: '123' },
+    { ...workflowRun, workflow_id: 42 }, { ...workflowRun, run_attempt: 2 },
+    { ...workflowRun, head_sha: 'b'.repeat(40) }, { ...workflowRun, head_branch: 'old-release' },
+    { ...workflowRun, event: 'pull_request' }, { ...workflowRun, path: '.github/workflows/alternative.yml' },
+    { ...workflowRun, path: `${RELEASE_WORKFLOW.path}@refs/tags/main` },
+    { ...workflowRun, actor: { login: 'substituted' } }, { ...workflowRun, triggering_actor: undefined },
+    ...repositoryOverrides.map(override => ({ ...workflowRun, repository: { ...workflowRepository, ...override } })),
+    { ...workflowRun, head_repository: { ...workflowRepository, id: 42 } },
+    { ...workflowRun, referenced_workflows: [{ path: 'other/reusable/.github/workflows/deploy.yml@main' }] },
+    { ...workflowRun, referenced_workflows: {} },
+  ];
+  for (const run of runs) {
+    const api = fakeApi({ run });
+    await assert.rejects(preflightRelease(env, api), /workflow identity/);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+  for (const workflow of [null, {}, [], { ...workflowDefinition, id: 42 },
+    { ...workflowDefinition, path: '.github/workflows/alternative.yml' }, { ...workflowDefinition, state: 'disabled_manually' }]) {
+    const api = fakeApi({ workflow });
+    await assert.rejects(preflightRelease(env, api), /workflow identity/);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+});
+
+test('changing both workflow-provided SHA strings cannot replace GitHub main and attempt evidence', async () => {
+  const substituted = { ...env, GITHUB_SHA: 'b'.repeat(40), GITHUB_WORKFLOW_SHA: 'b'.repeat(40),
+    RELEASE_SHA: 'b'.repeat(40), RELEASE_CONFIRMATION: `DEPLOY-CLOSED:${'b'.repeat(40)}` };
+  const history = [{ ...approved, comment: `${substituted.RELEASE_CONFIRMATION}:123:1` }];
+  const api = fakeApi({ history });
+  await assert.rejects(preflightRelease(substituted, api), /Main moved/);
+  assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  const actors = fakeApi();
+  await assert.rejects(preflightRelease({ ...env, GITHUB_ACTOR: 'substituted' }, actors), /workflow identity/);
+  assert.ok(actors.calls.every(call => call.url.startsWith('https://api.github.com/')));
+});
+
+test('missing approval environment or credential inputs fail closed without a provider request', async () => {
+  const missingEnvironment = fakeApi({ environment: null });
+  await assert.rejects(preflightRelease(env, missingEnvironment), /dedicated production environment/);
+  assert.ok(missingEnvironment.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  for (const name of ['GITHUB_TOKEN', 'CLOUDFLARE_API_TOKEN']) {
+    const api = fakeApi();
+    await assert.rejects(preflightRelease({ ...env, [name]: undefined }, api), /Missing API credential/);
+    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+  }
+  // These are credential-presence checks inside preflight. They do not test or
+  // establish an external credential broker, OIDC exchange or issuance boundary.
 });
