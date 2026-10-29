@@ -9,6 +9,8 @@ deployer, admission code, binding, migration or credential.
 added the manually dispatched, main-guarded production workflow described in
 [release safeguards](request-admission-release-safeguards.md). Source integration
 does not establish operational readiness. #166 remains separate and NO-GO.
+The current [solo deployment guide](solo-production-deployment.md) supersedes
+earlier mandatory independent-review and external-service requirements.
 
 ## What #170 established
 
@@ -31,7 +33,7 @@ repository scope. The fresh environment was not present in the environment list.
 These are dated observations: re-read live metadata before merging. Raw resource
 identifiers and responses belong in private operator evidence, not this document.
 
-## Required external settings: separate authorization
+## GitHub and credential setup: separate authorization
 
 No settings or credentials were changed by #170 or the #167/#168 code-only
 merges. Before claiming historical or direct deployment paths are fenced, an
@@ -43,12 +45,13 @@ authorized administrator must:
    native Git integration and deploy hooks again. Record unavailable visibility as
    UNKNOWN. Reject/cancel old pending releases under separate authorization, and
    reconcile any possibly issued upload; cancellation is not proof of no effect.
-2. Retire or remove access to the old deployment credentials, including repository
+2. After replacements are configured and verified, retire old deployment
+   credentials, including repository
    `CLOUDFLARE_API_TOKEN`, copies in environments/organization secrets and external
    automation. Removing a GitHub secret does not revoke a leaked or copied token;
    review the actual provider grant and authorize its retirement separately.
    Until then historical reruns and direct token holders remain possible writers.
-3. For the merged #168 manual release path, create a fresh environment named
+3. For the manual release path, verify the existing environment named
    `production-admission`. Never move the new token into historical `production`.
    Reserve fresh secret names `ADMISSION_PAGES_API_TOKEN` and
    `ADMISSION_CLOUDFLARE_ACCOUNT_ID` exclusively in the new environment. Do not
@@ -56,20 +59,14 @@ authorized administrator must:
    fall back there when an environment secret is missing. Check secret-name
    inventories privately; do not print values. An absent fresh token must stop a
    release, not fall back to the old token.
-4. Require independent reviewers, prevent self-review, explicitly disable
-   administrator bypass, and configure custom deployment branch rules as exactly
-   one `main` rule of type `branch`, with no tags/wildcards. Do not substitute
-   "protected branches only": when no branches are protected, GitHub permits all
-   branches in that mode. Unsupported or unreadable protections are blockers;
-   the later release preflight must fail closed rather than assume protection.
-5. Protect main and workflow/release-script changes with independent review and
-   controlled bypass permissions. GitHub environments do not natively allowlist
-   a workflow file. Reviewers must verify the exact workflow path, current source
-   SHA, run ID and run attempt before approving. Any actor able to change trusted
-   main workflow code or environment policy remains a trust boundary. A stronger
-   machine-enforced workflow allowlist requires a separately reviewed deployment
-   protection app or credential broker; YAML/environment naming alone cannot
-   provide one.
+4. Keep administrator bypass disabled and exactly one selected `main` branch
+   rule of type `branch`, without tags/wildcards. No required reviewer is needed
+   for this solo-maintainer model. Missing or unreadable policy still fails closed.
+5. Protect main with PRs, strict CI and no force/delete/admin bypass. Zero required
+   PR approvals supports solo maintenance. The intended workflow verifies current
+   main, exact workflow/run/attempt and environment identity before provider access.
+   A maintainer able to change trusted main or environment policy remains trusted;
+   the environment does not allowlist workflow files. This residual risk is accepted.
 6. Verify the fresh CI principal's intended account and minimum Pages Write/control
    D1 Read permissions. Local OAuth grants and secret-name visibility are not that
    verification. Preserve existing app D1/R2/auth/runtime identities. No deployment,
@@ -79,7 +76,7 @@ GitHub documents [environment secret availability and branch policy semantics](h
 Its [branch-policy API](https://docs.github.com/en/rest/deployments/branch-policies)
 documents branch/tag policies, but its response examples omit the rule type.
 Never infer `branch` from an omitted type or a rule named `main`: the release
-check requires an explicit type and refuses otherwise. Required reviewers,
+check requires an explicit type and refuses otherwise. Environment identity,
 bypass and rule-type fields must be visible to the actual release job token;
 maintainer CLI visibility does not prove that. Unsupported API responses remain
 an operational blocker; do not weaken the policy or grant broad admin access. [Cloudflare Git integration](https://developers.cloudflare.com/pages/configuration/git-integration/)
@@ -92,9 +89,11 @@ is a separate deployment path from GitHub Actions and must be checked live.
 2. **Completed in source:** #167 merged without changing validation-only CI.
    This did not deploy the initial closed gate or authorize an outage.
 3. **Completed in source:** #168 merged with #171's approval correction, one manual
-   release workflow, fresh environment/secret references, exact SHA/run/attempt
-   approval and quarantine/rejection protections. No settings were installed or
-   release dispatched. Do not add a competing automatic deployment workflow.
+   release workflow, fresh environment/secret references and quarantine protections.
+   The solo-maintainer follow-up replaces its original independent-review gate
+   with explicit dispatch/confirmation and exact SHA/run/attempt identity checks.
+   No settings were installed or release dispatched by these source changes.
+   Do not add a competing automatic deployment workflow.
 4. Only after external settings, resource/IAM verification and separate outage
    authorization, consider deploying #167/#168. Initial closed/unverified means
    normal API unavailability. Control provisioning/migration/bindings, bootstrap,
