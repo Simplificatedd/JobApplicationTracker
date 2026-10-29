@@ -1,10 +1,10 @@
 // Defense in depth inside the release process; this is NOT credential issuance
-// enforcement. A modified approved workflow could omit these checks entirely.
+// enforcement. A compromised main workflow could omit these checks entirely.
 export const RELEASE_WORKFLOW = Object.freeze({
   repository: 'Simplificatedd/JobApplicationTracker', repositoryId: 1353415059,
   owner: 'Simplificatedd', ownerId: 110826519,
   path: '.github/workflows/production.yml', workflowId: 399529633,
-  ref: 'refs/heads/main', environment: 'production-admission',
+  ref: 'refs/heads/main', environment: 'production-admission', environmentId: 25704782492,
 });
 const requireIdentity = condition => {
   if (!condition) throw new Error('Release workflow identity is missing, mismatched or unverified.');

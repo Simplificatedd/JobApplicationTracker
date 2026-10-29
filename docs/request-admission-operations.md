@@ -6,8 +6,10 @@ provides a separate manually dispatched, main-guarded release path.
 Nothing here authorizes resource creation, a deployment, a traffic pause, a remote
 migration, or reopening. PR #166 remains unmerged and production remains NO-GO.
 Read the [design and safety limits](request-admission-design.md) first.
+Use the [solo deployment guide](solo-production-deployment.md) for credential
+setup and dispatch; independent reviewer approval is not required.
 The [release safeguards](request-admission-release-safeguards.md) describe the
-implemented manual approval workflow, compiled labels, legacy URL retirement options,
+implemented manual dispatch workflow, compiled labels, legacy URL retirement options,
 live IAM gaps and ordered production setup. They are not active production settings.
 
 ## Resources and deployment contract
@@ -62,7 +64,7 @@ Before an actual production deployment, record private evidence for every item:
 1. Identify the actual Pages project/account, deployment workflow and configuration
    source. The checked-in `wrangler.example.jsonc` is only an example and is not
    loaded by CI as production configuration. Current CI is validation-only;
-   the separate production workflow requires manual exact-SHA approval. Neither
+   the separate production workflow requires manual exact-SHA confirmation. Neither
    applies migrations. Historical workflow reruns retain the old uploader and
    remain a risk until their credentials are separately retired.
 2. Verify the dedicated control database's actual resource ID is distinct from

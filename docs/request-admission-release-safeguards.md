@@ -1,5 +1,10 @@
 # Production release safeguards and remaining blockers
 
+Current release policy: follow the [solo deployment guide](solo-production-deployment.md).
+Independent reviewer approval and an external deployment service are not required.
+The historical review records below retain the earlier policy for context;
+resource, closed/drained state, artifact and recovery protections still apply.
+
 The admission runtime (#167) and release safeguards (#168) are merged into main;
 #171's approval-policy correction is included through #168. They authorize no
 GitHub settings changes, Cloudflare writes, deployment, deletion, traffic controls,
@@ -40,9 +45,9 @@ to make a failed inspection pass.
 
 The deployment token in GitHub cannot be recovered by listing secret names.
 Membership/OAuth permissions do not establish that separate principal's effective
-grants. Production had no required reviewers configured at inspection. Repository
-YAML alone cannot install that external approval policy. These are dated inventory
-findings, not fresh production verification by the local independent code review;
+grants. Production had no required reviewers configured at inspection; the current
+solo model does not require them. These are dated inventory findings, not fresh
+production verification by the local independent code review;
 re-inspect all resources, policies and grants before any authorized rollout.
 
 ## Legacy URLs: admission denial and drain are separate
@@ -136,29 +141,18 @@ require a supported single-attempt/idempotent uploader contract; it is not suppl
 by current Wrangler. The safeguard guarantees fresh identities for approved retry
 builds and refuses to accept ambiguous creates as safely selectable releases.
 
-## Approval and maintenance safeguards
+## Manual release and maintenance safeguards
 
 `ci.yml` verifies PRs/main but has no deployment job or Cloudflare credential.
 `production.yml` runs only on manual dispatch from main. It requires the exact
 current source SHA, current canonical UUID, expected control revision, release
-mode and `DEPLOY-CLOSED:FULL_SHA` confirmation. `production-admission` must have nonempty
-required reviewers and prevent self-review; preflight reads the real GitHub
-environment and fails if these are absent. Configure independent reviewers and
-disable administrator bypass under separate authorization. It additionally reads
-the [run's actual review history](https://docs.github.com/en/rest/actions/workflow-runs#get-the-review-history-for-a-workflow-run).
-The reviewer must approve `production-admission` with the exact comment
-`DEPLOY-CLOSED:FULL_SHA:RUN_ID:RUN_ATTEMPT` (the ID is in the run URL).
-Approval must come from someone other than both the original initiator and the
-rerun initiator. Missing/bypass/self approval or an earlier attempt's comment
-fails before upload. Every rerun needs fresh explicit approval; none is inferred
-from an old green run. Any rejected production review in the run history refuses
-the entire run, even if an approval also exists: use a new dispatch/run ID after
-rejection, not a rerun of that history. The API must explicitly report
-`can_admins_bypass=false`; missing visibility is
-UNKNOWN and refuses release. It must report custom branch policies and a complete
-branch-rule response containing exactly `main` of type `branch`. Null/unrestricted,
-protected-only, wildcard, tag and unreadable policies are refused. A protected-only
-policy is not main-only when the repository has no protected branches.
+mode and `DEPLOY-CLOSED:FULL_SHA` confirmation. This is the maintainer's explicit
+release decision, not independent approval. Preflight does not require reviewers
+or read approval history. It verifies the intended workflow and exact run/attempt,
+current main, and `production-admission` identity. The API must explicitly report
+`can_admins_bypass=false`, custom branch policies and a complete response containing
+exactly `main` of type `branch`. Null/unrestricted, protected-only, wildcard, tag
+and unreadable policies are refused. Missing credentials fail before API calls.
 
 Production runs serialize with `cancel-in-progress: false`. A new push does not
 cancel or deploy over an approved release. Main/source, canonical ID, live bindings
@@ -182,7 +176,7 @@ spanning GitHub, Pages and D1. Freeze external operator transitions, bindings an
 direct deployments while relying on them. A failed post-upload check cannot undo
 an upload; quarantine and reconcile it while admission remains closed.
 
-During maintenance, hold production approvals, prohibit other deployment paths
+During maintenance, pause manual releases, prohibit other deployment paths
 and freeze operator transitions/direct writers. This serializes this workflow's
 releases; it is not a global platform lock. Cancel or reject historical queued
 runs before granting new credentials. A workflow from old history can still be
@@ -194,10 +188,9 @@ and keep the new names absent at repository/organization scope to prevent fallba
 Retire all old token grants/copies only through an approved credential change;
 otherwise historical reruns and direct uploads remain possible. Restrict environment
 deployment branches to main, protect workflow edits and disable native Git
-auto-deployment. Environments do not allowlist workflow files: independent review
-and protected trusted code are required; stronger isolation requires a separately
-reviewed protection app or credential broker. These are external prerequisites,
-not settings installed by YAML.
+auto-deployment. Environments do not allowlist workflow files; trusted main code
+and the maintainer remain trusted. This conventional model accepts historical
+and compromised-maintainer risks rather than requiring another service.
 
 ## Future setup and release order
 
@@ -207,8 +200,8 @@ All steps below require separate authorization. None was performed here.
    503 for session startup and all API reads/writes. Static assets are not cloud
    availability. Establish a cancellation owner and recovery decision before any
    production deployment.
-2. Configure GitHub `production-admission` reviewers/prevent-self-review, exactly
-   one custom `main` branch rule (type `branch`) and no admin bypass. Put fresh
+2. Verify GitHub `production-admission` has exactly one custom `main` branch rule
+   (type `branch`) and no admin bypass. No reviewer is required. Put fresh
    `ADMISSION_CLOUDFLARE_ACCOUNT_ID` and `ADMISSION_PAGES_API_TOKEN` secrets only in
    that protected environment; never repository/organization scope or historical
    `production`. The workflow maps them to Wrangler's ordinary process variables.
@@ -230,10 +223,10 @@ All steps below require separate authorization. None was performed here.
    `PRODUCTION_CONTROL_DATABASE_ID`, `PRODUCTION_R2_BUCKET`. Keep actual resource
    identities in private configuration/evidence, not in source examples.
 6. After a separately authorized merge, dispatch the exact approved current main
-   SHA, canonical UUID and closed revision. A reviewer approves that specific run
-   attempt with the exact confirmation comment described above;
-   preflight checks live resources using the deployment principal itself. Perform
-   no manual upload alongside it. CI verifies all tests/builds and local native
+   SHA, canonical UUID and closed revision with the explicit confirmation above.
+   Preflight checks workflow/run identity and live resources using the deployment
+   principal itself. Perform no manual upload alongside it. CI verifies all
+   tests/builds and local native
    integration before preparing/uploading the fresh identity.
 7. Record actual promotion and bindings, single-attempt/unique-record evidence,
    manifest and unchanged closed state. Under separately approved smoke scope,
@@ -266,7 +259,8 @@ reviewed pending retry or forward repair, never blind replay.
 
 ## Current decision
 
-**Production deployment: NO-GO pending actual external setup/IAM/outage approval
+**Production deployment: NO-GO pending verified environment credentials/resources,
+IAM and outage approval
 and separate authorization. Bootstrap/reopening: NO-GO pending
 legacy ingress and complete old-work evidence. #166: open and NO-GO.**
 Native local checks establish build/router/label/ledger behavior, not production
@@ -274,7 +268,11 @@ Access enforcement, IAM write grants, provider termination or completion of old
 storage operations. The repository changes are ready for independent review;
 approval of the integrated follow-up remains separate from operational readiness.
 
-## Independent review and corrections
+## Historical independent review and corrections
+
+These findings describe the former reviewer-based release policy. Its approval-
+history checks are superseded by the solo-maintainer policy above. Data-integrity,
+artifact, resource and ambiguity checks remain in force.
 
 The review reproduced these failures against the preserved pre-review code using
 synthetic API responses and local SQLite only; no production probe was needed.
@@ -320,9 +318,9 @@ provider idempotency guarantee or exclude future privileged writers.
 The CI-only [main prerequisite](production-deployment-prerequisite.md)
 was completed by #170 before the #167/#168 code-only merges. Neither main pushes
 nor CI manual dispatch publishes. #171's environment/policy follow-up is included
-in merged #168 and preserves exact-attempt independent approval, complete
-fail-closed approval history, fresh labels, artifact identity, observed retry
-quarantine and closed-state checks.
+in merged #168 and originally required independent review/history. The solo model
+removes that requirement while preserving exact workflow/run/attempt identity,
+fresh labels, artifact identity, observed retry quarantine and closed-state checks.
 
 The environment/branch-policy GETs use GitHub's versioned REST API and Actions Read.
 403/404, missing fields, unsupported settings, malformed rule counts and ambiguous

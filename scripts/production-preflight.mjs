@@ -16,7 +16,6 @@ export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
 export const RELEASE_STATUS_SQL = `SELECT *, (SELECT COUNT(*) FROM request_deployments) AS selection_count FROM (${CONTROL_STATUS_SQL})`;
 export const MIGRATION_STATUS_SQL = 'SELECT name FROM d1_migrations ORDER BY id';
 function requireCondition(condition, message) { if (!condition) throw new Error(message); }
-const identifiableLogin = value => typeof value === 'string' && value.length > 0 && !/\s/.test(value);
 
 export function assertDashboardConfiguration(root, env) {
   requireCondition(!['wrangler.json', 'wrangler.jsonc', 'wrangler.toml', '.wrangler/deploy/config.json'].some(name => existsSync(join(root, name))) &&
@@ -62,14 +61,9 @@ export function assertReleaseRequest(env) {
     env.GITHUB_ACTOR && env.GITHUB_TRIGGERING_ACTOR, 'Run/attempt and original/rerun actors are required.');
 }
 
-export function assertApprovalEnvironment(environment, branches) {
-  const reviewers = Array.isArray(environment?.protection_rules)
-    ? environment.protection_rules.find(rule => rule?.type === 'required_reviewers') : undefined;
-  requireCondition(environment?.name === RELEASE_ENVIRONMENT && Number.isSafeInteger(environment.id) && environment.id > 0 &&
-    reviewers?.prevent_self_review === true && Array.isArray(reviewers.reviewers) && reviewers.reviewers.length > 0 &&
-    reviewers.reviewers.every(value => (value?.type === 'User' && identifiableLogin(value.reviewer?.login)) ||
-      (value?.type === 'Team' && Number.isSafeInteger(value.reviewer?.id) && value.reviewer.id > 0)),
-  'The dedicated production environment must have identifiable required reviewers with self-review disabled.');
+export function assertReleaseEnvironment(environment, branches) {
+  requireCondition(environment?.name === RELEASE_ENVIRONMENT && environment.id === RELEASE_WORKFLOW.environmentId,
+    'The dedicated production environment is missing or has the wrong identity.');
   requireCondition(environment.can_admins_bypass === false,
     'Administrator bypass must be explicitly disabled; an unavailable setting is not verified protection.');
   requireCondition(environment.deployment_branch_policy?.protected_branches === false &&
@@ -77,23 +71,6 @@ export function assertApprovalEnvironment(environment, branches) {
     Array.isArray(branches.branch_policies) && branches.branch_policies.length === 1 &&
     branches.branch_policies[0]?.name === 'main' && branches.branch_policies[0].type === 'branch',
   'Production requires exactly one explicit main branch rule; unrestricted, protected-only, wildcard and tag policies are refused.');
-}
-
-export function assertIndependentApproval(history, environment, env) {
-  const confirmation = `${env.RELEASE_CONFIRMATION}:${env.GITHUB_RUN_ID}:${env.GITHUB_RUN_ATTEMPT}`;
-  const actors = [env.GITHUB_ACTOR, env.GITHUB_TRIGGERING_ACTOR].map(name => name.toLowerCase());
-  // An incomplete record cannot prove that a rejection concerned another
-  // environment. Validate the entire response before accepting any approval.
-  requireCondition(Array.isArray(history) && history.every(review => review &&
-    ['approved', 'rejected'].includes(review.state) && typeof review.comment === 'string' &&
-    identifiableLogin(review.user?.login) && Array.isArray(review.environments) && review.environments.length > 0 &&
-    review.environments.every(value => Number.isSafeInteger(value?.id) && value.id > 0)),
-  'Approval history is incomplete or ambiguous; readiness UNKNOWN.');
-  requireCondition(!history.some(review => review.state === 'rejected' &&
-    review.environments.some(value => value.id === environment.id)) && Number.isSafeInteger(environment.id) && history.some(review =>
-    review.state === 'approved' && review.comment === confirmation &&
-    !actors.includes(review.user.login.toLowerCase()) && review.environments.some(value => value.id === environment.id)),
-  'Independent production approval for this exact run attempt is required; bypass/self/stale approvals are insufficient.');
 }
 
 export function assertProductionProject(project, env) {
@@ -134,6 +111,8 @@ export function assertSingleCreateAttempt(log, env) {
 // no redirects, no retries. The only POST is the fixed read-only control SELECT.
 export async function preflightRelease(env, { after, fetcher = fetch, manifest } = {}) {
   assertReleaseRequest(env);
+  requireCondition([env.GITHUB_TOKEN, env.CLOUDFLARE_API_TOKEN].every(value => typeof value === 'string' && value.trim()),
+    'Missing API credential.');
   requireCondition(/^[0-9a-f]{32}$/.test(env.CLOUDFLARE_ACCOUNT_ID ?? '') && /^[a-z0-9][a-z0-9-]*$/.test(env.CLOUDFLARE_PAGES_PROJECT ?? ''), 'Account and Pages project are required.');
   async function api(origin, path, token, body) {
     requireCondition(Boolean(token), 'Missing API credential.');
@@ -150,10 +129,11 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
   const environmentPath = `/environments/${RELEASE_ENVIRONMENT}`;
   const environment = await github(environmentPath);
   const branches = await github(`${environmentPath}/deployment-branch-policies?per_page=100&page=1`);
-  assertApprovalEnvironment(environment, branches);
-  assertIndependentApproval(await github(`/actions/runs/${env.GITHUB_RUN_ID}/approvals`), environment, env);
+  // Solo-maintainer admission is the explicit dispatch plus these policy and
+  // identity checks. It does not claim an independent reviewer approved the run.
+  assertReleaseEnvironment(environment, branches);
   const branch = await github('/git/ref/heads/main');
-  requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved since dispatch; obtain new approval for a new run.');
+  requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved since dispatch; start a new run from current main.');
   // Verify GitHub's metadata for this exact attempt, not just workflow-provided
   // environment strings. No new permissions or OIDC/credential request is used.
   const run = await github(`/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT}`);

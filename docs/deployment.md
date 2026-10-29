@@ -2,7 +2,8 @@
 
 For this repository's existing Direct Upload production project, #170 made CI
 validation-only. #167 and #168 are now merged; the separate production workflow
-is manually dispatched and main-guarded. Follow the
+is manually dispatched and main-guarded. Follow the practical
+[solo production guide](solo-production-deployment.md),
 [release safeguards](request-admission-release-safeguards.md) and
 [credential-isolation prerequisite](production-deployment-prerequisite.md), not
 the Git-integrated fork onboarding below. Do not restore old CI upload jobs,
@@ -10,7 +11,9 @@ repository deployment tokens or historical reruns to publish production.
 
 The 2026-10-28 read-only audit confirmed production still serves pre-admission
 source `1d1382b`; the control database/binding and protected release environment
-are absent. Deployment, bootstrap, reopening, safe drain and #166 remain **NO-GO**.
+were absent at that inspection. GitHub protections have since been configured;
+provider resource verification is still required. Deployment, bootstrap, reopening,
+safe drain and #166 remain **NO-GO** until their prerequisites are met.
 
 Anyone can deploy an independent copy from a fork. A team or other group can
 also share one deployment. The app uses each person's verified sign-in to keep
@@ -20,7 +23,7 @@ The fork-onboarding sections below describe a separate Git-connected Pages
 project, where pushes may update that fork's live site and PRs may create
 previews. They do not establish admission readiness on current main or apply to
 the existing Direct Upload production project. Native Git builds do not implement
-the reviewed per-release label/approval mechanism. Admission-enabled production
+the reviewed per-release label/confirmation mechanism. Admission-enabled production
 must use the guarded manual build or a separately reviewed equivalent; a static
 dashboard label must not be reused across automatic deployments.
 

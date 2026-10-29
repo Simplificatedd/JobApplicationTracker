@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { assertReleaseRequest, assertApprovalEnvironment, assertIndependentApproval, assertProductionProject, assertControlState, assertSingleCreateAttempt,
+import { assertReleaseRequest, assertReleaseEnvironment, assertProductionProject, assertControlState, assertSingleCreateAttempt,
   assertCheckout, assertDashboardConfiguration, assertControlSchema, CONTROL_SCHEMA_SQL, MIGRATION_STATUS_SQL, RELEASE_STATUS_SQL, preflightRelease } from './production-preflight.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
@@ -30,8 +30,9 @@ const workflowRun = { id: 123, run_attempt: 1, workflow_id: RELEASE_WORKFLOW.wor
   actor: { login: env.GITHUB_ACTOR }, triggering_actor: { login: env.GITHUB_TRIGGERING_ACTOR } };
 const workflowDefinition = { id: RELEASE_WORKFLOW.workflowId, path: RELEASE_WORKFLOW.path, state: 'active' };
 const branches = { total_count: 1, branch_policies: [{ id: 1, name: 'main', type: 'branch' }] };
-const approval = { name: 'production-admission', can_admins_bypass: false, deployment_branch_policy: { protected_branches: false, custom_branch_policies: true }, id: 1234, protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'User', reviewer: { login: 'reviewer' } }] }] };
-const approved = { state: 'approved', comment: `${env.RELEASE_CONFIRMATION}:123:1`, user: { login: 'reviewer' }, environments: [{ id: approval.id }] };
+const environment = { name: 'production-admission', can_admins_bypass: false,
+  deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+  id: RELEASE_WORKFLOW.environmentId, protection_rules: [{ type: 'branch_policy' }] };
 const config = { d1_databases: { DB: { id: appId }, REQUEST_CONTROL_DB: { id: controlId } },
   r2_buckets: { RESUME_FILES: { name: 'test-resumes' } }, env_vars: { TEAM_DOMAIN: { type: 'secret_text' }, POLICY_AUD: { type: 'secret_text' } },
   compatibility_date: '2026-09-22', compatibility_flags: [] };
@@ -51,7 +52,7 @@ test('ordinary CI cannot deploy; production has only manual dispatch and never c
   assert.doesNotMatch(release, /cancel-in-progress: true/);
 });
 
-test('manual exact-SHA approval rejects push, stale SHA, branch and malformed confirmations', () => {
+test('manual exact-SHA confirmation rejects push, stale SHA, branch and malformed confirmations', () => {
   assert.doesNotThrow(() => assertReleaseRequest(env));
   for (const override of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/other' }, { RELEASE_SHA: 'c'.repeat(40) },
     { RELEASE_CONFIRMATION: 'yes' }, { EXPECTED_DEPLOYMENT: '' }, { CONTROL_REVISION: '9007199254740992' }, { RELEASE_MODE: 'open' }]) {
@@ -79,12 +80,7 @@ test('Wrangler redirects and API overrides cannot silently change the production
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('an unprotected environment, self approval and production binding drift fail closed', () => {
-  assert.doesNotThrow(() => assertApprovalEnvironment(approval, branches));
-  for (const value of [{}, { protection_rules: [] }, { protection_rules: [{ type: 'required_reviewers', reviewers: [] }] },
-    { protection_rules: [{ type: 'required_reviewers', reviewers: [{}], prevent_self_review: false }] }]) {
-    assert.throws(() => assertApprovalEnvironment(value, branches));
-  }
+test('production resource identities and local-auth exclusion remain enforced', () => {
   assert.doesNotThrow(() => assertProductionProject(project, env));
   for (const override of [{ PRODUCTION_CONTROL_DATABASE_ID: appId }, { PRODUCTION_CONTROL_DATABASE_ID: 'bad' },
     { PRODUCTION_PROJECT_ID: controlId }, { PRODUCTION_R2_BUCKET: 'wrong' }]) {
@@ -108,17 +104,6 @@ test('fresh empty ledger stays unverified; open/stale/uncertain established rele
     receipt_sample: JSON.stringify([{ id: 'uncertain' }]) }, established));
 });
 
-test('approval history must independently approve this exact attempt, not bypass or an older rerun', () => {
-  assert.doesNotThrow(() => assertIndependentApproval([approved], approval, env));
-  for (const history of [[], [{ ...approved, state: 'rejected' }], [{ ...approved, comment: 'Ship it!' }],
-    [{ ...approved, user: { login: 'INITIATOR' } }], [{ ...approved, user: { login: 'rerunner' } }],
-    [{ ...approved, environments: [{ id: 9999 }] }]]) {
-    assert.throws(() => assertIndependentApproval(history, approval, env));
-  }
-  assert.throws(() => assertIndependentApproval([approved], approval, { ...env, GITHUB_RUN_ATTEMPT: '2' }));
-  assert.throws(() => assertIndependentApproval([approved, { ...approved, state: 'rejected', comment: 'Stop release' }], approval, env));
-});
-
 function controlSchema(change) {
   const database = new DatabaseSync(':memory:');
   try {
@@ -129,7 +114,7 @@ function controlSchema(change) {
 }
 
 function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, deny = false, stale = false, primary = true, deploymentOverride = {},
-  environment = approval, policies = branches, policyStatus = 200, history = [approved],
+  environment: releaseEnvironment = environment, policies = branches, policyStatus = 200,
   run = workflowRun, workflow = workflowDefinition,
   schema = controlSchema(), migrations = [{ name: '0001_request_control.sql' }] } = {}) {
   const calls = [];
@@ -140,9 +125,8 @@ function fakeApi({ promoted = false, duplicate = false, lateDuplicate = false, d
   const fetcher = async (url, options) => {
     calls.push({ url, options });
     if (deny) return new Response('SENSITIVE RESPONSE MUST NOT BE LOGGED', { status: 403 });
-    if (url.endsWith('/environments/production-admission')) return Response.json(environment);
+    if (url.endsWith('/environments/production-admission')) return Response.json(releaseEnvironment);
     if (url.endsWith('/deployment-branch-policies?per_page=100&page=1')) return policyStatus === 200 ? Response.json(policies) : new Response('SENSITIVE RESPONSE MUST NOT BE LOGGED', { status: policyStatus });
-    if (url.endsWith('/approvals')) return Response.json(history);
     if (url.endsWith('/actions/runs/123/attempts/1')) return Response.json(run);
     if (url.endsWith(`/actions/workflows/${RELEASE_WORKFLOW.workflowId}`)) return Response.json(workflow);
     if (url.endsWith('/git/ref/heads/main')) return Response.json({ object: { sha: stale ? 'e'.repeat(40) : env.GITHUB_SHA } });
@@ -167,7 +151,7 @@ test('preflight performs metadata GETs and only fixed read-only SELECTs; no tran
   const result = await preflightRelease(env, api);
   assert.equal(result.coverageVerified, false);
   assert.equal(result.drained, false);
-  assert.equal(api.calls.length, 8);
+  assert.equal(api.calls.length, 7);
   assert.equal(api.calls.filter(c => c.options.method === 'POST').length, 1);
   assert.ok(api.calls.every(c => c.options.redirect === 'error'));
   const denied = fakeApi({ deny: true });
@@ -231,28 +215,33 @@ test('unknown or repeated create attempts are quarantined even before duplicate 
   }
 });
 
-test('dedicated approval policy rejects absent settings, admin bypass and malformed reviewer identities', () => {
+test('solo release accepts a reviewer-free environment but rejects missing identity or admin bypass', async () => {
+  assert.doesNotThrow(() => assertReleaseEnvironment(environment, branches));
+  const api = fakeApi();
+  await preflightRelease(env, api);
+  assert.ok(api.calls.every(call => !call.url.endsWith('/approvals')), 'Solo dispatch must not depend on review history');
   for (const override of [{ can_admins_bypass: true }, { can_admins_bypass: undefined }, { name: 'production' },
-    { name: undefined }, { id: 0 }, { id: undefined }, { protection_rules: undefined }, { protection_rules: {} },
-    { protection_rules: [null] }, { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [null] }] },
-    { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{}] }] },
-    { protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'Team', reviewer: {} }] }] }]) {
-    assert.throws(() => assertApprovalEnvironment({ ...approval, ...override }, branches));
+    { name: 'preview' }, { name: undefined }, { id: 0 }, { id: undefined }, { id: environment.id + 1 }]) {
+    const badEnvironment = { ...environment, ...override };
+    assert.throws(() => assertReleaseEnvironment(badEnvironment, branches));
+    const invalid = fakeApi({ environment: badEnvironment });
+    await assert.rejects(preflightRelease(env, invalid));
+    assert.ok(invalid.calls.every(call => call.url.startsWith('https://api.github.com/')));
   }
-  assert.throws(() => assertApprovalEnvironment(null, branches));
+  assert.throws(() => assertReleaseEnvironment(null, branches));
 });
 
 test('only an explicit complete main-branch rule is accepted; protected-only is not main-only', () => {
   for (const deployment_branch_policy of [null, undefined, {}, { protected_branches: true, custom_branch_policies: false },
     { protected_branches: false, custom_branch_policies: false }]) {
-    assert.throws(() => assertApprovalEnvironment({ ...approval, deployment_branch_policy }, branches));
+    assert.throws(() => assertReleaseEnvironment({ ...environment, deployment_branch_policy }, branches));
   }
   for (const policies of [undefined, null, {}, { total_count: 0, branch_policies: [] },
     { ...branches, total_count: 101 }, { ...branches, total_count: undefined },
     { total_count: 2, branch_policies: [branches.branch_policies[0], { name: '*', type: 'branch' }] },
     ...[{ name: '*', type: 'branch' }, { name: 'other', type: 'branch' }, { name: 'main', type: 'tag' }, { name: 'main' }, null]
       .map(rule => ({ total_count: 1, branch_policies: [rule] }))]) {
-    assert.throws(() => assertApprovalEnvironment(approval, policies));
+    assert.throws(() => assertReleaseEnvironment(environment, policies));
   }
 });
 
@@ -264,8 +253,8 @@ test('unreadable or permissive policy stops before Cloudflare access without lea
     assert.ok(api.calls.every(call => call.options.method === 'GET' && call.url.startsWith('https://api.github.com/')));
   }
   for (const overrides of [{ policies: {} },
-    { policies: { total_count: 1, branch_policies: [{ id: 1, name: 'main' }] } }, { environment: { ...approval, can_admins_bypass: true } },
-    { environment: { ...approval, deployment_branch_policy: null } }]) {
+    { policies: { total_count: 1, branch_policies: [{ id: 1, name: 'main' }] } }, { environment: { ...environment, can_admins_bypass: true } },
+    { environment: { ...environment, deployment_branch_policy: null } }]) {
     const api = fakeApi(overrides);
     await assert.rejects(preflightRelease(env, api));
     assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
@@ -280,14 +269,6 @@ test('preflight reads the fresh environment and policy, never the historical env
   assert.ok(github.some(call => call.url.endsWith('/environments/production-admission/deployment-branch-policies?per_page=100&page=1')));
   assert.ok(github.every(call => call.options.headers['X-GitHub-Api-Version'] === '2022-11-28'));
   assert.ok(!github.some(call => /\/environments\/production(?:\/|$)/.test(call.url)));
-});
-
-test('historical environment approval and another run or SHA never authorize the fresh release', async () => {
-  await assert.rejects(preflightRelease(env, fakeApi({ history: [{ ...approved, environments: [{ id: 999 }] }] })), /Independent/);
-  for (const override of [{ GITHUB_RUN_ID: '124' }, { GITHUB_RUN_ATTEMPT: '2' },
-    { RELEASE_CONFIRMATION: `DEPLOY-CLOSED:${'b'.repeat(40)}` }]) {
-    assert.throws(() => assertIndependentApproval([approved], approval, { ...env, ...override }));
-  }
 });
 
 test('the only release workflow reserves fresh secret names instead of resolving historical repository credentials', () => {
@@ -306,59 +287,26 @@ test('the only release workflow reserves fresh secret names instead of resolving
   assert.equal(legacyRepository.CLOUDFLARE_API_TOKEN, 'synthetic-old-token', 'Existing historical credentials STILL require external retirement');
 });
 
-test('approval evidence rejects missing, empty or whitespace reviewer identities', async () => {
-  for (const login of [undefined, null, '', '   ', '\t\n', ' reviewer', 'reviewer ', 're viewer', 123]) {
-    const user = { login };
-    assert.throws(() => assertApprovalEnvironment({ ...approval, protection_rules: [{ type: 'required_reviewers',
-      prevent_self_review: true, reviewers: [{ type: 'User', reviewer: user }] }] }, branches), /identifiable/);
-    const api = fakeApi({ history: [{ ...approved, user }] });
-    await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
-    assert.equal(api.calls.length, 3);
-    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
-  }
-});
-
-test('approval evidence validates every history record before trusting a matching approval', async () => {
-  for (const history of [null, {}, 'approved']) {
-    assert.throws(() => assertIndependentApproval(history, approval, env), /UNKNOWN/);
-  }
-  const malformed = [null, {}, { ...approved, state: undefined }, { ...approved, state: 'unknown' },
-    { ...approved, user: undefined }, { ...approved, user: null }, { ...approved, user: {} },
-    { ...approved, user: { login: '' } }, { ...approved, user: { login: '   ' } },
-    { ...approved, comment: undefined }, { ...approved, comment: null }];
-  for (const record of malformed) {
-    for (const history of [[approved, record], [record, approved]]) {
-      const api = fakeApi({ history });
-      await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
-      assert.equal(api.calls.length, 3);
-      assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
-    }
-  }
-});
-
-test('approval evidence cannot hide rejected or ambiguously scoped history entries', async () => {
-  const malformedScopes = [undefined, null, {}, [], [null], [{}], [{ id: String(approval.id) }],
-    [{ id: 0 }], [{ id: -1 }], [{ id: 1.5 }], [{ id: Number.MAX_SAFE_INTEGER + 1 }],
-    [{ id: approval.id }, { id: 'unknown' }]];
-  for (const state of ['approved', 'rejected']) {
-    for (const environments of malformedScopes) {
-      const record = { ...approved, state, environments };
-      for (const history of [[approved, record], [record, approved]]) {
-        const api = fakeApi({ history });
-        await assert.rejects(preflightRelease(env, api), /UNKNOWN/);
-        assert.equal(api.calls.length, 3);
-        assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
-      }
-    }
-  }
-  for (const history of [[approved, { ...approved, state: 'rejected' }], [{ ...approved, state: 'rejected' }, approved]]) {
-    const api = fakeApi({ history });
-    await assert.rejects(preflightRelease(env, api), /Independent/);
-    assert.equal(api.calls.length, 3);
-    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
-  }
-  // Fully identified reviews of other environments do not change this gate.
-  await preflightRelease(env, fakeApi({ history: [approved, { ...approved, state: 'rejected', environments: [{ id: 999 }] }] }));
+test('production credentials cannot be exposed by a preview job or workflow-level environment', () => {
+  const source = readFileSync(join(repository, '.github/workflows/production.yml'), 'utf8');
+  const assertPlacement = text => {
+    const [header, jobs, extra] = text.split('\njobs:\n');
+    assert.equal(extra, undefined);
+    assert.doesNotMatch(header, /\bsecrets\s*[.[]/);
+    assert.deepEqual(jobs.match(/^ {2}[\w-]+:/gm), ['  release:']);
+    assert.match(jobs, /^ {4}environment: production-admission$/m);
+    assert.match(jobs, /^ {4}if: github.ref == 'refs\/heads\/main'$/m);
+    assert.deepEqual([...new Set([...jobs.matchAll(/secrets\.([A-Z_]+)/g)].map(match => match[1]))].sort(),
+      ['ADMISSION_CLOUDFLARE_ACCOUNT_ID', 'ADMISSION_PAGES_API_TOKEN']);
+  };
+  assert.doesNotThrow(() => assertPlacement(source));
+  for (const unsafe of [
+    source.replace('environment: production-admission', 'environment: preview'),
+    source.replace("if: github.ref == 'refs/heads/main'", "if: github.ref == 'refs/heads/preview'"),
+    source.replaceAll('secrets.ADMISSION_PAGES_API_TOKEN', 'secrets.CLOUDFLARE_API_TOKEN'),
+    source.replace('\njobs:\n', '\nenv:\n  TOKEN: ${{ secrets.ADMISSION_PAGES_API_TOKEN }}\njobs:\n'),
+    `${source}\n  preview:\n    environment: production-admission\n`,
+  ]) assert.throws(() => assertPlacement(unsafe));
 });
 
 test('release workflow identity accepts only the designated workflow and documented main path forms', () => {
@@ -419,8 +367,7 @@ test('GitHub attempt metadata rejects historical, alternative, forked or malform
 test('changing both workflow-provided SHA strings cannot replace GitHub main and attempt evidence', async () => {
   const substituted = { ...env, GITHUB_SHA: 'b'.repeat(40), GITHUB_WORKFLOW_SHA: 'b'.repeat(40),
     RELEASE_SHA: 'b'.repeat(40), RELEASE_CONFIRMATION: `DEPLOY-CLOSED:${'b'.repeat(40)}` };
-  const history = [{ ...approved, comment: `${substituted.RELEASE_CONFIRMATION}:123:1` }];
-  const api = fakeApi({ history });
+  const api = fakeApi();
   await assert.rejects(preflightRelease(substituted, api), /Main moved/);
   assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
   const actors = fakeApi();
@@ -428,15 +375,17 @@ test('changing both workflow-provided SHA strings cannot replace GitHub main and
   assert.ok(actors.calls.every(call => call.url.startsWith('https://api.github.com/')));
 });
 
-test('missing approval environment or credential inputs fail closed without a provider request', async () => {
+test('missing release environment or credential inputs fail closed without a provider request', async () => {
   const missingEnvironment = fakeApi({ environment: null });
   await assert.rejects(preflightRelease(env, missingEnvironment), /dedicated production environment/);
   assert.ok(missingEnvironment.calls.every(call => call.url.startsWith('https://api.github.com/')));
   for (const name of ['GITHUB_TOKEN', 'CLOUDFLARE_API_TOKEN']) {
-    const api = fakeApi();
-    await assert.rejects(preflightRelease({ ...env, [name]: undefined }, api), /Missing API credential/);
-    assert.ok(api.calls.every(call => call.url.startsWith('https://api.github.com/')));
+    for (const value of [undefined, '', '   ']) {
+      const api = fakeApi();
+      await assert.rejects(preflightRelease({ ...env, [name]: value }, api), /Missing API credential/);
+      assert.equal(api.calls.length, 0);
+    }
   }
-  // These are credential-presence checks inside preflight. They do not test or
-  // establish an external credential broker, OIDC exchange or issuance boundary.
+  // Presence checks do not establish which GitHub secret scope supplied a token.
+  // Operator setup must keep the reserved names exclusively in the environment.
 });
