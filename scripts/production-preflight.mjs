@@ -5,8 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { CONTROL_STATUS_SQL, describeControlStatus } from '../functions/lib/requestControl.ts';
 import { verifyPreparedRelease } from './prepare-pages-release.mjs';
+import { RELEASE_WORKFLOW, assertReleaseWorkflowContext, assertReleaseWorkflowRun } from './release-workflow-identity.mjs';
 
-export const RELEASE_ENVIRONMENT = 'production-admission';
+export const RELEASE_ENVIRONMENT = RELEASE_WORKFLOW.environment;
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const CONTROL_SCHEMA_SQL = `SELECT name, type, sql FROM sqlite_schema
@@ -49,6 +50,7 @@ export function assertControlSchema(rows, migrations) {
 }
 
 export function assertReleaseRequest(env) {
+  assertReleaseWorkflowContext(env);
   requireCondition(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main', 'Only an explicit main workflow dispatch may release.');
   requireCondition(/^[0-9a-f]{40}$/.test(env.GITHUB_SHA ?? '') && env.RELEASE_SHA === env.GITHUB_SHA &&
     env.RELEASE_CONFIRMATION === `DEPLOY-CLOSED:${env.GITHUB_SHA}`, 'Confirm the exact dispatched source SHA with DEPLOY-CLOSED:SHA.');
@@ -141,7 +143,7 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
       ...(body ? { body: JSON.stringify(body) } : {}) });
     requireCondition(response.ok, `Preflight API denied or unavailable (${response.status}); readiness UNKNOWN.`);
     const data = await response.json();
-    requireCondition(data.success !== false, 'Preflight API response failed; readiness UNKNOWN.');
+    requireCondition(data?.success !== false, 'Preflight API response failed; readiness UNKNOWN.');
     return data;
   }
   const github = path => api('https://api.github.com', `/repos/${env.GITHUB_REPOSITORY}${path}`, env.GITHUB_TOKEN);
@@ -152,6 +154,11 @@ export async function preflightRelease(env, { after, fetcher = fetch, manifest }
   assertIndependentApproval(await github(`/actions/runs/${env.GITHUB_RUN_ID}/approvals`), environment, env);
   const branch = await github('/git/ref/heads/main');
   requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved since dispatch; obtain new approval for a new run.');
+  // Verify GitHub's metadata for this exact attempt, not just workflow-provided
+  // environment strings. No new permissions or OIDC/credential request is used.
+  const run = await github(`/actions/runs/${env.GITHUB_RUN_ID}/attempts/${env.GITHUB_RUN_ATTEMPT}`);
+  const workflow = await github(`/actions/workflows/${RELEASE_WORKFLOW.workflowId}`);
+  assertReleaseWorkflowRun(env, run, workflow);
   const base = `/accounts/${env.CLOUDFLARE_ACCOUNT_ID}`;
   const cloudflare = (path, body) => api('https://api.cloudflare.com/client/v4', `${base}${path}`, env.CLOUDFLARE_API_TOKEN, body);
   const projectPath = `/pages/projects/${env.CLOUDFLARE_PAGES_PROJECT}`;
