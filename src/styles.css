@@ -246,6 +246,9 @@
     }
   }
 
+  .native-modal:not([open]) { display: none; }
+  .native-modal::backdrop { background: transparent; }
+
   .modal-overlay {
     /* Overlays are pinned to the viewport, so they must not pick up
        space-y-* margins from the stack they happen to be rendered in. */

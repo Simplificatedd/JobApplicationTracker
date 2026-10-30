@@ -89,6 +89,8 @@ export function normalizeUserSettings(
   return {
     ...DEFAULT_USER_SETTINGS,
     ...settings,
+    defaultFollowUpPromptDays: wholeDays(settings?.defaultFollowUpPromptDays, DEFAULT_USER_SETTINGS.defaultFollowUpPromptDays),
+    dueSoonDays: wholeDays(settings?.dueSoonDays, DEFAULT_USER_SETTINGS.dueSoonDays),
     addJobFormLayout: "long_form",
     addJobPresentation: "modal",
     visibleApplicationColumns: [...new Set(visibleApplicationColumns)],
@@ -130,4 +132,10 @@ export function createId(prefix: string) {
   }
 
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+
+function wholeDays(value: number | undefined, fallback: number) {
+  return value !== undefined && Number.isSafeInteger(Math.floor(value))
+    ? Math.max(1, Math.floor(value)) : fallback;
 }

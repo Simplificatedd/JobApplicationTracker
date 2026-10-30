@@ -1,5 +1,4 @@
 import { MapPin, Upload, X } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import {
@@ -22,7 +21,7 @@ import {
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { NativeModal } from "../../components/NativeModal";
 import {
   type DuplicateApplicationMatch,
   findDuplicateApplication,
@@ -174,10 +173,6 @@ export function AddApplicationModal({
   const [duplicateMatch, setDuplicateMatch] =
     useState<DuplicateApplicationMatch | null>(null);
 
-  useEscapeKey(
-    isOpen && !isDiscardWarningOpen && !duplicateMatch,
-    requestClose,
-  );
 
   if (!isOpen) {
     return null;
@@ -281,11 +276,6 @@ export function AddApplicationModal({
     }));
   }
 
-  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      requestClose();
-    }
-  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -469,12 +459,10 @@ export function AddApplicationModal({
   }
 
   return (
-    <div
-      aria-labelledby="add-application-title"
-      aria-modal="true"
+    <NativeModal
+      labelledBy="add-application-title"
+      onRequestClose={requestClose}
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={requestCloseFromBackdrop}
-      role="dialog"
     >
       <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
@@ -503,6 +491,7 @@ export function AddApplicationModal({
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Job Title" required>
               <input
+                data-initial-focus
                 aria-describedby={titleError ? "job-title-error" : undefined}
                 aria-invalid={titleError ? "true" : "false"}
                 className="field-control"
@@ -1048,7 +1037,7 @@ export function AddApplicationModal({
           />
         ) : null}
       </div>
-    </div>
+    </NativeModal>
   );
 }
 
@@ -1063,12 +1052,11 @@ function DuplicateApplicationDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEscapeKey(true, onCancel);
 
   return (
-    <div
-      aria-labelledby="duplicate-application-title"
-      aria-modal="true"
+    <NativeModal
+      labelledBy="duplicate-application-title"
+      onRequestClose={() => { if (!isSaving) onCancel(); }}
       className="modal-overlay fixed inset-0 z-[60] flex items-center justify-center p-4"
       role="alertdialog"
     >
@@ -1094,6 +1082,7 @@ function DuplicateApplicationDialog({
           <button
             className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
             disabled={isSaving}
+            data-initial-focus
             onClick={onCancel}
             type="button"
           >
@@ -1109,7 +1098,7 @@ function DuplicateApplicationDialog({
           </button>
         </div>
       </div>
-    </div>
+    </NativeModal>
   );
 }
 

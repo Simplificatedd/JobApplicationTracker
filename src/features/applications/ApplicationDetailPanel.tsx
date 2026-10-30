@@ -10,7 +10,6 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { useState } from "react";
 import {
   APPLICATION_STATUSES,
@@ -33,7 +32,7 @@ import {
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { NativeModal } from "../../components/NativeModal";
 import type {
   ApplicationUpdate,
   MutationResult,
@@ -126,6 +125,9 @@ export function ApplicationDetailPanel({
   workingCoverLetterId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
+  const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
+  const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
   const [editBase, setEditBase] = useState(() => structuredClone(application));
@@ -138,9 +140,9 @@ export function ApplicationDetailPanel({
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
 
-  useEscapeKey(!isDiscardWarningOpen, requestClose);
 
   function startEditing() {
+    if (nestedEditorOpen) return;
     setEditBase(structuredClone(application));
     setDraft(toDraft(application));
     setResumeUploadError("");
@@ -233,7 +235,7 @@ export function ApplicationDetailPanel({
   }
 
   function requestClose() {
-    if (isSaving) {
+    if (isSaving || nestedEditorOpen) {
       return;
     }
 
@@ -261,19 +263,12 @@ export function ApplicationDetailPanel({
     onClose();
   }
 
-  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLElement>) {
-    if (event.target === event.currentTarget) {
-      requestClose();
-    }
-  }
 
   return (
-    <aside
-      aria-labelledby="application-detail-title"
-      aria-modal="true"
+    <NativeModal
+      labelledBy="application-detail-title"
+      onRequestClose={requestClose}
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
-      onMouseDown={requestCloseFromBackdrop}
-      role="dialog"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
@@ -316,14 +311,14 @@ export function ApplicationDetailPanel({
                 </button>
               </>
             ) : (
-              <button className="icon-button" onClick={startEditing} type="button">
+              <button className="icon-button" disabled={nestedEditorOpen} onClick={startEditing} type="button">
                 <Pencil aria-hidden="true" size={18} />
                 <span className="sr-only">Edit</span>
               </button>
             )}
             <button
               className="icon-button"
-              disabled={isSaving}
+              disabled={isSaving || nestedEditorOpen}
               onClick={requestClose}
               type="button"
             >
@@ -333,6 +328,7 @@ export function ApplicationDetailPanel({
           </div>
         </header>
 
+        {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
             <EditForm
@@ -353,6 +349,8 @@ export function ApplicationDetailPanel({
             />
           ) : (
             <ReadOnlyDetails
+              onInterviewEditingChange={setInterviewEditorOpen}
+              onAssessmentEditingChange={setAssessmentEditorOpen}
               activities={activities}
               application={application}
               contacts={contacts}
@@ -405,11 +403,13 @@ export function ApplicationDetailPanel({
           />
         ) : null}
       </div>
-    </aside>
+    </NativeModal>
   );
 }
 
 function ReadOnlyDetails({
+  onInterviewEditingChange,
+  onAssessmentEditingChange,
   assessments,
   assessmentActions,
   activities,
@@ -431,6 +431,8 @@ function ReadOnlyDetails({
   workingResumeId,
   workingCoverLetterId,
 }: {
+  onInterviewEditingChange: (editing: boolean) => void;
+  onAssessmentEditingChange: (editing: boolean) => void;
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
@@ -616,11 +618,13 @@ function ReadOnlyDetails({
       <TextBlock label="Notes" value={application.notes} />
 
       <AssessmentsSection
+        onEditingChange={onAssessmentEditingChange}
         application={application}
         assessments={assessments}
         assessmentActions={assessmentActions}
       />
       <InterviewsSection
+        onEditingChange={onInterviewEditingChange}
         onConvert={assessmentActions.convertInterviewToAssessment}
         application={application}
         interviews={interviews}
