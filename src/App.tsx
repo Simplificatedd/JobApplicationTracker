@@ -11,12 +11,14 @@ import {
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { deriveReminderNotifications } from "./lib/reminders";
 import { useTrackerStore } from "./store/useTrackerStore";
+import { useReminderClock } from "./hooks/useReminderClock";
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
+  const now = useReminderClock();
   const notifications = useMemo(
     () =>
       deriveReminderNotifications({
@@ -25,6 +27,7 @@ export function App() {
         assessments: tracker.assessments,
         notificationState: tracker.notificationState,
         settings: tracker.settings,
+        now,
       }),
     [
       tracker.applications,
@@ -32,6 +35,7 @@ export function App() {
       tracker.assessments,
       tracker.notificationState,
       tracker.settings,
+      now,
     ],
   );
 
@@ -93,6 +97,7 @@ export function App() {
           tracker,
           openApplicationId,
           () => setOpenApplicationId(null),
+          now,
         )
       )}
       {isAddOpen ? (
@@ -165,6 +170,7 @@ function renderView(
   tracker: ReturnType<typeof useTrackerStore>,
   openApplicationId: string | null,
   onOpenApplicationHandled: () => void,
+  now: Date,
 ) {
   if (view === "applications" || view === "archive") {
     return (
@@ -189,6 +195,7 @@ function renderView(
         getCoverLetterFile={tracker.getCoverLetterFile}
         openApplicationId={openApplicationId}
         onOpenApplicationHandled={onOpenApplicationHandled}
+        now={now}
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         settings={tracker.settings}

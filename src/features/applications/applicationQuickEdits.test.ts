@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Application } from "../../types/application";
 import {
+  canQuickEditInterview,
   createInterviewQuickEdit,
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
@@ -36,20 +37,26 @@ describe("application quick-edit updates", () => {
   });
 
   it("does not change status when clearing an interview time", () => {
-    expect(createInterviewQuickEdit(application, "")).toEqual({
+    expect(createInterviewQuickEdit({ ...application, interviewDateTime: "2026-10-01T14:30" }, "")).toEqual({
       interviewDateTime: undefined,
     });
   });
 
   it.each(["Offered", "Accepted", "Rejected", "Withdrawn"] as const)(
-    "does not overwrite the %s status when scheduling interview history",
+    "does not offer a silently reverting quick edit for %s",
     (status) => {
       expect(
         createInterviewQuickEdit(
           { ...application, status },
           "2026-10-01T14:30",
         ),
-      ).toEqual({ interviewDateTime: "2026-10-01T14:30" });
+      ).toEqual({});
+      expect(canQuickEditInterview({ ...application, status })).toBe(false);
     },
   );
+});
+
+
+it("does not write an unchanged schedule", () => {
+  expect(createInterviewQuickEdit({ ...application, status: "Interviewing", interviewDateTime: "2026-10-01T14:30" }, "2026-10-01T14:30")).toEqual({});
 });

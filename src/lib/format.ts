@@ -1,3 +1,6 @@
+import { isValidDateTime } from "./dateTime";
+import { normalizeFollowUpDateInput } from "./followUps";
+
 const dateFormatter = new Intl.DateTimeFormat("en-SG", {
   day: "2-digit",
   month: "short",
@@ -17,7 +20,8 @@ export function formatDate(value?: string) {
     return "";
   }
 
-  return dateFormatter.format(new Date(value));
+  return normalizeFollowUpDateInput(value.split("T")[0]) && (!value.includes("T") || isValidDateTime(value))
+    ? dateFormatter.format(new Date(value)) : "Invalid date";
 }
 
 export function formatDateRange(start?: string, end?: string) {
@@ -30,7 +34,7 @@ export function formatDeadline(value?: string) {
   }
 
   return value.includes("T")
-    ? dateTimeFormatter.format(new Date(value))
+    ? formatSafeDateTime(value)
     : formatDate(value);
 }
 
@@ -39,9 +43,13 @@ export function formatDateTime(value?: string) {
     return "Not scheduled";
   }
 
-  return dateTimeFormatter.format(new Date(value));
+  return formatSafeDateTime(value);
 }
 
 export function formatUpdatedAt(value: string) {
-  return dateTimeFormatter.format(new Date(value));
+  return formatSafeDateTime(value);
+}
+
+function formatSafeDateTime(value: string) {
+  return isValidDateTime(value) ? dateTimeFormatter.format(new Date(value)) : "Invalid date";
 }
