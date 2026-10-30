@@ -1,5 +1,5 @@
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getInterviewTypeLabel,
   INTERVIEW_MODE_OPTIONS,
@@ -28,6 +28,7 @@ import { validateInterviewRound } from "./applicationForm";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface InterviewsSectionProps {
+  onEditingChange?: (editing: boolean) => void;
   onConvert: (id: string) => Promise<MutationResult<Assessment>>;
   application: Application;
   interviews: Interview[];
@@ -57,6 +58,7 @@ interface InterviewDraft {
 type InterviewDetailsInput = Omit<InterviewInput, "applicationId">;
 
 export function InterviewsSection({
+  onEditingChange,
   onConvert,
   application,
   interviews,
@@ -70,6 +72,12 @@ export function InterviewsSection({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const sortedInterviews = sortInterviewHistory(interviews);
+
+  const editorOpen = Boolean(draft) || isSaving;
+  useEffect(() => {
+    onEditingChange?.(editorOpen);
+    return () => onEditingChange?.(false);
+  }, [editorOpen, onEditingChange]);
 
   function startAdding() {
     setEditingId("new");
