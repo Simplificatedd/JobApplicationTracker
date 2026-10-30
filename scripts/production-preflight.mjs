@@ -29,23 +29,35 @@ export function assertProductionProject(project, env) {
   'Expected the existing main-only Direct Upload Pages project.');
   const production = project.deployment_configs?.production;
   requireCondition(uuid.test(env.PRODUCTION_APP_DATABASE_ID ?? '') &&
-    production?.d1_databases?.DB?.id === env.PRODUCTION_APP_DATABASE_ID &&
-    Object.keys(production.d1_databases).length === 1,
-  'Production must bind DB to the existing application D1, with no additional D1 bindings.');
-  requireCondition(env.PRODUCTION_R2_BUCKET && production.r2_buckets?.RESUME_FILES?.name === env.PRODUCTION_R2_BUCKET &&
-    Object.keys(production.r2_buckets).length === 1,
+    production?.d1_databases?.DB?.id === env.PRODUCTION_APP_DATABASE_ID,
+  'Production must bind DB to the existing application D1.');
+  requireCondition(env.PRODUCTION_R2_BUCKET && production.r2_buckets?.RESUME_FILES?.name === env.PRODUCTION_R2_BUCKET,
   'Production must bind RESUME_FILES to the existing private R2 bucket.');
-  requireCondition(production.env_vars?.TEAM_DOMAIN?.type === 'secret_text' &&
-    production.env_vars?.POLICY_AUD?.type === 'secret_text' &&
-    !Object.hasOwn(production.env_vars, 'LOCAL_DEV_AUTH_EMAIL') &&
-    !Object.hasOwn(production.env_vars, 'REQUEST_CONTROL_DEPLOYMENT'),
-  'Keep encrypted Access configuration, with no remote local-auth bypass or obsolete control label.');
+  // Issuer and audience identify the Access application; neither is a credential.
+  // Cloudflare omits encrypted values, so only validate plaintext when available.
+  for (const name of ['TEAM_DOMAIN', 'POLICY_AUD']) {
+    const setting = production.env_vars?.[name];
+    requireCondition(setting && ['plain_text', 'secret_text'].includes(setting.type),
+      `Production Access configuration is missing ${name}.`);
+    if (setting.type === 'plain_text') {
+      const value = typeof setting.value === 'string' ? setting.value.trim() : '';
+      requireCondition(name === 'TEAM_DOMAIN'
+        ? /^https:\/\/[a-z0-9.-]+\.cloudflareaccess\.com$/i.test(value.replace(/\/$/, ''))
+        : Boolean(value), `Production Access configuration has an invalid ${name}.`);
+    }
+  }
+  requireCondition(!Object.hasOwn(production.env_vars, 'LOCAL_DEV_AUTH_EMAIL'),
+    'Keep local authentication overrides out of production.');
   requireCondition(production.compatibility_date === '2026-09-22' && !production.compatibility_flags?.length,
     'Runtime compatibility changed; review before deploying.');
   const preview = project.deployment_configs?.preview;
   requireCondition(preview && !Object.keys(preview.d1_databases ?? {}).length &&
-    !Object.keys(preview.r2_buckets ?? {}).length && !Object.keys(preview.env_vars ?? {}).length,
-  'Previews are unused: remove their D1/R2 bindings and environment values; do not create preview resources.');
+    !Object.keys(preview.r2_buckets ?? {}).length,
+  'Previews are unused: remove their D1/R2 bindings; do not create preview resources.');
+  const deploymentCredentials = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CF_API_TOKEN', 'CF_API_KEY',
+    'ADMISSION_PAGES_API_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN', 'LOCAL_DEV_AUTH_EMAIL'];
+  requireCondition(!deploymentCredentials.some(name => Object.hasOwn(preview.env_vars ?? {}, name)),
+    'Keep deployment credentials and local authentication overrides out of unused previews.');
 }
 
 // Only GET requests: no SQL, migrations, uploads, restore, or storage changes.

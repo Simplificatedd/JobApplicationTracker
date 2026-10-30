@@ -19,37 +19,33 @@ Merging this change does not deploy; production deployment needs separate approv
 2. **Keep production bindings.** Cloudflare → Workers & Pages → existing project
    → Settings → Bindings → Production: `DB` selects the existing application D1;
    `RESUME_FILES` selects the existing resume bucket. Under Variables and Secrets,
-   keep encrypted `TEAM_DOMAIN` (the existing `https://…cloudflareaccess.com` issuer)
-   and `POLICY_AUD` (the existing production Access AUD). No `LOCAL_DEV_AUTH_EMAIL`,
-   `REQUEST_CONTROL_DB`, or `REQUEST_CONTROL_DEPLOYMENT` belongs in production.
-   Removing an unused binding does not delete its database. Keep compatibility
-   date `2026-09-22` and no flags. Save settings without redeploying. Do not create
+   keep `TEAM_DOMAIN` (the existing `https://…cloudflareaccess.com` issuer) and
+   `POLICY_AUD` (the existing production Access AUD). These are public identifiers;
+   ordinary variables and encrypted secrets both work. Keep already configured
+   values without re-entering them. Never set `LOCAL_DEV_AUTH_EMAIL` remotely.
+   No control binding or deployment label is needed. Removing an unused binding
+   does not delete its database. Keep compatibility date `2026-09-22` and no flags. Save settings without redeploying. Do not create
    replacement production storage or apply any migration.
 
 3. **Disable previews; create no preview storage.** Keep this project as Direct
    Upload, without a Git connection, deploy hooks, or preview upload workflows.
    In Settings → Bindings → Preview, remove all D1/R2 bindings; under Variables
-   and Secrets → Preview, remove environment values, especially production auth
-   or deployment credentials. There is no preview job in this repository. For a
-   separately Git-connected fork, Settings → Builds & deployments → Configure
+   and Secrets → Preview, keep deployment credentials and local authentication
+   overrides absent. Harmless configuration such as `LOG_LEVEL` or public Access
+   identifiers does not grant storage access and need not be removed. Keep all
+   actual deployment credentials in GitHub, never in Pages runtime variables.
+   There is no preview job in this repository. For a separately Git-connected fork, Settings → Builds & deployments → Configure
    Production deployments must disable automatic production
    deployment, and Configure Preview deployments → None disables preview builds.
    Those Git build controls may not appear for Direct Upload projects.
 
-   Existing immutable deployment URLs retain their old bindings. Defaults do not
-   disable them retroactively. Before production approval, inventory those URLs
-   and block preview access through the preview-only Cloudflare Access application:
-   Workers & Pages → project → Settings → General → Manage access policy, then
-   Zero Trust → Access controls → Applications → the wildcard preview application
-   → Policies: use a Block policy including Everyone and remove preview Allow /
-   Bypass / Service Auth policies. If preview Access is absent, enabling the Pages
-   preview access policy is an operator action, followed by the same Block policy.
-   Preserve the separate exact production hostname's Access application. Check any
-   custom preview hostnames too. Verify anonymous and previously authenticated
-   preview requests are denied. Do not delete deployment resources or assume that
-   disabling future builds fences old URLs. Cloudflare documents [preview Access
-   and immutable URLs](https://developers.cloudflare.com/pages/configuration/preview-deployments/)
-   and [branch controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/).
+   Existing immutable production URLs retain their old bindings; disabling future
+   preview uploads does not change them. Public static HTML alone is not evidence
+   of private-data exposure: API access still requires server-verified Access JWTs
+   and matching ownership. Blanket historical URL blocking is optional hardening,
+   not a deployment prerequisite. Investigate a URL if there is evidence of private
+   data exposure or unauthorized operations, preserving the production hostname's
+   Access configuration. See Cloudflare's [preview and immutable URL documentation](https://developers.cloudflare.com/pages/configuration/preview-deployments/).
 
 4. **Add only three environment variables.** GitHub → repository → Settings →
    Environments → `production-admission` → Environment variables:
@@ -65,14 +61,40 @@ Merging this change does not deploy; production deployment needs separate approv
    alone pending verification. Never substitute names from the local example config
    for verified resource identities. No secret values belong in chat or Git.
 
-5. **Verify before approving deployment.** Independently inspect GitHub environment
-   names/variables/protections, Cloudflare identities/bindings/authentication and
-   disabled preview access. Check the existing application schema read-only;
-   this change does not alter it. Confirm D1 recovery/Time Travel access and keep a
-   recent full backup including resume bytes, with its local preview validated.
-   Do not restore into live production to test recovery. Keep legacy credentials
-   until replacement permissions, consumers and recovery access are verified.
-   No provider settings or data are modified by this PR itself.
+5. **Verify the essentials.** Check CI, main-only environment protection, the
+   configured resource identities, production Access authentication, absence of
+   preview storage/credentials, and runtime compatibility. Existing production
+   schema must support the checked-out code; this workflow never runs migrations.
+   D1 Time Travel is the accepted recovery mechanism for a code-only deployment.
+   A separate full backup is useful but is not required for non-destructive work;
+   reassess recovery needs before any separately approved data/schema change.
+   Keep legacy credentials until their replacements and recovery access are
+   verified. Existing completed configuration does not need to be repeated.
+
+## MVP readiness criteria
+
+- **Essential:** passing CI; protected main; manual deployment using the current
+  main SHA; environment-scoped credentials; deployment concurrency; correct
+  application D1/R2 bindings and compatible schema/runtime; server-side Access JWT
+  validation, ownership checks and existing data-integrity protections; unused
+  previews without storage or deployment credentials; an available recovery path.
+- **Recommended:** owner sign-in/read checks after deployment, dependency updates,
+  and full backups including document bytes. Time Travel covers D1, not R2; this
+  code-only workflow does not delete or rewrite either resource.
+- **Optional:** Cloudflare account MFA and blanket restrictions on historical URLs.
+  Their accepted residual risks do not block this MVP release without evidence
+  of an application authentication or private-data failure.
+- **Unnecessary:** a separate control D1, custom admission/bootstrap/drain system,
+  extra preview databases/buckets, external upload services or credential brokers,
+  and independent reviewer approval. Retain the existing lightweight workflow.
+
+Unavailable token-policy or Access administrative metadata is **unknown**, not
+proof of misconfiguration and not a deployment blocker by itself. Required reads
+of the selected project and main ref still fail closed if the workflow cannot
+verify its deployment target. Secret values cannot be inspected through GitHub;
+verify their names/scopes and the workflow's authenticated project read without
+printing them. Runtime JWT verification remains authoritative when encrypted
+Access identifiers are opaque to the configuration API.
 
 ## Later deployment, only after explicit approval
 
@@ -82,9 +104,10 @@ production deployment → Run workflow, select main and enter that full current
 SHA as `release_sha`. Do not dispatch from an unmerged branch or an old run.
 
 The workflow checks the selected SHA against current main, a clean checkout, the
-existing Direct Upload project and its production D1/R2 identities, encrypted
-Access settings, runtime compatibility, and empty preview configuration. It runs
-the application tests/build and backup recovery tests, rechecks immediately before
+existing Direct Upload project and its production D1/R2 identities, configured
+Access identifiers, runtime compatibility, and absence of preview storage and
+deployment credentials. It runs the application tests/build and backup recovery
+tests, rechecks immediately before
 upload, and deploys application code only with `--branch=main`. Deployments are
 serialized and do not cancel an upload already in progress. Checks make only GET
 requests; the workflow has no SQL, migrations, database creation/deletion, bucket

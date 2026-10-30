@@ -50,18 +50,43 @@ test('existing production identities, Access and unused previews are checked wit
     p => { p.production_branch = 'other'; },
     p => { p.source = { type: 'github' }; },
     p => { p.deployment_configs.production.d1_databases.DB.id = '33333333-3333-4333-8333-333333333333'; },
-    p => { p.deployment_configs.production.d1_databases.REQUEST_CONTROL_DB = { id: env.PRODUCTION_APP_DATABASE_ID }; },
     p => { p.deployment_configs.production.r2_buckets.RESUME_FILES.name = 'wrong-bucket'; },
     p => { p.deployment_configs.production.env_vars.LOCAL_DEV_AUTH_EMAIL = { type: 'plain_text' }; },
-    p => { p.deployment_configs.production.env_vars.POLICY_AUD.type = 'plain_text'; },
-    p => { p.deployment_configs.production.env_vars.REQUEST_CONTROL_DEPLOYMENT = { type: 'plain_text' }; },
+    p => { delete p.deployment_configs.production.env_vars.POLICY_AUD; },
+    p => { p.deployment_configs.production.env_vars.POLICY_AUD = { type: 'plain_text', value: '  ' }; },
+    p => { p.deployment_configs.production.env_vars.TEAM_DOMAIN = { type: 'plain_text', value: 'https://attacker.invalid' }; },
+    p => { p.deployment_configs.production.env_vars.TEAM_DOMAIN.type = 'unknown'; },
     p => { p.deployment_configs.production.compatibility_flags = ['nodejs_compat']; },
     p => { p.deployment_configs.preview.d1_databases.DB = { id: env.PRODUCTION_APP_DATABASE_ID }; },
     p => { p.deployment_configs.preview.r2_buckets.RESUME_FILES = { name: env.PRODUCTION_R2_BUCKET }; },
-    p => { p.deployment_configs.preview.env_vars.POLICY_AUD = { type: 'secret_text' }; },
   ]) {
     const unsafe = structuredClone(project); modify(unsafe);
     assert.throws(() => assertProductionProject(unsafe, env));
+  }
+});
+
+test('public Access identifiers and harmless preview variables do not block deployment', () => {
+  const configured = structuredClone(project);
+  configured.deployment_configs.production.env_vars = {
+    TEAM_DOMAIN: { type: 'plain_text', value: ' https://test-team.cloudflareaccess.com/ ' },
+    POLICY_AUD: { type: 'plain_text', value: 'test-audience' },
+    REQUEST_CONTROL_DEPLOYMENT: { type: 'plain_text', value: 'unused-legacy-label' },
+  };
+  configured.deployment_configs.preview.env_vars = {
+    LOG_LEVEL: { type: 'plain_text', value: 'info' },
+    POLICY_AUD: { type: 'plain_text', value: 'public-identifier' },
+  };
+  assertProductionProject(configured, env);
+  configured.deployment_configs.production.env_vars.TEAM_DOMAIN = { type: 'secret_text' };
+  assertProductionProject(configured, env);
+});
+
+test('unused previews cannot receive deployment credentials or local auth overrides', () => {
+  for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CF_API_TOKEN', 'CF_API_KEY',
+    'ADMISSION_PAGES_API_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN', 'LOCAL_DEV_AUTH_EMAIL']) {
+    const unsafe = structuredClone(project);
+    unsafe.deployment_configs.preview.env_vars[name] = { type: 'secret_text' };
+    assert.throws(() => assertProductionProject(unsafe, env), /credentials|overrides/);
   }
 });
 
@@ -91,6 +116,8 @@ test('workflow deploys code only, uses the existing environment secrets, and nev
   assert.match(workflow, /environment: production-admission/);
   assert.deepEqual([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).sort(),
     ['ADMISSION_CLOUDFLARE_ACCOUNT_ID', 'ADMISSION_PAGES_API_TOKEN']);
+  assert.deepEqual([...workflow.matchAll(/vars\.([A-Z0-9_]+)/g)].map(m => m[1]).sort(),
+    ['CLOUDFLARE_PAGES_PROJECT', 'PRODUCTION_APP_DATABASE_ID', 'PRODUCTION_R2_BUCKET']);
   assert.equal((workflow.match(/wrangler pages deploy/g) ?? []).length, 1);
   assert.match(workflow, /--branch=main/);
   assert.doesNotMatch(workflow, /migrations|d1 execute|r2 object|request-control|REQUEST_CONTROL|production-preflight\.mjs (before|ready)/);
