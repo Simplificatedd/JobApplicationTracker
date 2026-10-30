@@ -20,6 +20,7 @@ import {
   type SortColumn,
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
+import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { deriveApplicationNotifications } from "../../lib/reminders";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
@@ -210,15 +211,11 @@ export function ApplicationsPage({
         assessments.filter((item) => item.applicationId === application.id),
       ).length > 0,
   ).length;
-  const baseApplicationIds = new Set(
-    baseApplications.map((application) => application.id),
+  const summary = countApplicationSummary(
+    countScope === "total" ? applications : baseApplications,
+    interviews,
+    assessments,
   );
-  const interviewCount = interviews.filter((interview) =>
-    baseApplicationIds.has(interview.applicationId),
-  ).length;
-  const assessmentCount = assessments.filter((item) =>
-    baseApplicationIds.has(item.applicationId),
-  ).length;
   const selectedApplication = useMemo(
     () =>
       applications.find(
@@ -293,11 +290,7 @@ export function ApplicationsPage({
             />
           }
           label={countScope === "total" ? "Total applications" : viewLabel}
-          value={String(
-            countScope === "total"
-              ? applications.length
-              : baseApplications.length,
-          )}
+          value={String(summary.applications)}
         />
         <SummaryMetric
           label="Needs attention"
@@ -306,12 +299,12 @@ export function ApplicationsPage({
         />
         <SummaryMetric
           label="Interviews"
-          value={String(interviewCount)}
+          value={String(summary.interviews)}
           tone="info"
         />
         <SummaryMetric
           label="Assessments"
-          value={String(assessmentCount)}
+          value={String(summary.assessments)}
           tone="info"
         />
       </section>
