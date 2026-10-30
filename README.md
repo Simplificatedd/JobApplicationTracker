@@ -14,7 +14,7 @@ your own Cloudflare account where only the people you allow can sign in.
 ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white)
 ![Private by default](https://img.shields.io/badge/access-private-2ea44f)
 
-[Features](#-features) · [Quickstart](#-quickstart-host-your-own-private-tracker) · [Local development](#-local-development) · [Docs](#-documentation) · [FAQ](#-faq)
+[Features](#-features) · [Deployment](#-production-deployment) · [Local development](#-local-development) · [Docs](#-documentation) · [FAQ](#-faq)
 
 <img src="docs/images/applications.png" alt="Applications table with statuses, follow-ups, and quick actions" width="900">
 
@@ -75,186 +75,35 @@ your own Cloudflare account where only the people you allow can sign in.
 
 <sub>Screenshots use fictional demo data.</sub>
 
-## 🚀 Quickstart: host your own private tracker
+## 🚀 Production deployment
 
-PRs #167 and #168 are merged. #170 removed automatic production uploads;
-ordinary CI validates only. The repository now provides a separate, manually
-dispatched, main-guarded workflow for future approved Direct Upload releases in
-[release safeguards and bootstrap prerequisites](docs/request-admission-release-safeguards.md).
-As of the 2026-10-28 read-only audit, production still serves pre-admission source
-`1d1382b`, and the separate control database/binding are absent. Source safeguards
-are not operational approval: deployment, bootstrap, reopening, safe drain and
-#166 remain **NO-GO**.
-
-The Git-connected steps below describe independent fork onboarding, not the
-existing production rollout. Current main additionally requires the separate
-control infrastructure and approved admission/bootstrap procedure; steps 1–7
-alone do not make an admission-enabled deployment usable. Native Git builds do
-not supply the reviewed immutable release label and approval path. Use the
-manual release build for admission-enabled production; another deployment path
-needs its own reviewed safeguards, not a reused dashboard label.
-
-Deploy your own copy to **Cloudflare Pages** behind **Cloudflare Access**, so the
-site asks for a sign-in and only the email addresses you approve can open it.
-Personal use should fit within Cloudflare's free allowances.
+The tracker needs **one Cloudflare Pages project, one application D1 database,
+and one private R2 bucket**, protected by the existing Cloudflare Access login.
+Reuse the existing production resources; code deployment does not migrate or
+replace their data. No control database, bootstrap, drain ledger, or hosted
+preview storage is required.
 
 ```mermaid
 flowchart LR
-    You([You]) -->|sign in| Access[Cloudflare Access]
-    Access -->|approved emails only| Pages[Cloudflare Pages<br/>app + API]
-    Pages --> D1[(D1<br/>tracker data)]
-    Pages --> R2[(R2<br/>resume files)]
+    You([You]) --> Access[Cloudflare Access]
+    Access --> Pages[Existing Pages app + API]
+    Pages --> D1[(Existing application D1)]
+    Pages --> R2[(Existing private R2)]
 ```
 
-**You need:** a free [Cloudflare account](https://dash.cloudflare.com/sign-up), a
-GitHub account, and [Node.js 22.23.4](https://nodejs.org/en/blog/release/v22.23.4) with npm 10.9.9 (see `.nvmrc`).
-
-> [!NOTE]
-> Cloudflare may ask you to add a payment method before it enables R2 or Zero
-> Trust, even on the free plans. Usage within the free allowances is not
-> charged. See [usage limits](docs/privacy-and-security.md#cost-and-usage-guardrails).
-
-### 1. Fork and verify the project
-
-Select **Fork** at the top of this page, then clone your fork:
-
-```bash
-git clone https://github.com/<your-username>/JobApplicationTracker.git
-cd JobApplicationTracker
-nvm use            # or make sure `node --version` reports 22
-npm ci
-npm run check
-```
-
-Continue once `npm run check` passes.
-
-### 2. Create the database and file storage
-
-In the Cloudflare dashboard, open **Storage & Databases**:
-
-1. Create a **D1** database named `job-application-tracker` and copy its
-   database ID.
-2. Create an **R2** bucket named `job-application-tracker-resumes`. Keep the
-   **Standard** storage class and leave public access **off**.
-
-Then create the database tables from your terminal. First copy the config:
-
-```bash
-cp wrangler.example.jsonc wrangler.jsonc
-```
-
-Open `wrangler.jsonc` and replace `replace-with-your-d1-database-id` with your
-D1 database ID. Then sign in and apply the migrations:
-
-```bash
-npx wrangler login
-npx wrangler d1 migrations apply job-application-tracker --remote
-```
-
-`wrangler login` opens a browser to approve access. Check that the migration
-targets the Cloudflare account you expect, then answer `Yes` when asked.
-
-### 3. Create the Pages site
-
-Open **Workers & Pages → Create application → Pages → Connect to Git**, pick your
-fork, and use these build settings:
-
-| Setting | Value |
-| --- | --- |
-| Production branch | `main` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-
-Deploy, then note your address, for example `https://<your-project>.pages.dev`.
-The site can load static assets while its API remains unavailable. Current main
-also requires the separate admission setup and approvals, beyond steps 4 to 7.
-
-> [!TIP]
-> For an independently managed Git-connected fork, later pushes can redeploy
-> automatically. Do not enable that path for the existing Direct Upload
-> production project or use it to bypass the admission release procedure.
-
-### 4. Put the site behind Cloudflare Access
-
-1. If you have never used **Zero Trust**, open it from the dashboard once to
-   set it up: choose a team name (it becomes
-   `<your-team>.cloudflareaccess.com`) and select the **Free** plan.
-2. In your Pages project, open **Settings → General** and select
-   **Enable access policy**, then **Manage**.
-3. Under **Destinations / Public hostnames**, clear the subdomain (delete the
-   `*`) so the destination is exactly `<your-project>.pages.dev`. Rename the
-   application if Cloudflare reports a naming conflict.
-4. Add a policy with action **Allow** and **Include → Emails** set to your email
-   address (and anyone else you want to let in).
-5. Under **Authentication**, choose **One-time PIN**. Access emails a short code
-   to approved addresses, so no other login setup is needed. If One-time PIN is
-   not listed, add it under **Zero Trust → Integrations → Identity providers**
-   first.
-6. Save, then use **Policy tester** with your email to confirm you are allowed.
-
-> [!WARNING]
-> Never use **Everyone**, an email wildcard, **Bypass**, or **Service Auth** in
-> this policy. Any of them would make your tracker reachable by people you did
-> not approve.
-
-### 5. Copy your two Access values
-
-| Value | Where to find it |
-| --- | --- |
-| Team domain | **Zero Trust → Settings → Team name and domain**, written as `https://<your-team>.cloudflareaccess.com` |
-| Application Audience (AUD) tag | **Zero Trust → Access controls → Applications →** your `<your-project>.pages.dev` application **→ Configure → Additional settings** (called **Details** in some layouts) |
-
-These let the server verify that every request really came through your Access
-sign-in.
-
-### 6. Connect storage and secrets
-
-In **Workers & Pages → your project → Settings**, add these to the
-**Production** environment. Bindings go under **Bindings**; the two values go
-under **Variables and Secrets**.
-
-| Type | Name | Value |
-| --- | --- | --- |
-| D1 database binding | `DB` | `job-application-tracker` |
-| R2 bucket binding | `RESUME_FILES` | `job-application-tracker-resumes` |
-| Variable or secret | `TEAM_DOMAIN` | `https://<your-team>.cloudflareaccess.com` |
-| Variable or secret | `POLICY_AUD` | the AUD tag from step 5 |
-
-### 7. Redeploy and check
-
-For Git-connected fork onboarding, bindings take effect on a new deployment.
-Before expecting current main's API to work, complete the separate control and
-admission setup in the [operator runbook](docs/request-admission-operations.md).
-For the existing Direct Upload project, use only a separately approved manual
-release; dashboard Retry/rollback is not its admission rollout procedure.
-After the required setup and opening approvals, verify your independent site:
-
-- [ ] The site asks you to sign in before showing anything.
-- [ ] After signing in, **Settings** shows **Cloud sync is active** with your email.
-- [ ] A test application is still there after a refresh.
-- [ ] Delete the test application before you start using or sharing the site.
-
-Only after those checks and admission approvals is the independent tracker
-ready at `https://<your-project>.pages.dev`. Access controls who can enter;
-it does not establish that old requests have drained.
-
-<details>
-<summary><strong>Going further</strong></summary>
-
-- Sign in with Google or your Cloudflare account instead of a PIN, protect
-  preview deployments, or prepare a guarded manual GitHub Actions release to a Direct
-  Upload project: see the [full deployment guide](docs/deployment.md).
-- Something not working? Check [troubleshooting](docs/troubleshooting.md).
-
-</details>
+Follow the [short production configuration checklist](docs/deployment.md).
+GitHub CI checks pull requests and main without deploying. A separate manual
+workflow deploys only a confirmed current main SHA, checks the existing resource
+bindings, and serializes deployments. Preview publishing is disabled; do not
+bind preview code to production storage. Merging a PR does not deploy it.
 
 ## 💻 Local development
 
 Use Node.js 22.23.4 and its bundled npm 10.9.9 (see `.nvmrc`).
 Local sign-in uses `LOCAL_DEV_AUTH_EMAIL`, which
 only works on `localhost`. The placeholder database ID in the example config is
-fine locally; production needs distinct verified application/control resources
-and separate rollout approval.
+fine locally; production uses the existing verified application database and
+bucket, with dashboard bindings rather than a committed local config.
 
 ```bash
 nvm install
@@ -263,16 +112,11 @@ npm ci
 cp wrangler.example.jsonc wrangler.jsonc
 cp .dev.vars.example .dev.vars
 npx wrangler d1 migrations apply job-application-tracker --local
-npx wrangler d1 migrations apply REQUEST_CONTROL_DB --local
 npm run dev            # app + API at http://localhost:8788
 ```
 
-The local control ledger starts closed/unverified, so the API returns 503 until
-the [local-only operator setup](docs/request-admission-operations.md#initial-bootstrap-unavoidable-external-proof)
-is completed for your test configuration and its `local-prerequisite` label.
-Use `npm run test:admission-local` for an isolated synthetic demonstration; local
-test coverage is never production bootstrap evidence. Do not point local setup
-commands at production resources.
+Local development uses local D1/R2 emulation; do not use remote flags or connect
+local tests to production resources. No admission setup is required.
 
 `npm run dev:ui` starts only the Vite frontend for isolated UI work. Before
 committing or deploying, run the same gate as CI:
@@ -287,7 +131,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 
 | Guide | What it covers |
 | --- | --- |
-| [Deployment guide](docs/deployment.md) | Every Cloudflare step in detail, login options, previews, and GitHub Actions deploys |
+| [Deployment guide](docs/deployment.md) | Existing production resources, short setup checklist, manual deployment and recovery |
 | [Privacy, security, and limits](docs/privacy-and-security.md) | How sign-in and storage work, privacy notes, and usage guardrails |
 | [Data model](docs/data-model.md) | How follow-ups, statuses, deadlines, deletion, and resumes behave |
 | [Backups and recovery](docs/backups.md) | Restore limits, recovery archives, and oversized legacy-file extraction |
@@ -319,12 +163,10 @@ applications.
 <details>
 <summary><strong>How do I get updates?</strong></summary>
 
-For a Git-connected independent fork, **Sync fork** can trigger its native
-Pages deployment; review admission requirements before updating. For this
-repository's existing Direct Upload project, syncing or merging changes source
-only: production requires a separately approved manual release. Apply only
-separately reviewed migrations to their intended databases; admission control
-0001 is separate from application migrations, and #166 is not authorized.
+Review updates in a PR and run CI. For the existing Direct Upload project,
+merging changes source only; use the separately approved manual production
+workflow after checking backups and resource bindings. Application schema changes
+need their own review and authorization; deployment never runs migrations.
 
 </details>
 

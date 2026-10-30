@@ -2,8 +2,6 @@ import type { JWTPayload } from "jose";
 import type { StorageSnapshot } from "../../src/storage/StorageAdapter";
 
 export interface CloudflareEnv {
-  REQUEST_CONTROL_DB: D1Database;
-  REQUEST_CONTROL_DEPLOYMENT: string;
   DB: D1Database;
   LOCAL_DEV_AUTH_EMAIL?: string;
   POLICY_AUD: string;

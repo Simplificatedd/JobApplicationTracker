@@ -3,19 +3,12 @@
   "name": "job-application-tracker",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-09-22",
-  "vars": { "REQUEST_CONTROL_DEPLOYMENT": "local-prerequisite" },
   "d1_databases": [
-    {
-      "binding": "REQUEST_CONTROL_DB",
-      "database_name": "job-application-tracker-control",
-      "database_id": "replace-with-your-separate-control-database-id",
-      "preview_database_id": "REQUEST_CONTROL_DB",
-      "migrations_dir": "control-migrations"
-    },
     {
       "binding": "DB",
       "database_name": "job-application-tracker",
       "database_id": "replace-with-your-d1-database-id",
+      // Local Pages emulator binding name; no hosted preview database is needed.
       "preview_database_id": "DB",
       "migrations_dir": "migrations"
     }
@@ -23,8 +16,7 @@
   "r2_buckets": [
     {
       "binding": "RESUME_FILES",
-      "bucket_name": "job-application-tracker-resumes",
-      "preview_bucket_name": "job-application-tracker-resumes-preview"
+      "bucket_name": "job-application-tracker-resumes"
     }
   ]
 }
