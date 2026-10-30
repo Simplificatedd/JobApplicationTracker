@@ -233,6 +233,14 @@ function removeRecords<T extends { id: string }>(
   return records.filter((record) => !deleted.has(record.id));
 }
 
+// The UI already validated extension/signature and recorded its fallback MIME.
+// Preserve bytes and explicit browser MIME; fill only an absent MIME from metadata.
+function documentBlob(file: Blob, storageKey: string, snapshot: StorageSnapshot) {
+  if (file.type) return file;
+  const document = [...snapshot.resumes, ...snapshot.coverLetters].find(item => item.storageKey === storageKey);
+  return document ? file.slice(0, file.size, document.mimeType) : file;
+}
+
 export interface CloudStorageAdapter extends StorageAdapter {
   // Preserve the state the caller read before async refresh can advance it.
   saveSettings(settings: UserSettings, expected?: UserSettings): Promise<void>;
@@ -242,6 +250,8 @@ export interface CloudStorageAdapter extends StorageAdapter {
   // Revalidate remote state after pending saves; never replay startup migration.
   refresh(): Promise<StorageSnapshot>;
   getAccount(): CloudAccount | null;
+  getDocumentCleanupWarning(): string | null;
+  subscribeDocumentCleanupWarning(listener: (warning: string | null) => void): () => void;
   getCacheWarning(): string | null;
   subscribeCacheWarning(listener: (warning: string | null) => void): () => void;
   repairCache(): Promise<void>;
@@ -280,6 +290,17 @@ export function createCloudStorageAdapter({
   let accountIdentityChanged = false;
   let accountGeneration = 0;
   let mutationQueue = Promise.resolve();
+  let documentCleanupWarning: string | null = null;
+  const cleanupListeners = new Set<(warning: string | null) => void>();
+  function getDocumentCleanupWarning() { assertActive(); return documentCleanupWarning; }
+  function subscribeDocumentCleanupWarning(listener: (warning: string | null) => void) {
+    cleanupListeners.add(listener);
+    return () => { cleanupListeners.delete(listener); };
+  }
+  function reportCleanupFailure() {
+    documentCleanupWarning = "Cloud changes were saved, but some document files could not be deleted and may still use storage. Do not repeat the saved change. No automatic cleanup is scheduled.";
+    for (const listener of cleanupListeners) listener(documentCleanupWarning);
+  }
   let cacheWarning: string | null = null;
   const cacheListeners = new Set<(warning: string | null) => void>();
 
@@ -474,10 +495,11 @@ export function createCloudStorageAdapter({
         localFiles = unownedFiles;
       }
     }
+    localFiles = localFiles.map(record => ({ ...record, file: documentBlob(record.file, record.storageKey, localSnapshot) }));
     serializeCloudSnapshot(localSnapshot);
     await Promise.all(
       localFiles.map(({ file, storageKey }) =>
-        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
+        cloudRequest(api.putResumeFile(storageKey, documentBlob(file, storageKey, localSnapshot), accountId())),
       ),
     );
 
@@ -624,15 +646,17 @@ export function createCloudStorageAdapter({
     mutation = structuredClone(mutation);
     const initialized = await ensureInitialized();
     const base = captured ?? structuredClone(initialized.snapshot);
-    const resumeFiles = [...(mutation.resumeFiles ?? [])];
     const proposed = applyStorageMutation(initialized.snapshot, mutation, base);
+    const resumeFiles = (mutation.resumeFiles ?? []).map(record => ({
+      ...record, file: documentBlob(record.file, record.storageKey, proposed),
+    }));
     // Reject known-impossible document mutations before uploading their bytes.
     // Ordinary state saves are measured once by the API client, including rebases.
     if (resumeFiles.length) serializeCloudSnapshot(normalizeSnapshot(proposed));
 
     await Promise.all(
       resumeFiles.map(({ file, storageKey }) =>
-        cloudRequest(api.putResumeFile(storageKey, file, accountId())),
+        cloudRequest(api.putResumeFile(storageKey, documentBlob(file, storageKey, proposed), accountId())),
       ),
     );
     await mutateSnapshot(
@@ -640,7 +664,7 @@ export function createCloudStorageAdapter({
       resumeFiles,
     );
 
-    await Promise.allSettled(
+    const cleanup = await Promise.allSettled(
       (mutation.deleteResumeFileKeys ?? []).map((storageKey) =>
         cloudRequest(api.deleteResumeFile(storageKey, accountId())),
       ),
@@ -648,6 +672,7 @@ export function createCloudStorageAdapter({
     if (accountIdentityChanged) {
       throw new Error("Signed-in account changed. Reload the tracker.");
     }
+    if (cleanup.some(result => result.status === "rejected")) reportCleanupFailure();
   }
 
   async function snapshot() {
@@ -856,8 +881,9 @@ export function createCloudStorageAdapter({
   async function saveResumeFile(storageKey: string, file: Blob) {
     await queueMutation(async () => {
       const current = await ensureInitialized();
-      await cloudRequest(api.putResumeFile(storageKey, file, accountId()));
-      await tryCache(() => activeCache().saveResumeFile(storageKey, file, current.revision));
+      const typed = documentBlob(file, storageKey, current.snapshot);
+      await cloudRequest(api.putResumeFile(storageKey, typed, accountId()));
+      await tryCache(() => activeCache().saveResumeFile(storageKey, typed, current.revision));
     });
   }
 
@@ -892,9 +918,13 @@ export function createCloudStorageAdapter({
         ...(await listResumeMetadata()),
         ...(await listCoverLetterMetadata()),
       ];
-      await Promise.allSettled(
+      const cleanup = await Promise.allSettled(
         documents.map((document) => cloudRequest(api.deleteResumeFile(document.storageKey, accountId()))),
       );
+      assertActive();
+      if (cleanup.some(result => result.status === "rejected")) {
+        throw new Error("Some document files could not be deleted. The deletion may be partial; inspect existing files before trying again.");
+      }
       await tryCache(() => activeCache().clearResumeFiles());
     });
   }
@@ -1097,6 +1127,8 @@ export function createCloudStorageAdapter({
     exportSnapshot: guarded(exportSnapshot),
     importSnapshot: guarded(importSnapshot),
     getAccount,
+    getDocumentCleanupWarning,
+    subscribeDocumentCleanupWarning,
     getCacheWarning,
     subscribeCacheWarning,
     repairCache: guarded(repairCache),

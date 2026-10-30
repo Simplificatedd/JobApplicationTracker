@@ -29,6 +29,7 @@ import {
 } from "../../lib/constants";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import { formatDate, formatDateTime } from "../../lib/format";
+import { toDateTimeLocal } from "../../lib/dateTime";
 import {
   createFollowUpScheduleUpdate,
   createHandledFollowUpUpdate,
@@ -44,6 +45,7 @@ import type {
   ResumeFile,
 } from "../../types/application";
 import {
+  canQuickEditInterview,
   createInterviewQuickEdit,
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
@@ -277,12 +279,13 @@ export function InterviewCell({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftDateTime, setDraftDateTime] = useState(
-    application.interviewDateTime?.slice(0, 16) ?? "",
+    toDateTimeLocal(application.interviewDateTime),
   );
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const canEdit = canQuickEditInterview(application);
 
   function startEditing() {
-    setDraftDateTime(application.interviewDateTime?.slice(0, 16) ?? "");
+    setDraftDateTime(toDateTimeLocal(application.interviewDateTime));
     setIsEditing(true);
   }
 
@@ -292,6 +295,8 @@ export function InterviewCell({
         aria-expanded={isEditing}
         aria-haspopup="dialog"
         aria-label="Quick edit scheduled date and time"
+        disabled={!canEdit}
+        title={canEdit ? undefined : "Use the interview editor in application details."}
         className="touch-target group flex w-full min-w-0 max-w-full gap-2 rounded-md text-left"
         onClick={isEditing ? () => setIsEditing(false) : startEditing}
         ref={triggerRef}
@@ -306,6 +311,7 @@ export function InterviewCell({
           <p className="truncate text-sm font-medium text-foreground">
             {formatDateTime(application.interviewDateTime)}
           </p>
+          {!canEdit ? <p className="text-xs text-muted">Edit in details</p> : null}
           {application.interviewType ? (
             <p className="mt-1 truncate text-xs text-muted">
               {getInterviewTypeLabel(application.interviewType)}
@@ -335,7 +341,10 @@ export function InterviewCell({
           label="scheduled date and time"
           onCancel={() => setIsEditing(false)}
           onConfirm={() => {
-            onUpdate(createInterviewQuickEdit(application, draftDateTime));
+            if (canEdit) {
+              const update = createInterviewQuickEdit(application, draftDateTime);
+              if (Object.keys(update).length) onUpdate(update);
+            }
             setIsEditing(false);
           }}
         />

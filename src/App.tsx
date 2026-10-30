@@ -11,12 +11,14 @@ import {
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { deriveReminderNotifications } from "./lib/reminders";
 import { useTrackerStore } from "./store/useTrackerStore";
+import { useReminderClock } from "./hooks/useReminderClock";
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
+  const now = useReminderClock();
   const notifications = useMemo(
     () =>
       deriveReminderNotifications({
@@ -25,6 +27,7 @@ export function App() {
         assessments: tracker.assessments,
         notificationState: tracker.notificationState,
         settings: tracker.settings,
+        now,
       }),
     [
       tracker.applications,
@@ -32,6 +35,7 @@ export function App() {
       tracker.assessments,
       tracker.notificationState,
       tracker.settings,
+      now,
     ],
   );
 
@@ -84,6 +88,7 @@ export function App() {
           retryLabel="Repair browser cache"
         />
       ) : null}
+      {tracker.documentCleanupWarning ? <StorageErrorBanner message={tracker.documentCleanupWarning} /> : null}
       {tracker.isStorageLoading ? (
         <StorageLoading />
       ) : (
@@ -92,6 +97,7 @@ export function App() {
           tracker,
           openApplicationId,
           () => setOpenApplicationId(null),
+          now,
         )
       )}
       {isAddOpen ? (
@@ -120,7 +126,7 @@ function StorageErrorBanner({
   retryLabel = "Retry",
 }: {
   message: string;
-  onRetry: () => void;
+  onRetry?: () => void;
   retryLabel?: string;
 }) {
   return (
@@ -132,14 +138,14 @@ function StorageErrorBanner({
         <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={18} />
         <p className="min-w-0">{message}</p>
       </div>
-      <button
+      {onRetry ? <button
         className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 font-semibold hover:bg-amber-100"
         onClick={onRetry}
         type="button"
       >
         <RefreshCw aria-hidden="true" size={15} />
         {retryLabel}
-      </button>
+      </button> : null}
     </div>
   );
 }
@@ -164,6 +170,7 @@ function renderView(
   tracker: ReturnType<typeof useTrackerStore>,
   openApplicationId: string | null,
   onOpenApplicationHandled: () => void,
+  now: Date,
 ) {
   if (view === "applications" || view === "archive") {
     return (
@@ -188,6 +195,7 @@ function renderView(
         getCoverLetterFile={tracker.getCoverLetterFile}
         openApplicationId={openApplicationId}
         onOpenApplicationHandled={onOpenApplicationHandled}
+        now={now}
         restoreApplication={tracker.restoreApplication}
         resumes={tracker.resumes}
         settings={tracker.settings}
