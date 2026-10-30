@@ -62,6 +62,7 @@ interface ApplicationsPageProps {
   getResumeFile: (id: string) => Promise<Blob>;
   getCoverLetterFile: (id: string) => Promise<Blob>;
   interviews: Interview[];
+  now?: Date;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
   restoreApplication: (id: string) => void;
@@ -108,6 +109,7 @@ export function ApplicationsPage({
   getResumeFile,
   getCoverLetterFile,
   interviews,
+  now = new Date(),
   openApplicationId,
   onOpenApplicationHandled,
   restoreApplication,
@@ -187,7 +189,7 @@ export function ApplicationsPage({
         isNeedsAttention(
           application,
           settings,
-          new Date(),
+          now,
           interviews.filter(
             (interview) => interview.applicationId === application.id,
           ),
@@ -201,7 +203,7 @@ export function ApplicationsPage({
       deriveApplicationNotifications(
         application,
         settings,
-        new Date(),
+        now,
         interviews.filter(
           (interview) => interview.applicationId === application.id,
         ),

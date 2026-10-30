@@ -9,6 +9,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { formatDate, formatDateTime } from "../lib/format";
+import { dateTimeEditValue, isValidDateTime, toDateTimeLocal } from "../lib/dateTime";
 import {
   createHandledFollowUpUpdate,
   normalizeFollowUpDateInput,
@@ -375,26 +376,7 @@ function NotificationItem({
                   ? "Edit scheduled assessment start"
                   : "Edit assessment deadline"
               }
-              onClick={() => {
-                const value = window.prompt(
-                  notification.type === "assessment_start"
-                    ? "Set scheduled assessment start (YYYY-MM-DDTHH:mm)"
-                    : "Set assessment deadline (YYYY-MM-DDTHH:mm)",
-                  notification.dueAt ?? "",
-                );
-                if (value === null) return;
-                const date = new Date(value);
-                if (Number.isNaN(date.getTime())) {
-                  window.alert("Enter a valid date and time.");
-                  return;
-                }
-                onUpdateAssessment(
-                  notification.assessmentId!,
-                  notification.type === "assessment_start"
-                    ? { scheduledStart: date.toISOString() }
-                    : { deadline: date.toISOString() },
-                );
-              }}
+              onClick={() => changeAssessmentDate(notification, onUpdateAssessment)}
             >
               {notification.type === "assessment_start" ? "Time" : "Deadline"}
             </SmallActionButton>
@@ -456,7 +438,7 @@ function SmallActionButton({
   );
 }
 
-function changeDate(
+export function changeDate(
   notification: ReminderNotification,
   onUpdateApplication: (id: string, input: ApplicationUpdate) => void,
   onUpdateInterview: (id: string, input: InterviewUpdate) => void,
@@ -471,7 +453,7 @@ function changeDate(
       : "Set date/time (YYYY-MM-DDTHH:mm)",
     isFollowUp
       ? (notification.application.followUpDate ?? "")
-      : (notification.dueAt ?? ""),
+      : toDateTimeLocal(notification.dueAt),
   );
 
   if (nextValue === null) {
@@ -499,28 +481,31 @@ function changeDate(
 
   const trimmedValue = nextValue.trim();
 
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmedValue)) {
+  if (!isValidDateTime(trimmedValue)) {
     window.alert("Use YYYY-MM-DDTHH:mm.");
     return;
   }
 
+  const editedValue = dateTimeEditValue(trimmedValue, notification.dueAt);
+  if (editedValue === notification.dueAt) return;
+
   if (mode === "offer_deadline") {
     onUpdateApplication(notification.applicationId, {
-      offerDeadline: trimmedValue,
+      offerDeadline: editedValue,
     });
     return;
   }
 
   if (mode === "interview") {
     if (notification.interviewId) {
-      onUpdateInterview(notification.interviewId, { dateTime: trimmedValue });
+      onUpdateInterview(notification.interviewId, { dateTime: editedValue });
     }
     return;
   }
 
   if (notification.interviewId) {
     onUpdateInterview(notification.interviewId, {
-      deadline: trimmedValue,
+      deadline: editedValue,
     });
   }
 }
@@ -539,4 +524,27 @@ function getNotificationTone(severity: ReminderNotification["severity"]) {
   }
 
   return "border-border bg-surface";
+}
+
+
+export function changeAssessmentDate(
+  notification: ReminderNotification,
+  onUpdateAssessment: (id: string, input: AssessmentUpdate) => void,
+) {
+  if (!notification.assessmentId) return;
+  const value = window.prompt(
+    notification.type === "assessment_start"
+      ? "Set scheduled assessment start (YYYY-MM-DDTHH:mm)"
+      : "Set assessment deadline (YYYY-MM-DDTHH:mm)",
+    toDateTimeLocal(notification.dueAt),
+  );
+  if (value === null) return;
+  if (!isValidDateTime(value.trim())) {
+    window.alert("Enter a valid date and time.");
+    return;
+  }
+  const edited = dateTimeEditValue(value, notification.dueAt);
+  if (edited === notification.dueAt) return;
+  onUpdateAssessment(notification.assessmentId, notification.type === "assessment_start"
+    ? { scheduledStart: edited } : { deadline: edited });
 }
