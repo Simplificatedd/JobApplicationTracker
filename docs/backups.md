@@ -37,8 +37,9 @@ files plus the staged files must fit the 100 MiB user quota.** Restoring a full
 100 MiB library is supported into an account with enough free upload capacity.
 A replacement restore near quota can fail safely even when its final library
 would fit. Do not delete live files to manufacture space before a restore.
-Durable orphan reconciliation, removal of superseded files, and replacement-quota
-accounting are tracked separately in issues #126 and #127.
+Failed ordinary document cleanup is reported separately from a confirmed save.
+Unused files may remain; this MVP does not promise automatic orphan reclamation
+or atomic replacement-quota accounting.
 
 ## Failed or interrupted restores
 
@@ -56,8 +57,7 @@ A lost response, server error or invalid save response may hide a committed
 restore. In that case staged files are retained, because deleting them could
 break the committed snapshot. **Reload and inspect cloud data before retrying.**
 There is no cross-service transaction across D1 and R2. Unreferenced old files and
-staged files whose cleanup failed can continue to consume quota until #126's
-reconciliation support is available. Contact the deployment administrator for
+staged files whose cleanup failed can continue to consume quota after a failed operation. Contact the deployment administrator for
 such quota failures; do not manually delete objects without checking current
 snapshot references and concurrent users.
 
@@ -138,3 +138,15 @@ Recovery utility checks:
 ```sh
 python3 -B -m unittest discover -s scripts -p 'test_*.py'
 ```
+
+## CSV text safety and day settings
+
+CSV export is intended for viewing in spreadsheets. Formula-like text cells are
+quoted and prefixed with a tab using the [OWASP Excel-oriented guidance](https://community.owasp.org/attacks/CSV_Injection).
+That tab is part of the exported cell; other spreadsheet/import workflows may
+handle it differently. Use JSON backup for lossless data transfer. Stored data
+and JSON exports are unchanged by CSV escaping.
+
+Day settings use whole days with a minimum of 1. Decimal settings round down;
+nonfinite or unsafe values use the existing default. Correct an old setting in
+Settings before exporting a validated full backup if export reports invalid data.
