@@ -7,7 +7,7 @@ Common deployment problems and what to check. For the full setup, see
 | --- | --- |
 | `That account does not have access` | The identity provider succeeded, but the user did not match the Allow policy. Test the exact email and verify the selector. |
 | `No Access cookie found. Please login first.` | Open the normal production root URL again. Avoid private browsing modes that block Access cookies, and confirm the hostname is covered by the production Access application. |
-| Cloud sync is not active | Verify the actual deployed code, production `DB`/`RESUME_FILES` bindings and encrypted Access settings. No control database or bootstrap is needed. |
+| Cloud sync is not active | Verify the actual deployed code, production `DB`/`RESUME_FILES` bindings and Access settings (ordinary variables or encrypted secrets). No control database or bootstrap is needed. |
 | Browser cache is unavailable | Confirmed cloud saves succeeded. Use **Repair browser cache** after browser storage becomes available; do not repeat the saved operation. Documents can still download from the cloud. |
 | Tracker data exceeds the cloud limit / HTTP 413 | The attempted snapshot was not saved. Export a recovery archive, then remove unneeded records or shorten long notes/job descriptions until the compact UTF-8 snapshot is at most 1,900,000 bytes. Archiving retains data and does not reduce its size. Cache repair cannot increase this limit; Retry reads current cloud data without resubmitting the rejected edit. |
 | Cloud storage could not be reached | **Retry** waits for already-issued edits and reads current cloud state. If that read fails, the displayed acknowledged data is retained and the failure remains visible. |
