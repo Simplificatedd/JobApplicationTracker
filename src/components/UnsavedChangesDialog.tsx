@@ -1,6 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { useEscapeKey } from "../hooks/useEscapeKey";
+import { NativeModal } from "./NativeModal";
 
 interface UnsavedChangesDialogProps {
   body?: string;
@@ -17,20 +16,11 @@ export function UnsavedChangesDialog({
   onConfirm,
   title = "Discard changes?",
 }: UnsavedChangesDialogProps) {
-  useEscapeKey(true, onCancel);
-
-  function cancelFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onCancel();
-    }
-  }
-
   return (
-    <div
-      aria-labelledby="unsaved-changes-title"
-      aria-modal="true"
+    <NativeModal
+      labelledBy="unsaved-changes-title"
+      onRequestClose={onCancel}
       className="modal-overlay fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={cancelFromBackdrop}
       role="alertdialog"
     >
       <div className="w-full max-w-md rounded-lg bg-surface shadow-popover">
@@ -54,6 +44,7 @@ export function UnsavedChangesDialog({
         <footer className="flex flex-wrap justify-end gap-2 px-4 py-4 sm:px-5">
           <button
             className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            data-initial-focus
             onClick={onCancel}
             type="button"
           >
@@ -68,6 +59,6 @@ export function UnsavedChangesDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </NativeModal>
   );
 }

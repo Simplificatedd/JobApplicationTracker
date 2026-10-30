@@ -1,5 +1,5 @@
 import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ASSESSMENT_TYPES,
   ASSESSMENT_PROGRESS,
@@ -21,12 +21,14 @@ import type {
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 export interface AssessmentSectionProps {
+  onEditingChange?: (editing: boolean) => void;
   application: Application;
   assessments: Assessment[];
   assessmentActions: AssessmentActions;
 }
 
 export function AssessmentsSection({
+  onEditingChange,
   application,
   assessments,
   assessmentActions,
@@ -38,6 +40,12 @@ export function AssessmentsSection({
   const [deadlineOnly, setDeadlineOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const editorOpen = Boolean(draft) || busy;
+  useEffect(() => {
+    onEditingChange?.(editorOpen);
+    return () => onEditingChange?.(false);
+  }, [editorOpen, onEditingChange]);
 
   function edit(assessment?: Assessment, onlyDeadline = false) {
     setEditingId(assessment?.id ?? null);

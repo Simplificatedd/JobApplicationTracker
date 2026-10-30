@@ -1,8 +1,7 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { NativeModal } from "../../components/NativeModal";
 import { changedDraftFields } from "../../lib/editIntent";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ContactInput, MutationResult } from "../../store/useTrackerStore";
@@ -57,7 +56,6 @@ export function ContactsPanel({
   const [newContact, setNewContact] = useState(emptyDraft);
   const [operationError, setOperationError] = useState("");
 
-  useEscapeKey(!editingContactId && !isDiscardWarningOpen, requestClose);
 
   const panelClass =
     displayMode === "modal"
@@ -93,12 +91,7 @@ export function ContactsPanel({
   }
 
   function requestClose() {
-    if (isAdding) {
-      return;
-    }
-
-    if (editingContactId) {
-      setIsDiscardWarningOpen(true);
+    if (isAdding || editingContactId) {
       return;
     }
 
@@ -116,21 +109,14 @@ export function ContactsPanel({
     onClose();
   }
 
-  function requestCloseFromBackdrop(event: ReactMouseEvent<HTMLElement>) {
-    if (event.target === event.currentTarget) {
-      requestClose();
-    }
-  }
 
   return (
-    <aside
-      aria-labelledby="contacts-panel-title"
-      aria-modal="true"
+    <NativeModal
+      labelledBy="contacts-panel-title"
+      onRequestClose={requestClose}
       className={`modal-overlay fixed inset-0 z-50 flex p-0 ${
         displayMode === "modal" ? "items-center p-4" : ""
       }`}
-      onMouseDown={requestCloseFromBackdrop}
-      role="dialog"
     >
       <div className={`flex flex-col overflow-hidden bg-surface shadow-popover ${panelClass}`}>
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
@@ -145,7 +131,7 @@ export function ContactsPanel({
           </div>
           <button
             className="icon-button"
-            disabled={isAdding}
+            disabled={isAdding || Boolean(editingContactId)}
             onClick={requestClose}
             type="button"
           >
@@ -154,6 +140,7 @@ export function ContactsPanel({
           </button>
         </header>
 
+        {editingContactId ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the contact edit before closing.</p> : null}
         <div className="space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
           <section className="rounded-lg border border-border bg-surface-raised p-3">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -258,7 +245,7 @@ export function ContactsPanel({
           />
         ) : null}
       </div>
-    </aside>
+    </NativeModal>
   );
 }
 
@@ -285,7 +272,6 @@ function ContactCard({
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
   const [editBase, setEditBase] = useState(() => structuredClone(contact));
 
-  useEscapeKey(isEditing && !isDiscardWarningOpen, requestCancel);
 
   useEffect(() => {
     onEditingChange(isEditing ? contact.id : null);
