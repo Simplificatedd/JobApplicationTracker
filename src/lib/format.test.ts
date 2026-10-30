@@ -4,6 +4,7 @@ import {
   formatDateRange,
   formatDateTime,
   formatDeadline,
+  formatUpdatedAt,
 } from "./format";
 
 describe("optional date formatting", () => {
@@ -30,4 +31,10 @@ describe("optional date formatting", () => {
       formatDateTime("2026-09-24T17:30"),
     );
   });
+});
+
+
+it.each(["not a date", "2026-99-99T99:99", "2026-02-31T12:00"])("safely displays invalid stored date %s", value => {
+  expect(formatDate(value)).toBe("Invalid date"); expect(formatDeadline(value)).toBe("Invalid date");
+  expect(formatDateTime(value)).toBe("Invalid date"); expect(formatUpdatedAt(value)).toBe("Invalid date");
 });
