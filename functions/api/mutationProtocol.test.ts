@@ -1,4 +1,3 @@
-import { requestControlEnv } from "../../src/test/requestControl";
 import { describe, expect, it, vi } from "vitest";
 import { onRequest } from "./[[path]]";
 import { snapshot } from "../../src/test/assessmentFixtures";
@@ -16,7 +15,7 @@ function context(path: string, method: string, protocol?: string, account = "loc
     ...(method === "PUT" ? { body: JSON.stringify({ baseRevision: null, snapshot: snapshot() }) } : {}),
   });
   return { prepare, remove, context: { request, env: {
-    ...requestControlEnv(), LOCAL_DEV_AUTH_EMAIL: "student@example.edu", DB: { prepare }, RESUME_FILES: { delete: remove },
+    LOCAL_DEV_AUTH_EMAIL: "student@example.edu", DB: { prepare }, RESUME_FILES: { delete: remove },
   } } as never };
 }
 

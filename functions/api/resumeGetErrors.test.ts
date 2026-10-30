@@ -1,4 +1,3 @@
-import { requestControlEnv } from "../../src/test/requestControl";
 import { describe, expect, it, vi } from "vitest";
 import { onRequest } from "./[[path]]";
 
@@ -21,7 +20,6 @@ function context(
   return {
     request,
     env: {
-      ...requestControlEnv(),
       DB: database,
       RESUME_FILES: { get: getObject },
       LOCAL_DEV_AUTH_EMAIL: "student@example.edu",
@@ -99,7 +97,6 @@ describe("resume GET success and access boundaries", () => {
           headers: { "X-Tracker-Account-Id": `local:${email}` },
         }),
         env: {
-          ...requestControlEnv(),
           DB: { prepare }, RESUME_FILES: { get },
           ...(authenticated ? { LOCAL_DEV_AUTH_EMAIL: email } : {
             TEAM_DOMAIN: "https://test.cloudflareaccess.com", POLICY_AUD: "test-audience",

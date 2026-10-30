@@ -12,8 +12,7 @@
     "lint": "eslint src functions vite.config.ts tailwind.config.ts scripts/*.mjs --max-warnings=0",
     "preview": "vite preview",
     "test": "vitest run && npm run test:production-release",
-    "test:production-release": "node --experimental-strip-types --test scripts/*release*.test.mjs",
-    "test:admission-local": "node --experimental-strip-types scripts/test-request-admission.mjs",
+    "test:production-release": "node --test scripts/*release*.test.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc -b --pretty false"
   },

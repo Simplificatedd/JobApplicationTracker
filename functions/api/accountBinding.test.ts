@@ -1,14 +1,13 @@
-import { requestControlEnv } from "../../src/test/requestControl";
 import { describe, expect, it } from "vitest";
 import { onRequest } from "./[[path]]";
 
-const env = () => ({ ...requestControlEnv(), LOCAL_DEV_AUTH_EMAIL: "student@example.edu" });
+const env = { LOCAL_DEV_AUTH_EMAIL: "student@example.edu" };
 
 async function call(path: string, accountId?: string) {
   const request = new Request(`http://127.0.0.1:8788/api/${path}`, {
     headers: accountId ? { "X-Tracker-Account-Id": accountId } : undefined,
   });
-  return onRequest({ request, env: env() } as never);
+  return onRequest({ request, env } as never);
 }
 
 describe("cloud account binding", () => {

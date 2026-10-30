@@ -1,4 +1,3 @@
-import { requestControlEnv } from "../../src/test/requestControl";
 import { describe, expect, it, vi } from "vitest";
 import { onRequest } from "./[[path]]";
 import { snapshotWithBytes } from "../../src/test/snapshotSize";
@@ -13,7 +12,7 @@ function call(data: StorageSnapshot, database: object) {
     headers: { Origin: "http://127.0.0.1:8788", "X-Tracker-Account-Id": "local:student@example.edu", "X-Tracker-Mutation-Protocol": MUTATION_PROTOCOL_VERSION },
     body: JSON.stringify({ baseRevision: 1, snapshot: data }),
   });
-  return onRequest({ request, env: { ...requestControlEnv(), LOCAL_DEV_AUTH_EMAIL: "student@example.edu", DB: database } } as never);
+  return onRequest({ request, env: { LOCAL_DEV_AUTH_EMAIL: "student@example.edu", DB: database } } as never);
 }
 
 describe("snapshot size HTTP boundary", () => {

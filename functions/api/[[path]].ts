@@ -1,4 +1,3 @@
-import { withRequestAdmission } from "../lib/requestAdmission";
 import { authenticateAccessRequest } from "../lib/auth";
 import {
   errorResponse,
@@ -24,7 +23,7 @@ import {
   MUTATION_PROTOCOL_VERSION,
 } from "../../src/storage/mutationProtocol";
 
-export const onRequest: PagesFunction<CloudflareEnv> = withRequestAdmission(async (context) => {
+export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
   try {
     const user = await authenticateAccessRequest(context.request, context.env);
     requireSameOriginMutation(context.request);
@@ -105,4 +104,4 @@ export const onRequest: PagesFunction<CloudflareEnv> = withRequestAdmission(asyn
   } catch (error) {
     return errorResponse(error);
   }
-});
+};

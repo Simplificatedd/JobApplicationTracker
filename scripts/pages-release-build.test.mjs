@@ -1,81 +1,66 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { preparePagesRelease, verifyPreparedRelease } from './prepare-pages-release.mjs';
-import { CONTROL_STATUS_SQL, controlTransition } from '../functions/lib/requestControl.ts';
 
-const repository = fileURLToPath(new URL('../', import.meta.url));
-const sourceSha = 'a'.repeat(40);
+const root = fileURLToPath(new URL('../', import.meta.url));
 
-test('actual Pages-built releases carry distinct immutable identities across retries and retain admission/routing', async () => {
-  const temporary = mkdtempSync(join(tmpdir(), 'tracker-release-test-'));
+test('real Pages Functions retain existing records/resumes and reject stale writes with one D1 and one R2', async () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'tracker-pages-test-'));
   let mf;
   try {
-    for (const name of ['node_modules', 'functions', 'src']) symlinkSync(join(repository, name), join(temporary, name), 'dir');
-    const releases = [];
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const output = join(temporary, `dist-${attempt}`);
-      mkdirSync(output); writeFileSync(join(output, 'index.html'), 'synthetic asset');
-      const runAttempt = attempt === 3 ? '2' : '1'; // Also rebuild within the same attempt.
-      const release = preparePagesRelease({ root: temporary, output, sha: sourceSha, runId: '123', runAttempt });
-      const identity = { output, sha: sourceSha, runId: '123', runAttempt };
-      assert.equal(verifyPreparedRelease(release, identity), release);
-      for (const override of [{ sha: 'b'.repeat(40) }, { runId: '124' }, { runAttempt: '9' }]) {
-        assert.throws(() => verifyPreparedRelease(release, { ...identity, ...override }), /does not match/);
-      }
-      // A different asset build can otherwise retain the same release metadata.
-      writeFileSync(join(output, 'index.html'), 'different asset');
-      assert.throws(() => verifyPreparedRelease(release, identity), /contents changed/);
-      writeFileSync(join(output, 'index.html'), 'synthetic asset');
-      const entry = join(output, '_worker.js/index.js'), saved = readFileSync(entry);
-      writeFileSync(entry, 'export default { fetch() { return new Response("unwrapped"); } };');
-      assert.throws(() => verifyPreparedRelease(release, identity), /contents changed/);
-      writeFileSync(entry, saved);
-      symlinkSync(join(output, 'index.html'), join(output, 'unexpected-link'));
-      assert.throws(() => verifyPreparedRelease(release, identity), /symbolic links/);
-      rmSync(join(output, 'unexpected-link'));
-      assert.equal(verifyPreparedRelease(release, identity), release);
-      assert.match(release.label, /^[A-Za-z0-9._-]{1,80}$/);
-      assert.throws(() => preparePagesRelease({ root: temporary, output, sha: sourceSha, runId: '123', runAttempt }), /never upload or reuse/);
-      const routes = JSON.parse(readFileSync(join(output, '_routes.json'), 'utf8'));
-      assert.ok(routes.include.includes('/api/*'));
-      assert.ok(!routes.include.includes('/*'));
-      releases.push({ ...release, scriptPath: join(output, '_worker.js/index.js') });
+    const assets = join(temporary, 'assets'), output = join(temporary, 'functions');
+    mkdirSync(assets); writeFileSync(join(assets, 'index.html'), 'synthetic frontend');
+    const build = spawnSync(join(root, 'node_modules/.bin/wrangler'), ['pages', 'functions', 'build', join(root, 'functions'),
+      '--outdir', output, '--project-directory', root, '--build-output-directory', assets, '--compatibility-date', '2026-09-22'],
+    { cwd: root, encoding: 'utf8', env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+    const worker = { modulesRoot: output, modules: [{ type: 'ESModule', path: join(output, 'index.js') }], compatibilityDate: '2026-09-22',
+      serviceBindings: { ASSETS: async () => new Response('synthetic frontend') } };
+    const production = { ...worker, bindings: { LOCAL_DEV_AUTH_EMAIL: 'synthetic@example.invalid',
+      TEAM_DOMAIN: 'https://synthetic.cloudflareaccess.com', POLICY_AUD: 'synthetic-audience' },
+    d1Databases: { DB: 'existing-app' }, r2Buckets: { RESUME_FILES: 'existing-resumes' } };
+    mf = new Miniflare(convertV4MiniflareOptions({ port: 0, workers: [
+      { ...production, name: 'previous' }, { ...production, name: 'next' }, { ...worker, name: 'unconfigured-preview' },
+    ] }));
+    const db = await mf.getD1Database('DB', 'previous');
+    for (const name of ['0001_authenticated_cloud_storage.sql', '0002_free_tier_usage_budgets.sql']) {
+      await db.exec(readFileSync(join(root, 'migrations', name), 'utf8').replace(/\n/g, ' '));
     }
-    assert.equal(new Set(releases.map(r => r.label)).size, 3);
-    const workers = releases.slice(0, 2).map((release, i) => ({ name: `release-${i}`, modulesRoot: join(release.scriptPath, '..'),
-      modules: ['index.js', 'functions.js'].map(name => ({ type: 'ESModule', path: join(release.scriptPath, '..', name) })),
-      compatibilityDate: '2026-09-22', bindings: { LOCAL_DEV_AUTH_EMAIL: 'synthetic@example.invalid', REQUEST_CONTROL_DEPLOYMENT: 'stale-dashboard-label' },
-      d1Databases: { DB: 'local-only-app', REQUEST_CONTROL_DB: 'local-only-control' }, r2Buckets: ['RESUME_FILES'],
-      serviceBindings: { ASSETS: async () => new Response('synthetic asset') } }));
-    mf = new Miniflare(convertV4MiniflareOptions({ port: 0, workers }));
-    const control = await mf.getD1Database('REQUEST_CONTROL_DB', 'release-0');
-    // Native SQLite executes the exact control schema; no application 0003.
-    await control.exec(readFileSync(join(repository, 'control-migrations/0001_request_control.sql'), 'utf8').replace(/--[^\n]*/g, '').replace(/\n/g, ' '));
-    const state = () => control.prepare(CONTROL_STATUS_SQL).first();
-    const transition = async (action, value) => {
-      const before = await state();
-      assert.ok(await control.prepare(controlTransition(action, before.revision, value)).first());
-    };
-    const a = await mf.getWorker('release-0'), b = await mf.getWorker('release-1');
-    let response = await a.fetch('http://localhost/api/session');
-    assert.equal(response.status, 503);
-    assert.equal(response.headers.get('X-Tracker-Deployment'), releases[0].label);
-    assert.equal((await state()).coverage_hash, null);
-    await transition('attest-coverage', 'f'.repeat(64));
-    await transition('select-deployment', releases[0].label); await transition('reopen');
-    assert.equal((await a.fetch('http://127.0.0.1/api/session')).status, 200);
-    assert.equal((await b.fetch('http://localhost/api/session')).status, 503);
-    assert.equal((await a.fetch('http://localhost/api/unknown')).status, 404);
-    assert.equal(await (await a.fetch('http://localhost/')).text(), 'synthetic asset');
-    await transition('close'); await transition('select-deployment', releases[1].label); await transition('reopen');
-    assert.equal((await a.fetch('http://localhost/api/session')).status, 503);
-    assert.equal((await b.fetch('http://127.0.0.1/api/session')).status, 200);
-    assert.equal((await state()).outstanding, 0);
+    const owner = 'local:synthetic@example.invalid';
+    const snapshot = { dataVersion: 2, applications: [{ id: 'existing-application', company: 'Retained company' }],
+      interviews: [], activities: [], contacts: [], coverLetters: [], resumes: [], settings: {},
+      notificationState: {}, analyticsSettings: {}, tablePreferences: null };
+    await db.prepare('INSERT INTO tracker_state VALUES (?, ?, 7, ?, ?, ?)')
+      .bind(owner, 'synthetic@example.invalid', JSON.stringify(snapshot), 'existing-created', 'existing-updated').run();
+    const bucket = await mf.getR2Bucket('RESUME_FILES', 'previous');
+    const bytes = '%PDF-1.7\nexisting synthetic resume';
+    await bucket.put(`${encodeURIComponent(owner)}/existing-file`, bytes);
+    await db.prepare('INSERT INTO resume_objects VALUES (?, ?, ?, ?, ?)')
+      .bind(owner, 'existing-file', 'application/pdf', bytes.length, 'existing-updated').run();
+    const previous = await mf.getWorker('previous'), next = await mf.getWorker('next');
+    function request(path, method = 'GET', body) {
+      return new Request(`http://localhost/api/${path}`, { method,
+        headers: { Origin: 'http://localhost', 'X-Tracker-Account-Id': owner, 'X-Tracker-Mutation-Protocol': '1' },
+        ...(body ? { body: JSON.stringify(body) } : {}) });
+    }
+    for (const version of [previous, next]) {
+      assert.equal((await version.fetch(request('session'))).status, 200);
+      assert.deepEqual((await (await version.fetch(request('state'))).json()).snapshot, snapshot);
+      assert.equal(await (await version.fetch(request('resume-files/existing-file'))).text(), bytes);
+    }
+    const updated = { ...snapshot, applications: [...snapshot.applications, { id: 'new-application' }] };
+    assert.equal((await next.fetch(request('state', 'PUT', { baseRevision: 7, snapshot: updated }))).status, 200);
+    assert.equal((await previous.fetch(request('state', 'PUT', { baseRevision: 7, snapshot }))).status, 409);
+    assert.deepEqual((await (await next.fetch(request('state'))).json()).snapshot, updated);
+    assert.equal(await (await next.fetch(request('resume-files/existing-file'))).text(), bytes);
+    assert.equal((await next.fetch('https://production.invalid/api/session')).status, 401);
+    assert.equal((await (await mf.getWorker('unconfigured-preview')).fetch('https://preview.invalid/api/state')).status, 500);
+    assert.equal(await (await next.fetch('http://localhost/')).text(), 'synthetic frontend');
   } finally {
     if (mf) await mf.dispose();
     rmSync(temporary, { recursive: true, force: true });

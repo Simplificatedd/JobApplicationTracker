@@ -7,18 +7,17 @@ Common deployment problems and what to check. For the full setup, see
 | --- | --- |
 | `That account does not have access` | The identity provider succeeded, but the user did not match the Allow policy. Test the exact email and verify the selector. |
 | `No Access cookie found. Please login first.` | Open the normal production root URL again. Avoid private browsing modes that block Access cookies, and confirm the hostname is covered by the production Access application. |
-| Cloud sync is not active | Inspect the actual deployed version and its bindings. Admission-enabled releases additionally need the separate control DB, compiled label and approved bootstrap/opening; use the [operator runbook](request-admission-operations.md). Do not redeploy or reopen merely to clear an error. |
+| Cloud sync is not active | Verify the actual deployed code, production `DB`/`RESUME_FILES` bindings and encrypted Access settings. No control database or bootstrap is needed. |
 | Browser cache is unavailable | Confirmed cloud saves succeeded. Use **Repair browser cache** after browser storage becomes available; do not repeat the saved operation. Documents can still download from the cloud. |
 | Tracker data exceeds the cloud limit / HTTP 413 | The attempted snapshot was not saved. Export a recovery archive, then remove unneeded records or shorten long notes/job descriptions until the compact UTF-8 snapshot is at most 1,900,000 bytes. Archiving retains data and does not reduce its size. Cache repair cannot increase this limit; Retry reads current cloud data without resubmitting the rejected edit. |
 | Cloud storage could not be reached | **Retry** waits for already-issued edits and reads current cloud state. If that read fails, the displayed acknowledged data is retained and the failure remains visible. |
 | API returns a configuration error | Confirm the AUD came from the exact production application and that `TEAM_DOMAIN` includes `https://` with no callback path. |
-| D1 reports a missing table | Stop and identify the application/control database, actual schema and migration marker. Any remote migration needs separate review and authorization; never replay control 0001, delete markers, or apply it to the application DB. |
+| D1 reports a missing table | Stop and verify the existing application database identity and schema. Do not create an empty replacement or run a remote migration as part of deployment. |
 | The wildcard cannot be removed | Edit the public hostname destination, leave **Subdomain** completely blank, keep the exact `pages.dev` domain selected, and save. Rename the application if Cloudflare reports a conflict. |
-| Admission-enabled API returns 503 / status is UNKNOWN | Preserve the ledger and closure; inspect schema/bindings/revision under the approved scope. Missing control state, uncertainty or absent coverage never proves drain. See [recovery](request-admission-operations.md#failure-behavior-and-recovery); do not clear receipts, reset the DB or bypass admission. |
-| CI has no `Deploy production` job | Expected: CI validates source only. Follow the [deployment-safety prerequisite](production-deployment-prerequisite.md); do not restore historical upload jobs or repository credentials. |
+| CI has no deployment job | Expected: CI validates only. Use the separately approved manual workflow described in [deployment.md](deployment.md). |
 | Cloudflare reports `Project not found` | Set `CLOUDFLARE_PAGES_PROJECT` to the Pages project name, not its `pages.dev` hostname, and confirm the project belongs to `CLOUDFLARE_ACCOUNT_ID`. |
-| Cloudflare rejects the deployment token | Stop and verify the release principal/account under separate authorization. Never replace a repository secret or rerun an old uploader as a workaround; use the reviewed credential-isolation procedure. |
-| GitHub shows a successful merge but the live site is old | Expected for Direct Upload: merging does not deploy. A later guarded release needs separate review, infrastructure checks and explicit approval. |
+| Cloudflare rejects the deployment token | Verify its account restriction, expiration and Pages Edit permission. Reuse the environment secret; never rerun a historical uploader or replace unrelated credentials as a workaround. |
+| GitHub shows a successful merge but the live site is old | Expected for Direct Upload: merging does not deploy. A manual production deployment requires separate approval. |
 
 Browser cache repair only rebuilds local storage from this session's last
 acknowledged cloud state. It does not send a cloud save, repeat a create or delete,
