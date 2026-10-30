@@ -348,7 +348,7 @@ export function SettingsPage({
             onLabel="Top navbar"
           />
           <NumberField
-            description="Sets the default number of days before a newly added application should prompt you to follow up."
+            description="Whole days before a newly added application should prompt you to follow up. Decimals round down; minimum 1."
             label="Follow-up prompt after:"
             min={1}
             onChange={(value) =>
@@ -523,7 +523,7 @@ export function SettingsPage({
             }
           />
           <NumberField
-            description="Controls how many days ahead counts as due soon for follow-ups and interviews."
+            description="Whole days ahead that count as due soon. Decimals round down; minimum 1."
             label="Due soon means within:"
             min={1}
             onChange={(value) => onUpdateSettings({ dueSoonDays: value })}
@@ -1043,8 +1043,9 @@ function NumberField({
           className="field-control h-9 w-20 text-right tabular-nums"
           min={min}
           onChange={(event) =>
-            onChange(Math.max(min, Number(event.target.value) || min))
+            onChange(Math.max(min, Math.floor(Number(event.target.value)) || min))
           }
+          step={1}
           type="number"
           value={value}
         />

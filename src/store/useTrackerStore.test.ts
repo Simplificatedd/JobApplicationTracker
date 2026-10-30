@@ -63,6 +63,7 @@ const storage = vi.hoisted(() => ({
   getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
   importSnapshot: vi.fn(), getResumeFile: vi.fn(),
+  getDocumentCleanupWarning: vi.fn(), subscribeDocumentCleanupWarning: vi.fn(),
   getCacheWarning: vi.fn(), subscribeCacheWarning: vi.fn(), repairCache: vi.fn(), refresh: vi.fn(),
 }));
 vi.mock("../storage/cloudStorageAdapter", () => ({ cloudStorageAdapter: storage }));
@@ -115,6 +116,8 @@ beforeEach(() => {
   storage.listCoverLetterMetadata.mockResolvedValue([]);
   storage.listContacts.mockResolvedValue([]);
   storage.deleteApplication.mockResolvedValue(undefined);
+  storage.getDocumentCleanupWarning.mockReturnValue(null);
+  storage.subscribeDocumentCleanupWarning.mockReturnValue(() => {});
   storage.getCacheWarning.mockReturnValue(null);
   storage.subscribeCacheWarning.mockReturnValue(() => {});
   storage.repairCache.mockResolvedValue(undefined);
@@ -802,4 +805,14 @@ describe("table preference saves", () => {
     expect(stored).toMatchObject({ searchQuery: "react" });
   });
 
+});
+
+it("exposes cleanup warnings without reporting a failed cloud save and ignores stale account warnings", async () => {
+  storage.getDocumentCleanupWarning.mockReturnValue("Cloud changes were saved; cleanup failed.");
+  RenderStore(); await flush();
+  expect(RenderStore().documentCleanupWarning).toContain("Cloud changes were saved");
+  expect(RenderStore().storageError).toBeNull();
+  const lateWarning = storage.subscribeDocumentCleanupWarning.mock.calls[0][0] as (warning: string) => void;
+  invalidate(); lateWarning("Late old-account cleanup warning");
+  expect(RenderStore().documentCleanupWarning).toBeNull();
 });

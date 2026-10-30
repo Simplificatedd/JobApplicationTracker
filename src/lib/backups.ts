@@ -1101,9 +1101,13 @@ function isOptionalOneOf<const T extends string>(
 function toCsvRow(fields: Array<string | undefined>) {
   return fields
     .map((field) => {
-      const value = field ?? "";
+      const raw = field ?? "";
+      // Spreadsheet-view CSV: a quoted leading tab prevents formula execution
+      // in Excel. JSON backup remains the lossless, programmatic format.
+      const dangerous = /^[\s\u200B\uFEFF]*[=+\-@＝＋－＠]/u.test(raw) || /^[\t\r\n]/.test(raw);
+      const value = dangerous ? `\t${raw}` : raw;
 
-      return /[",\n\r]/.test(value)
+      return dangerous || /[",\n\r]/.test(value)
         ? `"${value.replace(/"/g, '""')}"`
         : value;
     })
