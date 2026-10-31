@@ -115,7 +115,7 @@ export function MultiSeriesChart({
     return (
       <>
         {legend}
-        <EmptyChart />
+        <div ref={containerRef}><EmptyChart /></div>
       </>
     );
   }

@@ -9,6 +9,7 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_STATUSES } from "../../lib/constants";
+import { createDateStamp } from "../../lib/domain";
 import {
   calculateFollowUpDueDate,
   classifyReminderSeverity,
@@ -17,6 +18,7 @@ import {
 import {
   APPLICATION_OUTCOME_PATH_LABELS,
   classifyApplicationOutcomePath,
+  normalizeStatusActivities,
   type ApplicationOutcomePath,
 } from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
@@ -1126,8 +1128,8 @@ export function deriveActivityCalendarDays(
       .filter((value): value is string => Boolean(value)),
   ];
   const earliest = dateValues
-    .map((value) => new Date(value))
-    .filter((date) => !Number.isNaN(date.getTime()))
+    .map(parseCalendarDate)
+    .filter((date): date is Date => date !== null)
     .sort((left, right) => left.getTime() - right.getTime())[0];
   const start = startOfMonth(earliest ?? new Date());
   const end = endOfMonth(new Date());
@@ -1137,15 +1139,18 @@ export function deriveActivityCalendarDays(
 
   activities.forEach((activity) => {
     const key = toDateKey(activity.createdAt);
+    if (!key) return;
     activityByDate.set(key, [...(activityByDate.get(key) ?? []), activity]);
   });
   applications.forEach((application) => {
     const key = toDateKey(application.dateApplied || application.createdAt);
+    if (!key) return;
     applicationByDate.set(key, [...(applicationByDate.get(key) ?? []), application]);
   });
   interviews.forEach((interview) => {
     if (!interview.dateTime) return;
     const key = toDateKey(interview.dateTime);
+    if (!key) return;
     interviewsByDate.set(key, [...(interviewsByDate.get(key) ?? []), interview]);
   });
 
@@ -1156,7 +1161,7 @@ export function deriveActivityCalendarDays(
     cursor <= end;
     cursor.setDate(cursor.getDate() + 1)
   ) {
-    const key = toDateKey(cursor.toISOString());
+    const key = createDateStamp(cursor);
     const dayActivities = activityByDate.get(key) ?? [];
     const dayApplications = applicationByDate.get(key) ?? [];
     const dayInterviews = interviewsByDate.get(key) ?? [];
@@ -1173,8 +1178,8 @@ export function deriveActivityCalendarDays(
       countLabel(eventCounts.applications, "job applied", "jobs applied"),
       countLabel(
         eventCounts.interviews,
-        "interview completed",
-        "interviews completed",
+        "interview scheduled",
+        "interviews scheduled",
       ),
       countLabel(eventCounts.offers, "offer"),
       countLabel(eventCounts.rejections, "rejection"),
@@ -1212,18 +1217,19 @@ function getCalendarEventCounts(
   activities: Activity[],
   interviews: Interview[],
 ) {
-  const lowerCaseMessages = activities.map((activity) =>
-    activity.message.toLowerCase(),
+  const statusEvents = normalizeStatusActivities(activities).filter(
+    (activity) =>
+      (activity.type === "created" || activity.type === "status_changed") &&
+      activity.statusFrom !== activity.statusTo,
   );
 
   return {
     applications: applications.length,
     interviews: interviews.length,
-    offers: lowerCaseMessages.filter((message) => message.includes("offer"))
+    offers: statusEvents.filter((activity) => activity.statusTo === "Offered")
       .length,
-    rejections: lowerCaseMessages.filter((message) =>
-      message.includes("rejected"),
-    ).length,
+    rejections: statusEvents.filter((activity) => activity.statusTo === "Rejected")
+      .length,
     statusChanges: activities.filter(
       (activity) => activity.type === "status_changed",
     ).length,
@@ -1279,7 +1285,17 @@ function endOfMonth(date: Date) {
 }
 
 function toDateKey(value: string) {
-  return new Date(value).toISOString().slice(0, 10);
+  const date = parseCalendarDate(value);
+  return date ? createDateStamp(date) : undefined;
+}
+
+function parseCalendarDate(value: string) {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = new Date(dateOnly ? `${value}T00:00:00` : value);
+  if (Number.isNaN(date.getTime())) return null;
+  // Literal application dates identify a calendar day, not a UTC instant.
+  if (dateOnly && createDateStamp(date) !== value) return null;
+  return date;
 }
 
 function countLabel(count: number, singular: string, plural = `${singular}s`) {
