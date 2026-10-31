@@ -1,5 +1,10 @@
 # Production deployment with existing infrastructure
 
+For a new account or empty installation, start with [first-time installation](installation.md).
+This page covers updates to an installation whose resources, schema, Access and
+GitHub environment are already configured. “Existing” means your own resources;
+it does not require access to the upstream maintainer's account.
+
 Use the existing Direct Upload Pages project, application D1 and private R2
 bucket. Preserve the existing Access application, policies, team domain and AUD.
 There is no control database or hosted preview environment. CI validates only.
