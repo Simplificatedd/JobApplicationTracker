@@ -54,7 +54,7 @@ export function TimeSeriesChart({
   }, []);
 
   if (points.length === 0) {
-    return <EmptyChart />;
+    return <div ref={containerRef}><EmptyChart /></div>;
   }
 
   const plotWidth = Math.max(1, width - PADDING.left - PADDING.right);
