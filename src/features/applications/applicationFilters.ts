@@ -165,6 +165,9 @@ export function applyApplicationFilters(
   filters: ApplicationFilters,
   interviews?: Interview[],
 ) {
+  const interviewType = filters.interviewType
+    ? normalizeInterviewType(filters.interviewType)
+    : "";
   return applications.filter((application) => {
     const applicationInterviews = interviews?.filter(
       (interview) => interview.applicationId === application.id,
@@ -263,12 +266,15 @@ export function applyApplicationFilters(
     }
 
     if (
-      filters.interviewType &&
+      interviewType &&
       !(applicationInterviews
         ? applicationInterviews.some(
-            (interview) => interview.type === filters.interviewType,
+            (interview) =>
+              normalizeInterviewType(interview.type) === interviewType,
           )
-        : application.interviewType === filters.interviewType)
+        : application.interviewType !== undefined &&
+          normalizeInterviewType(application.interviewType) ===
+            interviewType)
     ) {
       return false;
     }
