@@ -1,7 +1,8 @@
 # Troubleshooting
 
-Common deployment problems and what to check. For the full setup, see
-[deployment.md](deployment.md).
+Common deployment problems and what to check. For a new account, follow
+[first-time installation and its troubleshooting table](installation.md#9-first-installation-troubleshooting).
+For an established installation, see [deployment and updates](deployment.md).
 
 | Symptom | Check |
 | --- | --- |
@@ -12,7 +13,7 @@ Common deployment problems and what to check. For the full setup, see
 | Tracker data exceeds the cloud limit / HTTP 413 | The attempted snapshot was not saved. Export a recovery archive, then remove unneeded records or shorten long notes/job descriptions until the compact UTF-8 snapshot is at most 1,900,000 bytes. Archiving retains data and does not reduce its size. Cache repair cannot increase this limit; Retry reads current cloud data without resubmitting the rejected edit. |
 | Cloud storage could not be reached | **Retry** waits for already-issued edits and reads current cloud state. If that read fails, the displayed acknowledged data is retained and the failure remains visible. |
 | API returns a configuration error | Confirm the AUD came from the exact production application and that `TEAM_DOMAIN` includes `https://` with no callback path. |
-| D1 reports a missing table | Stop and verify the existing application database identity and schema. Do not create an empty replacement or run a remote migration as part of deployment. |
+| D1 reports a missing table | For a new installation, initialize the exact new database using [installation step 3](installation.md#3-create-the-private-document-bucket-and-initialize-d1); local migrations do not initialize hosted D1. For an established installation, stop and verify its database identity/schema. Do not create an empty replacement or run a remote migration as part of a code deployment. |
 | The wildcard cannot be removed | Edit the public hostname destination, leave **Subdomain** completely blank, keep the exact `pages.dev` domain selected, and save. Rename the application if Cloudflare reports a conflict. |
 | CI has no deployment job | Expected: CI validates only. Use the separately approved manual workflow described in [deployment.md](deployment.md). |
 | Cloudflare reports `Project not found` | Set `CLOUDFLARE_PAGES_PROJECT` to the Pages project name, not its `pages.dev` hostname, and confirm the project belongs to `CLOUDFLARE_ACCOUNT_ID`. |

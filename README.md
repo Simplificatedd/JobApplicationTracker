@@ -78,20 +78,26 @@ your own Cloudflare account where only the people you allow can sign in.
 ## 🚀 Production deployment
 
 The tracker needs **one Cloudflare Pages project, one application D1 database,
-and one private R2 bucket**, protected by the existing Cloudflare Access login.
-Reuse the existing production resources; code deployment does not migrate or
-replace their data. No control database, bootstrap, drain ledger, or hosted
-preview storage is required.
+and one private R2 bucket**, protected by Cloudflare Access.
+
+**First time self-hosting? Start with the [installation guide](docs/installation.md).**
+It walks through creating your own resources, initializing D1, setting up sign-in
+and configuring your fork's GitHub Actions. You do not need the maintainer's
+Cloudflare account, resource IDs or GitHub secrets.
+
+For an existing installation, follow the [deployment and update checklist](docs/deployment.md)
+and reuse your production resources. Code deployment does not migrate or replace
+their data. No control database, bootstrap, drain ledger, or hosted preview
+storage is required.
 
 ```mermaid
 flowchart LR
     You([You]) --> Access[Cloudflare Access]
-    Access --> Pages[Existing Pages app + API]
-    Pages --> D1[(Existing application D1)]
-    Pages --> R2[(Existing private R2)]
+    Access --> Pages[Your Pages app + API]
+    Pages --> D1[(Your application D1)]
+    Pages --> R2[(Your private R2)]
 ```
 
-Follow the [short production configuration checklist](docs/deployment.md).
 GitHub CI checks pull requests and main without deploying. A separate manual
 workflow deploys only a confirmed current main SHA, checks the existing resource
 bindings, and serializes deployments. Preview publishing is disabled; do not
@@ -131,6 +137,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 
 | Guide | What it covers |
 | --- | --- |
+| [First-time installation](docs/installation.md) | Your own Cloudflare resources, initial schema, Access sign-in and first manual deployment |
 | [Deployment guide](docs/deployment.md) | Existing production resources, short setup checklist, manual deployment and recovery |
 | [Privacy, security, and limits](docs/privacy-and-security.md) | How sign-in and storage work, privacy notes, and usage guardrails |
 | [Data model](docs/data-model.md) | How follow-ups, statuses, deadlines, deletion, and resumes behave |
