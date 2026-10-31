@@ -183,6 +183,26 @@ that file from the same section after signing in to the new one.
 Issues and pull requests are welcome. Keep commits small and focused, and make
 sure `npm run check` passes before opening a pull request.
 
+### Tech stack and source layout
+
+The frontend uses React, TypeScript, Vite and Tailwind CSS, with Lucide icons.
+Cloudflare Pages serves the app and Pages Functions API. Cloudflare Access
+provides sign-in; the API verifies identity and isolates each user's D1 records
+and private R2 documents. IndexedDB caches cloud data in the browser.
+
+- `src/features/` — applications, resumes, settings and optional analytics.
+- `src/components/`, `src/hooks/`, `src/lib/` — shared UI, hooks and domain helpers.
+- `src/store/`, `src/storage/` — tracker actions, cloud API, browser cache and restore logic.
+- `functions/` — API routes, authentication, validation and storage limits.
+- `migrations/` — application D1 schema; code deployment does not apply migrations.
+- `scripts/` — offline recovery and deployment verification utilities.
+- `docs/` — existing [data model](docs/data-model.md), [security](docs/privacy-and-security.md),
+  [backup](docs/backups.md) and [deployment](docs/deployment.md) guides.
+
+Vitest tests live beside the code they cover; shared test helpers are in
+`src/test/`. `npm run check` runs typecheck, lint, tests and builds. CI also runs
+`python3 -B -m unittest discover -s scripts -p 'test_*.py'` for recovery and workflow checks.
+
 ## 📄 License
 
 [MIT](LICENSE)
