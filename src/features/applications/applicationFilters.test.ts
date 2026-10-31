@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Application, Interview } from "../../types/application";
+import { normalizeSnapshot } from "../../storage/normalizeSnapshot";
+import { snapshot } from "../../test/assessmentFixtures";
 import {
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
@@ -280,4 +282,56 @@ describe("canonical interview filters", () => {
       ),
     ).toEqual([baseApplication]);
   });
+
+  it.each([
+    ["technical", "technical-interview"],
+    ["recruiter", "recruiter-screen"],
+    ["face-to-face", "other"],
+  ] as const)("finds preserved %s records under %s", (legacy, canonical) => {
+    const stored = { ...interviews[0], type: legacy };
+    const normalized = normalizeSnapshot(snapshot({
+      applications: [baseApplication], interviews: [stored],
+    }));
+    const before = structuredClone(normalized);
+    const filters = { ...DEFAULT_APPLICATION_FILTERS, interviewType: canonical };
+
+    expect(normalized.interviews[0].type).toBe(legacy);
+    expect(applyApplicationFilters(
+      normalized.applications, filters, normalized.interviews,
+    )).toEqual(normalized.applications);
+    expect(applyApplicationFilters(
+      [{ ...baseApplication, interviewType: legacy }], filters,
+    )).toHaveLength(1);
+    expect(normalized).toEqual(before);
+  });
+
+  it("keeps canonical matching scoped to the application's interviews", () => {
+    const canonical = { ...interviews[0], type: "technical-interview" as const };
+    const other = { ...baseApplication, id: "other-application" };
+    const filters = {
+      ...DEFAULT_APPLICATION_FILTERS, interviewType: "technical-interview" as const,
+    };
+    expect(applyApplicationFilters([baseApplication, other], filters, [canonical]))
+      .toEqual([baseApplication]);
+    expect(applyApplicationFilters([baseApplication], filters, [interviews[1]]))
+      .toEqual([]);
+    expect(applyApplicationFilters([baseApplication], filters)).toEqual([]);
+  });
+
+  it("does not fall back to a projection when an empty interview list is supplied", () => {
+    const projected = { ...baseApplication, interviewType: "technical" as const };
+    const filters = {
+      ...DEFAULT_APPLICATION_FILTERS, interviewType: "technical-interview" as const,
+    };
+    expect(applyApplicationFilters([projected], filters)).toEqual([projected]);
+    expect(applyApplicationFilters([projected], filters, [])).toEqual([]);
+  });
+
+  it.each(["HireVue", "HackerRank", "online-assessment"] as const)(
+    "does not reclassify %s as a canonical interview type", (type) => {
+      expect(applyApplicationFilters([baseApplication], {
+        ...DEFAULT_APPLICATION_FILTERS, interviewType: "technical-interview",
+      }, [{ ...interviews[0], type }])).toEqual([]);
+    },
+  );
 });
