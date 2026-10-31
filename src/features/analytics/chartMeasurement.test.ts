@@ -18,6 +18,7 @@ vi.mock("react", async (importOriginal) => ({
 }));
 import { TimeSeriesChart } from "./TimeSeriesChart";
 import { MultiSeriesChart } from "./MultiSeriesChart";
+import { FlowChart, TreemapChart } from "./chartViews";
 
 // Effects run after React attaches refs. Check that the empty render has a real
 // measurement target at the same DOM position as the populated render.
@@ -45,6 +46,13 @@ const charts = [
   }) },
   { name: "multi series", render: (empty: boolean) => MultiSeriesChart({
     grouping: "daily", series: [{ id: "applications", label: "Applications", color: "blue", data: empty ? [] : data }],
+  }) },
+  { name: "treemap", render: (empty: boolean) => TreemapChart({
+    data: empty ? [] : data, colorFor: () => "#123456",
+  }) },
+  { name: "status flow", render: (empty: boolean) => FlowChart({
+    links: empty ? [] : [{ from: "Awaiting Response", to: "Interviewing", value: 2 }],
+    order: ["Awaiting Response", "Interviewing"], colorFor: () => "#123456",
   }) },
 ];
 

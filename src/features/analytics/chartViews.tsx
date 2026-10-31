@@ -85,7 +85,7 @@ export function TreemapChart({
   const total = items.reduce((sum, item) => sum + item.datum.value, 0);
 
   if (total === 0) {
-    return <EmptyChart />;
+    return <div><div ref={containerRef}><EmptyChart /></div></div>;
   }
 
   const rects = width > 0 ? squarify(items, 0, 0, width, TREEMAP_HEIGHT) : [];
@@ -662,7 +662,7 @@ export function FlowChart({
   const total = links.reduce((sum, link) => sum + link.value, 0);
 
   if (total === 0) {
-    return <EmptyChart message="No status changes recorded yet." />;
+    return <div ref={containerRef}><EmptyChart message="No status changes recorded yet." /></div>;
   }
 
   const sortByOrder = (labels: string[]) =>
