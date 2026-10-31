@@ -18,6 +18,7 @@ import {
 import {
   APPLICATION_OUTCOME_PATH_LABELS,
   classifyApplicationOutcomePath,
+  normalizeStatusActivities,
   type ApplicationOutcomePath,
 } from "../../lib/statusHistory";
 import type { AnalyticsSettings } from "../../types/analytics";
@@ -1177,8 +1178,8 @@ export function deriveActivityCalendarDays(
       countLabel(eventCounts.applications, "job applied", "jobs applied"),
       countLabel(
         eventCounts.interviews,
-        "interview completed",
-        "interviews completed",
+        "interview scheduled",
+        "interviews scheduled",
       ),
       countLabel(eventCounts.offers, "offer"),
       countLabel(eventCounts.rejections, "rejection"),
@@ -1216,18 +1217,19 @@ function getCalendarEventCounts(
   activities: Activity[],
   interviews: Interview[],
 ) {
-  const lowerCaseMessages = activities.map((activity) =>
-    activity.message.toLowerCase(),
+  const statusEvents = normalizeStatusActivities(activities).filter(
+    (activity) =>
+      (activity.type === "created" || activity.type === "status_changed") &&
+      activity.statusFrom !== activity.statusTo,
   );
 
   return {
     applications: applications.length,
     interviews: interviews.length,
-    offers: lowerCaseMessages.filter((message) => message.includes("offer"))
+    offers: statusEvents.filter((activity) => activity.statusTo === "Offered")
       .length,
-    rejections: lowerCaseMessages.filter((message) =>
-      message.includes("rejected"),
-    ).length,
+    rejections: statusEvents.filter((activity) => activity.statusTo === "Rejected")
+      .length,
     statusChanges: activities.filter(
       (activity) => activity.type === "status_changed",
     ).length,

@@ -49,7 +49,7 @@ describe("interview analytics", () => {
       (candidate) => candidate.date === "2026-09-20",
     );
 
-    expect(day?.summary).toContain("2 interviews completed");
+    expect(day?.summary).toContain("2 interviews scheduled");
   });
 });
 
@@ -127,6 +127,72 @@ describe("activity calendar local dates", () => {
     }], [{ ...interviews[0], dateTime: "invalid" }]);
     expect(days[0].date).toBe("2026-10-01");
     expect(days.every(day => day.tone === "none")).toBe(true);
+  });
+});
+
+describe("activity calendar event facts", () => {
+  afterEach(() => vi.useRealTimers());
+
+  function calendarDay(activities: Activity[], scheduled: Interview[] = []) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 15, 12));
+    return deriveActivityCalendarDays([], activities, scheduled).find(
+      day => day.date === "2026-09-03",
+    )!;
+  }
+
+  const event: Activity = {
+    id: "event", applicationId: "app-1", type: "status_changed",
+    message: "Misleading message: offer rejected", createdAt: "2026-09-03T12:00",
+    statusFrom: "Interviewing", statusTo: "Offered",
+  };
+
+  it("uses structured statuses rather than contradictory message text", () => {
+    expect(calendarDay([event]).summary)
+      .toBe("On this date: 1 offer; 1 major status change.");
+    expect(calendarDay([{ ...event, message: "Offer", statusTo: "Rejected" }]))
+      .toMatchObject({ tone: "rejection", summary: "On this date: 1 rejection; 1 major status change." });
+  });
+
+  it("ignores arbitrary offer/rejection mentions and status fields on ordinary edits", () => {
+    expect(calendarDay([{ ...event, type: "updated" }]).tone).toBe("none");
+  });
+
+  it("counts creation facts but not acceptance or repeated identical statuses as new offers", () => {
+    const activities: Activity[] = [
+      { ...event, type: "created", statusFrom: undefined },
+      { ...event, id: "accepted", statusFrom: "Offered", statusTo: "Accepted" },
+      { ...event, id: "unchanged", statusFrom: "Offered" },
+    ];
+    const before = structuredClone(activities);
+    expect(calendarDay(activities).summary)
+      .toBe("On this date: 1 offer; 2 major status changes.");
+    expect(activities).toEqual(before);
+  });
+
+  it("reuses supported legacy status normalization without guessing offer dates", () => {
+    expect(calendarDay([{
+      ...event, statusFrom: undefined, statusTo: undefined,
+      message: "Status changed to Rejected.",
+    }]).tone).toBe("rejection");
+    // Legacy message-only Offered means Accepted in the existing compatibility rules.
+    expect(calendarDay([{
+      ...event, statusFrom: undefined, statusTo: undefined,
+      message: "Status changed to Offered.",
+    }]).summary).toBe("On this date: 1 major status change.");
+  });
+
+  it("labels both past and future dated interviews scheduled and ignores undated records", () => {
+    const scheduled: Interview[] = interviews.map(interview => ({
+      ...interview, dateTime: "2026-09-03T10:00",
+    }));
+    scheduled.push({ ...interviews[0], id: "undated", dateTime: undefined });
+    expect(calendarDay([], scheduled).summary).toBe("On this date: 2 interviews scheduled.");
+    vi.setSystemTime(new Date(2026, 8, 1, 12));
+    const future = deriveActivityCalendarDays([], [], scheduled).find(
+      day => day.date === "2026-09-03",
+    );
+    expect(future?.summary).toBe("On this date: 2 interviews scheduled.");
   });
 });
 
