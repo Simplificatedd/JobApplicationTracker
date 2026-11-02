@@ -788,7 +788,13 @@ export function FlowChart({
       <p className="mt-2 h-4 truncate text-xs text-muted max-sm:h-auto max-sm:min-h-8 max-sm:whitespace-normal">
         {active
           ? `${active.link.from} → ${active.link.to}: ${active.link.value} ${active.link.value === 1 ? "change" : "changes"}`
-          : "Left: status before · Right: status after · hover a flow"}
+          : (
+            <>
+              Left: status before · Right: status after ·{" "}
+              <span className="touch:hidden">hover</span>
+              <span className="hidden touch:inline">tap</span> a flow
+            </>
+          )}
       </p>
     </div>
   );
