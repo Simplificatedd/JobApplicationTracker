@@ -452,3 +452,26 @@ describe("compact phone summary", () => {
     expect(html.match(/text-2xl/g)).toHaveLength(4);
   });
 });
+
+describe("phone list toolbar", () => {
+  const classesOf = (html: string, marker: string) => {
+    const index = html.indexOf(marker);
+    const tagStart = html.lastIndexOf("<", index);
+    return (/class="([^"]*)"/.exec(html.slice(tagStart, html.indexOf(">", index) + 1))?.[1] ?? "").split(" ");
+  };
+
+  it("gives search, Filters and sort 44px on phones and keeps 40px from md", () => {
+    const html = renderPage("");
+    // The sort and filter selects share one select style.
+    const selects = [...html.matchAll(/<select class="([^"]*appearance-none[^"]*)"/g)].map((match) => match[1].split(" "));
+
+    expect(selects.length).toBeGreaterThan(0);
+    for (const classes of [
+      classesOf(html, 'type="search"'),
+      classesOf(html, 'aria-haspopup="dialog"'),
+      ...selects,
+    ]) {
+      expect(classes).toEqual(expect.arrayContaining(["h-10", "max-md:h-11"]));
+    }
+  });
+});
