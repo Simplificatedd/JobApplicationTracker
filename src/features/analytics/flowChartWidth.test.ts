@@ -54,3 +54,14 @@ describe("status flow width", () => {
     expect(scroller.props.className).toBeUndefined();
   });
 });
+
+describe("status flow hint", () => {
+  it("wraps the explanation below sm instead of cutting it off", () => {
+    const hint = elements(renderAt(256).root).find((element) => element.type === "p")!;
+
+    expect(hint.props.children).toContain("Left: status before");
+    expect(hint.props.className).toContain("truncate");
+    // Two lines reserved so swapping in a tapped flow's text doesn't shift the page.
+    expect(hint.props.className).toContain("max-sm:h-auto max-sm:min-h-8 max-sm:whitespace-normal");
+  });
+});
