@@ -133,4 +133,11 @@ describe("document upload panel on phones", () => {
       'id="cover-letter-upload-file-input"',
     );
   });
+
+  it("gives the phone Upload and name/version buttons 44px targets", () => {
+    const markup = renderPage();
+
+    expect(markup).toMatch(/class="[^"]*max-md:h-11[^"]*"[^>]*><svg[\s\S]*?<\/svg>Upload<\/button>/);
+    expect(markup).toMatch(/class="[^"]*max-md:h-11 md:hidden"[^>]*>[\s\S]*?Add name and version<\/button>/);
+  });
 });

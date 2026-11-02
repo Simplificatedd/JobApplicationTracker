@@ -243,7 +243,7 @@ export function ResumesPage({
             />
           </Field>
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 md:self-end"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11 md:self-end"
             disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             type="button"
@@ -254,7 +254,7 @@ export function ResumesPage({
           <button
             aria-controls={`${uploadDetailsId}-name ${uploadDetailsId}-version`}
             aria-expanded={showUploadDetails}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 md:hidden"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11 md:hidden"
             onClick={() => setShowUploadDetails((current) => !current)}
             type="button"
           >
