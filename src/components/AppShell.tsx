@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePhoneLayout } from "../hooks/usePhoneLayout";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
@@ -124,6 +125,7 @@ export function AppShell({
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
   const [isMorePanelOpen, setIsMorePanelOpen] = useState(false);
+  const isPhone = usePhoneLayout();
   const ToggleIcon = isTopNavigation
     ? isNavigationHidden
       ? PanelTopOpen
@@ -143,6 +145,12 @@ export function AppShell({
   const sideNavigationStyle = {
     "--side-navigation-width": `${sideNavigationWidth}px`,
   } as CSSProperties;
+
+  // The More sheet belongs to the phone bottom bar; close it when the layout
+  // crosses the breakpoint instead of leaving it over the desktop navigation.
+  useEffect(() => {
+    setIsMorePanelOpen(false);
+  }, [isPhone]);
 
   // Publish the sticky header's height so page-level sticky elements, such
   // as the Settings section strip, can sit directly beneath it.

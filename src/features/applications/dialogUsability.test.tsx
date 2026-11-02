@@ -27,6 +27,7 @@ import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
 import { NotificationBell } from "../../components/NotificationBell";
+import { AppShell } from "../../components/AppShell";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type { ReminderNotification } from "../../lib/reminders";
 
@@ -260,6 +261,27 @@ it("closes the notifications panel when the layout crosses the phone breakpoint"
   const tree = render(() => NotificationBell(props));
   expect(named(tree, "NativeModal")).toBeUndefined();
   expect(elements(tree).some(e => e.props.role === "dialog")).toBe(false);
+});
+it("closes the phone More sheet when the layout crosses the phone breakpoint", () => {
+  vi.stubGlobal("window", { confirm: () => true, matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  const props = {
+    children: null, currentView: "applications", enableBetaAnalytics: false, enableNotificationBell: false, groupedNotifications: false,
+    navigationDisplayMode: "side", notifications: [], onDismissNotification: vi.fn(), onMarkNotificationsOpened: vi.fn(),
+    onOpenApplicationFromNotification: vi.fn(), onPrimaryAction: vi.fn(), onUpdateApplication: vi.fn(), onUpdateAssessment: vi.fn(),
+    onUpdateInterview: vi.fn(), onViewChange: vi.fn(),
+  } as ComponentProps<typeof AppShell>;
+  let tree = render(() => AppShell(props));
+  call(named(tree, "BottomNavigation").props.onOpenMore);
+  tree = render(() => AppShell(props));
+  expect(named(tree, "MorePanel")).toBeDefined();
+  // The More flag is the first true slot; the phone flag is the one after it.
+  const isMoreSlot = host.slots.indexOf(true);
+  const isPhoneSlot = host.slots.indexOf(true, isMoreSlot + 1);
+  expect(isPhoneSlot).toBeGreaterThan(isMoreSlot);
+  host.slots[isPhoneSlot] = false;
+  render(() => AppShell(props));
+  expect(named(render(() => AppShell(props)), "MorePanel")).toBeUndefined();
 });
 it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
   const listeners = new Map<string, () => void>();
