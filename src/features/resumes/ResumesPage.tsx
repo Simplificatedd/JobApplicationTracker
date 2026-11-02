@@ -204,7 +204,7 @@ export function ResumesPage({
             Upload buttons and reappears if it receives keyboard focus. */}
         <div className="grid gap-3 md:grid-cols-[1.2fr_0.9fr_0.9fr_auto]">
           <Field
-            className="max-sm:sr-only max-sm:focus-within:not-sr-only"
+            className="max-md:sr-only max-md:focus-within:not-sr-only"
             label="File"
           >
             <input
@@ -217,7 +217,7 @@ export function ResumesPage({
             />
           </Field>
           <Field
-            className={showUploadDetails ? "" : "max-sm:hidden"}
+            className={showUploadDetails ? "" : "max-md:hidden"}
             id={`${uploadDetailsId}-name`}
             label="Display Name"
           >
@@ -230,7 +230,7 @@ export function ResumesPage({
             />
           </Field>
           <Field
-            className={showUploadDetails ? "" : "max-sm:hidden"}
+            className={showUploadDetails ? "" : "max-md:hidden"}
             id={`${uploadDetailsId}-version`}
             label="Version"
           >
@@ -254,7 +254,7 @@ export function ResumesPage({
           <button
             aria-controls={`${uploadDetailsId}-name ${uploadDetailsId}-version`}
             aria-expanded={showUploadDetails}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 sm:hidden"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 md:hidden"
             onClick={() => setShowUploadDetails((current) => !current)}
             type="button"
           >
