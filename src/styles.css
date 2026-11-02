@@ -134,6 +134,20 @@
     }
   }
 
+  /* Phones show only Filters and Sort: Filters takes its natural width so
+     the sort label has room, and the narrowest toolbars stack the two. */
+  @media (max-width: 767.98px) {
+    .applications-toolbar-controls {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+  }
+
+  @container (max-width: 18rem) {
+    .applications-toolbar-controls {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   /* Narrow application cards list fields as label/value rows; wider cards
      pair stacked fields. Same container-query approach as the toolbar. */
   .application-card {

@@ -98,9 +98,9 @@ describe("phone sort control", () => {
     );
 
     expect([...markup.matchAll(/<option[^>]*>([^<]+)<\/option>/g)].map((match) => match[1])).toEqual([
-      "Recently updated",
-      "Applied, newest first",
-      "Applied, oldest first",
+      "Last updated",
+      "Newest applied",
+      "Oldest applied",
       "Company A–Z",
       "Job title A–Z",
       "Status",

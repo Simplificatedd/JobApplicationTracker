@@ -173,7 +173,7 @@ export function ApplicationsToolbar({
           </button>
 
           <button
-            className="applications-toolbar-reset h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="applications-toolbar-reset h-10 items-center max-md:hidden justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onResetFilters}
             type="button"
           >
@@ -1013,9 +1013,9 @@ function PresenceFilterSelect({
 }
 
 const PHONE_SORT_OPTIONS: Array<{ label: string; sort: SortState }> = [
-  { label: "Recently updated", sort: DEFAULT_SORT_STATE },
-  { label: "Applied, newest first", sort: { column: "dateApplied", direction: "descending" } },
-  { label: "Applied, oldest first", sort: { column: "dateApplied", direction: "ascending" } },
+  { label: "Last updated", sort: DEFAULT_SORT_STATE },
+  { label: "Newest applied", sort: { column: "dateApplied", direction: "descending" } },
+  { label: "Oldest applied", sort: { column: "dateApplied", direction: "ascending" } },
   { label: "Company A–Z", sort: { column: "company", direction: "ascending" } },
   { label: "Job title A–Z", sort: { column: "jobTitle", direction: "ascending" } },
   { label: "Status", sort: { column: "status", direction: "ascending" } },
