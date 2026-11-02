@@ -138,10 +138,13 @@ function fuzzyWordScore(
     return 0;
   }
 
-  // Strict matching allows typos such as "gogle" but not abbreviations.
+  // Strict matching allows typos such as "gogle" but not abbreviations or
+  // short terms like "sre" that loosely fit an unrelated company name.
   if (
     options.strict &&
-    (query.length < 3 || query.length / value.length < 0.75)
+    (query.length < 4 ||
+      query[0] !== value[0] ||
+      query.length / value.length < 0.8)
   ) {
     return 0;
   }

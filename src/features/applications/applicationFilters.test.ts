@@ -7,6 +7,7 @@ import {
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
+  includeSelectedFilterOption,
   normalizeApplicationFilters,
   normalizeApplicationSort,
   sortApplications,
@@ -334,4 +335,20 @@ describe("canonical interview filters", () => {
       }, [{ ...interviews[0], type }])).toEqual([]);
     },
   );
+});
+
+describe("includeSelectedFilterOption", () => {
+  it("adds a selected value missing from the options", () => {
+    expect(includeSelectedFilterOption(["Acme"], "Google")).toEqual([
+      "Acme",
+      "Google",
+    ]);
+  });
+
+  it("leaves options unchanged when nothing new is selected", () => {
+    const options = ["Acme"];
+
+    expect(includeSelectedFilterOption(options, "Acme")).toBe(options);
+    expect(includeSelectedFilterOption(options, "")).toBe(options);
+  });
 });

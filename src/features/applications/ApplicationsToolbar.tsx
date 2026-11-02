@@ -1065,7 +1065,7 @@ function FilterSelect({
   );
 }
 
-function SearchScopeToggle({
+export function SearchScopeToggle({
   onChange,
   scope,
   viewMode,

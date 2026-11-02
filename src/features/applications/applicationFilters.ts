@@ -373,6 +373,17 @@ export function normalizeApplicationFilters(
   };
 }
 
+// Keeps an active filter value listed even when the current results no longer
+// contain it, such as a company picked from a cleared cross-archive search.
+export function includeSelectedFilterOption(
+  options: string[],
+  selected: string,
+) {
+  return selected && !options.includes(selected)
+    ? [...options, selected]
+    : options;
+}
+
 export function getApplicationFilterOptions(
   applications: Application[],
   field: "company" | "location",

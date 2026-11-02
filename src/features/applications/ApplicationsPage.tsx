@@ -12,6 +12,7 @@ import {
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
+  includeSelectedFilterOption,
   isNeedsAttention,
   normalizeApplicationFilters,
   normalizeApplicationSort,
@@ -174,8 +175,9 @@ export function ApplicationsPage({
     viewMode === "archive" ? archivedApplications : activeApplications;
   const viewLabel = viewMode === "archive" ? "Archived" : "Active";
   const [countScope, setCountScope] = useState<"view" | "total">("view");
-  // Not remembered with the table view: each visit starts with the default
-  // scope, and the stored table preferences keep their existing shape.
+  // Kept out of the remembered table view so stored preferences keep their
+  // shape. Like the search itself, it carries over between Applications and
+  // Archive because both views share this page instance.
   const [searchScope, setSearchScope] = useState<SearchScope>("all");
   const searchBase = selectSearchBase(
     applications,
@@ -183,13 +185,15 @@ export function ApplicationsPage({
     searchQuery,
     searchScope,
   );
-  const companyOptions = getApplicationFilterOptions(
-    searchBase.applications,
-    "company",
+  // A value picked from cross-archive results stays listed after the search
+  // is cleared, so the active filter is never hidden from its own dropdown.
+  const companyOptions = includeSelectedFilterOption(
+    getApplicationFilterOptions(searchBase.applications, "company"),
+    filters.company,
   );
-  const locationOptions = getApplicationFilterOptions(
-    searchBase.applications,
-    "location",
+  const locationOptions = includeSelectedFilterOption(
+    getApplicationFilterOptions(searchBase.applications, "location"),
+    filters.location,
   );
   // Search relevance takes priority; the selected column orders equal matches.
   const searchedApplications = searchApplications(

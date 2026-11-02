@@ -205,6 +205,32 @@ describe("searchApplications", () => {
     ]);
   });
 
+  it.each([
+    ["sre", "Sure Inc", "SRE"],
+    ["ios", "Ions", "iOS Engineer"],
+    ["mta", "Meta", "MTA Analyst"],
+  ])(
+    "does not let a loose company match for %s outrank title matches",
+    (query, company, jobTitle) => {
+      const looseCompany = {
+        ...baseApplication,
+        id: "company",
+        company,
+        jobTitle: "Intern",
+      };
+      const titleMatch = {
+        ...baseApplication,
+        id: "title",
+        company: "Acme",
+        jobTitle,
+      };
+
+      expect(
+        searchApplications([looseCompany, titleMatch], query)[0],
+      ).toBe(titleMatch);
+    },
+  );
+
   it("ignores case and repeated whitespace", () => {
     const match = { ...baseApplication, company: "Google  Singapore" };
 
