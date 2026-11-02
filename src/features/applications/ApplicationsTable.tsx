@@ -38,6 +38,8 @@ interface ApplicationsTableProps {
   emptyTitle?: string;
   enableDraggableColumnWidths: boolean;
   enableDeleteActiveApplications: boolean;
+  // Cross-archive search results label archived entries.
+  markArchivedApplications?: boolean;
   onArchiveApplication: (applicationId: string) => void;
   onDeleteApplication: (applicationId: string) => void;
   onOpenApplication: (applicationId: string) => void;
@@ -317,6 +319,7 @@ export function ApplicationsTable({
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
   enableDeleteActiveApplications,
+  markArchivedApplications = false,
   onArchiveApplication,
   onDeleteApplication,
   onOpenApplication,
@@ -491,6 +494,9 @@ export function ApplicationsTable({
                 onPreviewResume={onPreviewResume}
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
+                showArchivedBadge={
+                  markArchivedApplications && Boolean(application.archivedAt)
+                }
                 visibleColumnIds={visibleColumnIds}
                 resume={
                   application.resumeId
@@ -629,6 +635,10 @@ export function ApplicationsTable({
                     onPreviewResume={onPreviewResume}
                     onRestoreApplication={onRestoreApplication}
                     onUpdateApplication={onUpdateApplication}
+                    showArchivedBadge={
+                      markArchivedApplications &&
+                      Boolean(application.archivedAt)
+                    }
                     visibleColumnIds={visibleColumnIds}
                     resume={
                       application.resumeId
@@ -756,6 +766,7 @@ function ApplicationRow({
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  showArchivedBadge = false,
   visibleColumnIds,
   workingResumeId,
 }: {
@@ -770,6 +781,7 @@ function ApplicationRow({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  showArchivedBadge?: boolean;
   visibleColumnIds: ApplicationColumnId[];
   workingResumeId: string | null;
 }) {
@@ -815,6 +827,7 @@ function ApplicationRow({
                 onRestoreApplication={onRestoreApplication}
                 onUpdateApplication={onUpdateApplication}
                 resume={resume}
+                showArchivedBadge={showArchivedBadge}
                 workingResumeId={workingResumeId}
               />
             </div>
@@ -863,6 +876,7 @@ function ApplicationColumnCell({
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  showArchivedBadge = false,
   workingResumeId,
 }: {
   application: JobApplication;
@@ -876,13 +890,23 @@ function ApplicationColumnCell({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  showArchivedBadge?: boolean;
   workingResumeId: string | null;
 }) {
   if (columnId === "jobTitle") {
-    return (
+    const title = (
       <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground underline-offset-2 group-hover:text-primary group-hover:underline">
         {application.jobTitle}
       </span>
+    );
+
+    return showArchivedBadge ? (
+      <span className="flex min-w-0 items-center gap-2">
+        {title}
+        <ArchivedBadge />
+      </span>
+    ) : (
+      title
     );
   }
 
@@ -1049,6 +1073,7 @@ function ApplicationCard({
   onRestoreApplication,
   onUpdateApplication,
   resume,
+  showArchivedBadge = false,
   visibleColumnIds,
   workingResumeId,
 }: {
@@ -1063,6 +1088,7 @@ function ApplicationCard({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resume?: ResumeFile;
+  showArchivedBadge?: boolean;
   visibleColumnIds: ApplicationColumnId[];
   workingResumeId: string | null;
 }) {
@@ -1104,6 +1130,11 @@ function ApplicationCard({
           <p className="block max-w-full text-left text-sm font-semibold leading-5 text-foreground">
             {application.jobTitle}
           </p>
+          {showArchivedBadge ? (
+            <div className="mt-1">
+              <ArchivedBadge />
+            </div>
+          ) : null}
           {isColumnVisible("company") && application.company ? (
             <p className="mt-1 truncate text-xs font-medium text-muted">
               {application.company}
@@ -1171,6 +1202,14 @@ function shouldIgnoreEntryOpen(
   );
 
   return Boolean(interactiveElement && interactiveElement !== currentTarget);
+}
+
+function ArchivedBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border border-border bg-slate-100 px-2 py-0.5 text-xs font-semibold text-muted">
+      Archived
+    </span>
+  );
 }
 
 function CardField({

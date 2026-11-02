@@ -36,6 +36,7 @@ import {
   DEFAULT_APPLICATION_FILTERS,
   type ApplicationFilters,
 } from "./applicationFilters";
+import type { SearchScope } from "./applicationSearch";
 import type {
   InterviewType,
   JobType,
@@ -53,7 +54,10 @@ interface ApplicationsToolbarProps {
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
   onSearchQueryChange?: (value: string) => void;
+  onSearchScopeChange?: (scope: SearchScope) => void;
   searchQuery?: string;
+  searchScope?: SearchScope;
+  viewMode?: "active" | "archive";
   visibleApplicationColumns?: string[];
 }
 
@@ -67,7 +71,10 @@ export function ApplicationsToolbar({
   onNeedsAttentionOnlyChange,
   onResetFilters,
   onSearchQueryChange,
+  onSearchScopeChange,
   searchQuery = "",
+  searchScope = "all",
+  viewMode = "active",
   visibleApplicationColumns = [],
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
@@ -85,31 +92,40 @@ export function ApplicationsToolbar({
   return (
     <section className="surface-panel applications-toolbar rounded-lg p-4">
       <div className="applications-toolbar-grid grid gap-3">
-        <label className="relative block min-w-0">
-          <Search
-            aria-hidden="true"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            size={18}
-          />
-          <span className="sr-only">Search applications</span>
-          <input
-            className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
-            onChange={(event) => onSearchQueryChange?.(event.target.value)}
-            placeholder="Search jobs or descriptions"
-            type="search"
-            value={searchQuery}
-          />
-          {searchQuery ? (
-            <button
-              className="touch-target absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
-              onClick={() => onSearchQueryChange?.("")}
-              type="button"
-            >
-              <X aria-hidden="true" size={15} />
-              <span className="sr-only">Clear search</span>
-            </button>
+        <div className="grid min-w-0 gap-2">
+          <label className="relative block min-w-0">
+            <Search
+              aria-hidden="true"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              size={18}
+            />
+            <span className="sr-only">Search applications</span>
+            <input
+              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
+              onChange={(event) => onSearchQueryChange?.(event.target.value)}
+              placeholder="Search companies, jobs or descriptions"
+              type="search"
+              value={searchQuery}
+            />
+            {searchQuery ? (
+              <button
+                className="touch-target absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-slate-100 hover:text-foreground"
+                onClick={() => onSearchQueryChange?.("")}
+                type="button"
+              >
+                <X aria-hidden="true" size={15} />
+                <span className="sr-only">Clear search</span>
+              </button>
+            ) : null}
+          </label>
+          {searchQuery.trim() && onSearchScopeChange ? (
+            <SearchScopeToggle
+              onChange={onSearchScopeChange}
+              scope={searchScope}
+              viewMode={viewMode}
+            />
           ) : null}
-        </label>
+        </div>
 
         <div className="applications-toolbar-controls grid min-w-0 gap-2">
           <div className="applications-primary-filter min-w-0">
@@ -1046,5 +1062,52 @@ function FilterSelect({
         size={16}
       />
     </label>
+  );
+}
+
+export function SearchScopeToggle({
+  onChange,
+  scope,
+  viewMode,
+}: {
+  onChange: (scope: SearchScope) => void;
+  scope: SearchScope;
+  viewMode: "active" | "archive";
+}) {
+  const options = [
+    { value: "all", label: "Active and archived" },
+    {
+      value: "section",
+      label: viewMode === "archive" ? "Archived only" : "Active only",
+    },
+  ] as const;
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+      <span className="font-medium text-muted" id="search-scope-label">
+        Searching
+      </span>
+      <div
+        aria-labelledby="search-scope-label"
+        className="inline-flex shrink-0 rounded-md border border-border bg-background p-0.5"
+        role="group"
+      >
+        {options.map((option) => (
+          <button
+            aria-pressed={scope === option.value}
+            className={`touch-target rounded px-2 py-0.5 font-semibold transition ${
+              scope === option.value
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-muted hover:text-foreground"
+            }`}
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

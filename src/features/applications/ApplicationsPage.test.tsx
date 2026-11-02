@@ -120,22 +120,83 @@ describe("application search results in the table", () => {
     expect(renderPage("accounting")).toContain("No matching applications");
   });
 
+  const archivedMatch: Application = {
+    ...titleMatch,
+    id: "archived",
+    jobTitle: "Archived Software Engineer",
+    archivedAt: "2026-09-03T00:00:00.000Z",
+  };
+  const archivedBadge = />Archived<\/span>/;
+
   it.each(["active", "archive"] as const)(
-    "searches only applications in the %s view",
+    "searches active and archived applications from the %s view",
     (viewMode) => {
-      const archived = {
-        ...titleMatch,
-        jobTitle: "Archived Software Engineer",
-        archivedAt: "2026-09-03T00:00:00.000Z",
-      };
       const html = renderPage("software", {
-        applications: [archived, descriptionMatch],
+        applications: [archivedMatch, descriptionMatch],
         viewMode,
       });
-      expect(html.includes(archived.jobTitle)).toBe(viewMode === "archive");
-      expect(html.includes(descriptionMatch.jobTitle)).toBe(viewMode === "active");
+      expect(html).toContain(archivedMatch.jobTitle);
+      expect(html).toContain(descriptionMatch.jobTitle);
+      expect(html).toMatch(archivedBadge);
     },
   );
+
+  it.each(["active", "archive"] as const)(
+    "keeps the %s section split for blank searches",
+    (viewMode) => {
+      const html = renderPage("", {
+        applications: [archivedMatch, descriptionMatch],
+        viewMode,
+      });
+      expect(html.includes(archivedMatch.jobTitle)).toBe(viewMode === "archive");
+      expect(html.includes(descriptionMatch.jobTitle)).toBe(viewMode === "active");
+      expect(html).not.toMatch(archivedBadge);
+    },
+  );
+
+  it.each([
+    ["active", "Active only"],
+    ["archive", "Archived only"],
+  ] as const)(
+    "shows the active search scope in the %s view",
+    (viewMode, sectionLabel) => {
+      const html = renderPage("software", { viewMode });
+      expect(html).toContain(
+        '<button aria-pressed="true" class="touch-target rounded px-2 py-0.5 font-semibold transition bg-surface text-foreground shadow-sm" type="button">Active and archived</button>',
+      );
+      expect(html).toContain(sectionLabel);
+      expect(renderPage("", { viewMode })).not.toContain("Active and archived");
+    },
+  );
+
+  it("finds applications by company name", () => {
+    const html = renderPage("example company", {
+      applications: [descriptionMatch, { ...titleMatch, company: "Other Co" }],
+    });
+    expect(html).toContain(descriptionMatch.jobTitle);
+    expect(html).not.toContain(titleMatch.jobTitle);
+  });
+
+  it("explains that a cross-archive search found nothing", () => {
+    expect(renderPage("accounting")).toContain(
+      "No active or archived applications match",
+    );
+  });
+
+  it("composes cross-archive search with status filters", () => {
+    const html = renderPage("software", {
+      applications: [
+        { ...archivedMatch, status: "Rejected" },
+        { ...titleMatch, status: "Awaiting Response" },
+      ],
+      tablePreferences: {
+        ...tablePreferences,
+        filters: { ...DEFAULT_APPLICATION_FILTERS, status: "Rejected" },
+      },
+    });
+    expect(html).toContain(archivedMatch.jobTitle);
+    expect(html).not.toContain(`>${titleMatch.jobTitle}<`);
+  });
 
   it("composes search with status filters", () => {
     const html = renderPage("software", {
