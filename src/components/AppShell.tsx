@@ -359,10 +359,7 @@ export function AppShell({
           currentView={currentView}
           items={visibleNavigation}
           onClose={() => setIsMorePanelOpen(false)}
-          onViewChange={(view) => {
-            setIsMorePanelOpen(false);
-            onViewChange(view);
-          }}
+          onViewChange={onViewChange}
         />
       ) : null}
     </div>
@@ -437,11 +434,11 @@ export function MorePanel({
 }) {
   return (
     <NativeModal
-      className="modal-overlay fixed inset-0 z-40 flex items-end"
+      className="modal-overlay sheet-overlay fixed inset-0 z-40 flex items-end"
       labelledBy="more-navigation-title"
       onRequestClose={onClose}
     >
-      <div className="w-full rounded-t-2xl bg-surface px-4 pb-4 pt-3 shadow-popover">
+      <div className="w-full rounded-t-2xl bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-popover">
         <div className="flex items-center justify-between gap-3">
           <h2
             className="text-base font-semibold text-foreground"
@@ -476,7 +473,10 @@ export function MorePanel({
                       : "text-foreground hover:bg-slate-100"
                   }`}
                   key={item.key}
-                  onClick={() => onViewChange(item.key)}
+                  onClick={() => {
+                    onClose();
+                    onViewChange(item.key);
+                  }}
                   type="button"
                 >
                   <Icon aria-hidden="true" size={18} />

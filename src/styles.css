@@ -262,6 +262,11 @@
       env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
   }
 
+  /* Bottom sheets run under the home indicator and pad their own content. */
+  .modal-overlay.sheet-overlay {
+    border-bottom-width: 0 !important;
+  }
+
   .field-control {
     min-height: 2.5rem;
     width: 100%;

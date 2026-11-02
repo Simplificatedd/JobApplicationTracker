@@ -130,9 +130,17 @@ describe("AppShell phone navigation", () => {
       expect(labels(tabletNavigation)).toEqual([
         "Applications", "Archive", "Resumes", "Cover Letters", "Settings",
       ]);
-      expect(markup).toMatch(/class="[^"]*max-md:hidden[^"]*"[^>]*>(?:(?!<\/nav>)[\s\S])*aria-label="Primary navigation"/);
+      const row = navigationDisplayMode === "side" ? "<aside" : "border-b border-border bg-surface px-4 py-3";
+      expect(classOf(markup, row)).toContain("max-md:hidden");
     }
     expect(classOf(renderShell(), 'aria-label="Hide side navigation"')).toContain("max-md:hidden");
+  });
+
+  it("shows the header bell on phones and desktops, but not beside the tablet row's bell", () => {
+    const markup = renderShell({ enableNotificationBell: true });
+
+    expect(markup).toContain('<div class="md:max-lg:hidden">');
+    expect(markup).toContain('<div class="lg:hidden">');
   });
 
   it("pads page content clear of the bottom bar", () => {
@@ -153,4 +161,27 @@ describe("AppShell phone navigation", () => {
     ]);
     expect(moreNavigation).toMatch(/aria-current="page"[^>]*>.*?Settings/);
   });
+
+  it("closes the More panel before navigating", () => {
+    const calls: string[] = [];
+    const panel = MorePanel({
+      currentView: "applications",
+      items: navigationItems,
+      onClose: () => calls.push("close"),
+      onViewChange: (view) => calls.push(view),
+    });
+    const settings = flatten(panel).find(
+      (node) => node.type === "button" && JSON.stringify(node.props.children).includes("Settings"),
+    )!;
+
+    (settings.props.onClick as () => void)();
+    expect(calls).toEqual(["close", "settings"]);
+  });
 });
+
+type Node = { type: unknown; props: Record<string, unknown> };
+function flatten(node: unknown): Node[] {
+  if (Array.isArray(node)) return node.flatMap(flatten);
+  if (!node || typeof node !== "object" || !("props" in node)) return [];
+  return [node as Node, ...flatten((node as Node).props.children)];
+}
