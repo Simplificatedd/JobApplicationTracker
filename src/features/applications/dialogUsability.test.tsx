@@ -130,16 +130,20 @@ it("closes only the actions menu on Escape, leaving the detail panel to handle E
   const next = escape(); call(actionsWrapper(closed).props.onKeyDown, next);
   expect(next.stopPropagation).not.toHaveBeenCalled();
 });
-it("closes the actions menu on an outside pointer, but not on one inside it", () => {
+it("closes the actions menu when a pointer or focus moves outside it, but not inside it", () => {
   const props = detailProps(); openActions(props);
   // The first null ref slot is the menu wrapper, declared before the trigger ref.
   const inside = { target: "inside" }; const ref = host.slots.find(s => s && typeof s === "object" && "current" in s && (s as { current: unknown }).current === null) as { current: unknown };
   ref.current = { contains: (node: unknown) => node === inside.target };
   listeners.get("pointerdown")!(inside);
   expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(true);
+  listeners.get("focusin")!(inside);
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(true);
   listeners.get("pointerdown")!({ target: "outside" });
   expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
-  expect(listeners.has("pointerdown")).toBe(false);
+  expect(listeners.size).toBe(0);
+  openActions(props); listeners.get("focusin")!({ target: "outside" });
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });
 it("blocks repeat header actions while one is pending and shows its failure in the panel", async () => {
   let resolve!: (value: unknown) => void;

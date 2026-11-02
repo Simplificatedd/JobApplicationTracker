@@ -168,18 +168,20 @@ export function ApplicationDetailPanel({
       return;
     }
 
-    // Pointer-based, not blur-based: Safari and macOS Firefox do not focus a
-    // clicked button, so a blur check would close the menu before its click.
-    function closeOnOutsidePointer(event: PointerEvent) {
+    // Not blur-based: Safari and macOS Firefox do not focus a clicked button,
+    // so a blur check would close the menu before an item's click landed.
+    function closeOnOutsideEvent(event: Event) {
       if (!actionsRef.current?.contains(event.target as Node)) {
         setIsActionsMenuOpen(false);
       }
     }
 
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("pointerdown", closeOnOutsideEvent);
+    document.addEventListener("focusin", closeOnOutsideEvent);
 
     return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("pointerdown", closeOnOutsideEvent);
+      document.removeEventListener("focusin", closeOnOutsideEvent);
     };
   }, [isActionsMenuOpen]);
 
@@ -378,16 +380,6 @@ export function ApplicationDetailPanel({
               <>
                 <div
                   className="relative"
-                  onBlur={(event) => {
-                    // Tabbing away closes the menu. A click gives no related
-                    // target in Safari, so pointers are handled above.
-                    if (
-                      event.relatedTarget &&
-                      !event.currentTarget.contains(event.relatedTarget)
-                    ) {
-                      setIsActionsMenuOpen(false);
-                    }
-                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Escape" && isActionsMenuOpen) {
                       // Close only the menu, not the detail dialog, wherever
