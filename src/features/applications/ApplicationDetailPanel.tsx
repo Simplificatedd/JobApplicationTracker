@@ -506,7 +506,7 @@ export function ApplicationDetailPanel({
           <label className="block border-b border-border px-4 pb-3 sm:px-6 md:hidden">
             <span className="sr-only">Application status</span>
             <select
-              className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
+              className="field-control h-11 w-auto max-w-full py-1 text-sm font-semibold"
               // Like the actions trigger, it stays enabled while saving so
               // focus is not lost; changes wait for the save to settle.
               disabled={nestedEditorOpen}

@@ -118,6 +118,8 @@ describe("application detail layout", () => {
 
     expect(header).toMatch(/<label class="block border-b border-border px-4 pb-3 sm:px-6 md:hidden"><span class="sr-only">Application status<\/span><select/);
     expect(header).toMatch(new RegExp(`<option value="${application.status}" selected="">`));
+    // Phone-only, so the 44px tap height applies at every width it shows.
+    expect(header).toMatch(/<select class="field-control h-11 /);
     expect(html).toMatch(/<header class="[^"]*max-md:border-b-0"/);
   });
 });

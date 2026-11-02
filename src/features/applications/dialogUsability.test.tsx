@@ -185,7 +185,7 @@ it("returns focus to the trigger when the trigger closes the menu", () => {
 it("changes the status from the phone header through the guarded header action", async () => {
   let resolve!: (value: unknown) => void;
   const props = { ...detailProps(), onUpdate: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
-  const picker = (tree: unknown) => elements(tree).find(e => e.type === "select" && e.props.className?.toString().includes("field-control h-9"))!;
+  const picker = (tree: unknown) => elements(tree).find(e => e.type === "select" && e.props.className?.toString().includes("field-control h-11"))!;
   let tree = render(() => ApplicationDetailPanel(props));
   expect(picker(tree).props.value).toBe(application.status);
   call(picker(tree).props.onChange, { target: { value: "Offered" } });
