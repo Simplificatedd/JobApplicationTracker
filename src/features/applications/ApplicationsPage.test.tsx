@@ -335,6 +335,50 @@ describe("applications page on phones", () => {
     expect(rowTexts(html)[0]).toContain("Interview · 05 Nov 2026, 02:30 pm");
   });
 
+  it("finds the next event beyond the attention window and with interview attention off", () => {
+    const html = renderPage("", {
+      applications: [{ ...titleMatch, status: "Interviewing", followUpDate: "2026-11-20" }],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: titleMatch.id,
+          dateTime: "2026-11-30T09:00",
+          mode: "video",
+          proctored: false,
+          round: 1,
+          type: "technical-interview",
+          createdAt: titleMatch.createdAt,
+          updatedAt: titleMatch.updatedAt,
+        },
+      ],
+      now: new Date(2026, 10, 2, 12, 0),
+      settings: { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3, includeUpcomingInterviewsInAttention: false },
+    });
+
+    expect(rowTexts(html)[0]).toContain("Follow up · 20 Nov 2026");
+  });
+
+  it("shows no event for archived applications", () => {
+    const html = renderPage("engineer", {
+      applications: [{ ...titleMatch, archivedAt: "2026-10-01T00:00:00.000Z", followUpDate: "2026-11-20" }],
+      now: new Date(2026, 10, 2, 12, 0),
+    });
+
+    expect(rowTexts(html)[0]).not.toContain("Follow up");
+  });
+
+  it("explains an empty list filtered only by company", () => {
+    const html = renderPage("", {
+      tablePreferences: {
+        ...tablePreferences,
+        searchQuery: "",
+        filters: { ...DEFAULT_APPLICATION_FILTERS, company: "Nobody Inc" },
+      },
+    });
+
+    expect(html).toContain("No applications match these filters");
+  });
+
   it("marks archived results in a cross-archive search", () => {
     const html = renderPage("engineer", {
       applications: [{ ...titleMatch, archivedAt: "2026-10-01T00:00:00.000Z" }],

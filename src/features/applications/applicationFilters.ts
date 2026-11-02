@@ -594,6 +594,7 @@ export function countActiveFilters(
 ) {
   return [
     filters.applicationUrl,
+    filters.company,
     filters.contacts,
     filters.coverLetterVersion,
     filters.dateApplied,

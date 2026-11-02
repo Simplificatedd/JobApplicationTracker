@@ -223,12 +223,19 @@ export function ApplicationsPage({
       )
     : filteredApplications;
   const visibleApplications = focusedApplications;
+  // Rows show the next event however far ahead it is, so the attention
+  // window and the interview-attention setting are widened for this lookup.
+  const upcomingEventSettings = {
+    ...settings,
+    dueSoonDays: 36500,
+    includeUpcomingInterviewsInAttention: true,
+  };
   const upcomingEvents = new Map(
     visibleApplications.flatMap((application) => {
       const event = selectUpcomingEvent(
         deriveApplicationNotifications(
           application,
-          settings,
+          upcomingEventSettings,
           now,
           interviews.filter(
             (interview) => interview.applicationId === application.id,
