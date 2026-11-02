@@ -150,6 +150,8 @@ export function ApplicationDetailPanel({
   const [isActionPending, setIsActionPending] = useState(false);
   const [actionError, setActionError] = useState("");
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  // Shows a chosen status while it saves; cleared when the save settles.
+  const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(null);
   const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
@@ -497,14 +499,18 @@ export function ApplicationDetailPanel({
             <span className="sr-only">Application status</span>
             <select
               className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
-              disabled={headerActionsDisabled}
+              // Like the actions trigger, it stays enabled while saving so
+              // focus is not lost; changes wait for the save to settle.
+              disabled={nestedEditorOpen}
               onChange={(event) => {
+                if (isActionPending) return;
                 const status = event.target.value as ApplicationStatus;
+                setPendingStatus(status);
                 void runHeaderAction((id) =>
                   onUpdate(id, createStatusQuickEdit(status)),
-                );
+                ).finally(() => setPendingStatus(null));
               }}
-              value={application.status}
+              value={pendingStatus ?? application.status}
             >
               {APPLICATION_STATUSES.map((status) => (
                 <option key={status} value={status}>
@@ -698,7 +704,7 @@ function ReadOnlyDetails({
         {isPhone ? (
           <h3 className="text-sm font-semibold text-foreground">Key facts</h3>
         ) : null}
-        <section className="grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           <InfoTile className="max-md:hidden" label="Status">
             <StatusBadge status={application.status} />
           </InfoTile>
