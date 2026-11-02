@@ -1053,7 +1053,7 @@ function NumberField({
       <SettingLabel description={description} label={label} />
       <span className="inline-flex shrink-0 items-center gap-2 self-start">
         <input
-          className="field-control h-9 w-20 text-right tabular-nums"
+          className="field-control h-9 w-20 text-right tabular-nums max-md:h-11"
           min={min}
           onChange={(event) =>
             onChange(Math.max(min, Math.floor(Number(event.target.value)) || min))
@@ -1108,7 +1108,7 @@ function TextField({
     >
       <SettingLabel description={description} label={label} />
       <input
-        className="field-control h-9 w-full shrink-0 self-start sm:w-48"
+        className="field-control h-9 w-full shrink-0 self-start max-md:h-11 sm:w-48"
         disabled={disabled}
         maxLength={80}
         onBlur={commitDraft}

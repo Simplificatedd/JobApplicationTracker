@@ -111,3 +111,15 @@ describe("phone confirmation buttons", () => {
     expect(countMatches(source, "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600")).toBe(2);
   });
 });
+
+describe("phone settings fields", () => {
+  it("gives the number and text fields 44px on phones", () => {
+    const markup = renderPage();
+
+    const fields = markup.match(/class="field-control[^"]*"/g) ?? [];
+
+    // Two day counts and the quick location.
+    expect(fields).toHaveLength(3);
+    for (const field of fields) expect(field).toContain("max-md:h-11");
+  });
+});
