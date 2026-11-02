@@ -22,6 +22,8 @@ import {
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { NativeModal } from "../../components/NativeModal";
+import { usePhoneLayout } from "../../hooks/usePhoneLayout";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import {
   type DuplicateApplicationMatch,
   findDuplicateApplication,
@@ -159,6 +161,7 @@ export function AddApplicationModal({
     createInitialFormState(),
   );
   const [form, setForm] = useState<AddApplicationFormState>(cleanForm);
+  const visibleViewportStyle = useVisibleViewportStyle(usePhoneLayout());
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [resumeUploadFile, setResumeUploadFile] = useState<File | null>(null);
   const [coverLetterUploadFile, setCoverLetterUploadFile] =
@@ -462,9 +465,13 @@ export function AddApplicationModal({
     <NativeModal
       labelledBy="add-application-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4"
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-0 max-md:items-start md:p-4"
     >
-      <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover max-md:h-full max-md:max-h-none max-md:rounded-none">
+      {/* Phones fill the screen, sized to what the keyboard leaves visible. */}
+      <div
+        className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover max-md:h-full max-md:max-h-none max-md:rounded-none"
+        style={visibleViewportStyle}
+      >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6 md:py-4">
           <h2
             className="text-lg font-semibold text-foreground"

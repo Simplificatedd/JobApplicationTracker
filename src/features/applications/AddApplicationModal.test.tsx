@@ -37,7 +37,7 @@ describe("AddApplicationModal on phones", () => {
   it("fills the screen below md and keeps the dialog layout from md up", () => {
     const markup = renderModal();
 
-    expect(markup).toMatch(/<dialog[^>]*class="[^"]*\bp-0 md:p-4\b/);
+    expect(markup).toMatch(/<dialog[^>]*class="[^"]*\bp-0 max-md:items-start md:p-4\b/);
     expect(markup).toContain(
       'class="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover max-md:h-full max-md:max-h-none max-md:rounded-none"',
     );

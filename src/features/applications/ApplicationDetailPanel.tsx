@@ -44,6 +44,7 @@ import {
 import { moveMenuFocus } from "./TableCells";
 import { NativeModal } from "../../components/NativeModal";
 import { usePhoneLayout } from "../../hooks/usePhoneLayout";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type {
   ApplicationUpdate,
   MutationResult,
@@ -145,6 +146,8 @@ export function ApplicationDetailPanel({
   workingCoverLetterId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const isPhone = usePhoneLayout();
+  const editViewportStyle = useVisibleViewportStyle(isEditing && isPhone);
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
@@ -341,7 +344,11 @@ export function ApplicationDetailPanel({
       onRequestClose={requestClose}
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
     >
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover md:rounded-lg">
+      {/* While editing on a phone, size to what the keyboard leaves visible. */}
+      <div
+        className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover md:rounded-lg"
+        style={editViewportStyle}
+      >
         <header
           className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
             isEditing ? "" : "max-md:border-b-0"
