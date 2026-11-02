@@ -185,3 +185,11 @@ function flatten(node: unknown): Node[] {
   if (!node || typeof node !== "object" || !("props" in node)) return [];
   return [node as Node, ...flatten((node as Node).props.children)];
 }
+
+describe("AppShell phone primary action", () => {
+  it("sizes the top-bar primary action to 44px on phones", () => {
+    const classes = classOf(renderShell(), 'aria-label="Add job"').split(" ");
+
+    expect(classes).toEqual(expect.arrayContaining(["h-10", "min-w-10", "max-md:h-11", "max-md:min-w-11"]));
+  });
+});

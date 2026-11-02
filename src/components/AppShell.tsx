@@ -330,7 +330,7 @@ export function AppShell({
                 {showAddButton ? (
                   <button
                     aria-label={addLabel}
-                    className="inline-flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 md:px-4"
+                    className="inline-flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 max-md:h-11 max-md:min-w-11 md:px-4"
                     onClick={onPrimaryAction}
                     type="button"
                   >
