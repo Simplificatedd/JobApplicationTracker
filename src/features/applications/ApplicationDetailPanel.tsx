@@ -339,7 +339,11 @@ export function ApplicationDetailPanel({
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
-        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
+        <header
+          className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
+            isEditing ? "" : "max-md:border-b-0"
+          }`}
+        >
           <div className="min-w-0">
             {application.company ? (
               <p className="text-sm font-medium text-muted">
@@ -352,30 +356,6 @@ export function ApplicationDetailPanel({
             >
               {application.jobTitle}
             </h2>
-            {/* Phones keep the status in the sticky header and change it in
-                place; the table's quick-edit popover cannot open in a modal. */}
-            {!isEditing ? (
-              <label className="mt-2 block md:hidden">
-                <span className="sr-only">Application status</span>
-                <select
-                  className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
-                  disabled={headerActionsDisabled}
-                  onChange={(event) => {
-                    const status = event.target.value as ApplicationStatus;
-                    void runHeaderAction((id) =>
-                      onUpdate(id, createStatusQuickEdit(status)),
-                    );
-                  }}
-                  value={application.status}
-                >
-                  {APPLICATION_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isEditing ? (
@@ -509,6 +489,31 @@ export function ApplicationDetailPanel({
             </button>
           </div>
         </header>
+
+        {/* Phones keep the status in the sticky header area and change it in
+            place; the table's quick-edit popover cannot open in a modal. */}
+        {!isEditing ? (
+          <label className="block border-b border-border px-4 pb-3 sm:px-6 md:hidden">
+            <span className="sr-only">Application status</span>
+            <select
+              className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
+              disabled={headerActionsDisabled}
+              onChange={(event) => {
+                const status = event.target.value as ApplicationStatus;
+                void runHeaderAction((id) =>
+                  onUpdate(id, createStatusQuickEdit(status)),
+                );
+              }}
+              value={application.status}
+            >
+              {APPLICATION_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
@@ -924,6 +929,8 @@ function usePhoneLayout() {
     const query = window.matchMedia?.(PHONE_LAYOUT_QUERY);
     if (!query) return;
     const update = () => setIsPhone(query.matches);
+    // Catch a change between the first render and this subscription.
+    update();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);

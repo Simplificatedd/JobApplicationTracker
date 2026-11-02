@@ -112,9 +112,11 @@ describe("application detail layout", () => {
 
   it("shows the status as a phone-only picker in the header", () => {
     const html = renderPanel();
-    const header = /<header[\s\S]*?<\/header>/.exec(html)?.[0] ?? "";
+    // The picker sits directly under the header row, outside the scrolling body.
+    const header = /<\/header><label[\s\S]*?<\/label>/.exec(html)?.[0] ?? "";
 
-    expect(header).toMatch(/<label class="mt-2 block md:hidden"><span class="sr-only">Application status<\/span><select/);
+    expect(header).toMatch(/<label class="block border-b border-border px-4 pb-3 sm:px-6 md:hidden"><span class="sr-only">Application status<\/span><select/);
     expect(header).toMatch(new RegExp(`<option value="${application.status}" selected="">`));
+    expect(html).toMatch(/<header class="[^"]*max-md:border-b-0"/);
   });
 });
