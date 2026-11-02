@@ -49,6 +49,10 @@ import {
   createInterviewQuickEdit,
   createStatusQuickEdit,
 } from "./applicationQuickEdits";
+import {
+  canDeleteApplication,
+  confirmApplicationDelete,
+} from "./applicationActions";
 import { StatusBadge } from "./StatusBadge";
 import {
   FollowUpAutoResetControls,
@@ -608,7 +612,10 @@ export function RowActionsMenu({
   onRestoreApplication: (applicationId: string) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
 }) {
-  const canDelete = Boolean(application.archivedAt) || enableDeleteActiveApplications;
+  const canDelete = canDeleteApplication(
+    application,
+    enableDeleteActiveApplications,
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
   const menuId = useId();
@@ -681,11 +688,7 @@ export function RowActionsMenu({
   }, [isOpen]);
 
   function confirmDelete() {
-    const confirmed = window.confirm(
-      `Delete "${application.jobTitle}" permanently? This also removes linked contacts, interviews, and activity.`,
-    );
-
-    if (confirmed) {
+    if (confirmApplicationDelete(application)) {
       setIsOpen(false);
       onDeleteApplication(application.id);
     }

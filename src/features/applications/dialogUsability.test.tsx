@@ -45,6 +45,7 @@ function detailProps(): ComponentProps<typeof ApplicationDetailPanel> {
   return {
     application, assessments: [], assessmentActions: assessmentActions(), activities: [], contacts: [], coverLetters: [], interviews: [], resumes: [],
     coverLetterActionError: "", resumeActionError: "", workingResumeId: null, workingCoverLetterId: null,
+    enableDeleteActiveApplications: false, onArchive: vi.fn(), onDelete: vi.fn(), onRestore: vi.fn(),
     onClose: vi.fn(), onAddInterview: vi.fn(), onDeleteInterview: vi.fn(), onUpdate: vi.fn(), onUpdateInterview: vi.fn(),
     onDownloadCoverLetter: vi.fn(), onDownloadResume: vi.fn(), onPreviewResume: vi.fn(), onPreviewCoverLetter: vi.fn(),
   };
@@ -78,4 +79,31 @@ it("keeps an assessment editor registered until its explicit Cancel", () => {
   const name = elements(tree).find(e => e.type === "input" && e.props.value === "")!; call(name.props.onChange, { target: { value: "Keep my assessment" } });
   tree = view(); expect(elements(tree).some(e => e.type === "input" && e.props.value === "Keep my assessment")).toBe(true);
   call(button(tree, "Cancel").props.onClick); view(); expect((props.onEditingChange as Mock).mock.lastCall).toEqual([false]);
+});
+it("archives an active application from the detail header", () => {
+  const props = detailProps(); const tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Archive").props.onClick); expect(props.onArchive).toHaveBeenCalledWith(application.id);
+  expect(button(tree, "Restore")).toBeUndefined(); expect(button(tree, "Delete")).toBeUndefined();
+});
+it("restores and deletes an archived application after confirmation", () => {
+  const props = { ...detailProps(), application: { ...application, archivedAt: "2026-10-01T00:00:00.000Z" } };
+  let tree = render(() => ApplicationDetailPanel(props)); expect(button(tree, "Archive")).toBeUndefined();
+  call(button(tree, "Restore").props.onClick); expect(props.onRestore).toHaveBeenCalledWith(application.id);
+  vi.stubGlobal("window", { confirm: () => false }); tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Delete").props.onClick); expect(props.onDelete).not.toHaveBeenCalled();
+  vi.stubGlobal("window", { confirm: () => true }); tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Delete").props.onClick); expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+it("offers active deletion only when it is enabled in Settings", () => {
+  const props = { ...detailProps(), enableDeleteActiveApplications: true };
+  const tree = render(() => ApplicationDetailPanel(props)); call(button(tree, "Delete").props.onClick);
+  expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+it("disables header actions while a nested editor is open and hides them while editing", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true); tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive").props.disabled).toBe(true);
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, false); tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive")).toBeUndefined();
 });

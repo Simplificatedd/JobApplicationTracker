@@ -266,6 +266,13 @@ export function ApplicationsPage({
     sort,
   ]);
 
+  async function deleteAndCloseApplication(id: string) {
+    const result = await deleteApplication(id);
+    if (result.ok && id === selectedApplicationId) {
+      setSelectedApplicationId(null);
+    }
+  }
+
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
     setFilters(DEFAULT_APPLICATION_FILTERS);
@@ -365,12 +372,7 @@ export function ApplicationsPage({
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
-        onDeleteApplication={async (id) => {
-          const result = await deleteApplication(id);
-          if (result.ok && id === selectedApplicationId) {
-            setSelectedApplicationId(null);
-          }
-        }}
+        onDeleteApplication={deleteAndCloseApplication}
         onOpenApplication={setSelectedApplicationId}
         onOpenContacts={setContactsApplicationId}
         onColumnWidthsChange={setColumnWidths}
@@ -409,8 +411,12 @@ export function ApplicationsPage({
           interviews={interviews.filter(
             (interview) => interview.applicationId === selectedApplication.id,
           )}
+          enableDeleteActiveApplications={enableDeleteActiveApplications}
           onAddInterview={addInterview}
+          onArchive={archiveApplication}
           onClose={() => setSelectedApplicationId(null)}
+          onDelete={deleteAndCloseApplication}
+          onRestore={restoreApplication}
           onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}

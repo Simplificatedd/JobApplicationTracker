@@ -1,4 +1,5 @@
 import {
+  Archive,
   CalendarCheck,
   CalendarPlus,
   CalendarX,
@@ -7,6 +8,8 @@ import {
   Eye,
   ExternalLink,
   Pencil,
+  RotateCcw,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -32,6 +35,10 @@ import {
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
+import {
+  canDeleteApplication,
+  confirmApplicationDelete,
+} from "./applicationActions";
 import { NativeModal } from "../../components/NativeModal";
 import type {
   ApplicationUpdate,
@@ -70,7 +77,11 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   coverLetter?: CoverLetterMetadata;
   coverLetterActionError: string;
   coverLetters: CoverLetterMetadata[];
+  enableDeleteActiveApplications: boolean;
+  onArchive: (id: string) => void;
   onClose: () => void;
+  onDelete: (id: string) => void;
+  onRestore: (id: string) => void;
   onAddInterview: (
     input: InterviewInput,
   ) => Promise<MutationResult<Interview>>;
@@ -108,14 +119,18 @@ export function ApplicationDetailPanel({
   coverLetter,
   coverLetterActionError,
   coverLetters,
+  enableDeleteActiveApplications,
   interviews,
   onAddInterview,
+  onArchive,
   onClose,
+  onDelete,
   onDeleteInterview,
   onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
   onPreviewCoverLetter,
+  onRestore,
   onUpdate,
   onUpdateInterview,
   resume,
@@ -311,10 +326,54 @@ export function ApplicationDetailPanel({
                 </button>
               </>
             ) : (
-              <button className="icon-button" disabled={nestedEditorOpen} onClick={startEditing} type="button">
-                <Pencil aria-hidden="true" size={18} />
-                <span className="sr-only">Edit</span>
-              </button>
+              <>
+                {application.archivedAt ? (
+                  <button
+                    className="icon-button"
+                    disabled={nestedEditorOpen}
+                    onClick={() => onRestore(application.id)}
+                    title="Restore"
+                    type="button"
+                  >
+                    <RotateCcw aria-hidden="true" size={18} />
+                    <span className="sr-only">Restore</span>
+                  </button>
+                ) : (
+                  <button
+                    className="icon-button"
+                    disabled={nestedEditorOpen}
+                    onClick={() => onArchive(application.id)}
+                    title="Archive"
+                    type="button"
+                  >
+                    <Archive aria-hidden="true" size={18} />
+                    <span className="sr-only">Archive</span>
+                  </button>
+                )}
+                {canDeleteApplication(
+                  application,
+                  enableDeleteActiveApplications,
+                ) ? (
+                  <button
+                    className="icon-button text-destructive"
+                    disabled={nestedEditorOpen}
+                    onClick={() => {
+                      if (confirmApplicationDelete(application)) {
+                        onDelete(application.id);
+                      }
+                    }}
+                    title="Delete"
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={18} />
+                    <span className="sr-only">Delete</span>
+                  </button>
+                ) : null}
+                <button className="icon-button" disabled={nestedEditorOpen} onClick={startEditing} type="button">
+                  <Pencil aria-hidden="true" size={18} />
+                  <span className="sr-only">Edit</span>
+                </button>
+              </>
             )}
             <button
               className="icon-button"
