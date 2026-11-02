@@ -36,8 +36,9 @@ describe("isSectionReached", () => {
     // 640-1023px: 85px header + 52px strip + 12px gap. A fixed 140px
     // threshold left the previous section highlighted here.
     expect(isSectionReached(149, 149)).toBe(true);
-    // Phones: 53px header + 52px strip + 12px gap.
-    expect(isSectionReached(117, 117)).toBe(true);
+    // Phones: 61px header + 60px strip + 12px gap.
+    expect(isSectionReached(161, 133)).toBe(true);
+    expect(isSectionReached(162, 133)).toBe(false);
   });
 
   it("does not count a section that is still well below its landing point", () => {
@@ -68,5 +69,16 @@ describe("phone navigation setting", () => {
     expect(openingTag(navigationRow, "class=")).toContain("max-md:[&amp;+*]:!border-t-0");
     expect(markup).toContain('aria-label="Show navigation as"');
     expect(openingTag(markup, 'aria-label="Open contacts as"')).not.toContain("max-md:hidden");
+  });
+});
+
+describe("phone section strip", () => {
+  it("gives strip links 44px on phones and keeps sections clear of the taller strip", () => {
+    const markup = renderPage();
+
+    expect(openingTag(markup, 'href="#settings-account"')).toContain("max-md:h-11");
+    expect(openingTag(markup, 'id="settings-account"')).toContain(
+      "max-md:scroll-mt-[calc(var(--app-header-height,0px)+4.5rem)]",
+    );
   });
 });

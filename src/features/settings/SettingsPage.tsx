@@ -774,7 +774,7 @@ function SettingsNav({
         return (
           <a
             aria-current={isActive ? "true" : undefined}
-            className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+            className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 max-md:h-11 text-sm font-medium transition ${
               DESKTOP_ONLY_SECTIONS.has(section.id) ? "max-md:hidden" : ""
             } ${
               isActive
@@ -827,7 +827,7 @@ function SettingsSection({
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
+      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] max-md:scroll-mt-[calc(var(--app-header-height,0px)+4.5rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
         id === "reset" ? "border-red-200" : ""
       } ${DESKTOP_ONLY_SECTIONS.has(id) ? "max-md:hidden" : ""}`}
       id={`settings-${id}`}
