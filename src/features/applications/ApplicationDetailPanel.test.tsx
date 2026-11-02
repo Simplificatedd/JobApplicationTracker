@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { application } from "../../test/assessmentFixtures";
@@ -118,5 +119,24 @@ describe("application detail layout", () => {
     expect(header).toMatch(/<label class="block border-b border-border px-4 pb-3 sm:px-6 md:hidden"><span class="sr-only">Application status<\/span><select/);
     expect(header).toMatch(new RegExp(`<option value="${application.status}" selected="">`));
     expect(html).toMatch(/<header class="[^"]*max-md:border-b-0"/);
+  });
+});
+
+describe("phone detail panel scroll lock", () => {
+  it("marks the panel so the page behind it can be locked", () => {
+    const markup = renderPanel();
+    const dialog = markup.slice(markup.indexOf("<dialog"), markup.indexOf(">", markup.indexOf("<dialog")) + 1);
+
+    expect(dialog).toContain("application-detail-panel");
+    // The panel body keeps its own scroll and doesn't hand it to the page.
+    expect(markup).toContain("flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain");
+  });
+
+  it("locks page scrolling only below md and only while the panel is open", () => {
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(
+      /max-width:\s*767\.98px\)\s*\{\s*html:has\(\.application-detail-panel\[open\]\)\s*\{\s*overflow:\s*hidden/,
+    );
   });
 });

@@ -267,6 +267,12 @@
      notifications panel even when its list is too short to scroll. */
   html:has(.notifications-panel[open]) { overflow: hidden; }
 
+  /* The same for the detail panel, which is only full-screen on phones; at
+     md and up the page scrollbar stays put. */
+  @media (max-width: 767.98px) {
+    html:has(.application-detail-panel[open]) { overflow: hidden; }
+  }
+
   .modal-overlay {
     /* Overlays are pinned to the viewport, so they must not pick up
        space-y-* margins from the stack they happen to be rendered in. */
