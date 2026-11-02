@@ -35,6 +35,7 @@ import {
   validateFollowUpAutoReset,
   validateFollowUpSchedule,
 } from "../../lib/followUps";
+import { LinkifiedText } from "../../components/LinkifiedText";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import {
   canDeleteApplication,
@@ -1324,7 +1325,7 @@ function TextBlock({ label, value }: { label: string; value?: string }) {
     <section>
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
       <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm leading-6 text-foreground">
-        {value ?? ""}
+        {value ? <LinkifiedText text={value} /> : ""}
       </p>
     </section>
   );
