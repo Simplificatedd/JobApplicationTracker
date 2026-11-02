@@ -26,6 +26,8 @@ vi.mock("react", () => ({
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
+import { NotificationBell } from "../../components/NotificationBell";
+import type { ReminderNotification } from "../../lib/reminders";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function elements(node: unknown): Element[] {
@@ -200,4 +202,61 @@ it("changes the status from the phone header through the guarded header action",
   expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Status could not be saved.")).toBe(true);
   call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true);
   expect(picker(render(() => ApplicationDetailPanel(props))).props.disabled).toBe(true);
+});
+function bellProps(): ComponentProps<typeof NotificationBell> {
+  const notification = {
+    application, applicationId: application.id, body: "Example / Due soon", group: "followups", id: "follow-up",
+    severity: "due_soon", sortAt: 0, title: `Follow up on ${application.jobTitle}`, type: "follow_up", dueAt: "2026-11-04",
+  } as ReminderNotification;
+  return {
+    grouped: false, notifications: [notification], onDismiss: vi.fn(), onMarkOpened: vi.fn(), onOpenApplication: vi.fn(),
+    onUpdateApplication: vi.fn(), onUpdateAssessment: vi.fn(), onUpdateInterview: vi.fn(),
+  };
+}
+function openBell(props: ComponentProps<typeof NotificationBell>, phone: boolean) {
+  vi.stubGlobal("window", { confirm: () => true, matchMedia: () => ({ matches: phone, addEventListener() {}, removeEventListener() {} }) });
+  const tree = render(() => NotificationBell(props));
+  call(elements(tree).find(e => e.props.title === "Notifications")!.props.onClick);
+  return render(() => NotificationBell(props));
+}
+it("opens a full-screen notifications panel on phones and marks reminders opened", () => {
+  const props = bellProps(); const tree = openBell(props, true);
+  const panel = named(tree, "NativeModal");
+  expect(props.onMarkOpened).toHaveBeenCalledTimes(1);
+  expect(panel.props.className).toContain("fixed inset-0");
+  expect(panel.props.className).toContain("pt-[env(safe-area-inset-top)]");
+  expect(elements(tree).some(e => e.props.role === "dialog" && e.props["aria-label"] === "Notifications")).toBe(false);
+  const close = elements(panel).find(e => e.props["aria-label"] === "Close notifications")!;
+  expect(close.props["data-initial-focus"]).toBe(true);
+  call(panel.props.onRequestClose);
+  expect(named(render(() => NotificationBell(props)), "NativeModal")).toBeUndefined();
+});
+it("keeps notification actions working from the phone panel", () => {
+  const props = bellProps(); let tree = openBell(props, true);
+  const item = named(tree, "NotificationItem");
+  call(item.props.onDismiss, "follow-up"); expect(props.onDismiss).toHaveBeenCalledWith("follow-up");
+  call(item.props.onOpenApplication, application.id);
+  expect(props.onOpenApplication).toHaveBeenCalledWith(application.id);
+  tree = render(() => NotificationBell(props));
+  expect(named(tree, "NativeModal")).toBeUndefined();
+});
+it("keeps the anchored popover on tablets and desktops", () => {
+  const tree = openBell(bellProps(), false);
+  expect(named(tree, "NativeModal")).toBeUndefined();
+  const popover = elements(tree).find(e => e.props.role === "dialog" && e.props["aria-label"] === "Notifications")!;
+  expect(popover.props.className).toContain("absolute right-0 top-12");
+  expect(popover.props.className).not.toContain("max-md:");
+});
+it("closes the notifications panel when the layout crosses the phone breakpoint", () => {
+  const props = bellProps(); openBell(props, true);
+  expect(named(render(() => NotificationBell(props)), "NativeModal")).toBeDefined();
+  // The breakpoint listener reports a wider screen.
+  // The open flag is the first true slot; the phone flag is the last one.
+  const isPhoneSlot = host.slots.lastIndexOf(true);
+  expect(isPhoneSlot).toBeGreaterThan(host.slots.indexOf(true));
+  host.slots[isPhoneSlot] = false;
+  render(() => NotificationBell(props));
+  const tree = render(() => NotificationBell(props));
+  expect(named(tree, "NativeModal")).toBeUndefined();
+  expect(elements(tree).some(e => e.props.role === "dialog")).toBe(false);
 });

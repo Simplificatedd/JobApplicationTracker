@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
+import { usePhoneLayout } from "../hooks/usePhoneLayout";
 import { formatDate, formatDateTime } from "../lib/format";
 import { dateTimeEditValue, isValidDateTime, toDateTimeLocal } from "../lib/dateTime";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
 import type { AssessmentUpdate, InterviewUpdate } from "../types/application";
+import { NativeModal } from "./NativeModal";
 
 interface NotificationBellProps {
   grouped: boolean;
@@ -55,8 +57,56 @@ export function NotificationBell({
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const count = notifications.length;
+  const isPhone = usePhoneLayout();
+  const summary =
+    count === 0 ? "All clear" : `${count} active reminder${count === 1 ? "" : "s"}`;
+  const openApplication = (id: string) => {
+    setIsOpen(false);
+    onOpenApplication(id);
+  };
+  const list =
+    count === 0 ? (
+      <div className="px-2 py-8 text-center">
+        <p className="text-sm font-semibold text-foreground">
+          No reminders right now
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          Follow-ups, interviews, assessments, and offer deadlines will
+          appear here.
+        </p>
+      </div>
+    ) : grouped ? (
+      <GroupedNotifications
+        notifications={notifications}
+        onDismiss={onDismiss}
+        onOpenApplication={openApplication}
+        onUpdateApplication={onUpdateApplication}
+        onUpdateAssessment={onUpdateAssessment}
+        onUpdateInterview={onUpdateInterview}
+      />
+    ) : (
+      <div className="mt-3 space-y-2">
+        {notifications.map((notification) => (
+          <NotificationItem
+            key={notification.id}
+            notification={notification}
+            onDismiss={onDismiss}
+            onOpenApplication={openApplication}
+            onUpdateApplication={onUpdateApplication}
+            onUpdateAssessment={onUpdateAssessment}
+            onUpdateInterview={onUpdateInterview}
+          />
+        ))}
+      </div>
+    );
 
   useEscapeKey(isOpen, () => setIsOpen(false));
+
+  // Crossing the phone breakpoint swaps the panel for the popover (or back),
+  // so close it rather than reopen it unprompted after a rotation.
+  useEffect(() => {
+    setIsOpen(false);
+  }, [isPhone]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -89,9 +139,7 @@ export function NotificationBell({
   }
 
   return (
-    // On phones the bell sits beside the Add button, so the panel anchors to the
-    // full-width top bar instead of the bell to stay on screen.
-    <div className="relative shrink-0 max-md:static" ref={panelRef}>
+    <div className="relative shrink-0" ref={panelRef}>
       <button
         aria-expanded={isOpen}
         aria-haspopup="dialog"
@@ -109,10 +157,43 @@ export function NotificationBell({
         ) : null}
       </button>
 
-      {isOpen ? (
+      {isOpen && isPhone ? (
+        // A full-screen modal: the page behind is inert and focus stays here.
+        // The top bar's backdrop blur would trap a fixed popover inside it.
+        <NativeModal
+          className="notifications-panel fixed inset-0 z-50 flex flex-col overscroll-contain bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]"
+          labelledBy="notifications-panel-title"
+          onRequestClose={() => setIsOpen(false)}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div className="min-w-0">
+              <h2
+                className="text-lg font-semibold text-foreground"
+                id="notifications-panel-title"
+              >
+                Needs attention
+              </h2>
+              <p className="text-sm text-muted">{summary}</p>
+            </div>
+            <button
+              aria-label="Close notifications"
+              className="icon-button shrink-0"
+              data-initial-focus
+              onClick={() => setIsOpen(false)}
+              title="Close notifications"
+              type="button"
+            >
+              <X aria-hidden="true" size={18} />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {list}
+          </div>
+        </NativeModal>
+      ) : isOpen ? (
         <div
           aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto max-md:left-4 max-md:right-4 max-md:top-full max-md:mt-2 max-md:max-h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-md:w-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
+          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
           role="dialog"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
@@ -120,9 +201,7 @@ export function NotificationBell({
               <p className="text-sm font-semibold text-foreground">
                 Needs attention
               </p>
-              <p className="text-xs text-muted">
-                {count === 0 ? "All clear" : `${count} active reminder${count === 1 ? "" : "s"}`}
-              </p>
+              <p className="text-xs text-muted">{summary}</p>
             </div>
             <button
               aria-label="Close notifications"
@@ -135,46 +214,7 @@ export function NotificationBell({
             </button>
           </div>
 
-          {count === 0 ? (
-            <div className="px-2 py-8 text-center">
-              <p className="text-sm font-semibold text-foreground">
-                No reminders right now
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Follow-ups, interviews, assessments, and offer deadlines will
-                appear here.
-              </p>
-            </div>
-          ) : grouped ? (
-            <GroupedNotifications
-              notifications={notifications}
-              onDismiss={onDismiss}
-              onOpenApplication={(id) => {
-                setIsOpen(false);
-                onOpenApplication(id);
-              }}
-              onUpdateApplication={onUpdateApplication}
-              onUpdateAssessment={onUpdateAssessment}
-              onUpdateInterview={onUpdateInterview}
-            />
-          ) : (
-            <div className="mt-3 space-y-2">
-              {notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onDismiss={onDismiss}
-                  onOpenApplication={(id) => {
-                    setIsOpen(false);
-                    onOpenApplication(id);
-                  }}
-                  onUpdateApplication={onUpdateApplication}
-                  onUpdateAssessment={onUpdateAssessment}
-                  onUpdateInterview={onUpdateInterview}
-                />
-              ))}
-            </div>
-          )}
+          {list}
         </div>
       ) : null}
     </div>
@@ -266,19 +306,19 @@ function NotificationItem({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground">
+          <p className="truncate text-sm font-semibold text-foreground max-md:whitespace-normal max-md:break-words">
             {notification.title}
           </p>
           <p className="mt-1 text-xs font-medium text-muted">
             {severityLabel(notification.severity)} / {dueText}
           </p>
-          <p className="mt-1 truncate text-xs text-muted">
+          <p className="mt-1 truncate text-xs text-muted max-md:whitespace-normal max-md:break-words">
             {notification.body}
           </p>
         </div>
         <button
           aria-label={`Dismiss ${notification.title}`}
-          className="icon-button h-8 w-8 shrink-0 bg-surface"
+          className="icon-button h-8 w-8 shrink-0 bg-surface max-md:h-11 max-md:w-11"
           onClick={() => onDismiss(notification.id)}
           title="Dismiss"
           type="button"
@@ -430,7 +470,7 @@ function SmallActionButton({
   return (
     <button
       aria-label={label}
-      className="touch-target inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50"
+      className="touch-target inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11 max-md:px-3 max-md:text-sm"
       onClick={onClick}
       title={label}
       type="button"
