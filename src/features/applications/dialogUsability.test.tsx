@@ -287,3 +287,11 @@ it("sizes an active phone form to the visible viewport and stops listening when 
   expect(view()).toBeUndefined();
   expect(listeners.size).toBe(0);
 });
+it("shows labelled Save and Cancel in the phone edit footer and hides the header icons below md", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
+  const footer = elements(tree).find(e => e.type === "footer")!;
+  expect(footer.props.className).toContain("md:hidden");
+  expect(button(footer, "Cancel")).toBeDefined(); expect(button(footer, "Save")).toBeDefined();
+  expect(elements(tree).filter(e => e.type === "button" && String(e.props.className).includes("hidden md:inline-flex"))).toHaveLength(2);
+});

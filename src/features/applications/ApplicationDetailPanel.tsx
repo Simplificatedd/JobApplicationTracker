@@ -339,9 +339,9 @@ export function ApplicationDetailPanel({
     <NativeModal
       labelledBy="application-detail-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
+      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
     >
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
+      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover md:rounded-lg">
         <header
           className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
             isEditing ? "" : "max-md:border-b-0"
@@ -365,7 +365,7 @@ export function ApplicationDetailPanel({
               <>
                 {/* Phones use the labelled footer actions below instead. */}
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={saveChanges}
                   type="button"
@@ -376,7 +376,7 @@ export function ApplicationDetailPanel({
                   </span>
                 </button>
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={cancelEditing}
                   type="button"
@@ -570,9 +570,9 @@ export function ApplicationDetailPanel({
           )}
         </div>
         {isEditing ? (
-          <footer className="flex justify-end gap-2 border-t border-border px-4 py-3 sm:hidden">
+          <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3 sm:px-6 md:hidden">
             <button
-              className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="h-11 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
               disabled={isSaving}
               onClick={cancelEditing}
               type="button"
@@ -580,7 +580,7 @@ export function ApplicationDetailPanel({
               Cancel
             </button>
             <button
-              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+              className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
               disabled={isSaving}
               onClick={saveChanges}
               type="button"
