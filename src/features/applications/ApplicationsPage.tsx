@@ -19,7 +19,11 @@ import {
   type ApplicationFilters,
   type SortColumn,
 } from "./applicationFilters";
-import { searchApplications } from "./applicationSearch";
+import {
+  type SearchScope,
+  searchApplications,
+  selectSearchBase,
+} from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { deriveApplicationNotifications } from "../../lib/reminders";
@@ -170,14 +174,26 @@ export function ApplicationsPage({
     viewMode === "archive" ? archivedApplications : activeApplications;
   const viewLabel = viewMode === "archive" ? "Archived" : "Active";
   const [countScope, setCountScope] = useState<"view" | "total">("view");
-  const companyOptions = getApplicationFilterOptions(baseApplications, "company");
+  // Not remembered with the table view: each visit starts with the default
+  // scope, and the stored table preferences keep their existing shape.
+  const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  const searchBase = selectSearchBase(
+    applications,
+    viewMode,
+    searchQuery,
+    searchScope,
+  );
+  const companyOptions = getApplicationFilterOptions(
+    searchBase.applications,
+    "company",
+  );
   const locationOptions = getApplicationFilterOptions(
-    baseApplications,
+    searchBase.applications,
     "location",
   );
   // Search relevance takes priority; the selected column orders equal matches.
   const searchedApplications = searchApplications(
-    sortApplications(baseApplications, sort),
+    sortApplications(searchBase.applications, sort),
     searchQuery,
   );
   const filteredApplications = applyApplicationFilters(
@@ -328,7 +344,10 @@ export function ApplicationsPage({
           resetTableView();
         }}
         onSearchQueryChange={setSearchQuery}
+        onSearchScopeChange={setSearchScope}
         searchQuery={searchQuery}
+        searchScope={searchScope}
+        viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
@@ -349,7 +368,9 @@ export function ApplicationsPage({
         columnWidths={columnWidths}
         emptyBody={
           searchQuery.trim()
-            ? "No applications match that title or description."
+            ? searchBase.searchesAll
+              ? "No active or archived applications match that company, title, or description."
+              : "No applications match that company, title, or description."
             : viewMode === "archive"
               ? "Archived applications will appear here."
               : "New entries will appear here once they are added."
@@ -363,6 +384,7 @@ export function ApplicationsPage({
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
+        markArchivedApplications={searchBase.searchesAll}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={async (id) => {
