@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
@@ -118,5 +119,23 @@ describe("phone sort control", () => {
     expect(renderToStaticMarkup(element)).toMatch(/<option disabled="" value="priority:descending" selected="">Table sort<\/option>/);
     (element.props.onChange as (value: string) => void)("updatedAt:descending");
     expect(onChange).toHaveBeenCalledWith(DEFAULT_SORT_STATE);
+  });
+});
+
+describe("phone filter dialog footer", () => {
+  it("gives Reset and Done 44px on phones", () => {
+    // The dialog only renders after Filters is pressed, so check the source.
+    const source = readFileSync(new URL("./ApplicationsToolbar.tsx", import.meta.url), "utf8");
+    const start = source.indexOf("<footer", source.indexOf("function MoreFiltersModal"));
+    const footer = source.slice(start, source.indexOf("</footer>", start));
+    // Each footer button's class list, found by the button's own label.
+    const buttonClasses = (label: string) => {
+      const button = footer.slice(footer.lastIndexOf("<button", footer.indexOf(label)));
+      return /className="([^"]*)"/.exec(button)?.[1].split(" ") ?? [];
+    };
+
+    for (const label of ["Reset", "Done"]) {
+      expect(buttonClasses(label)).toEqual(expect.arrayContaining(["h-10", "max-md:h-11"]));
+    }
   });
 });

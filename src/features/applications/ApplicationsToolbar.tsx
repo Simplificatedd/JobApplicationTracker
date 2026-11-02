@@ -968,7 +968,7 @@ function MoreFiltersModal({
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={onResetFilters}
             type="button"
           >
@@ -976,7 +976,7 @@ function MoreFiltersModal({
             Reset
           </button>
           <button
-            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
             onClick={onClose}
             type="button"
           >
