@@ -81,7 +81,11 @@ export function ChartCard({
 
   return (
     <article className={`surface-panel flex min-w-0 flex-col rounded-lg p-4 ${className}`}>
-      <header className="flex min-w-0 items-start justify-between gap-3">
+      <header
+        // An extra action plus the view switcher leave a phone title almost
+        // no width, so below sm they wrap onto their own row.
+        className={`flex min-w-0 items-start justify-between gap-3 ${action ? "max-sm:flex-wrap" : ""}`}
+      >
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
           {description ? (
