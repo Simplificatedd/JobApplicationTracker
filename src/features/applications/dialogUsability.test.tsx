@@ -123,10 +123,11 @@ it("blocks repeat header actions while one is pending and shows its failure in t
   const props = { ...detailProps(), onArchive: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
   call(button(openActions(props), "Archive").props.onClick, menuEvent);
   let tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "More actions").props.disabled).toBe(true); expect(button(tree, "Edit").props.disabled).toBe(true);
+  expect(button(tree, "Archive")).toBeUndefined(); expect(button(tree, "Edit").props.disabled).toBe(true);
+  expect(button(openActions(props), "Archive").props.disabled).toBe(true);
   resolve({ ok: false, error: "Archive could not be saved." }); await Promise.resolve(); await Promise.resolve();
   tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "More actions").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
+  expect(button(tree, "Archive").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
   expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Archive could not be saved.")).toBe(true);
 });
 it("disables the actions menu while a nested editor is open and hides it while editing", () => {
