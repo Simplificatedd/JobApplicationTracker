@@ -14,7 +14,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   APPLICATION_STATUSES,
   getInterviewTypeLabel,
@@ -63,6 +63,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
+import { createStatusQuickEdit } from "./applicationQuickEdits";
 import {
   AssessmentsSection,
   type AssessmentSectionProps,
@@ -149,6 +150,8 @@ export function ApplicationDetailPanel({
   const [isActionPending, setIsActionPending] = useState(false);
   const [actionError, setActionError] = useState("");
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  // Shows a chosen status while it saves; cleared when the save settles.
+  const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(null);
   const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
@@ -338,7 +341,11 @@ export function ApplicationDetailPanel({
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
-        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
+        <header
+          className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
+            isEditing ? "" : "max-md:border-b-0"
+          }`}
+        >
           <div className="min-w-0">
             {application.company ? (
               <p className="text-sm font-medium text-muted">
@@ -484,6 +491,35 @@ export function ApplicationDetailPanel({
             </button>
           </div>
         </header>
+
+        {/* Phones keep the status in the sticky header area and change it in
+            place; the table's quick-edit popover cannot open in a modal. */}
+        {!isEditing ? (
+          <label className="block border-b border-border px-4 pb-3 sm:px-6 md:hidden">
+            <span className="sr-only">Application status</span>
+            <select
+              className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
+              // Like the actions trigger, it stays enabled while saving so
+              // focus is not lost; changes wait for the save to settle.
+              disabled={nestedEditorOpen}
+              onChange={(event) => {
+                if (isActionPending) return;
+                const status = event.target.value as ApplicationStatus;
+                setPendingStatus(status);
+                void runHeaderAction((id) =>
+                  onUpdate(id, createStatusQuickEdit(status)),
+                ).finally(() => setPendingStatus(null));
+              }}
+              value={pendingStatus ?? application.status}
+            >
+              {APPLICATION_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
@@ -661,137 +697,152 @@ function ReadOnlyDetails({
     onUpdate(application.id, createHandledFollowUpUpdate(application));
   }
 
-  return (
-    <div className="space-y-6">
-      <section className="grid gap-3 sm:grid-cols-3">
-        <InfoTile label="Status">
-          <StatusBadge status={application.status} />
-        </InfoTile>
-        <InfoTile label="Priority">{application.priority}</InfoTile>
-        <InfoTile label="Last updated">
-          {formatUpdatedAt(application.updatedAt)}
-        </InfoTile>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2">
-        <DetailRow label="Location" value={application.location} />
-        <DetailRow label="Work mode" value={application.workMode} />
-        <DetailRow label="Job type" value={application.jobType} />
-        <DetailRow label="Source" value={application.source} />
-        <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
-        {application.status === "Offered" || application.offerDeadline ? (
-          <DetailRow
-            label="Offer deadline"
-            value={formatDateTime(application.offerDeadline)}
-          />
+  const isPhone = usePhoneLayout();
+  const sections = {
+    facts: (
+      <Fragment key="facts">
+        {isPhone ? (
+          <h3 className="text-sm font-semibold text-foreground">Key facts</h3>
         ) : null}
-        <DetailRow
-          label="Role dates"
-          value={formatDateRange(
-            application.roleStartDate,
-            application.roleEndDate,
-          )}
-        />
-        <DetailRow
-          label="Follow-up"
-          value={
-            application.followUpNeeded
-              ? application.followUpDate
-                ? `Compulsory / ${formatDate(application.followUpDate)}`
-                : "Compulsory / Date required"
-              : application.followUpDate
-                ? `Optional / ${formatDate(application.followUpDate)}`
-                : "No Follow-Up"
-          }
-        />
-        <DetailRow
-          label="Follow-up auto-reset"
-          value={
-            application.followUpAutoResetEnabled
-              ? `On / ${application.followUpPromptDays ?? 7} days`
-              : "Off"
-          }
-        />
-        <DetailRow
-          label="Current interview"
-          value={formatInterviewSummary(application)}
-        />
-        <ResumeDetail
-          error={resumeActionError}
-          isWorking={resume?.id === workingResumeId}
-          onDownload={onDownloadResume}
-          onPreview={onPreviewResume}
-          resume={resume}
-        />
-        <DocumentDetail
-          document={coverLetter}
-          error={coverLetterActionError}
-          isWorking={coverLetter?.id === workingCoverLetterId}
-          label="Cover letter"
-          onDownload={onDownloadCoverLetter}
-          onPreview={onPreviewCoverLetter}
-        />
-        <DetailRow label="Salary / pay" value={application.salary} />
-      </section>
-
-      {!application.archivedAt ? (
-        <section>
-          <h3 className="text-sm font-semibold text-foreground">
-            Follow-up actions
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <DetailActionButton onClick={changeFollowUpDate}>
-              <CalendarPlus aria-hidden="true" size={16} />
-              Change date
-            </DetailActionButton>
-            {!application.followUpNeeded && application.followUpDate ? (
-              <DetailActionButton onClick={clearFollowUpDate}>
-                <CalendarX aria-hidden="true" size={16} />
-                Clear date
-              </DetailActionButton>
-            ) : null}
-            {application.followUpDate ? (
-              <DetailActionButton onClick={handleFollowUp}>
-              <CalendarCheck aria-hidden="true" size={16} />
-                Follow-up handled
-              </DetailActionButton>
-            ) : null}
-          </div>
+        <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <InfoTile className="max-md:hidden" label="Status">
+            <StatusBadge status={application.status} />
+          </InfoTile>
+          <InfoTile label="Priority">{application.priority}</InfoTile>
+          <InfoTile label="Last updated">
+            {formatUpdatedAt(application.updatedAt)}
+          </InfoTile>
         </section>
-      ) : null}
 
-      {safeApplicationUrl ? (
-        <a
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700"
-          href={safeApplicationUrl}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Open application link
-          <ExternalLink aria-hidden="true" size={16} />
-        </a>
-      ) : null}
+        <section className="grid gap-3 sm:grid-cols-2">
+          <DetailRow label="Location" value={application.location} />
+          <DetailRow label="Work mode" value={application.workMode} />
+          <DetailRow label="Job type" value={application.jobType} />
+          <DetailRow label="Source" value={application.source} />
+          <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
+          {application.status === "Offered" || application.offerDeadline ? (
+            <DetailRow
+              label="Offer deadline"
+              value={formatDateTime(application.offerDeadline)}
+            />
+          ) : null}
+          <DetailRow
+            label="Role dates"
+            value={formatDateRange(
+              application.roleStartDate,
+              application.roleEndDate,
+            )}
+          />
+          <DetailRow
+            label="Follow-up"
+            value={
+              application.followUpNeeded
+                ? application.followUpDate
+                  ? `Compulsory / ${formatDate(application.followUpDate)}`
+                  : "Compulsory / Date required"
+                : application.followUpDate
+                  ? `Optional / ${formatDate(application.followUpDate)}`
+                  : "No Follow-Up"
+            }
+          />
+          <DetailRow
+            label="Follow-up auto-reset"
+            value={
+              application.followUpAutoResetEnabled
+                ? `On / ${application.followUpPromptDays ?? 7} days`
+                : "Off"
+            }
+          />
+          <DetailRow
+            label="Current interview"
+            value={formatInterviewSummary(application)}
+          />
+          <ResumeDetail
+            error={resumeActionError}
+            isWorking={resume?.id === workingResumeId}
+            onDownload={onDownloadResume}
+            onPreview={onPreviewResume}
+            resume={resume}
+          />
+          <DocumentDetail
+            document={coverLetter}
+            error={coverLetterActionError}
+            isWorking={coverLetter?.id === workingCoverLetterId}
+            label="Cover letter"
+            onDownload={onDownloadCoverLetter}
+            onPreview={onPreviewCoverLetter}
+          />
+          <DetailRow label="Salary / pay" value={application.salary} />
+        </section>
 
-      <TextBlock label="Job description" value={application.jobDescription} />
-      <TextBlock label="Notes" value={application.notes} />
+        {!application.archivedAt ? (
+          <section>
+            <h3 className="text-sm font-semibold text-foreground">
+              Follow-up actions
+            </h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <DetailActionButton onClick={changeFollowUpDate}>
+                <CalendarPlus aria-hidden="true" size={16} />
+                Change date
+              </DetailActionButton>
+              {!application.followUpNeeded && application.followUpDate ? (
+                <DetailActionButton onClick={clearFollowUpDate}>
+                  <CalendarX aria-hidden="true" size={16} />
+                  Clear date
+                </DetailActionButton>
+              ) : null}
+              {application.followUpDate ? (
+                <DetailActionButton onClick={handleFollowUp}>
+                <CalendarCheck aria-hidden="true" size={16} />
+                  Follow-up handled
+                </DetailActionButton>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
-      <AssessmentsSection
-        onEditingChange={onAssessmentEditingChange}
-        application={application}
-        assessments={assessments}
-        assessmentActions={assessmentActions}
+        {safeApplicationUrl ? (
+          <a
+            className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700"
+            href={safeApplicationUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open application link
+            <ExternalLink aria-hidden="true" size={16} />
+          </a>
+        ) : null}
+      </Fragment>
+    ),
+    description: (
+      <TextBlock
+        key="description"
+        label="Job description"
+        value={application.jobDescription}
       />
-      <InterviewsSection
-        onEditingChange={onInterviewEditingChange}
-        onConvert={assessmentActions.convertInterviewToAssessment}
-        application={application}
-        interviews={interviews}
-        onAdd={onAddInterview}
-        onDelete={onDeleteInterview}
-        onUpdate={onUpdateInterview}
-      />
-
-      <section>
+    ),
+    notes: <TextBlock key="notes" label="Notes" value={application.notes} />,
+    schedule: (
+      <Fragment key="schedule">
+        <AssessmentsSection
+          onEditingChange={onAssessmentEditingChange}
+          application={application}
+          assessments={assessments}
+          assessmentActions={assessmentActions}
+        />
+        <InterviewsSection
+          onEditingChange={onInterviewEditingChange}
+          onConvert={assessmentActions.convertInterviewToAssessment}
+          application={application}
+          interviews={interviews}
+          onAdd={onAddInterview}
+          onDelete={onDeleteInterview}
+          onUpdate={onUpdateInterview}
+        />
+      </Fragment>
+    ),
+    contacts: (
+      <section key="contacts">
         <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
         <div className="mt-3 grid gap-2">
           {contacts.length === 0 ? (
@@ -819,8 +870,29 @@ function ReadOnlyDetails({
           )}
         </div>
       </section>
-
-      <section>
+    ),
+    activity: isPhone ? (
+      <details key="activity">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+          Activity ({activities.length})
+        </summary>
+        <div className="mt-3 space-y-2">
+          {activities.length === 0 ? (
+            <p className="text-sm text-muted">No activity yet.</p>
+          ) : (
+            activities.map((activity) => (
+              <div className="rounded-lg border border-border px-3 py-2" key={activity.id}>
+                <p className="text-sm text-foreground">{activity.message}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {formatUpdatedAt(activity.createdAt)}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </details>
+    ) : (
+      <section key="activity">
         <h3 className="text-sm font-semibold text-foreground">Activity</h3>
         <div className="mt-3 space-y-2">
           {activities.length === 0 ? (
@@ -837,8 +909,39 @@ function ReadOnlyDetails({
           )}
         </div>
       </section>
-    </div>
+    ),
+  };
+  // Phones read the description first; wider screens keep the original order.
+  // Keyed sections move without losing an open interview or assessment edit.
+  const order: Array<keyof typeof sections> = isPhone
+    ? ["description", "notes", "schedule", "facts", "contacts", "activity"]
+    : ["facts", "description", "notes", "schedule", "contacts", "activity"];
+
+  return (
+    <div className="space-y-6">{order.map((key) => sections[key])}</div>
   );
+}
+
+const PHONE_LAYOUT_QUERY = "(max-width: 767.98px)";
+
+function usePhoneLayout() {
+  const [isPhone, setIsPhone] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      Boolean(window.matchMedia?.(PHONE_LAYOUT_QUERY).matches),
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia?.(PHONE_LAYOUT_QUERY);
+    if (!query) return;
+    const update = () => setIsPhone(query.matches);
+    // Catch a change between the first render and this subscription.
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return isPhone;
 }
 
 function DetailActionButton({
@@ -1214,13 +1317,15 @@ function DateField({
 
 function InfoTile({
   children,
+  className = "",
   label,
 }: {
   children: React.ReactNode;
+  className?: string;
   label: string;
 }) {
   return (
-    <div className="rounded-lg border border-border px-3 py-3">
+    <div className={`rounded-lg border border-border px-3 py-3 ${className}`}>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
       <div className="mt-2 text-sm font-medium capitalize text-foreground">
         {children}

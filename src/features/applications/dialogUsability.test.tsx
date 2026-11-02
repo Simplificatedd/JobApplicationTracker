@@ -179,3 +179,25 @@ it("returns focus to the trigger when the trigger closes the menu", () => {
   expect(focus).toHaveBeenCalled();
   expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });
+it("changes the status from the phone header through the guarded header action", async () => {
+  let resolve!: (value: unknown) => void;
+  const props = { ...detailProps(), onUpdate: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
+  const picker = (tree: unknown) => elements(tree).find(e => e.type === "select" && e.props.className?.toString().includes("field-control h-9"))!;
+  let tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.value).toBe(application.status);
+  call(picker(tree).props.onChange, { target: { value: "Offered" } });
+  expect(props.onUpdate).toHaveBeenCalledWith(application.id, { status: "Offered" });
+  tree = render(() => ApplicationDetailPanel(props));
+  // The choice stays shown and focusable while saving, and a second change waits.
+  expect(picker(tree).props.value).toBe("Offered");
+  expect(picker(tree).props.disabled).toBe(false);
+  call(picker(tree).props.onChange, { target: { value: "Rejected" } });
+  expect(props.onUpdate).toHaveBeenCalledTimes(1);
+  resolve({ ok: false, error: "Status could not be saved." });
+  for (let i = 0; i < 4; i++) await Promise.resolve();
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.value).toBe(application.status);
+  expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Status could not be saved.")).toBe(true);
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true);
+  expect(picker(render(() => ApplicationDetailPanel(props))).props.disabled).toBe(true);
+});
