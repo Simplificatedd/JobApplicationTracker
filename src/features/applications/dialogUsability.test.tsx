@@ -90,6 +90,11 @@ it("keeps an assessment editor registered until its explicit Cancel", () => {
   tree = view(); expect(elements(tree).some(e => e.type === "input" && e.props.value === "Keep my assessment")).toBe(true);
   call(button(tree, "Cancel").props.onClick); view(); expect((props.onEditingChange as Mock).mock.lastCall).toEqual([false]);
 });
+// The second null ref slot is the trigger, declared after the menu wrapper.
+function triggerFocus() {
+  const refs = host.slots.filter(s => s && typeof s === "object" && "current" in s) as { current: unknown }[];
+  const focus = vi.fn(); refs[1].current = { focus }; return focus;
+}
 function openActions(props: ComponentProps<typeof ApplicationDetailPanel>) {
   call(button(render(() => ApplicationDetailPanel(props)), "More actions").props.onClick);
   return render(() => ApplicationDetailPanel(props));
@@ -98,7 +103,9 @@ it("archives an active application from the detail actions menu and closes the m
   const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
   expect(button(tree, "Archive")).toBeUndefined();
   tree = openActions(props); expect(button(tree, "More actions").props["aria-expanded"]).toBe(true);
+  const focus = triggerFocus();
   call(button(tree, "Archive").props.onClick); expect(props.onArchive).toHaveBeenCalledWith(application.id);
+  expect(focus).toHaveBeenCalled();
   expect(button(tree, "Restore")).toBeUndefined(); expect(button(tree, "Delete")).toBeUndefined();
   expect(button(render(() => ApplicationDetailPanel(props)), "Archive")).toBeUndefined();
 });
@@ -122,8 +129,8 @@ const actionsWrapper = (tree: unknown) => elements(tree).find(e => e.type === "d
 const escape = () => ({ key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn() });
 it("closes only the actions menu on Escape, leaving the detail panel to handle Escape otherwise", () => {
   const props = detailProps(); const tree = openActions(props);
-  const open = escape(); call(actionsWrapper(tree).props.onKeyDown, open);
-  expect(open.preventDefault).toHaveBeenCalled(); expect(open.stopPropagation).toHaveBeenCalled();
+  const focus = triggerFocus(); const open = escape(); call(actionsWrapper(tree).props.onKeyDown, open);
+  expect(open.preventDefault).toHaveBeenCalled(); expect(open.stopPropagation).toHaveBeenCalled(); expect(focus).toHaveBeenCalled();
   const closed = render(() => ApplicationDetailPanel(props));
   expect(button(closed, "More actions").props["aria-expanded"]).toBe(false);
   // With the menu closed, Escape bubbles to the dialog's own close guard.
@@ -165,4 +172,10 @@ it("disables the actions menu while a nested editor is open and hides it while e
   call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, false); tree = render(() => ApplicationDetailPanel(props));
   call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
   expect(button(tree, "More actions")).toBeUndefined();
+});
+it("returns focus to the trigger when the trigger closes the menu", () => {
+  const props = detailProps(); const tree = openActions(props); const focus = triggerFocus();
+  call(button(tree, "More actions").props.onClick);
+  expect(focus).toHaveBeenCalled();
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });

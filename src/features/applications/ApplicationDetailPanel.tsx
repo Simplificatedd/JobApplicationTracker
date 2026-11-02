@@ -399,7 +399,13 @@ export function ApplicationDetailPanel({
                     // Stays enabled while an action saves so focus is not lost;
                     // the menu items are disabled instead.
                     disabled={nestedEditorOpen}
-                    onClick={() => setIsActionsMenuOpen((current) => !current)}
+                    onClick={() =>
+                      // Closing through the helper keeps focus here in Safari,
+                      // where a clicked button does not take focus.
+                      isActionsMenuOpen
+                        ? closeActionsMenu()
+                        : setIsActionsMenuOpen(true)
+                    }
                     ref={actionsTriggerRef}
                     title="More actions"
                     type="button"
