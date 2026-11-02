@@ -738,10 +738,10 @@ export function AddApplicationModal({
                     <Upload aria-hidden="true" size={16} />
                     Upload new resume
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <input
                       accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="field-control sm:col-span-2"
+                      className="field-control md:col-span-2"
                       onChange={(event) =>
                         setResumeUploadFile(event.target.files?.[0] ?? null)
                       }
@@ -794,10 +794,10 @@ export function AddApplicationModal({
                     <Upload aria-hidden="true" size={16} />
                     Upload new cover letter
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <input
                       accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="field-control sm:col-span-2"
+                      className="field-control md:col-span-2"
                       onChange={(event) =>
                         setCoverLetterUploadFile(event.target.files?.[0] ?? null)
                       }

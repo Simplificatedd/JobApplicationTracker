@@ -32,3 +32,12 @@ describe("AddApplicationModal quick location", () => {
     expect(renderModal()).not.toContain("Set location to");
   });
 });
+
+describe("AddApplicationModal on phones", () => {
+  it("stacks the upload name and version fields until md", () => {
+    const markup = renderModal();
+
+    expect(markup).not.toContain("sm:grid-cols-2");
+    expect(markup.match(/class="mt-3 grid gap-3 md:grid-cols-2"/g)).toHaveLength(2);
+  });
+});
