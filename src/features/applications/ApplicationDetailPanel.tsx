@@ -316,8 +316,8 @@ export function ApplicationDetailPanel({
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
-        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border px-4 py-4 sm:px-6">
-          <div className="min-w-0 flex-1 basis-48">
+        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
+          <div className="min-w-0">
             {application.company ? (
               <p className="text-sm font-medium text-muted">
                 {application.company}
@@ -330,7 +330,7 @@ export function ApplicationDetailPanel({
               {application.jobTitle}
             </h2>
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {isEditing ? (
               <>
                 {/* Phones use the labelled footer actions below instead. */}
