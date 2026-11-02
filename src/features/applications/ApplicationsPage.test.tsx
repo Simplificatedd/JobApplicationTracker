@@ -260,7 +260,7 @@ describe("applications page on narrow screens", () => {
   it("renders compact cards that switch layout by container width", () => {
     const html = renderPage("");
 
-    expect(html).toContain('class="grid gap-3 p-3 lg:grid-cols-2 xl:hidden"');
+    expect(html).toContain('class="hidden gap-3 p-3 md:grid lg:grid-cols-2 xl:hidden"');
     expect(html).toContain('class="application-card ');
     expect(html).toContain('class="application-card-fields ');
     expect(html).toContain('class="application-card-field min-w-0"');
@@ -274,11 +274,142 @@ describe("applications page on narrow screens", () => {
     );
   });
 
-  it("offers Columns beside Filters as well as in the wide-toolbar footer", () => {
+  it("offers Columns beside Filters as well as in the wide-toolbar footer, but not on phones", () => {
     const html = renderPage("");
 
-    expect(html).toContain('class="applications-toolbar-columns-inline min-w-0"');
+    expect(html).toContain('class="applications-toolbar-columns-inline min-w-0 max-md:hidden"');
+    expect(html).toMatch(/class="applications-toolbar-footer [^"]*max-md:hidden"/);
     expect(html).toContain('class="applications-toolbar-footer ');
     expect(html.match(/<span class="truncate">Columns<\/span>/g)).toHaveLength(2);
+  });
+});
+
+describe("applications page on phones", () => {
+  const phoneRows = (html: string) =>
+    /<ul class="divide-y divide-border md:hidden">([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? "";
+  const rowTexts = (html: string) =>
+    [...phoneRows(html).matchAll(/<li>([\s\S]*?)<\/li>/g)].map((match) =>
+      match[1].replace(/<[^>]+>/g, "|").replace(/\|+/g, "|").replace(/^\||\|$/g, ""),
+    );
+
+  it("shows company, status, title and details as read-only rows", () => {
+    const html = renderPage("", {
+      applications: [
+        { ...titleMatch, dateApplied: "2026-10-20", location: "Singapore", workMode: "hybrid" },
+      ],
+    });
+
+    expect(rowTexts(html)).toEqual([
+      "Example Company|Awaiting Response|Software Engineer|Applied 20 Oct 2026 · Singapore · Hybrid",
+    ]);
+    expect(phoneRows(html)).not.toMatch(/<(input|select)|role="menu/);
+  });
+
+  it("leaves out missing optional fields and falls back to the job title", () => {
+    const html = renderPage("", {
+      applications: [{ ...titleMatch, company: "" }],
+    });
+
+    expect(rowTexts(html)).toEqual(["Software Engineer|Awaiting Response"]);
+  });
+
+  it("shows the next event with its own scheduled time", () => {
+    const html = renderPage("", {
+      applications: [{ ...titleMatch, status: "Interviewing" }],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: titleMatch.id,
+          dateTime: "2026-11-05T14:30",
+          mode: "video",
+          proctored: false,
+          round: 1,
+          type: "technical-interview",
+          createdAt: titleMatch.createdAt,
+          updatedAt: titleMatch.updatedAt,
+        },
+      ],
+      now: new Date(2026, 10, 2, 12, 0),
+    });
+
+    expect(rowTexts(html)[0]).toContain("Interview · 05 Nov 2026, 02:30 pm");
+  });
+
+  it("finds the next event beyond the attention window and with interview attention off", () => {
+    const html = renderPage("", {
+      applications: [{ ...titleMatch, status: "Interviewing", followUpDate: "2026-11-20" }],
+      interviews: [
+        {
+          id: "interview-1",
+          applicationId: titleMatch.id,
+          dateTime: "2026-11-30T09:00",
+          mode: "video",
+          proctored: false,
+          round: 1,
+          type: "technical-interview",
+          createdAt: titleMatch.createdAt,
+          updatedAt: titleMatch.updatedAt,
+        },
+      ],
+      now: new Date(2026, 10, 2, 12, 0),
+      settings: { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3, includeUpcomingInterviewsInAttention: false },
+    });
+
+    expect(rowTexts(html)[0]).toContain("Follow up · 20 Nov 2026");
+  });
+
+  it("shows no event for archived applications", () => {
+    const html = renderPage("engineer", {
+      applications: [{ ...titleMatch, archivedAt: "2026-10-01T00:00:00.000Z", followUpDate: "2026-11-20" }],
+      now: new Date(2026, 10, 2, 12, 0),
+    });
+
+    expect(rowTexts(html)[0]).not.toContain("Follow up");
+  });
+
+  it("explains an empty list filtered only by company", () => {
+    const html = renderPage("", {
+      tablePreferences: {
+        ...tablePreferences,
+        searchQuery: "",
+        filters: { ...DEFAULT_APPLICATION_FILTERS, company: "Nobody Inc" },
+      },
+    });
+
+    expect(html).toContain("No applications match these filters");
+  });
+
+  it("marks archived results in a cross-archive search", () => {
+    const html = renderPage("engineer", {
+      applications: [{ ...titleMatch, archivedAt: "2026-10-01T00:00:00.000Z" }],
+    });
+
+    expect(rowTexts(html)[0]).toContain("Archived");
+  });
+
+  it.each([
+    ["no applications", { applications: [] }, "No applications yet"],
+    ["no archived applications", { applications: [], viewMode: "archive" as const }, "No archived applications"],
+    [
+      "filters with no match",
+      {
+        tablePreferences: {
+          ...tablePreferences,
+          searchQuery: "",
+          filters: { ...DEFAULT_APPLICATION_FILTERS, status: "Offered" as const },
+        },
+      },
+      "No applications match these filters",
+    ],
+  ])("explains an empty list with %s", (_case, overrides, title) => {
+    expect(renderPage("", overrides)).toContain(title);
+  });
+
+  it("explains an empty search", () => {
+    expect(renderPage("zzzz")).toContain("No matching applications");
+  });
+
+  it("offers sorting beside Filters", () => {
+    expect(renderPage("")).toMatch(/<div class="min-w-0 md:hidden"><label[\s\S]*?Sort applications/);
   });
 });
