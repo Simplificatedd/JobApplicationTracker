@@ -639,15 +639,15 @@ function ResumeCard({
         <>
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="break-words font-semibold">{resume.displayName}</p>
-              <p className="mt-1 truncate text-xs text-muted">
+              <p className="break-words font-semibold max-md:text-[15px]">{resume.displayName}</p>
+              <p className="mt-1 truncate text-xs text-muted max-md:text-[13px]">
                 {resume.versionLabel || "No version label"}
               </p>
             </div>
             <StorageBadge resume={resume} />
           </div>
           {resume.notes ? (
-            <p className="mt-2 line-clamp-2 text-xs text-muted">{resume.notes}</p>
+            <p className="mt-2 line-clamp-2 text-xs text-muted max-md:text-[13px]">{resume.notes}</p>
           ) : null}
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-3 text-xs">
             <DocumentMeta isWide label="Original file">
@@ -699,7 +699,7 @@ function DocumentMeta({
       <dt className="font-semibold uppercase tracking-[0.08em] text-muted">
         {label}
       </dt>
-      <dd className="mt-0.5 break-words text-sm text-foreground">{children}</dd>
+      <dd className="mt-0.5 break-words text-sm text-foreground max-md:text-[13px]">{children}</dd>
     </div>
   );
 }

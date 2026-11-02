@@ -84,6 +84,18 @@ describe("document library layouts", () => {
   });
 });
 
+describe("document cards on phones", () => {
+  it("uses 15px names and 13px metadata below md", () => {
+    const markup = renderPage({ resumes: [{ ...resume, notes: "Tailored for platform roles" }] });
+    const card = /<article[\s\S]*?<\/article>/.exec(markup)?.[0] ?? "";
+
+    expect(card).toMatch(/class="[^"]*max-md:text-\[15px\][^"]*">Software Resume<\/p>/);
+    expect(card).toMatch(/class="[^"]*max-md:text-\[13px\][^"]*">Frontend<\/p>/);
+    expect(card).toMatch(/class="[^"]*max-md:text-\[13px\][^"]*">Tailored for platform roles<\/p>/);
+    expect(card).toMatch(/<dd class="[^"]*max-md:text-\[13px\][^"]*">software-resume\.pdf<\/dd>/);
+  });
+});
+
 describe("document upload panel on phones", () => {
   it("folds the optional name and version behind a collapsed toggle below md", () => {
     const markup = renderPage();
