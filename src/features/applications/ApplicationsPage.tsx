@@ -53,7 +53,7 @@ interface ApplicationsPageProps {
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
   addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
   applications: Application[];
-  archiveApplication: (id: string) => void;
+  archiveApplication: (id: string) => Promise<MutationResult>;
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   deleteApplication: (id: string) => Promise<MutationResult>;
@@ -66,7 +66,7 @@ interface ApplicationsPageProps {
   now?: Date;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
-  restoreApplication: (id: string) => void;
+  restoreApplication: (id: string) => Promise<MutationResult>;
   resumes: ResumeMetadata[];
   settings: UserSettings;
   tablePreferences: TablePreferences | null;
@@ -271,6 +271,7 @@ export function ApplicationsPage({
     if (result.ok && id === selectedApplicationId) {
       setSelectedApplicationId(null);
     }
+    return result;
   }
 
   function resetTableView() {

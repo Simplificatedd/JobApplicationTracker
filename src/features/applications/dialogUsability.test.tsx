@@ -45,7 +45,7 @@ function detailProps(): ComponentProps<typeof ApplicationDetailPanel> {
   return {
     application, assessments: [], assessmentActions: assessmentActions(), activities: [], contacts: [], coverLetters: [], interviews: [], resumes: [],
     coverLetterActionError: "", resumeActionError: "", workingResumeId: null, workingCoverLetterId: null,
-    enableDeleteActiveApplications: false, onArchive: vi.fn(), onDelete: vi.fn(), onRestore: vi.fn(),
+    enableDeleteActiveApplications: false, onArchive: vi.fn().mockResolvedValue({ ok: true }), onDelete: vi.fn().mockResolvedValue({ ok: true }), onRestore: vi.fn().mockResolvedValue({ ok: true }),
     onClose: vi.fn(), onAddInterview: vi.fn(), onDeleteInterview: vi.fn(), onUpdate: vi.fn(), onUpdateInterview: vi.fn(),
     onDownloadCoverLetter: vi.fn(), onDownloadResume: vi.fn(), onPreviewResume: vi.fn(), onPreviewCoverLetter: vi.fn(),
   };
@@ -95,9 +95,22 @@ it("restores and deletes an archived application after confirmation", () => {
   call(button(tree, "Delete").props.onClick); expect(props.onDelete).toHaveBeenCalledWith(application.id);
 });
 it("offers active deletion only when it is enabled in Settings", () => {
+  expect(button(render(() => ApplicationDetailPanel(detailProps())), "Delete")).toBeUndefined();
+  host.slots = [];
   const props = { ...detailProps(), enableDeleteActiveApplications: true };
   const tree = render(() => ApplicationDetailPanel(props)); call(button(tree, "Delete").props.onClick);
   expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+it("blocks repeat header actions while one is pending and shows its failure in the panel", async () => {
+  let resolve!: (value: unknown) => void;
+  const props = { ...detailProps(), onArchive: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
+  let tree = render(() => ApplicationDetailPanel(props)); call(button(tree, "Archive").props.onClick);
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive").props.disabled).toBe(true); expect(button(tree, "Edit").props.disabled).toBe(true);
+  resolve({ ok: false, error: "Archive could not be saved." }); await Promise.resolve(); await Promise.resolve();
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
+  expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Archive could not be saved.")).toBe(true);
 });
 it("disables header actions while a nested editor is open and hides them while editing", () => {
   const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));

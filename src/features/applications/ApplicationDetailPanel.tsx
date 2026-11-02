@@ -78,10 +78,10 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   coverLetterActionError: string;
   coverLetters: CoverLetterMetadata[];
   enableDeleteActiveApplications: boolean;
-  onArchive: (id: string) => void;
+  onArchive: (id: string) => Promise<MutationResult>;
   onClose: () => void;
-  onDelete: (id: string) => void;
-  onRestore: (id: string) => void;
+  onDelete: (id: string) => Promise<MutationResult>;
+  onRestore: (id: string) => Promise<MutationResult>;
   onAddInterview: (
     input: InterviewInput,
   ) => Promise<MutationResult<Interview>>;
@@ -143,6 +143,9 @@ export function ApplicationDetailPanel({
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
+  const [isActionPending, setIsActionPending] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
   const [editBase, setEditBase] = useState(() => structuredClone(application));
@@ -155,6 +158,21 @@ export function ApplicationDetailPanel({
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
 
+
+  // The page behind this modal is inert, so action failures are shown here.
+  // Pending actions also block repeat clicks while a slow save completes.
+  async function runHeaderAction(
+    action: (id: string) => Promise<MutationResult>,
+  ) {
+    setIsActionPending(true);
+    setActionError("");
+    const result = await action(application.id);
+    setIsActionPending(false);
+
+    if (!result.ok) {
+      setActionError(result.error);
+    }
+  }
 
   function startEditing() {
     if (nestedEditorOpen) return;
@@ -286,8 +304,8 @@ export function ApplicationDetailPanel({
       className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
     >
       <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
-        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
-          <div className="min-w-0">
+        <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border px-4 py-4 sm:px-6">
+          <div className="min-w-0 flex-1 basis-48">
             {application.company ? (
               <p className="text-sm font-medium text-muted">
                 {application.company}
@@ -300,7 +318,7 @@ export function ApplicationDetailPanel({
               {application.jobTitle}
             </h2>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {isEditing ? (
               <>
                 {/* Phones use the labelled footer actions below instead. */}
@@ -330,8 +348,8 @@ export function ApplicationDetailPanel({
                 {application.archivedAt ? (
                   <button
                     className="icon-button"
-                    disabled={nestedEditorOpen}
-                    onClick={() => onRestore(application.id)}
+                    disabled={headerActionsDisabled}
+                    onClick={() => void runHeaderAction(onRestore)}
                     title="Restore"
                     type="button"
                   >
@@ -341,8 +359,8 @@ export function ApplicationDetailPanel({
                 ) : (
                   <button
                     className="icon-button"
-                    disabled={nestedEditorOpen}
-                    onClick={() => onArchive(application.id)}
+                    disabled={headerActionsDisabled}
+                    onClick={() => void runHeaderAction(onArchive)}
                     title="Archive"
                     type="button"
                   >
@@ -356,10 +374,10 @@ export function ApplicationDetailPanel({
                 ) ? (
                   <button
                     className="icon-button text-destructive"
-                    disabled={nestedEditorOpen}
+                    disabled={headerActionsDisabled}
                     onClick={() => {
                       if (confirmApplicationDelete(application)) {
-                        onDelete(application.id);
+                        void runHeaderAction(onDelete);
                       }
                     }}
                     title="Delete"
@@ -369,7 +387,7 @@ export function ApplicationDetailPanel({
                     <span className="sr-only">Delete</span>
                   </button>
                 ) : null}
-                <button className="icon-button" disabled={nestedEditorOpen} onClick={startEditing} type="button">
+                <button className="icon-button" disabled={headerActionsDisabled} onClick={startEditing} title="Edit" type="button">
                   <Pencil aria-hidden="true" size={18} />
                   <span className="sr-only">Edit</span>
                 </button>
@@ -379,6 +397,7 @@ export function ApplicationDetailPanel({
               className="icon-button"
               disabled={isSaving || nestedEditorOpen}
               onClick={requestClose}
+              title="Close"
               type="button"
             >
               <X aria-hidden="true" size={18} />
@@ -387,6 +406,7 @@ export function ApplicationDetailPanel({
           </div>
         </header>
 
+        {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
