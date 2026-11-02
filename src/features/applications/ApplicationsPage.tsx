@@ -8,6 +8,7 @@ import {
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { ContactsPanel } from "./ContactsPanel";
 import {
+  countActiveFilters,
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
@@ -27,7 +28,10 @@ import {
 } from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
-import { deriveApplicationNotifications } from "../../lib/reminders";
+import {
+  deriveApplicationNotifications,
+  selectUpcomingEvent,
+} from "../../lib/reminders";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import type {
   ApplicationUpdate,
@@ -219,6 +223,26 @@ export function ApplicationsPage({
       )
     : filteredApplications;
   const visibleApplications = focusedApplications;
+  const upcomingEvents = new Map(
+    visibleApplications.flatMap((application) => {
+      const event = selectUpcomingEvent(
+        deriveApplicationNotifications(
+          application,
+          settings,
+          now,
+          interviews.filter(
+            (interview) => interview.applicationId === application.id,
+          ),
+          assessments.filter((item) => item.applicationId === application.id),
+        ),
+        now,
+      );
+      return event ? [[application.id, event] as const] : [];
+    }),
+  );
+  const isFiltered =
+    countActiveFilters(filters, needsAttentionOnly) > 0 &&
+    searchBase.applications.length > 0;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -357,8 +381,10 @@ export function ApplicationsPage({
         }}
         onSearchQueryChange={setSearchQuery}
         onSearchScopeChange={setSearchScope}
+        onSortChange={setSort}
         searchQuery={searchQuery}
         searchScope={searchScope}
+        sort={sort}
         viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
@@ -383,14 +409,18 @@ export function ApplicationsPage({
             ? searchBase.searchesAll
               ? "No active or archived applications match that company, title, or description."
               : "No applications match that company, title, or description."
-            : viewMode === "archive"
+            : isFiltered
+              ? "Clear or change the filters to see more applications."
+              : viewMode === "archive"
               ? "Archived applications will appear here."
               : "New entries will appear here once they are added."
         }
         emptyTitle={
           searchQuery.trim()
             ? "No matching applications"
-            : viewMode === "archive"
+            : isFiltered
+              ? "No applications match these filters"
+              : viewMode === "archive"
               ? "No archived applications"
               : "No applications yet"
         }
@@ -409,6 +439,7 @@ export function ApplicationsPage({
         resumes={resumes}
         workingResumeId={workingResumeId}
         sort={sort}
+        upcomingEvents={upcomingEvents}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 

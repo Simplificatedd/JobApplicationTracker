@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
-import { ColumnsModal, SearchScopeToggle } from "./ApplicationsToolbar";
+import { ColumnsModal, PhoneSortSelect, SearchScopeToggle } from "./ApplicationsToolbar";
+import { DEFAULT_SORT_STATE } from "./applicationFilters";
 
 function renderColumnsModal() {
   return renderToStaticMarkup(
@@ -88,4 +89,34 @@ describe("Search scope toggle", () => {
       expect(onChange).toHaveBeenLastCalledWith("all");
     },
   );
+});
+
+describe("phone sort control", () => {
+  it("lists the phone sorts with the current one selected", () => {
+    const markup = renderToStaticMarkup(
+      <PhoneSortSelect onChange={vi.fn()} sort={{ column: "company", direction: "ascending" }} />,
+    );
+
+    expect([...markup.matchAll(/<option[^>]*>([^<]+)<\/option>/g)].map((match) => match[1])).toEqual([
+      "Recently updated",
+      "Applied, newest first",
+      "Applied, oldest first",
+      "Company A–Z",
+      "Job title A–Z",
+      "Status",
+    ]);
+    expect(markup).toMatch(/value="company:ascending" selected=""/);
+  });
+
+  it("keeps a table-only sort visible until another is chosen", () => {
+    const onChange = vi.fn();
+    const element = PhoneSortSelect({
+      onChange,
+      sort: { column: "priority", direction: "descending" },
+    });
+
+    expect(renderToStaticMarkup(element)).toMatch(/<option disabled="" value="priority:descending" selected="">Table sort<\/option>/);
+    (element.props.onChange as (value: string) => void)("updatedAt:descending");
+    expect(onChange).toHaveBeenCalledWith(DEFAULT_SORT_STATE);
+  });
 });

@@ -11,6 +11,7 @@ import {
 import {
   ArrowDownWideNarrow,
   ArrowUpDown,
+  CalendarClock,
   ArrowUpWideNarrow,
   RotateCcw,
 } from "lucide-react";
@@ -24,7 +25,14 @@ import {
   RowActionsMenu,
   StatusQuickEditCell,
 } from "./TableCells";
-import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
+import {
+  formatDate,
+  formatDateTime,
+  formatDeadline,
+  formatUpdatedAt,
+} from "../../lib/format";
+import type { NotificationType, ReminderNotification } from "../../lib/reminders";
+import { StatusBadge } from "./StatusBadge";
 import { getInterviewTypeLabel } from "../../lib/constants";
 import { getSafeHttpUrl } from "../../lib/urls";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
@@ -51,6 +59,8 @@ interface ApplicationsTableProps {
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
   sort: SortState;
+  // Phone rows show each application's next event, keyed by application id.
+  upcomingEvents?: Map<string, ReminderNotification>;
   visibleApplicationColumns: string[];
   workingResumeId: string | null;
 }
@@ -331,6 +341,7 @@ export function ApplicationsTable({
   onUpdateApplication,
   resumes,
   sort,
+  upcomingEvents,
   visibleApplicationColumns,
   workingResumeId,
 }: ApplicationsTableProps) {
@@ -476,7 +487,20 @@ export function ApplicationsTable({
         </div>
       ) : (
         <>
-          <div className="grid gap-3 p-3 lg:grid-cols-2 xl:hidden">
+          <ul className="divide-y divide-border md:hidden">
+            {applications.map((application) => (
+              <MobileApplicationRow
+                application={application}
+                key={application.id}
+                onOpenApplication={onOpenApplication}
+                showArchivedBadge={
+                  markArchivedApplications && Boolean(application.archivedAt)
+                }
+                upcomingEvent={upcomingEvents?.get(application.id)}
+              />
+            ))}
+          </ul>
+          <div className="hidden gap-3 p-3 md:grid lg:grid-cols-2 xl:hidden">
             {applications.map((application) => (
               <ApplicationCard
                 application={application}
@@ -1186,6 +1210,79 @@ function ApplicationCard({
         })}
       </div>
     </article>
+  );
+}
+
+const UPCOMING_EVENT_LABELS: Record<NotificationType, string> = {
+  assessment_deadline: "Assessment due",
+  assessment_start: "Assessment",
+  deadline: "Stage deadline",
+  flagged: "Reminder",
+  follow_up: "Follow up",
+  interview: "Interview",
+  offer_deadline: "Offer deadline",
+};
+
+function MobileApplicationRow({
+  application,
+  onOpenApplication,
+  showArchivedBadge,
+  upcomingEvent,
+}: {
+  application: JobApplication;
+  onOpenApplication: (applicationId: string) => void;
+  showArchivedBadge: boolean;
+  upcomingEvent?: ReminderNotification;
+}) {
+  const details = [
+    application.dateApplied
+      ? `Applied ${formatDate(application.dateApplied)}`
+      : undefined,
+    application.location?.trim(),
+    formatOption(application.workMode),
+  ].filter(Boolean);
+
+  return (
+    <li>
+      <button
+        className="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+        onClick={() => onOpenApplication(application.id)}
+        type="button"
+      >
+        <span className="flex w-full min-w-0 items-center justify-between gap-3">
+          <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+            {application.company || application.jobTitle}
+          </span>
+          <span className="flex max-w-[55%] shrink-0">
+            <StatusBadge status={application.status} />
+          </span>
+        </span>
+        {application.company ? (
+          <span className="w-full truncate text-sm text-foreground">
+            {application.jobTitle}
+          </span>
+        ) : null}
+        {details.length > 0 ? (
+          <span className="w-full truncate text-xs text-muted">
+            {details.join(" · ")}
+          </span>
+        ) : null}
+        {showArchivedBadge || upcomingEvent ? (
+          <span className="flex flex-wrap items-center gap-2 pt-1">
+            {showArchivedBadge ? <ArchivedBadge /> : null}
+            {upcomingEvent ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-foreground">
+                <CalendarClock aria-hidden="true" className="shrink-0 text-muted" size={13} />
+                <span className="truncate">
+                  {UPCOMING_EVENT_LABELS[upcomingEvent.type]} ·{" "}
+                  {formatDeadline(upcomingEvent.dueAt)}
+                </span>
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </button>
+    </li>
   );
 }
 

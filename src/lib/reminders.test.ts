@@ -5,6 +5,8 @@ import {
   calculateFollowUpDueDate,
   classifyReminderSeverity,
   deriveApplicationNotifications,
+  selectUpcomingEvent,
+  type ReminderNotification,
 } from "./reminders";
 
 const baseApplication: Application = {
@@ -337,5 +339,60 @@ describe("deriveApplicationNotifications", () => {
     );
 
     expect(notifications).toEqual([]);
+  });
+});
+
+describe("selectUpcomingEvent", () => {
+  const now = new Date(2026, 10, 2, 12, 0);
+  const event = (id: string, dueAt: string, sortAt = 0) =>
+    ({ id, dueAt, sortAt, type: "interview" }) as ReminderNotification;
+
+  it("picks the earliest event that is still ahead", () => {
+    expect(
+      selectUpcomingEvent(
+        [
+          event("past", "2026-11-01T09:00"),
+          event("later", "2026-11-09T09:00"),
+          event("sooner", "2026-11-04T09:00"),
+        ],
+        now,
+      )?.id,
+    ).toBe("sooner");
+  });
+
+  it("keeps a date-only event upcoming for the rest of its day", () => {
+    expect(selectUpcomingEvent([event("today", "2026-11-02")], now)?.id).toBe("today");
+    expect(selectUpcomingEvent([event("earlier today", "2026-11-02T09:00")], now)).toBeUndefined();
+  });
+
+  it("orders by the event time, not the reminder's sort time", () => {
+    expect(
+      selectUpcomingEvent(
+        [event("event later", "2026-11-09T09:00", 1), event("event sooner", "2026-11-04T09:00", 99)],
+        now,
+      )?.id,
+    ).toBe("event sooner");
+  });
+
+  it("uses the scheduled interview time from the existing derivation", () => {
+    const application = { ...baseApplication, status: "Interviewing" as const, followUpNeeded: false };
+    const interview: Interview = {
+      id: "interview-1",
+      applicationId: application.id,
+      dateTime: "2026-11-05T14:30",
+      mode: "video",
+      proctored: false,
+      round: 1,
+      type: "technical-interview",
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+    };
+    const upcoming = selectUpcomingEvent(
+      deriveApplicationNotifications(application, DEFAULT_USER_SETTINGS, now, [interview]),
+      now,
+    );
+
+    expect(upcoming?.type).toBe("interview");
+    expect(upcoming?.dueAt).toBe("2026-11-05T14:30");
   });
 });

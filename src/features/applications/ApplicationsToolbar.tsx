@@ -1,4 +1,5 @@
 import {
+  ArrowUpDown,
   CalendarDays,
   ChevronDown,
   ClipboardCheck,
@@ -33,8 +34,11 @@ import {
   type ApplicationColumnId,
 } from "./ApplicationsTable";
 import {
+  countActiveFilters,
   DEFAULT_APPLICATION_FILTERS,
+  DEFAULT_SORT_STATE,
   type ApplicationFilters,
+  type SortState,
 } from "./applicationFilters";
 import type { SearchScope } from "./applicationSearch";
 import type {
@@ -55,8 +59,10 @@ interface ApplicationsToolbarProps {
   onResetFilters?: () => void;
   onSearchQueryChange?: (value: string) => void;
   onSearchScopeChange?: (scope: SearchScope) => void;
+  onSortChange?: (sort: SortState) => void;
   searchQuery?: string;
   searchScope?: SearchScope;
+  sort?: SortState;
   viewMode?: "active" | "archive";
   visibleApplicationColumns?: string[];
 }
@@ -72,8 +78,10 @@ export function ApplicationsToolbar({
   onResetFilters,
   onSearchQueryChange,
   onSearchScopeChange,
+  onSortChange,
   searchQuery = "",
   searchScope = "all",
+  sort = DEFAULT_SORT_STATE,
   viewMode = "active",
   visibleApplicationColumns = [],
 }: ApplicationsToolbarProps) {
@@ -173,9 +181,16 @@ export function ApplicationsToolbar({
             Reset
           </button>
 
+          {/* Phones have no table headers, so sorting sits beside Filters. */}
+          {onSortChange ? (
+            <div className="min-w-0 md:hidden">
+              <PhoneSortSelect onChange={onSortChange} sort={sort} />
+            </div>
+          ) : null}
+
           {/* Narrow toolbars show Columns beside Filters instead of in a
-              footer row of its own. */}
-          <div className="applications-toolbar-columns-inline min-w-0">
+              footer row of its own. Phone rows ignore columns entirely. */}
+          <div className="applications-toolbar-columns-inline min-w-0 max-md:hidden">
             <ColumnsButton
               className="w-full"
               hiddenColumnCount={hiddenColumnCount}
@@ -185,7 +200,7 @@ export function ApplicationsToolbar({
         </div>
       </div>
 
-      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3">
+      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3 max-md:hidden">
         <ColumnsButton
           hiddenColumnCount={hiddenColumnCount}
           onClick={() => setIsColumnsOpen(true)}
@@ -973,37 +988,6 @@ function MoreFiltersModal({
   );
 }
 
-function countActiveFilters(
-  filters: ApplicationFilters,
-  needsAttentionOnly: boolean,
-) {
-  return [
-    filters.applicationUrl,
-    filters.contacts,
-    filters.coverLetterVersion,
-    filters.dateApplied,
-    filters.offerDeadline,
-    filters.status,
-    filters.followUp,
-    filters.followUpPromptDays,
-    filters.interview,
-    filters.interviewRound,
-    filters.interviewType,
-    filters.jobDescription,
-    filters.resume,
-    filters.source,
-    filters.jobType,
-    filters.location,
-    filters.notes,
-    filters.priority,
-    filters.roleEndDate,
-    filters.roleStartDate,
-    filters.salary,
-    filters.updatedAt,
-    filters.workMode,
-    needsAttentionOnly,
-  ].filter(Boolean).length;
-}
 
 function PresenceFilterSelect({
   label,
@@ -1024,6 +1008,52 @@ function PresenceFilterSelect({
       <option value="">{label}</option>
       <option value="filled">Has value</option>
       <option value="blank">Blank</option>
+    </FilterSelect>
+  );
+}
+
+const PHONE_SORT_OPTIONS: Array<{ label: string; sort: SortState }> = [
+  { label: "Recently updated", sort: DEFAULT_SORT_STATE },
+  { label: "Applied, newest first", sort: { column: "dateApplied", direction: "descending" } },
+  { label: "Applied, oldest first", sort: { column: "dateApplied", direction: "ascending" } },
+  { label: "Company A–Z", sort: { column: "company", direction: "ascending" } },
+  { label: "Job title A–Z", sort: { column: "jobTitle", direction: "ascending" } },
+  { label: "Status", sort: { column: "status", direction: "ascending" } },
+];
+
+const sortKey = (sort: SortState) => `${sort.column}:${sort.direction}`;
+
+export function PhoneSortSelect({
+  onChange,
+  sort,
+}: {
+  onChange: (sort: SortState) => void;
+  sort: SortState;
+}) {
+  const value = sortKey(sort);
+  const isTableSort = !PHONE_SORT_OPTIONS.some((option) => sortKey(option.sort) === value);
+
+  return (
+    <FilterSelect
+      icon={ArrowUpDown}
+      label="Sort applications"
+      onChange={(next) => {
+        const option = PHONE_SORT_OPTIONS.find((item) => sortKey(item.sort) === next);
+        if (option) onChange(option.sort);
+      }}
+      value={value}
+    >
+      {/* A column sort chosen on a wider screen stays selected until changed. */}
+      {isTableSort ? (
+        <option disabled value={value}>
+          Table sort
+        </option>
+      ) : null}
+      {PHONE_SORT_OPTIONS.map((option) => (
+        <option key={sortKey(option.sort)} value={sortKey(option.sort)}>
+          {option.label}
+        </option>
+      ))}
     </FilterSelect>
   );
 }

@@ -420,6 +420,31 @@ function getProjectedInterviewRecords(application: Application): Interview[] {
   ];
 }
 
+// The next event still ahead, timed by the event itself (dueAt) rather than by
+// when its reminder appears. Date-only events stay upcoming until their day ends.
+export function selectUpcomingEvent(
+  notifications: ReminderNotification[],
+  now = new Date(),
+) {
+  const today = startOfDay(now);
+  let upcoming: { at: number; notification: ReminderNotification } | undefined;
+
+  for (const notification of notifications) {
+    const dueDate = parseDate(notification.dueAt);
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(notification.dueAt ?? "");
+
+    if (!dueDate || dueDate < (isDateOnly ? today : now)) {
+      continue;
+    }
+
+    if (!upcoming || dueDate.getTime() < upcoming.at) {
+      upcoming = { at: dueDate.getTime(), notification };
+    }
+  }
+
+  return upcoming?.notification;
+}
+
 export function sortNotifications(notifications: ReminderNotification[]) {
   const severityRank: Record<ReminderSeverity, number> = {
     overdue: 0,

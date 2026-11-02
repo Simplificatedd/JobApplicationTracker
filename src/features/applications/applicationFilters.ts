@@ -587,3 +587,35 @@ function matchesUpdatedAt(value: string, filter: UpdatedAtFilter) {
 
   return true;
 }
+
+export function countActiveFilters(
+  filters: ApplicationFilters,
+  needsAttentionOnly: boolean,
+) {
+  return [
+    filters.applicationUrl,
+    filters.contacts,
+    filters.coverLetterVersion,
+    filters.dateApplied,
+    filters.offerDeadline,
+    filters.status,
+    filters.followUp,
+    filters.followUpPromptDays,
+    filters.interview,
+    filters.interviewRound,
+    filters.interviewType,
+    filters.jobDescription,
+    filters.resume,
+    filters.source,
+    filters.jobType,
+    filters.location,
+    filters.notes,
+    filters.priority,
+    filters.roleEndDate,
+    filters.roleStartDate,
+    filters.salary,
+    filters.updatedAt,
+    filters.workMode,
+    needsAttentionOnly,
+  ].filter(Boolean).length;
+}
