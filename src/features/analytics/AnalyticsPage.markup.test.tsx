@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_ANALYTICS_SETTINGS, DEFAULT_USER_SETTINGS } from "../../lib/domain";
@@ -77,5 +78,14 @@ describe("phone analytics header", () => {
 
     expect(includeArchived.slice(0, includeArchived.indexOf(">"))).toContain("max-md:h-11");
     expect(customize.slice(0, customize.indexOf(">"))).toContain("max-md:h-11");
+  });
+});
+
+describe("phone chart toggles", () => {
+  it("gives every Customize chart toggle 44px on phones", () => {
+    const source = readFileSync(new URL("./AnalyticsPage.tsx", import.meta.url), "utf8");
+
+    // The panel only renders after Customize is pressed, so check the source.
+    expect(source).toContain("inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition max-md:min-h-11");
   });
 });

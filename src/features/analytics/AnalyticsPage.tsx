@@ -257,7 +257,7 @@ export function AnalyticsPage({
 
                         return (
                           <label
-                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition max-md:min-h-11 ${
                               isVisible
                                 ? "border-primary/40 bg-blue-50 text-foreground"
                                 : "border-border bg-surface text-muted hover:text-foreground"
