@@ -351,7 +351,7 @@ export function StatTile({
     ) : null;
 
   return (
-    <div className="surface-panel relative flex min-w-0 items-end justify-between gap-3 overflow-hidden rounded-lg px-4 py-3 max-sm:px-3">
+    <div className="surface-panel relative flex min-w-0 items-end justify-between gap-3 overflow-hidden rounded-lg px-4 py-3 max-sm:items-start max-sm:px-3">
       <span
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-0.5"

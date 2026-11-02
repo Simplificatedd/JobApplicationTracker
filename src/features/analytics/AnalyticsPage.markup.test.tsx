@@ -55,3 +55,16 @@ describe("phone stat tiles", () => {
     expect(metrics.slice(metrics.indexOf(wrapper))).toMatch(/^<div[^>]*><svg[^>]*-rotate-90/);
   });
 });
+
+describe("phone key metrics", () => {
+  it("lays the key metrics out two by two until xl", () => {
+    const classes = keyMetrics().match(/^aria-label="Key metrics" class="([^"]*)"/)![1].split(" ");
+
+    expect(classes).toEqual(expect.arrayContaining(["grid", "grid-cols-2", "xl:grid-cols-4"]));
+    expect(classes).not.toContain("sm:grid-cols-2");
+  });
+
+  it("top-aligns tile content in the equal-height phone rows", () => {
+    expect(countMatches(keyMetrics(), "max-sm:items-start")).toBe(4);
+  });
+});
