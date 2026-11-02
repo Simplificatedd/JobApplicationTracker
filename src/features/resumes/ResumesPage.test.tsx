@@ -84,26 +84,60 @@ describe("document library layouts", () => {
   });
 });
 
+describe("document cards on phones", () => {
+  it("uses 15px names and 13px metadata below md", () => {
+    const markup = renderPage({ resumes: [{ ...resume, notes: "Tailored for platform roles" }] });
+    const card = /<article[\s\S]*?<\/article>/.exec(markup)?.[0] ?? "";
+
+    expect(card).toMatch(/class="[^"]*max-md:text-\[15px\][^"]*">Software Resume<\/p>/);
+    expect(card).toMatch(/class="[^"]*max-md:text-\[13px\][^"]*">Frontend<\/p>/);
+    expect(card).toMatch(/class="[^"]*max-md:text-\[13px\][^"]*">Tailored for platform roles<\/p>/);
+    expect(card).toMatch(/<dd class="[^"]*max-md:text-\[13px\][^"]*">software-resume\.pdf<\/dd>/);
+  });
+});
+
+describe("document card actions on phones", () => {
+  it("gives labelled card actions 44px targets in two columns below md", () => {
+    const markup = renderPage();
+    const card = /<article[\s\S]*?<\/article>/.exec(markup)?.[0] ?? "";
+    const table = /<table[\s\S]*?<\/table>/.exec(markup)?.[0] ?? "";
+
+    expect(card).toContain('class="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap"');
+    for (const label of ["Preview resume", "Download resume", "Edit metadata", "Delete resume"]) {
+      expect(card).toMatch(new RegExp(`aria-label="${label}" class="[^"]*max-md:h-11`));
+    }
+    // Icon-only table actions keep their size.
+    expect(table).not.toContain("max-md:h-11");
+  });
+});
+
 describe("document upload panel on phones", () => {
-  it("folds the optional name and version behind a collapsed toggle below sm", () => {
+  it("folds the optional name and version behind a collapsed toggle below md", () => {
     const markup = renderPage();
 
     expect(markup).toMatch(
-      /<button aria-controls="[^"]+-name [^"]+-version" aria-expanded="false" class="[^"]*\bsm:hidden\b[^"]*"[^>]*>.*Add name and version<\/button>/,
+      /<button aria-controls="[^"]+-name [^"]+-version" aria-expanded="false" class="[^"]*\bmd:hidden\b[^"]*"[^>]*>.*Add name and version<\/button>/,
     );
-    expect(markup).toMatch(/<label class="block max-sm:hidden" id="[^"]+-name">/);
-    expect(markup).toMatch(/<label class="block max-sm:hidden" id="[^"]+-version">/);
+    expect(markup).toMatch(/<label class="block max-md:hidden" id="[^"]+-name">/);
+    expect(markup).toMatch(/<label class="block max-md:hidden" id="[^"]+-version">/);
   });
 
   it("keeps the file input in the page for the Upload buttons, revealed on keyboard focus", () => {
     const markup = renderPage();
 
     expect(markup).toContain(
-      '<label class="block max-sm:sr-only max-sm:focus-within:not-sr-only">',
+      '<label class="block max-md:sr-only max-md:focus-within:not-sr-only">',
     );
     expect(markup).toContain('id="resume-upload-file-input"');
     expect(renderPage({ documentKind: "cover letter" })).toContain(
       'id="cover-letter-upload-file-input"',
     );
+  });
+
+  it("gives the phone Upload and name/version buttons 44px targets", () => {
+    const markup = renderPage();
+
+    expect(markup).toMatch(/class="[^"]*max-md:h-11[^"]*"[^>]*><svg[\s\S]*?<\/svg>Upload<\/button>/);
+    expect(markup).toMatch(/class="[^"]*max-md:h-11 md:hidden"[^>]*>[\s\S]*?Add name and version<\/button>/);
   });
 });
