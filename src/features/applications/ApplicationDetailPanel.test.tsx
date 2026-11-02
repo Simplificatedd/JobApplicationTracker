@@ -140,3 +140,15 @@ describe("phone detail panel scroll lock", () => {
     );
   });
 });
+
+describe("phone activity disclosure", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("pads the Activity summary to a 44px tap target", () => {
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
+    const summary = /<summary class="([^"]*)">Activity/.exec(renderPanel())?.[1].split(" ") ?? [];
+
+    // 20px text line + 12px above and below.
+    expect(summary).toEqual(expect.arrayContaining(["py-3", "text-sm", "cursor-pointer"]));
+  });
+});

@@ -881,10 +881,11 @@ function ReadOnlyDetails({
     ),
     activity: isPhone ? (
       <details key="activity">
-        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+        {/* Padded to a 44px tap target; display stays list-item to keep the marker. */}
+        <summary className="cursor-pointer py-3 text-sm font-semibold text-foreground">
           Activity ({activities.length})
         </summary>
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           {activities.length === 0 ? (
             <p className="text-sm text-muted">No activity yet.</p>
           ) : (
