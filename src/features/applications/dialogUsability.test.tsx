@@ -27,6 +27,7 @@ import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
 import { NotificationBell } from "../../components/NotificationBell";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type { ReminderNotification } from "../../lib/reminders";
 
 type Element = { type: unknown; props: Record<string, unknown> };
@@ -259,4 +260,30 @@ it("closes the notifications panel when the layout crosses the phone breakpoint"
   const tree = render(() => NotificationBell(props));
   expect(named(tree, "NativeModal")).toBeUndefined();
   expect(elements(tree).some(e => e.props.role === "dialog")).toBe(false);
+});
+it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
+  const listeners = new Map<string, () => void>();
+  const visual = { height: 400, offsetTop: 0, scale: 1, addEventListener: (type: string, fn: () => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) };
+  const focused = { scrollIntoView: vi.fn() };
+  vi.stubGlobal("HTMLElement", class {});
+  Object.setPrototypeOf(focused, (globalThis as unknown as { HTMLElement: { prototype: object } }).HTMLElement.prototype);
+  vi.stubGlobal("document", { activeElement: focused });
+  vi.stubGlobal("window", { visualViewport: visual, requestAnimationFrame: (fn: () => void) => fn() });
+  let active = true;
+  const view = () => render(() => useVisibleViewportStyle(active));
+  view();
+  expect(view()).toEqual({ height: "calc(400px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: undefined });
+  // The keyboard opens and Safari scrolls the visual viewport.
+  visual.height = 300; visual.offsetTop = 120; listeners.get("resize")!();
+  expect(view()).toEqual({ height: "calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: "translateY(120px)" });
+  expect(focused.scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+  // Safari scrolls the visual viewport without resizing it.
+  visual.offsetTop = 60; listeners.get("scroll")!();
+  expect(view()).toEqual({ height: "calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: "translateY(60px)" });
+  // A pinch-zoom leaves the form as it was.
+  visual.scale = 2; visual.height = 150; listeners.get("resize")!();
+  expect(view()?.height).toBe("calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))");
+  active = false; view();
+  expect(view()).toBeUndefined();
+  expect(listeners.size).toBe(0);
 });
