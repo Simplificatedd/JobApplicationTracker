@@ -14,7 +14,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   APPLICATION_STATUSES,
   getInterviewTypeLabel,
@@ -160,19 +160,37 @@ export function ApplicationDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
 
+  useEffect(() => {
+    if (!isActionsMenuOpen) {
+      return;
+    }
+
+    // Pointer-based, not blur-based: Safari and macOS Firefox do not focus a
+    // clicked button, so a blur check would close the menu before its click.
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!actionsRef.current?.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [isActionsMenuOpen]);
+
+  // Returns focus to the trigger so keyboard users stay in the header.
+  function closeActionsMenu() {
+    setIsActionsMenuOpen(false);
+    actionsTriggerRef.current?.focus();
+  }
 
   // The page behind this modal is inert, so action failures are shown here.
   // Pending actions also block repeat clicks while a slow save completes.
-  // Returns focus to the trigger so keyboard users stay in the header.
-  function closeActionsMenu(from: HTMLElement) {
-    setIsActionsMenuOpen(false);
-    from
-      .closest("[data-detail-actions]")
-      ?.querySelector<HTMLElement>("[aria-haspopup='menu']")
-      ?.focus();
-  }
-
   async function runHeaderAction(
     action: (id: string) => Promise<MutationResult>,
   ) {
@@ -280,7 +298,8 @@ export function ApplicationDetailPanel({
   }
 
   function requestClose() {
-    if (isSaving || nestedEditorOpen) {
+    // Covers Escape, the backdrop and the Close button.
+    if (isSaving || nestedEditorOpen || isActionPending) {
       return;
     }
 
@@ -359,12 +378,26 @@ export function ApplicationDetailPanel({
               <>
                 <div
                   className="relative"
-                  data-detail-actions
                   onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                    // Tabbing away closes the menu. A click gives no related
+                    // target in Safari, so pointers are handled above.
+                    if (
+                      event.relatedTarget &&
+                      !event.currentTarget.contains(event.relatedTarget)
+                    ) {
                       setIsActionsMenuOpen(false);
                     }
                   }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && isActionsMenuOpen) {
+                      // Close only the menu, not the detail dialog, wherever
+                      // focus sits (a disabled item leaves it on the trigger).
+                      event.preventDefault();
+                      event.stopPropagation();
+                      closeActionsMenu();
+                    }
+                  }}
+                  ref={actionsRef}
                 >
                   <button
                     aria-controls={isActionsMenuOpen ? "application-detail-actions" : undefined}
@@ -375,6 +408,7 @@ export function ApplicationDetailPanel({
                     // the menu items are disabled instead.
                     disabled={nestedEditorOpen}
                     onClick={() => setIsActionsMenuOpen((current) => !current)}
+                    ref={actionsTriggerRef}
                     title="More actions"
                     type="button"
                   >
@@ -387,49 +421,29 @@ export function ApplicationDetailPanel({
                     <div
                       className="absolute right-0 top-full z-10 mt-1 w-52 rounded-lg border border-border bg-surface p-1 shadow-popover"
                       id="application-detail-actions"
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          // Close only the menu, not the detail dialog.
-                          event.preventDefault();
-                          event.stopPropagation();
-                          closeActionsMenu(event.currentTarget);
-                          return;
-                        }
-                        moveMenuFocus(event);
-                      }}
+                      onKeyDown={moveMenuFocus}
                       role="menu"
                     >
-                      {application.archivedAt ? (
-                        <button
-                          autoFocus
-                          disabled={isActionPending}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
-                          onClick={(event) => {
-                            closeActionsMenu(event.currentTarget);
-                            void runHeaderAction(onRestore);
-                          }}
-                          role="menuitem"
-                          type="button"
-                        >
+                      <button
+                        autoFocus
+                        disabled={isActionPending}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
+                        onClick={() => {
+                          closeActionsMenu();
+                          void runHeaderAction(
+                            application.archivedAt ? onRestore : onArchive,
+                          );
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        {application.archivedAt ? (
                           <RotateCcw aria-hidden="true" size={16} />
-                          Restore
-                        </button>
-                      ) : (
-                        <button
-                          autoFocus
-                          disabled={isActionPending}
-                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
-                          onClick={(event) => {
-                            closeActionsMenu(event.currentTarget);
-                            void runHeaderAction(onArchive);
-                          }}
-                          role="menuitem"
-                          type="button"
-                        >
+                        ) : (
                           <Archive aria-hidden="true" size={16} />
-                          Archive
-                        </button>
-                      )}
+                        )}
+                        {application.archivedAt ? "Restore" : "Archive"}
+                      </button>
                       {canDeleteApplication(
                         application,
                         enableDeleteActiveApplications,
@@ -437,8 +451,8 @@ export function ApplicationDetailPanel({
                         <button
                           disabled={isActionPending}
                           className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700 touch:py-3"
-                          onClick={(event) => {
-                            closeActionsMenu(event.currentTarget);
+                          onClick={() => {
+                            closeActionsMenu();
                             if (confirmApplicationDelete(application)) {
                               void runHeaderAction(onDelete);
                             }
@@ -461,7 +475,7 @@ export function ApplicationDetailPanel({
             )}
             <button
               className="icon-button"
-              disabled={isSaving || nestedEditorOpen}
+              disabled={isSaving || nestedEditorOpen || isActionPending}
               onClick={requestClose}
               title="Close"
               type="button"
