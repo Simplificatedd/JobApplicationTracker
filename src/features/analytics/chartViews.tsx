@@ -732,7 +732,14 @@ export function FlowChart({
             aria-label={links.map((link) => `${link.from} to ${link.to}: ${link.value}`).join(", ")}
             className="block overflow-visible"
             height={FLOW_HEIGHT}
-            onPointerLeave={() => setActiveLink(null)}
+            // A screen without hover (touch, most pens) fires pointerleave
+            // straight after a tap, which would hide the tapped flow's
+            // details at once; a scroll that starts on a ribbon cancels the
+            // pointer instead, so that still clears.
+            onPointerCancel={() => setActiveLink(null)}
+            onPointerLeave={(event) => {
+              if (event.pointerType === "mouse") setActiveLink(null);
+            }}
             role="img"
             width={drawnWidth}
           >
