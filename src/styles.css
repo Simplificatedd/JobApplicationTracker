@@ -255,6 +255,16 @@
     margin: 0 !important;
     background: rgba(15, 23, 42, 0.48);
     backdrop-filter: blur(6px);
+    /* A transparent border keeps overlay content out of notches and the home
+       indicator without touching each overlay's own padding utilities. */
+    border: solid transparent !important;
+    border-width: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+  }
+
+  /* Bottom sheets run under the home indicator and pad their own content. */
+  .modal-overlay.sheet-overlay {
+    border-bottom-width: 0 !important;
   }
 
   .field-control {

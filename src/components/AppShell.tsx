@@ -3,6 +3,7 @@ import {
   BarChart3,
   BriefcaseBusiness,
   FileText,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   PanelTopClose,
@@ -10,6 +11,7 @@ import {
   Plus,
   Settings,
   Upload,
+  X,
 } from "lucide-react";
 import {
   type CSSProperties,
@@ -22,6 +24,7 @@ import {
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
+import { NativeModal } from "./NativeModal";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
@@ -53,7 +56,7 @@ interface AppShellProps {
   onViewChange: (view: ViewKey) => void;
 }
 
-const navigationItems: Array<{
+export const navigationItems: Array<{
   key: ViewKey;
   label: string;
   icon: typeof BriefcaseBusiness;
@@ -75,6 +78,9 @@ const pageTitle: Record<ViewKey, string> = {
   resumes: "Resumes",
   settings: "Settings",
 };
+
+// Phones get a bottom bar with these views; the rest sit behind More.
+const bottomNavigationKeys: ViewKey[] = ["applications", "archive", "analytics"];
 
 const MIN_SIDE_NAVIGATION_WIDTH = 240;
 const DEFAULT_SIDE_NAVIGATION_WIDTH = 288;
@@ -114,10 +120,10 @@ export function AppShell({
       : currentView === "coverLetters"
         ? "Upload cover letter"
         : "Add job";
-  const shortAddLabel = isDocumentLibrary ? "Upload" : addLabel;
   const PrimaryActionIcon = isDocumentLibrary ? Upload : Plus;
   const headerTitlePadding =
     !isTopNavigation && !isNavigationHidden ? "xl:pl-0" : "xl:pl-12";
+  const [isMorePanelOpen, setIsMorePanelOpen] = useState(false);
   const ToggleIcon = isTopNavigation
     ? isNavigationHidden
       ? PanelTopOpen
@@ -187,13 +193,13 @@ export function AppShell({
 
   return (
     <div
-      className="min-h-dvh bg-background text-foreground"
+      className="min-h-dvh bg-background pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-foreground"
       style={{ "--app-header-height": `${headerHeight}px` } as CSSProperties}
     >
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
-        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
+        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm max-md:hidden"
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
       >
@@ -206,7 +212,7 @@ export function AppShell({
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
-            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            className="relative border-b border-border bg-surface px-4 py-3 max-md:hidden xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
             style={sideNavigationStyle}
           >
             <div className="flex items-center justify-between gap-3 xl:block">
@@ -256,7 +262,7 @@ export function AppShell({
         ) : null}
 
         {isTopNavigation && !isNavigationHidden ? (
-          <div className="border-b border-border bg-surface px-4 py-3 lg:px-6 xl:px-8">
+          <div className="border-b border-border bg-surface px-4 py-3 max-md:hidden lg:px-6 xl:px-8">
             <div className="flex min-w-0 flex-wrap items-center gap-3 pl-12 sm:flex-nowrap">
               <div className="min-w-0 flex-1 sm:max-w-64 sm:shrink-0 sm:flex-none">
                 <p className="truncate text-lg font-semibold text-foreground">
@@ -289,12 +295,12 @@ export function AppShell({
 
         <main className="min-w-0 flex-1">
           <header
-            className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:py-4 lg:px-6 xl:px-8"
+            className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:py-4 lg:px-6 xl:px-8"
             ref={headerRef}
           >
             <div className="flex items-center justify-between gap-3">
               <div
-                className={`flex min-w-0 items-center gap-3 pl-12 ${headerTitlePadding}`}
+                className={`flex min-w-0 items-center gap-3 md:pl-12 ${headerTitlePadding}`}
               >
                 <div className="min-w-0">
                   <p className="hidden text-sm text-muted sm:block">Workspace</p>
@@ -306,7 +312,9 @@ export function AppShell({
 
               <div className="flex shrink-0 items-center justify-end gap-2">
                 {enableNotificationBell ? (
-                  <div className="hidden lg:block">
+                  // Phones show the bell here; tablets show it in the
+                  // navigation row, which is hidden on phones.
+                  <div className="md:max-lg:hidden">
                     <NotificationBell
                       grouped={groupedNotifications}
                       notifications={notifications}
@@ -322,26 +330,163 @@ export function AppShell({
                 {showAddButton ? (
                   <button
                     aria-label={addLabel}
-                    className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 sm:px-4"
+                    className="inline-flex h-10 min-w-10 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-blue-700 md:px-4"
                     onClick={onPrimaryAction}
                     type="button"
                   >
                     <PrimaryActionIcon aria-hidden="true" size={18} />
-                    <span className="sm:hidden">{shortAddLabel}</span>
-                    <span className="hidden sm:inline">{addLabel}</span>
+                    <span className="hidden md:inline">{addLabel}</span>
                   </button>
                 ) : null}
               </div>
             </div>
           </header>
 
-          <div className="min-w-0 px-4 py-5 lg:px-6 lg:py-7 xl:px-8 xl:py-8">
+          <div className="min-w-0 px-4 py-5 max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-7 xl:px-8 xl:py-8">
             {children}
           </div>
         </main>
       </div>
 
+      <BottomNavigation
+        currentView={currentView}
+        items={visibleNavigation}
+        onOpenMore={() => setIsMorePanelOpen(true)}
+        onViewChange={onViewChange}
+      />
+      {isMorePanelOpen ? (
+        <MorePanel
+          currentView={currentView}
+          items={visibleNavigation}
+          onClose={() => setIsMorePanelOpen(false)}
+          onViewChange={onViewChange}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function BottomNavigation({
+  currentView,
+  items,
+  onOpenMore,
+  onViewChange,
+}: {
+  currentView: ViewKey;
+  items: typeof navigationItems;
+  onOpenMore: () => void;
+  onViewChange: (view: ViewKey) => void;
+}) {
+  const isMoreActive = !bottomNavigationKeys.includes(currentView);
+  const tabClass = (isActive: boolean) =>
+    `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium transition ${
+      isActive ? "text-primary" : "text-muted hover:text-foreground"
+    }`;
+
+  return (
+    <nav
+      aria-label="Primary navigation"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] md:hidden"
+    >
+      {items
+        .filter((item) => bottomNavigationKeys.includes(item.key))
+        .map((item) => {
+          const Icon = item.icon;
+          const isActive = item.key === currentView;
+
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={tabClass(isActive)}
+              key={item.key}
+              onClick={() => onViewChange(item.key)}
+              type="button"
+            >
+              <Icon aria-hidden="true" size={20} />
+              <span className="max-w-full truncate">{item.label}</span>
+            </button>
+          );
+        })}
+      <button
+        aria-current={isMoreActive ? "page" : undefined}
+        aria-haspopup="dialog"
+        className={tabClass(isMoreActive)}
+        onClick={onOpenMore}
+        type="button"
+      >
+        <MoreHorizontal aria-hidden="true" size={20} />
+        <span>More</span>
+      </button>
+    </nav>
+  );
+}
+
+export function MorePanel({
+  currentView,
+  items,
+  onClose,
+  onViewChange,
+}: {
+  currentView: ViewKey;
+  items: typeof navigationItems;
+  onClose: () => void;
+  onViewChange: (view: ViewKey) => void;
+}) {
+  return (
+    <NativeModal
+      className="modal-overlay sheet-overlay fixed inset-0 z-40 flex items-end"
+      labelledBy="more-navigation-title"
+      onRequestClose={onClose}
+    >
+      <div className="w-full rounded-t-2xl bg-surface px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-popover">
+        <div className="flex items-center justify-between gap-3">
+          <h2
+            className="text-base font-semibold text-foreground"
+            id="more-navigation-title"
+          >
+            More
+          </h2>
+          <button
+            className="icon-button"
+            data-initial-focus
+            onClick={onClose}
+            title="Close"
+            type="button"
+          >
+            <X aria-hidden="true" size={18} />
+            <span className="sr-only">Close</span>
+          </button>
+        </div>
+        <nav aria-label="More navigation" className="mt-2 grid gap-1">
+          {items
+            .filter((item) => !bottomNavigationKeys.includes(item.key))
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = item.key === currentView;
+
+              return (
+                <button
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex min-h-12 items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground hover:bg-slate-100"
+                  }`}
+                  key={item.key}
+                  onClick={() => {
+                    onClose();
+                    onViewChange(item.key);
+                  }}
+                  type="button"
+                >
+                  <Icon aria-hidden="true" size={18} />
+                  {item.label}
+                </button>
+              );
+            })}
+        </nav>
+      </div>
+    </NativeModal>
   );
 }
 

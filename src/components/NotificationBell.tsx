@@ -89,7 +89,9 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative shrink-0" ref={panelRef}>
+    // On phones the bell sits beside the Add button, so the panel anchors to the
+    // full-width top bar instead of the bell to stay on screen.
+    <div className="relative shrink-0 max-md:static" ref={panelRef}>
       <button
         aria-expanded={isOpen}
         aria-haspopup="dialog"
@@ -110,7 +112,7 @@ export function NotificationBell({
       {isOpen ? (
         <div
           aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
+          className="absolute right-0 top-12 z-50 max-h-[min(34rem,calc(100dvh-6rem))] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto max-md:left-4 max-md:right-4 max-md:top-full max-md:mt-2 max-md:max-h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] max-md:w-auto rounded-lg border border-border bg-surface p-3 shadow-popover"
           role="dialog"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border pb-3">

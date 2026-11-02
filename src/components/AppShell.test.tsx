@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { AppShell } from "./AppShell";
+import { AppShell, MorePanel, navigationItems } from "./AppShell";
 
 function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
   return renderToStaticMarkup(
@@ -24,6 +24,18 @@ function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
     >
       <p>Page content</p>
     </AppShell>,
+  );
+}
+
+function navigations(markup: string) {
+  return [...markup.matchAll(/<nav aria-label="Primary navigation"[\s\S]*?<\/nav>/g)].map(
+    (match) => match[0],
+  );
+}
+
+function labels(markup: string) {
+  return [...markup.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>)?<span[^>]*>([^<]+)<\/span>/g)].map(
+    (match) => match[1],
   );
 }
 
@@ -55,11 +67,15 @@ describe("AppShell responsive layout", () => {
     },
   );
 
-  it("marks only the current page in the navigation", () => {
+  it("marks only the current page in each navigation", () => {
     const markup = renderShell({ currentView: "resumes" });
+    const [tabletNavigation, bottomNavigation] = navigations(markup);
 
-    expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(markup).toMatch(/aria-current="page"[^>]*>.*?Resumes/);
+    expect(tabletNavigation.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(tabletNavigation).toMatch(/aria-current="page"[^>]*>.*?Resumes/);
+    // Resumes lives behind More on phones, so More is the active tab.
+    expect(bottomNavigation.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(bottomNavigation).toMatch(/aria-current="page"[^>]*>.*?More/);
   });
 
   it("keeps the navigation toggle below every overlay layer", () => {
@@ -70,17 +86,16 @@ describe("AppShell responsive layout", () => {
   });
 
   it.each([
-    ["applications", "Add job", "Add job"],
-    ["resumes", "Upload resume", "Upload"],
-    ["coverLetters", "Upload cover letter", "Upload"],
+    ["applications", "Add job"],
+    ["resumes", "Upload resume"],
+    ["coverLetters", "Upload cover letter"],
   ] as const)(
-    "keeps the %s action on the title row with a short phone label",
-    (currentView, fullLabel, shortLabel) => {
+    "keeps the %s action on the title row as an icon button on phones",
+    (currentView, label) => {
       const markup = renderShell({ currentView });
 
-      expect(markup).toContain(`aria-label="${fullLabel}"`);
-      expect(markup).toContain(`<span class="sm:hidden">${shortLabel}</span>`);
-      expect(markup).toContain(`<span class="hidden sm:inline">${fullLabel}</span>`);
+      expect(markup).toContain(`aria-label="${label}"`);
+      expect(markup).toContain(`<span class="hidden md:inline">${label}</span>`);
       expect(markup).not.toContain("w-full items-center justify-end");
     },
   );
@@ -91,3 +106,82 @@ describe("AppShell responsive layout", () => {
     );
   });
 });
+
+describe("AppShell phone navigation", () => {
+  it.each([
+    [false, ["Applications", "Archive", "More"]],
+    [true, ["Applications", "Archive", "Analytics", "More"]],
+  ] as const)(
+    "shows the bottom tabs with analytics %s",
+    (enableBetaAnalytics, tabs) => {
+      const bottomNavigation = navigations(renderShell({ enableBetaAnalytics }))[1];
+
+      expect(labels(bottomNavigation)).toEqual(tabs);
+      expect(classOf(bottomNavigation, "<nav")).toContain("md:hidden");
+      expect(classOf(bottomNavigation, "<nav")).toContain("pb-[env(safe-area-inset-bottom)]");
+    },
+  );
+
+  it("keeps the tablet and desktop navigation and hides it on phones", () => {
+    for (const navigationDisplayMode of ["side", "top"] as const) {
+      const markup = renderShell({ navigationDisplayMode });
+      const tabletNavigation = navigations(markup)[0];
+
+      expect(labels(tabletNavigation)).toEqual([
+        "Applications", "Archive", "Resumes", "Cover Letters", "Settings",
+      ]);
+      const row = navigationDisplayMode === "side" ? "<aside" : "border-b border-border bg-surface px-4 py-3";
+      expect(classOf(markup, row)).toContain("max-md:hidden");
+    }
+    expect(classOf(renderShell(), 'aria-label="Hide side navigation"')).toContain("max-md:hidden");
+  });
+
+  it("shows the header bell on phones and desktops, but not beside the tablet row's bell", () => {
+    const markup = renderShell({ enableNotificationBell: true });
+
+    expect(markup).toContain('<div class="md:max-lg:hidden">');
+    expect(markup).toContain('<div class="lg:hidden">');
+  });
+
+  it("pads page content clear of the bottom bar", () => {
+    expect(renderShell()).toContain("max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))]");
+  });
+
+  it("lists the views not on the bottom bar in the More panel", () => {
+    const items = navigationItems;
+    const markup = renderToStaticMarkup(
+      <MorePanel currentView="settings" items={items} onClose={vi.fn()} onViewChange={vi.fn()} />,
+    );
+    const moreNavigation = /<nav aria-label="More navigation"[\s\S]*?<\/nav>/.exec(markup)?.[0] ?? "";
+
+    expect(markup).toContain('aria-labelledby="more-navigation-title"');
+    expect(markup).toMatch(/data-initial-focus[^>]*>.*?Close/);
+    expect([...moreNavigation.matchAll(/<\/svg>([^<]+)<\/button>/g)].map((m) => m[1])).toEqual([
+      "Resumes", "Cover Letters", "Settings",
+    ]);
+    expect(moreNavigation).toMatch(/aria-current="page"[^>]*>.*?Settings/);
+  });
+
+  it("closes the More panel before navigating", () => {
+    const calls: string[] = [];
+    const panel = MorePanel({
+      currentView: "applications",
+      items: navigationItems,
+      onClose: () => calls.push("close"),
+      onViewChange: (view) => calls.push(view),
+    });
+    const settings = flatten(panel).find(
+      (node) => node.type === "button" && JSON.stringify(node.props.children).includes("Settings"),
+    )!;
+
+    (settings.props.onClick as () => void)();
+    expect(calls).toEqual(["close", "settings"]);
+  });
+});
+
+type Node = { type: unknown; props: Record<string, unknown> };
+function flatten(node: unknown): Node[] {
+  if (Array.isArray(node)) return node.flatMap(flatten);
+  if (!node || typeof node !== "object" || !("props" in node)) return [];
+  return [node as Node, ...flatten((node as Node).props.children)];
+}
