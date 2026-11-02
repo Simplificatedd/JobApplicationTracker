@@ -179,3 +179,18 @@ it("returns focus to the trigger when the trigger closes the menu", () => {
   expect(focus).toHaveBeenCalled();
   expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });
+it("changes the status from the phone header through the guarded header action", async () => {
+  const props = { ...detailProps(), onUpdate: vi.fn().mockResolvedValue({ ok: false, error: "Status could not be saved." }) };
+  const picker = (tree: unknown) => elements(tree).find(e => e.type === "select" && e.props.value === application.status)!;
+  let tree = render(() => ApplicationDetailPanel(props));
+  call(picker(tree).props.onChange, { target: { value: "Offered" } });
+  expect(props.onUpdate).toHaveBeenCalledWith(application.id, { status: "Offered" });
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.disabled).toBe(true);
+  await Promise.resolve(); await Promise.resolve();
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.disabled).toBe(false);
+  expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Status could not be saved.")).toBe(true);
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true);
+  expect(picker(render(() => ApplicationDetailPanel(props))).props.disabled).toBe(true);
+});
