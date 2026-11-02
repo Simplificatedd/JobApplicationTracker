@@ -831,7 +831,7 @@ export function RowActionsMenu({
   );
 }
 
-function moveMenuFocus(event: React.KeyboardEvent<HTMLDivElement>) {
+export function moveMenuFocus(event: React.KeyboardEvent<HTMLDivElement>) {
   if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
     return;
   }

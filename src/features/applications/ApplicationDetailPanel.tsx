@@ -7,6 +7,7 @@ import {
   Download,
   Eye,
   ExternalLink,
+  MoreHorizontal,
   Pencil,
   RotateCcw,
   Trash2,
@@ -39,6 +40,7 @@ import {
   canDeleteApplication,
   confirmApplicationDelete,
 } from "./applicationActions";
+import { moveMenuFocus } from "./TableCells";
 import { NativeModal } from "../../components/NativeModal";
 import type {
   ApplicationUpdate,
@@ -145,6 +147,7 @@ export function ApplicationDetailPanel({
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
   const [isActionPending, setIsActionPending] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
@@ -161,6 +164,15 @@ export function ApplicationDetailPanel({
 
   // The page behind this modal is inert, so action failures are shown here.
   // Pending actions also block repeat clicks while a slow save completes.
+  // Returns focus to the trigger so keyboard users stay in the header.
+  function closeActionsMenu(from: HTMLElement) {
+    setIsActionsMenuOpen(false);
+    from
+      .closest("[data-detail-actions]")
+      ?.querySelector<HTMLElement>("[aria-haspopup='menu']")
+      ?.focus();
+  }
+
   async function runHeaderAction(
     action: (id: string) => Promise<MutationResult>,
   ) {
@@ -345,48 +357,97 @@ export function ApplicationDetailPanel({
               </>
             ) : (
               <>
-                {application.archivedAt ? (
+                <div
+                  className="relative"
+                  data-detail-actions
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                      setIsActionsMenuOpen(false);
+                    }
+                  }}
+                >
                   <button
+                    aria-controls={isActionsMenuOpen ? "application-detail-actions" : undefined}
+                    aria-expanded={isActionsMenuOpen}
+                    aria-haspopup="menu"
                     className="icon-button"
                     disabled={headerActionsDisabled}
-                    onClick={() => void runHeaderAction(onRestore)}
-                    title="Restore"
+                    onClick={() => setIsActionsMenuOpen((current) => !current)}
+                    title="More actions"
                     type="button"
                   >
-                    <RotateCcw aria-hidden="true" size={18} />
-                    <span className="sr-only">Restore</span>
+                    <MoreHorizontal aria-hidden="true" size={18} />
+                    <span className="sr-only">More actions</span>
                   </button>
-                ) : (
-                  <button
-                    className="icon-button"
-                    disabled={headerActionsDisabled}
-                    onClick={() => void runHeaderAction(onArchive)}
-                    title="Archive"
-                    type="button"
-                  >
-                    <Archive aria-hidden="true" size={18} />
-                    <span className="sr-only">Archive</span>
-                  </button>
-                )}
-                {canDeleteApplication(
-                  application,
-                  enableDeleteActiveApplications,
-                ) ? (
-                  <button
-                    className="icon-button text-destructive"
-                    disabled={headerActionsDisabled}
-                    onClick={() => {
-                      if (confirmApplicationDelete(application)) {
-                        void runHeaderAction(onDelete);
-                      }
-                    }}
-                    title="Delete"
-                    type="button"
-                  >
-                    <Trash2 aria-hidden="true" size={18} />
-                    <span className="sr-only">Delete</span>
-                  </button>
-                ) : null}
+                  {isActionsMenuOpen ? (
+                    // Rendered inside the modal dialog: a body portal would sit
+                    // behind the dialog's top layer and be inert.
+                    <div
+                      className="absolute right-0 top-full z-10 mt-1 w-52 rounded-lg border border-border bg-surface p-1 shadow-popover"
+                      id="application-detail-actions"
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          // Close only the menu, not the detail dialog.
+                          event.preventDefault();
+                          event.stopPropagation();
+                          closeActionsMenu(event.currentTarget);
+                          return;
+                        }
+                        moveMenuFocus(event);
+                      }}
+                      role="menu"
+                    >
+                      {application.archivedAt ? (
+                        <button
+                          autoFocus
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
+                          onClick={(event) => {
+                            closeActionsMenu(event.currentTarget);
+                            void runHeaderAction(onRestore);
+                          }}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <RotateCcw aria-hidden="true" size={16} />
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          autoFocus
+                          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
+                          onClick={(event) => {
+                            closeActionsMenu(event.currentTarget);
+                            void runHeaderAction(onArchive);
+                          }}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <Archive aria-hidden="true" size={16} />
+                          Archive
+                        </button>
+                      )}
+                      {canDeleteApplication(
+                        application,
+                        enableDeleteActiveApplications,
+                      ) ? (
+                        <button
+                          className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700 touch:py-3"
+                          onClick={(event) => {
+                            closeActionsMenu(event.currentTarget);
+                            if (confirmApplicationDelete(application)) {
+                              void runHeaderAction(onDelete);
+                            }
+                          }}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <Trash2 aria-hidden="true" size={16} />
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
                 <button className="icon-button" disabled={headerActionsDisabled} onClick={startEditing} title="Edit" type="button">
                   <Pencil aria-hidden="true" size={18} />
                   <span className="sr-only">Edit</span>

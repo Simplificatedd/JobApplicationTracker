@@ -80,43 +80,60 @@ it("keeps an assessment editor registered until its explicit Cancel", () => {
   tree = view(); expect(elements(tree).some(e => e.type === "input" && e.props.value === "Keep my assessment")).toBe(true);
   call(button(tree, "Cancel").props.onClick); view(); expect((props.onEditingChange as Mock).mock.lastCall).toEqual([false]);
 });
-it("archives an active application from the detail header", () => {
-  const props = detailProps(); const tree = render(() => ApplicationDetailPanel(props));
-  call(button(tree, "Archive").props.onClick); expect(props.onArchive).toHaveBeenCalledWith(application.id);
+// Menu item handlers return focus through the DOM, which this harness lacks.
+const menuEvent = { currentTarget: { closest: () => null } };
+function openActions(props: ComponentProps<typeof ApplicationDetailPanel>) {
+  call(button(render(() => ApplicationDetailPanel(props)), "More actions").props.onClick);
+  return render(() => ApplicationDetailPanel(props));
+}
+it("archives an active application from the detail actions menu and closes the menu", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive")).toBeUndefined();
+  tree = openActions(props); expect(button(tree, "More actions").props["aria-expanded"]).toBe(true);
+  call(button(tree, "Archive").props.onClick, menuEvent); expect(props.onArchive).toHaveBeenCalledWith(application.id);
   expect(button(tree, "Restore")).toBeUndefined(); expect(button(tree, "Delete")).toBeUndefined();
+  expect(button(render(() => ApplicationDetailPanel(props)), "Archive")).toBeUndefined();
 });
 it("restores and deletes an archived application after confirmation", () => {
   const props = { ...detailProps(), application: { ...application, archivedAt: "2026-10-01T00:00:00.000Z" } };
-  let tree = render(() => ApplicationDetailPanel(props)); expect(button(tree, "Archive")).toBeUndefined();
-  call(button(tree, "Restore").props.onClick); expect(props.onRestore).toHaveBeenCalledWith(application.id);
-  vi.stubGlobal("window", { confirm: () => false }); tree = render(() => ApplicationDetailPanel(props));
-  call(button(tree, "Delete").props.onClick); expect(props.onDelete).not.toHaveBeenCalled();
-  vi.stubGlobal("window", { confirm: () => true }); tree = render(() => ApplicationDetailPanel(props));
-  call(button(tree, "Delete").props.onClick); expect(props.onDelete).toHaveBeenCalledWith(application.id);
+  let tree = openActions(props); expect(button(tree, "Archive")).toBeUndefined();
+  call(button(tree, "Restore").props.onClick, menuEvent); expect(props.onRestore).toHaveBeenCalledWith(application.id);
+  vi.stubGlobal("window", { confirm: () => false }); tree = openActions(props);
+  call(button(tree, "Delete").props.onClick, menuEvent); expect(props.onDelete).not.toHaveBeenCalled();
+  vi.stubGlobal("window", { confirm: () => true }); tree = openActions(props);
+  call(button(tree, "Delete").props.onClick, menuEvent); expect(props.onDelete).toHaveBeenCalledWith(application.id);
 });
 it("offers active deletion only when it is enabled in Settings", () => {
-  expect(button(render(() => ApplicationDetailPanel(detailProps())), "Delete")).toBeUndefined();
+  expect(button(openActions(detailProps()), "Delete")).toBeUndefined();
   host.slots = [];
   const props = { ...detailProps(), enableDeleteActiveApplications: true };
-  const tree = render(() => ApplicationDetailPanel(props)); call(button(tree, "Delete").props.onClick);
+  call(button(openActions(props), "Delete").props.onClick, menuEvent);
   expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+it("closes only the actions menu on Escape, leaving the detail panel open", () => {
+  const props = detailProps(); const tree = openActions(props);
+  const menu = elements(tree).find(e => e.props.role === "menu")!;
+  const event = { key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn(), currentTarget: menuEvent.currentTarget };
+  call(menu.props.onKeyDown, event);
+  expect(event.stopPropagation).toHaveBeenCalled(); expect(props.onClose).not.toHaveBeenCalled();
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });
 it("blocks repeat header actions while one is pending and shows its failure in the panel", async () => {
   let resolve!: (value: unknown) => void;
   const props = { ...detailProps(), onArchive: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
-  let tree = render(() => ApplicationDetailPanel(props)); call(button(tree, "Archive").props.onClick);
-  tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "Archive").props.disabled).toBe(true); expect(button(tree, "Edit").props.disabled).toBe(true);
+  call(button(openActions(props), "Archive").props.onClick, menuEvent);
+  let tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "More actions").props.disabled).toBe(true); expect(button(tree, "Edit").props.disabled).toBe(true);
   resolve({ ok: false, error: "Archive could not be saved." }); await Promise.resolve(); await Promise.resolve();
   tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "Archive").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
+  expect(button(tree, "More actions").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
   expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Archive could not be saved.")).toBe(true);
 });
-it("disables header actions while a nested editor is open and hides them while editing", () => {
+it("disables the actions menu while a nested editor is open and hides it while editing", () => {
   const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
   call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true); tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "Archive").props.disabled).toBe(true);
+  expect(button(tree, "More actions").props.disabled).toBe(true);
   call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, false); tree = render(() => ApplicationDetailPanel(props));
   call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
-  expect(button(tree, "Archive")).toBeUndefined();
+  expect(button(tree, "More actions")).toBeUndefined();
 });
