@@ -139,3 +139,20 @@ describe("phone settings choices", () => {
     for (const radio of radios) expect(radio).toContain("max-md:h-11");
   });
 });
+
+describe("phone settings text", () => {
+  it("uses 15px setting names and 13px descriptions on phones", () => {
+    const markup = renderPage();
+    const settingName = markup.slice(markup.lastIndexOf("<span", markup.indexOf(">Quick location button")));
+    const settingDescription = markup.slice(
+      markup.lastIndexOf("<span", markup.indexOf("Shows a button beside the Location field")),
+    );
+    const sectionDescription = markup.slice(
+      markup.lastIndexOf("<p", markup.indexOf("Your signed-in cloud workspace.")),
+    );
+
+    expect(openingTag(settingName, "class=")).toContain("max-md:text-[15px]");
+    expect(openingTag(settingDescription, "class=")).toContain("max-md:text-[13px]");
+    expect(openingTag(sectionDescription, "class=")).toContain("max-md:text-[13px]");
+  });
+});

@@ -209,7 +209,7 @@ export function SettingsPage({
               Sign out
             </a>
           </div>
-          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted">
+          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted max-md:text-[13px]">
             <Cloud aria-hidden="true" className="mt-0.5 shrink-0 text-info" size={16} />
             <p>
               D1 stores your tracker data and R2 stores resume and cover letter
@@ -550,7 +550,7 @@ export function SettingsPage({
           title="Reset preferences"
         >
           <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-muted">
+            <p className="text-xs leading-5 text-muted max-md:text-[13px]">
               Your applications, contacts and files are not affected.
             </p>
             {isConfirmingReset ? (
@@ -847,7 +847,7 @@ function SettingsSection({
           >
             {title}
           </h3>
-          <p className="text-xs text-muted">{description}</p>
+          <p className="text-xs text-muted max-md:text-[13px]">{description}</p>
         </div>
       </header>
       <SectionAccentContext.Provider value={accent}>
@@ -882,7 +882,7 @@ function ExportTile({
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-foreground">{label}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-muted">{description}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">{description}</span>
       </span>
     </button>
   );
@@ -1136,7 +1136,7 @@ function SettingLabel({
 }) {
   return (
     <span className="min-w-0">
-      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground max-md:text-[15px]">
         {label.replace(/:$/, "")}
         {badge ? (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
@@ -1145,7 +1145,7 @@ function SettingLabel({
         ) : null}
       </span>
       {description ? (
-        <span className="mt-0.5 block text-xs leading-5 text-muted">
+        <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">
           {description}
         </span>
       ) : null}
