@@ -55,3 +55,18 @@ describe("phone settings", () => {
     expect(openingTag(markup, 'href="#settings-general"')).not.toContain("max-md:hidden");
   });
 });
+
+describe("phone navigation setting", () => {
+  it("hides the navigation layout choice below md and keeps contacts", () => {
+    const markup = renderPage();
+    const navigationRow = markup.slice(
+      markup.lastIndexOf("<div", markup.indexOf("Show navigation as")),
+    );
+
+    expect(openingTag(navigationRow, "class=")).toContain("max-md:hidden");
+    // Stops the next row's divider doubling the section header's border.
+    expect(openingTag(navigationRow, "class=")).toContain("max-md:[&amp;+*]:!border-t-0");
+    expect(markup).toContain('aria-label="Show navigation as"');
+    expect(openingTag(markup, 'aria-label="Open contacts as"')).not.toContain("max-md:hidden");
+  });
+});

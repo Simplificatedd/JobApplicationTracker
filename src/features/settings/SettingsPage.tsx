@@ -337,6 +337,9 @@ export function SettingsPage({
         >
           <ToggleButtonField
             checked={settings.navigationDisplayMode === "top"}
+            // Phones always use the bottom bar. The next row's divider would
+            // otherwise double the header's border.
+            className="max-md:hidden max-md:[&+*]:!border-t-0"
             description="Choose whether the main navigation sits on the left edge or across the top of the workspace."
             label="Show navigation as:"
             offLabel="Side navbar"
@@ -954,6 +957,7 @@ function ToggleField({
 
 function ToggleButtonField({
   checked,
+  className = "",
   description,
   label,
   offLabel,
@@ -961,6 +965,7 @@ function ToggleButtonField({
   onLabel,
 }: {
   checked: boolean;
+  className?: string;
   description: string;
   label: string;
   offLabel: string;
@@ -970,7 +975,7 @@ function ToggleButtonField({
   const accent = useContext(SectionAccentContext);
 
   return (
-    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className={`flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between ${className}`}>
       <SettingLabel description={description} label={label} />
       <div
         aria-label={label.replace(/:$/, "")}
