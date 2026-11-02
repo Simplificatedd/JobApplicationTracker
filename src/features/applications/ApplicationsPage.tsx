@@ -12,6 +12,7 @@ import {
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
+  includeSelectedFilterOption,
   isNeedsAttention,
   normalizeApplicationFilters,
   normalizeApplicationSort,
@@ -19,7 +20,11 @@ import {
   type ApplicationFilters,
   type SortColumn,
 } from "./applicationFilters";
-import { searchApplications } from "./applicationSearch";
+import {
+  type SearchScope,
+  searchApplications,
+  selectSearchBase,
+} from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { deriveApplicationNotifications } from "../../lib/reminders";
@@ -170,14 +175,29 @@ export function ApplicationsPage({
     viewMode === "archive" ? archivedApplications : activeApplications;
   const viewLabel = viewMode === "archive" ? "Archived" : "Active";
   const [countScope, setCountScope] = useState<"view" | "total">("view");
-  const companyOptions = getApplicationFilterOptions(baseApplications, "company");
-  const locationOptions = getApplicationFilterOptions(
-    baseApplications,
-    "location",
+  // Kept out of the remembered table view so stored preferences keep their
+  // shape. Like the search itself, it carries over between Applications and
+  // Archive because both views share this page instance.
+  const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  const searchBase = selectSearchBase(
+    applications,
+    viewMode,
+    searchQuery,
+    searchScope,
+  );
+  // A value picked from cross-archive results stays listed after the search
+  // is cleared, so the active filter is never hidden from its own dropdown.
+  const companyOptions = includeSelectedFilterOption(
+    getApplicationFilterOptions(searchBase.applications, "company"),
+    filters.company,
+  );
+  const locationOptions = includeSelectedFilterOption(
+    getApplicationFilterOptions(searchBase.applications, "location"),
+    filters.location,
   );
   // Search relevance takes priority; the selected column orders equal matches.
   const searchedApplications = searchApplications(
-    sortApplications(baseApplications, sort),
+    sortApplications(searchBase.applications, sort),
     searchQuery,
   );
   const filteredApplications = applyApplicationFilters(
@@ -336,7 +356,10 @@ export function ApplicationsPage({
           resetTableView();
         }}
         onSearchQueryChange={setSearchQuery}
+        onSearchScopeChange={setSearchScope}
         searchQuery={searchQuery}
+        searchScope={searchScope}
+        viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
@@ -357,7 +380,9 @@ export function ApplicationsPage({
         columnWidths={columnWidths}
         emptyBody={
           searchQuery.trim()
-            ? "No applications match that title or description."
+            ? searchBase.searchesAll
+              ? "No active or archived applications match that company, title, or description."
+              : "No applications match that company, title, or description."
             : viewMode === "archive"
               ? "Archived applications will appear here."
               : "New entries will appear here once they are added."
@@ -371,6 +396,7 @@ export function ApplicationsPage({
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
+        markArchivedApplications={searchBase.searchesAll}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={deleteAndCloseApplication}
