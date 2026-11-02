@@ -289,9 +289,9 @@ export function SettingsPage({
                     value={backupPreview.coverLetterFiles}
                   />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2 max-md:grid">
                   <button
-                    className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isImportingBackup}
                     onClick={importBackup}
                     type="button"
@@ -554,9 +554,9 @@ export function SettingsPage({
               Your applications, contacts and files are not affected.
             </p>
             {isConfirmingReset ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 max-sm:grid">
                 <button
-                  className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700"
+                  className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700"
                   onClick={() => {
                     onResetSettings();
                     setIsConfirmingReset(false);

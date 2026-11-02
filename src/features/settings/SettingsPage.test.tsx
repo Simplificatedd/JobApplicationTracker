@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
@@ -17,6 +18,10 @@ function renderPage() {
       settings={DEFAULT_USER_SETTINGS}
     />,
   );
+}
+
+function countMatches(text: string, part: string) {
+  return text.split(part).length - 1;
 }
 
 // The opening tag of the first element whose attributes include `marker`.
@@ -92,5 +97,17 @@ describe("phone settings actions", () => {
       const button = markup.slice(markup.lastIndexOf("<button", markup.lastIndexOf(label)));
       expect(openingTag(button, "class=")).toContain("max-md:h-11");
     }
+  });
+});
+
+describe("phone confirmation buttons", () => {
+  it("stacks the replace and reset confirmations full width on narrow phones", () => {
+    const source = readFileSync(new URL("./SettingsPage.tsx", import.meta.url), "utf8");
+
+    // Both pairs only render after a click, so check the source.
+    expect(countMatches(source, '"mt-3 flex flex-wrap gap-2 max-md:grid"')).toBe(1);
+    // The reset row turns horizontal at sm, so its pair only stacks below sm.
+    expect(countMatches(source, '"flex flex-wrap gap-2 max-sm:grid"')).toBe(1);
+    expect(countMatches(source, "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600")).toBe(2);
   });
 });
