@@ -203,7 +203,7 @@ export function AnalyticsPage({
               options={TIME_GROUPING_OPTIONS}
               value={analyticsSettings.defaultTimeGrouping}
             />
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50">
+            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50 max-md:h-11">
               <input
                 checked={analyticsSettings.includeArchived}
                 className="h-4 w-4 rounded border-border text-primary"
@@ -219,7 +219,7 @@ export function AnalyticsPage({
             <button
               aria-controls={customizePanelId}
               aria-expanded={isCustomizing}
-              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition max-md:h-11 ${
                 isCustomizing
                   ? "border-primary bg-blue-50 text-primary"
                   : "border-border text-foreground hover:bg-slate-50"

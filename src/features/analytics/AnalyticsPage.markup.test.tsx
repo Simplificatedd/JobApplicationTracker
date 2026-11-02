@@ -68,3 +68,14 @@ describe("phone key metrics", () => {
     expect(countMatches(keyMetrics(), "max-sm:items-start")).toBe(4);
   });
 });
+
+describe("phone analytics header", () => {
+  it("gives Include archived and Customize 44px on phones", () => {
+    const markup = renderPage();
+    const includeArchived = markup.slice(markup.lastIndexOf("<label", markup.indexOf("Include archived")));
+    const customize = markup.slice(markup.lastIndexOf("<button", markup.indexOf("Customize")));
+
+    expect(includeArchived.slice(0, includeArchived.indexOf(">"))).toContain("max-md:h-11");
+    expect(customize.slice(0, customize.indexOf(">"))).toContain("max-md:h-11");
+  });
+});
