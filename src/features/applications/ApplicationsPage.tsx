@@ -58,7 +58,7 @@ interface ApplicationsPageProps {
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
   addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
   applications: Application[];
-  archiveApplication: (id: string) => void;
+  archiveApplication: (id: string) => Promise<MutationResult>;
   contacts: ApplicationContact[];
   coverLetters: CoverLetterMetadata[];
   deleteApplication: (id: string) => Promise<MutationResult>;
@@ -71,7 +71,7 @@ interface ApplicationsPageProps {
   now?: Date;
   openApplicationId?: string | null;
   onOpenApplicationHandled?: () => void;
-  restoreApplication: (id: string) => void;
+  restoreApplication: (id: string) => Promise<MutationResult>;
   resumes: ResumeMetadata[];
   settings: UserSettings;
   tablePreferences: TablePreferences | null;
@@ -286,6 +286,14 @@ export function ApplicationsPage({
     sort,
   ]);
 
+  async function deleteAndCloseApplication(id: string) {
+    const result = await deleteApplication(id);
+    if (result.ok && id === selectedApplicationId) {
+      setSelectedApplicationId(null);
+    }
+    return result;
+  }
+
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
     setFilters(DEFAULT_APPLICATION_FILTERS);
@@ -391,12 +399,7 @@ export function ApplicationsPage({
         markArchivedApplications={searchBase.searchesAll}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
-        onDeleteApplication={async (id) => {
-          const result = await deleteApplication(id);
-          if (result.ok && id === selectedApplicationId) {
-            setSelectedApplicationId(null);
-          }
-        }}
+        onDeleteApplication={deleteAndCloseApplication}
         onOpenApplication={setSelectedApplicationId}
         onOpenContacts={setContactsApplicationId}
         onColumnWidthsChange={setColumnWidths}
@@ -435,8 +438,12 @@ export function ApplicationsPage({
           interviews={interviews.filter(
             (interview) => interview.applicationId === selectedApplication.id,
           )}
+          enableDeleteActiveApplications={enableDeleteActiveApplications}
           onAddInterview={addInterview}
+          onArchive={archiveApplication}
           onClose={() => setSelectedApplicationId(null)}
+          onDelete={deleteAndCloseApplication}
+          onRestore={restoreApplication}
           onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}

@@ -17,6 +17,11 @@ vi.mock("react", () => ({
     host.slots[i] = deps;
     host.effects.push(() => { host.cleanups[i]?.(); host.cleanups[i] = effect() ?? (() => {}); });
   },
+  useRef(initial: unknown) {
+    const i = host.cursor++;
+    if (!(i in host.slots)) host.slots[i] = { current: initial };
+    return host.slots[i];
+  },
 }));
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
@@ -38,13 +43,19 @@ const named = (node: unknown, name: string) => elements(node).find(e => typeof e
 const button = (node: unknown, label: string) => elements(node).find(e => e.type === "button" && text(e.props.children).trim() === label)!;
 function render<T>(component: () => T): T { host.cursor = 0; const tree = component(); host.effects.splice(0).forEach(effect => effect()); return tree; }
 const call = (fn: unknown, ...args: unknown[]) => (fn as (...args: unknown[]) => unknown)(...args);
-beforeEach(() => { host.cursor = 0; host.slots = []; host.effects = []; host.cleanups = []; vi.stubGlobal("window", { confirm: () => true }); });
+const listeners = vi.hoisted(() => new Map<string, (event: unknown) => void>());
+beforeEach(() => {
+  host.cursor = 0; host.slots = []; host.effects = []; host.cleanups = []; listeners.clear();
+  vi.stubGlobal("window", { confirm: () => true });
+  vi.stubGlobal("document", { addEventListener: (type: string, fn: (event: unknown) => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) });
+});
 afterEach(() => { host.cleanups.forEach(cleanup => cleanup?.()); vi.unstubAllGlobals(); });
 const assessmentActions = () => ({ addAssessment: vi.fn(), updateAssessment: vi.fn(), deleteAssessment: vi.fn(), convertInterviewToAssessment: vi.fn() });
 function detailProps(): ComponentProps<typeof ApplicationDetailPanel> {
   return {
     application, assessments: [], assessmentActions: assessmentActions(), activities: [], contacts: [], coverLetters: [], interviews: [], resumes: [],
     coverLetterActionError: "", resumeActionError: "", workingResumeId: null, workingCoverLetterId: null,
+    enableDeleteActiveApplications: false, onArchive: vi.fn().mockResolvedValue({ ok: true }), onDelete: vi.fn().mockResolvedValue({ ok: true }), onRestore: vi.fn().mockResolvedValue({ ok: true }),
     onClose: vi.fn(), onAddInterview: vi.fn(), onDeleteInterview: vi.fn(), onUpdate: vi.fn(), onUpdateInterview: vi.fn(),
     onDownloadCoverLetter: vi.fn(), onDownloadResume: vi.fn(), onPreviewResume: vi.fn(), onPreviewCoverLetter: vi.fn(),
   };
@@ -78,4 +89,93 @@ it("keeps an assessment editor registered until its explicit Cancel", () => {
   const name = elements(tree).find(e => e.type === "input" && e.props.value === "")!; call(name.props.onChange, { target: { value: "Keep my assessment" } });
   tree = view(); expect(elements(tree).some(e => e.type === "input" && e.props.value === "Keep my assessment")).toBe(true);
   call(button(tree, "Cancel").props.onClick); view(); expect((props.onEditingChange as Mock).mock.lastCall).toEqual([false]);
+});
+// The second null ref slot is the trigger, declared after the menu wrapper.
+function triggerFocus() {
+  const refs = host.slots.filter(s => s && typeof s === "object" && "current" in s) as { current: unknown }[];
+  const focus = vi.fn(); refs[1].current = { focus }; return focus;
+}
+function openActions(props: ComponentProps<typeof ApplicationDetailPanel>) {
+  call(button(render(() => ApplicationDetailPanel(props)), "More actions").props.onClick);
+  return render(() => ApplicationDetailPanel(props));
+}
+it("archives an active application from the detail actions menu and closes the menu", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive")).toBeUndefined();
+  tree = openActions(props); expect(button(tree, "More actions").props["aria-expanded"]).toBe(true);
+  const focus = triggerFocus();
+  call(button(tree, "Archive").props.onClick); expect(props.onArchive).toHaveBeenCalledWith(application.id);
+  expect(focus).toHaveBeenCalled();
+  expect(button(tree, "Restore")).toBeUndefined(); expect(button(tree, "Delete")).toBeUndefined();
+  expect(button(render(() => ApplicationDetailPanel(props)), "Archive")).toBeUndefined();
+});
+it("restores and deletes an archived application after confirmation", () => {
+  const props = { ...detailProps(), application: { ...application, archivedAt: "2026-10-01T00:00:00.000Z" } };
+  let tree = openActions(props); expect(button(tree, "Archive")).toBeUndefined();
+  call(button(tree, "Restore").props.onClick); expect(props.onRestore).toHaveBeenCalledWith(application.id);
+  vi.stubGlobal("window", { confirm: () => false }); tree = openActions(props);
+  call(button(tree, "Delete").props.onClick); expect(props.onDelete).not.toHaveBeenCalled();
+  vi.stubGlobal("window", { confirm: () => true }); tree = openActions(props);
+  call(button(tree, "Delete").props.onClick); expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+it("offers active deletion only when it is enabled in Settings", () => {
+  expect(button(openActions(detailProps()), "Delete")).toBeUndefined();
+  host.slots = [];
+  const props = { ...detailProps(), enableDeleteActiveApplications: true };
+  call(button(openActions(props), "Delete").props.onClick);
+  expect(props.onDelete).toHaveBeenCalledWith(application.id);
+});
+const actionsWrapper = (tree: unknown) => elements(tree).find(e => e.type === "div" && typeof e.props.onKeyDown === "function" && e.props.role !== "menu")!;
+const escape = () => ({ key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn() });
+it("closes only the actions menu on Escape, leaving the detail panel to handle Escape otherwise", () => {
+  const props = detailProps(); const tree = openActions(props);
+  const focus = triggerFocus(); const open = escape(); call(actionsWrapper(tree).props.onKeyDown, open);
+  expect(open.preventDefault).toHaveBeenCalled(); expect(open.stopPropagation).toHaveBeenCalled(); expect(focus).toHaveBeenCalled();
+  const closed = render(() => ApplicationDetailPanel(props));
+  expect(button(closed, "More actions").props["aria-expanded"]).toBe(false);
+  // With the menu closed, Escape bubbles to the dialog's own close guard.
+  const next = escape(); call(actionsWrapper(closed).props.onKeyDown, next);
+  expect(next.stopPropagation).not.toHaveBeenCalled();
+});
+it("closes the actions menu when a pointer or focus moves outside it, but not inside it", () => {
+  const props = detailProps(); openActions(props);
+  // The first null ref slot is the menu wrapper, declared before the trigger ref.
+  const inside = { target: "inside" }; const ref = host.slots.find(s => s && typeof s === "object" && "current" in s && (s as { current: unknown }).current === null) as { current: unknown };
+  ref.current = { contains: (node: unknown) => node === inside.target };
+  listeners.get("pointerdown")!(inside);
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(true);
+  listeners.get("focusin")!(inside);
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(true);
+  listeners.get("pointerdown")!({ target: "outside" });
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
+  expect(listeners.size).toBe(0);
+  openActions(props); listeners.get("focusin")!({ target: "outside" });
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
+});
+it("blocks repeat header actions while one is pending and shows its failure in the panel", async () => {
+  let resolve!: (value: unknown) => void;
+  const props = { ...detailProps(), onArchive: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
+  call(button(openActions(props), "Archive").props.onClick);
+  let tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive")).toBeUndefined(); expect(button(tree, "Edit").props.disabled).toBe(true);
+  expect(button(tree, "Close").props.disabled).toBe(true); call(tree.props.onRequestClose); expect(props.onClose).not.toHaveBeenCalled();
+  expect(button(openActions(props), "Archive").props.disabled).toBe(true);
+  resolve({ ok: false, error: "Archive could not be saved." }); await Promise.resolve(); await Promise.resolve();
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "Archive").props.disabled).toBe(false); expect(props.onArchive).toHaveBeenCalledTimes(1);
+  expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Archive could not be saved.")).toBe(true);
+});
+it("disables the actions menu while a nested editor is open and hides it while editing", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true); tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "More actions").props.disabled).toBe(true);
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, false); tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
+  expect(button(tree, "More actions")).toBeUndefined();
+});
+it("returns focus to the trigger when the trigger closes the menu", () => {
+  const props = detailProps(); const tree = openActions(props); const focus = triggerFocus();
+  call(button(tree, "More actions").props.onClick);
+  expect(focus).toHaveBeenCalled();
+  expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
 });

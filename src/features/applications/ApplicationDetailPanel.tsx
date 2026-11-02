@@ -1,4 +1,5 @@
 import {
+  Archive,
   CalendarCheck,
   CalendarPlus,
   CalendarX,
@@ -6,11 +7,14 @@ import {
   Download,
   Eye,
   ExternalLink,
+  MoreHorizontal,
   Pencil,
+  RotateCcw,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   APPLICATION_STATUSES,
   getInterviewTypeLabel,
@@ -33,6 +37,11 @@ import {
 } from "../../lib/followUps";
 import { LinkifiedText } from "../../components/LinkifiedText";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
+import {
+  canDeleteApplication,
+  confirmApplicationDelete,
+} from "./applicationActions";
+import { moveMenuFocus } from "./TableCells";
 import { NativeModal } from "../../components/NativeModal";
 import type {
   ApplicationUpdate,
@@ -71,7 +80,11 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   coverLetter?: CoverLetterMetadata;
   coverLetterActionError: string;
   coverLetters: CoverLetterMetadata[];
+  enableDeleteActiveApplications: boolean;
+  onArchive: (id: string) => Promise<MutationResult>;
   onClose: () => void;
+  onDelete: (id: string) => Promise<MutationResult>;
+  onRestore: (id: string) => Promise<MutationResult>;
   onAddInterview: (
     input: InterviewInput,
   ) => Promise<MutationResult<Interview>>;
@@ -109,14 +122,18 @@ export function ApplicationDetailPanel({
   coverLetter,
   coverLetterActionError,
   coverLetters,
+  enableDeleteActiveApplications,
   interviews,
   onAddInterview,
+  onArchive,
   onClose,
+  onDelete,
   onDeleteInterview,
   onDownloadCoverLetter,
   onDownloadResume,
   onPreviewResume,
   onPreviewCoverLetter,
+  onRestore,
   onUpdate,
   onUpdateInterview,
   resume,
@@ -129,6 +146,10 @@ export function ApplicationDetailPanel({
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
+  const [isActionPending, setIsActionPending] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
   const [editBase, setEditBase] = useState(() => structuredClone(application));
@@ -140,7 +161,51 @@ export function ApplicationDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsTriggerRef = useRef<HTMLButtonElement>(null);
 
+  useEffect(() => {
+    if (!isActionsMenuOpen) {
+      return;
+    }
+
+    // Not blur-based: Safari and macOS Firefox do not focus a clicked button,
+    // so a blur check would close the menu before an item's click landed.
+    function closeOnOutsideEvent(event: Event) {
+      if (!actionsRef.current?.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsideEvent);
+    document.addEventListener("focusin", closeOnOutsideEvent);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideEvent);
+      document.removeEventListener("focusin", closeOnOutsideEvent);
+    };
+  }, [isActionsMenuOpen]);
+
+  // Returns focus to the trigger so keyboard users stay in the header.
+  function closeActionsMenu() {
+    setIsActionsMenuOpen(false);
+    actionsTriggerRef.current?.focus();
+  }
+
+  // The page behind this modal is inert, so action failures are shown here.
+  // Pending actions also block repeat clicks while a slow save completes.
+  async function runHeaderAction(
+    action: (id: string) => Promise<MutationResult>,
+  ) {
+    setIsActionPending(true);
+    setActionError("");
+    const result = await action(application.id);
+    setIsActionPending(false);
+
+    if (!result.ok) {
+      setActionError(result.error);
+    }
+  }
 
   function startEditing() {
     if (nestedEditorOpen) return;
@@ -236,7 +301,8 @@ export function ApplicationDetailPanel({
   }
 
   function requestClose() {
-    if (isSaving || nestedEditorOpen) {
+    // Covers Escape, the backdrop and the Close button.
+    if (isSaving || nestedEditorOpen || isActionPending) {
       return;
     }
 
@@ -312,15 +378,105 @@ export function ApplicationDetailPanel({
                 </button>
               </>
             ) : (
-              <button className="icon-button" disabled={nestedEditorOpen} onClick={startEditing} type="button">
-                <Pencil aria-hidden="true" size={18} />
-                <span className="sr-only">Edit</span>
-              </button>
+              <>
+                <div
+                  className="relative"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && isActionsMenuOpen) {
+                      // Close only the menu, not the detail dialog, wherever
+                      // focus sits (a disabled item leaves it on the trigger).
+                      event.preventDefault();
+                      event.stopPropagation();
+                      closeActionsMenu();
+                    }
+                  }}
+                  ref={actionsRef}
+                >
+                  <button
+                    aria-controls={isActionsMenuOpen ? "application-detail-actions" : undefined}
+                    aria-expanded={isActionsMenuOpen}
+                    aria-haspopup="menu"
+                    className="icon-button"
+                    // Stays enabled while an action saves so focus is not lost;
+                    // the menu items are disabled instead.
+                    disabled={nestedEditorOpen}
+                    onClick={() =>
+                      // Closing through the helper keeps focus here in Safari,
+                      // where a clicked button does not take focus.
+                      isActionsMenuOpen
+                        ? closeActionsMenu()
+                        : setIsActionsMenuOpen(true)
+                    }
+                    ref={actionsTriggerRef}
+                    title="More actions"
+                    type="button"
+                  >
+                    <MoreHorizontal aria-hidden="true" size={18} />
+                    <span className="sr-only">More actions</span>
+                  </button>
+                  {isActionsMenuOpen ? (
+                    // Rendered inside the modal dialog: a body portal would sit
+                    // behind the dialog's top layer and be inert.
+                    <div
+                      className="absolute right-0 top-full z-10 mt-1 w-52 rounded-lg border border-border bg-surface p-1 shadow-popover"
+                      id="application-detail-actions"
+                      onKeyDown={moveMenuFocus}
+                      role="menu"
+                    >
+                      <button
+                        autoFocus
+                        disabled={isActionPending}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-slate-50 touch:py-3"
+                        onClick={() => {
+                          closeActionsMenu();
+                          void runHeaderAction(
+                            application.archivedAt ? onRestore : onArchive,
+                          );
+                        }}
+                        role="menuitem"
+                        type="button"
+                      >
+                        {application.archivedAt ? (
+                          <RotateCcw aria-hidden="true" size={16} />
+                        ) : (
+                          <Archive aria-hidden="true" size={16} />
+                        )}
+                        {application.archivedAt ? "Restore" : "Archive"}
+                      </button>
+                      {canDeleteApplication(
+                        application,
+                        enableDeleteActiveApplications,
+                      ) ? (
+                        <button
+                          disabled={isActionPending}
+                          className="mt-1 flex w-full items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700 touch:py-3"
+                          onClick={() => {
+                            closeActionsMenu();
+                            if (confirmApplicationDelete(application)) {
+                              void runHeaderAction(onDelete);
+                            }
+                          }}
+                          role="menuitem"
+                          type="button"
+                        >
+                          <Trash2 aria-hidden="true" size={16} />
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <button className="icon-button" disabled={headerActionsDisabled} onClick={startEditing} title="Edit" type="button">
+                  <Pencil aria-hidden="true" size={18} />
+                  <span className="sr-only">Edit</span>
+                </button>
+              </>
             )}
             <button
               className="icon-button"
-              disabled={isSaving || nestedEditorOpen}
+              disabled={isSaving || nestedEditorOpen || isActionPending}
               onClick={requestClose}
+              title="Close"
               type="button"
             >
               <X aria-hidden="true" size={18} />
@@ -329,6 +485,7 @@ export function ApplicationDetailPanel({
           </div>
         </header>
 
+        {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
           {isEditing ? (
