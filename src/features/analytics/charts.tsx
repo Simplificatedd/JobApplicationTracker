@@ -81,7 +81,11 @@ export function ChartCard({
 
   return (
     <article className={`surface-panel flex min-w-0 flex-col rounded-lg p-4 ${className}`}>
-      <header className="flex min-w-0 items-start justify-between gap-3">
+      <header
+        // An extra action plus the view switcher leave a phone title almost
+        // no width, so below sm they wrap onto their own row.
+        className={`flex min-w-0 items-start justify-between gap-3 ${action ? "max-sm:flex-wrap" : ""}`}
+      >
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
           {description ? (
@@ -343,15 +347,22 @@ export function StatTile({
   sparkline?: number[];
   value: string;
 }) {
+  const decoration =
+    progress !== undefined ? (
+      <ProgressRing color={accent} value={progress} />
+    ) : sparkline && sparkline.length > 1 ? (
+      <Sparkline color={accent} values={sparkline} />
+    ) : null;
+
   return (
-    <div className="surface-panel relative flex min-w-0 items-end justify-between gap-3 overflow-hidden rounded-lg px-4 py-3">
+    <div className="surface-panel relative flex min-w-0 items-end justify-between gap-3 overflow-hidden rounded-lg px-4 py-3 max-sm:items-start max-sm:px-3">
       <span
         aria-hidden="true"
         className="absolute inset-x-0 top-0 h-0.5"
         style={{ backgroundColor: accent }}
       />
       <div className="min-w-0">
-        <p className="flex items-center gap-2 truncate text-sm font-medium text-muted">
+        <p className="flex items-center gap-2 truncate text-sm font-medium text-muted max-sm:whitespace-normal max-sm:text-[13px]">
           {Icon ? (
             <span
               aria-hidden="true"
@@ -369,12 +380,11 @@ export function StatTile({
         <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
           {value}
         </p>
-        <p className="mt-0.5 truncate text-xs text-muted">{detail}</p>
+        <p className="mt-0.5 truncate text-xs text-muted max-sm:whitespace-normal">{detail}</p>
       </div>
-      {progress !== undefined ? (
-        <ProgressRing color={accent} value={progress} />
-      ) : sparkline && sparkline.length > 1 ? (
-        <Sparkline color={accent} values={sparkline} />
+      {decoration ? (
+        // Decorative, and too wide for a half-width phone tile.
+        <div className="flex shrink-0 max-sm:hidden">{decoration}</div>
       ) : null}
     </div>
   );
