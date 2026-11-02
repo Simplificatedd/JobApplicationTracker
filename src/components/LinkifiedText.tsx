@@ -16,6 +16,7 @@ export function LinkifiedText({ text }: { text: string }) {
             target="_blank"
           >
             {part.text}
+            <span className="sr-only"> (opens in a new tab)</span>
           </a>
         ) : (
           <Fragment key={index}>{part.text}</Fragment>

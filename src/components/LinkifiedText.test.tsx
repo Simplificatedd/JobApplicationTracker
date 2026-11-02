@@ -11,7 +11,7 @@ describe("LinkifiedText", () => {
     const html = render("Apply at https://example.com/jobs/1.");
 
     expect(html).toBe(
-      'Apply at <a class="font-medium text-primary underline underline-offset-2 [overflow-wrap:anywhere] hover:text-blue-700" href="https://example.com/jobs/1" rel="noopener noreferrer" target="_blank">https://example.com/jobs/1</a>.',
+      'Apply at <a class="font-medium text-primary underline underline-offset-2 [overflow-wrap:anywhere] hover:text-blue-700" href="https://example.com/jobs/1" rel="noopener noreferrer" target="_blank">https://example.com/jobs/1<span class="sr-only"> (opens in a new tab)</span></a>.',
     );
   });
 

@@ -90,6 +90,49 @@ describe("splitTextIntoLinkParts", () => {
     expect(splitTextIntoLinkParts(text)).toEqual([{ type: "text", text }]);
   });
 
+  it.each([
+    ["**https://example.com/a**", "https://example.com/a"],
+    ["See https://example.com/b\u2026", "https://example.com/b"],
+    ["\u8be6\u89c1 https://example.com/c\u3002", "https://example.com/c"],
+    ["<https://example.com/d>", "https://example.com/d"],
+    ["https://example.com:8443/x?y=1#z.", "https://example.com:8443/x?y=1#z"],
+  ])("finds the URL in %s", (text, url) => {
+    expect(
+      splitTextIntoLinkParts(text).find((part) => part.type === "link")?.text,
+    ).toBe(url);
+  });
+
+  it("links a safe URL that follows an invalid one", () => {
+    const links = splitTextIntoLinkParts(
+      "Bad https://example.com:99999 then https://example.com/ok",
+    ).filter((part) => part.type === "link");
+
+    expect(links.map((part) => part.text)).toEqual(["https://example.com/ok"]);
+  });
+
+  it.each([
+    "xhttps://example.com",
+    "javascript:https://example.com",
+    "https://jobs.example.com@other.example/path",
+    "https://user:secret@example.com",
+  ])("does not link %s", (text) => {
+    expect(
+      splitTextIntoLinkParts(text).some((part) => part.type === "link"),
+    ).toBe(false);
+  });
+
+  it.each([2000, 40000])(
+    "handles %i trailing closing brackets quickly",
+    (count) => {
+      const text = `https://example.com/${")".repeat(count)}`;
+      const startedAt = performance.now();
+      const parts = splitTextIntoLinkParts(text);
+
+      expect(performance.now() - startedAt).toBeLessThan(500);
+      expect(parts.map((part) => part.text).join("")).toBe(text);
+    },
+  );
+
   it("preserves line breaks, spacing, and bullet-like text", () => {
     const text = "Requirements:\n\n- React\n  • TypeScript";
 
