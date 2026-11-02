@@ -600,6 +600,10 @@ const SETTINGS_SECTIONS = [
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
+// Hidden below md, with their strip entries: every setting in them only
+// affects the desktop table. Stored values are left untouched.
+const DESKTOP_ONLY_SECTIONS = new Set<SettingsSectionId>(["table"]);
+
 // Each section has its own accent so the page is easier to scan. Class names are
 // written out in full so Tailwind can find them.
 const SECTION_ACCENTS: Record<
@@ -711,6 +715,8 @@ function useActiveSection() {
 
         if (
           element &&
+          // A section hidden on phones has no box and would always count.
+          element.getClientRects().length > 0 &&
           isSectionReached(
             element.getBoundingClientRect().top,
             parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
@@ -766,6 +772,8 @@ function SettingsNav({
           <a
             aria-current={isActive ? "true" : undefined}
             className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+              DESKTOP_ONLY_SECTIONS.has(section.id) ? "max-md:hidden" : ""
+            } ${
               isActive
                 ? `${accent.navActive} font-semibold`
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
@@ -818,7 +826,7 @@ function SettingsSection({
       aria-labelledby={`settings-${id}-title`}
       className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
         id === "reset" ? "border-red-200" : ""
-      }`}
+      } ${DESKTOP_ONLY_SECTIONS.has(id) ? "max-md:hidden" : ""}`}
       id={`settings-${id}`}
     >
       <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${accent.strip}`} />

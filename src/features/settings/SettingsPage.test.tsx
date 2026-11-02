@@ -1,5 +1,30 @@
-import { describe, expect, it } from "vitest";
-import { isSectionReached } from "./SettingsPage";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
+import { isSectionReached, SettingsPage } from "./SettingsPage";
+
+function renderPage() {
+  return renderToStaticMarkup(
+    <SettingsPage
+      cloudAccountEmail="user@example.com"
+      onExportApplicationsCsv={vi.fn()}
+      onExportFullBackup={vi.fn()}
+      onExportRecoveryBackup={vi.fn()}
+      onImportFullBackup={vi.fn()}
+      onPreviewBackupImport={vi.fn()}
+      onResetSettings={vi.fn()}
+      onUpdateSettings={vi.fn()}
+      settings={DEFAULT_USER_SETTINGS}
+    />,
+  );
+}
+
+// The opening tag of the first element whose attributes include `marker`.
+function openingTag(markup: string, marker: string) {
+  const index = markup.indexOf(marker);
+  expect(index).toBeGreaterThan(-1);
+  return markup.slice(markup.lastIndexOf("<", index), markup.indexOf(">", index) + 1);
+}
 
 describe("isSectionReached", () => {
   it("keeps the original 140px threshold where sections land 112px down (lg)", () => {
@@ -17,5 +42,16 @@ describe("isSectionReached", () => {
 
   it("does not count a section that is still well below its landing point", () => {
     expect(isSectionReached(400, 149)).toBe(false);
+  });
+});
+
+describe("phone settings", () => {
+  it("hides the applications table section and its strip entry below md", () => {
+    const markup = renderPage();
+
+    expect(openingTag(markup, 'id="settings-table"')).toContain("max-md:hidden");
+    expect(openingTag(markup, 'href="#settings-table"')).toContain("max-md:hidden");
+    expect(openingTag(markup, 'id="settings-general"')).not.toContain("max-md:hidden");
+    expect(openingTag(markup, 'href="#settings-general"')).not.toContain("max-md:hidden");
   });
 });
