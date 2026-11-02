@@ -202,7 +202,7 @@ export function SettingsPage({
               </div>
             </div>
             <a
-              className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
               href="/cdn-cgi/access/logout"
             >
               <LogOut aria-hidden="true" size={16} />
@@ -242,7 +242,7 @@ export function SettingsPage({
           </div>
           <div className="pb-4 text-sm text-muted">
             <p>Full backups support up to 100 MiB of documents, 10 MiB per file, and the cloud tracker-data limit. Restoring requires available cloud upload space.</p>
-            <button className="mt-2 font-semibold text-primary hover:underline" onClick={() => exportFullBackup(true)} type="button">
+            <button className="mt-2 font-semibold text-primary hover:underline max-md:h-11" onClick={() => exportFullBackup(true)} type="button">
               Export recovery archive
             </button>
             <p>Preserve data that exceeds restore limits for offline recovery. This archive may need repair before import.</p>
@@ -291,7 +291,7 @@ export function SettingsPage({
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
-                    className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isImportingBackup}
                     onClick={importBackup}
                     type="button"
@@ -300,7 +300,7 @@ export function SettingsPage({
                     Replace cloud data
                   </button>
                   <button
-                    className="touch-target h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    className="touch-target h-9 rounded-lg border border-border bg-surface px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
                     disabled={isImportingBackup}
                     onClick={clearBackupSelection}
                     type="button"
@@ -556,7 +556,7 @@ export function SettingsPage({
             {isConfirmingReset ? (
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                  className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700"
                   onClick={() => {
                     onResetSettings();
                     setIsConfirmingReset(false);
@@ -567,7 +567,7 @@ export function SettingsPage({
                   Confirm reset
                 </button>
                 <button
-                  className="touch-target h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                  className="touch-target h-9 rounded-lg border border-border px-3 text-sm max-md:h-11 font-semibold text-foreground hover:bg-slate-50"
                   onClick={() => setIsConfirmingReset(false)}
                   type="button"
                 >
@@ -576,7 +576,7 @@ export function SettingsPage({
               </div>
             ) : (
               <button
-                className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
+                className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 max-md:h-11 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
                 onClick={() => setIsConfirmingReset(true)}
                 type="button"
               >

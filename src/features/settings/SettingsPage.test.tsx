@@ -82,3 +82,15 @@ describe("phone section strip", () => {
     );
   });
 });
+
+describe("phone settings actions", () => {
+  it("gives account, backup and reset actions 44px on phones", () => {
+    const markup = renderPage();
+
+    expect(openingTag(markup, 'href="/cdn-cgi/access/logout"')).toContain("max-md:h-11");
+    for (const label of ["Export recovery archive", "Reset preferences"]) {
+      const button = markup.slice(markup.lastIndexOf("<button", markup.lastIndexOf(label)));
+      expect(openingTag(button, "class=")).toContain("max-md:h-11");
+    }
+  });
+});
