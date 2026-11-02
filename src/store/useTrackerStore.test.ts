@@ -627,6 +627,9 @@ describe("store with two independent revision-aware cloud adapters", () => {
   });
 
   it("does not apply a table edit to a different interview selected after a refresh", async () => {
+    // Both interviews must be upcoming so the refresh selects the earlier, newly added one.
+    vi.setSystemTime(new Date("2026-10-25T00:00:00.000Z"));
+    cleanups.push(() => vi.useRealTimers());
     const source = { ...interview(1), dateTime: "2026-11-03T10:00:00.000Z" };
     const { api, b, store } = await sessions(createSnapshot({ interviews: [source] }));
     const added = { ...interview(2), dateTime: "2026-11-01T10:00:00.000Z" };
