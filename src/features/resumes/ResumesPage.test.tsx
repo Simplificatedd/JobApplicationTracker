@@ -96,6 +96,21 @@ describe("document cards on phones", () => {
   });
 });
 
+describe("document card actions on phones", () => {
+  it("gives labelled card actions 44px targets in two columns below md", () => {
+    const markup = renderPage();
+    const card = /<article[\s\S]*?<\/article>/.exec(markup)?.[0] ?? "";
+    const table = /<table[\s\S]*?<\/table>/.exec(markup)?.[0] ?? "";
+
+    expect(card).toContain('class="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap"');
+    for (const label of ["Preview resume", "Download resume", "Edit metadata", "Delete resume"]) {
+      expect(card).toMatch(new RegExp(`aria-label="${label}" class="[^"]*max-md:h-11`));
+    }
+    // Icon-only table actions keep their size.
+    expect(table).not.toContain("max-md:h-11");
+  });
+});
+
 describe("document upload panel on phones", () => {
   it("folds the optional name and version behind a collapsed toggle below md", () => {
     const markup = renderPage();

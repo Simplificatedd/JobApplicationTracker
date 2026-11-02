@@ -668,7 +668,7 @@ function ResumeCard({
           </dl>
         </>
       )}
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+      <div className="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap">
         <DocumentActions
           documentLabel={documentLabel}
           editor={editor}
@@ -877,7 +877,7 @@ function IconAction({
     <button
       aria-label={label}
       className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
-        showLabel ? "px-3 text-sm font-semibold" : "w-9"
+        showLabel ? "px-3 text-sm font-semibold max-md:h-11" : "w-9"
       } ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"
