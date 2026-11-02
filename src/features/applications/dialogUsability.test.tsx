@@ -247,3 +247,16 @@ it("keeps the anchored popover on tablets and desktops", () => {
   expect(popover.props.className).toContain("absolute right-0 top-12");
   expect(popover.props.className).not.toContain("max-md:");
 });
+it("closes the notifications panel when the layout crosses the phone breakpoint", () => {
+  const props = bellProps(); openBell(props, true);
+  expect(named(render(() => NotificationBell(props)), "NativeModal")).toBeDefined();
+  // The breakpoint listener reports a wider screen.
+  // The open flag is the first true slot; the phone flag is the last one.
+  const isPhoneSlot = host.slots.lastIndexOf(true);
+  expect(isPhoneSlot).toBeGreaterThan(host.slots.indexOf(true));
+  host.slots[isPhoneSlot] = false;
+  render(() => NotificationBell(props));
+  const tree = render(() => NotificationBell(props));
+  expect(named(tree, "NativeModal")).toBeUndefined();
+  expect(elements(tree).some(e => e.props.role === "dialog")).toBe(false);
+});

@@ -263,6 +263,10 @@
   .native-modal:not([open]) { display: none; }
   .native-modal::backdrop { background: transparent; }
 
+  /* An inert page can still scroll; lock it behind the full-screen phone
+     notifications panel even when its list is too short to scroll. */
+  html:has(.notifications-panel[open]) { overflow: hidden; }
+
   .modal-overlay {
     /* Overlays are pinned to the viewport, so they must not pick up
        space-y-* margins from the stack they happen to be rendered in. */

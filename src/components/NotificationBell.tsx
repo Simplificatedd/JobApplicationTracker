@@ -102,6 +102,12 @@ export function NotificationBell({
 
   useEscapeKey(isOpen, () => setIsOpen(false));
 
+  // Crossing the phone breakpoint swaps the panel for the popover (or back),
+  // so close it rather than reopen it unprompted after a rotation.
+  useEffect(() => {
+    setIsOpen(false);
+  }, [isPhone]);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -155,7 +161,7 @@ export function NotificationBell({
         // A full-screen modal: the page behind is inert and focus stays here.
         // The top bar's backdrop blur would trap a fixed popover inside it.
         <NativeModal
-          className="fixed inset-0 z-50 flex flex-col bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]"
+          className="notifications-panel fixed inset-0 z-50 flex flex-col overscroll-contain bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]"
           labelledBy="notifications-panel-title"
           onRequestClose={() => setIsOpen(false)}
         >
