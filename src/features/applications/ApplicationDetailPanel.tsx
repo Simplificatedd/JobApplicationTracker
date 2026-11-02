@@ -44,6 +44,7 @@ import {
 import { moveMenuFocus } from "./TableCells";
 import { NativeModal } from "../../components/NativeModal";
 import { usePhoneLayout } from "../../hooks/usePhoneLayout";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type {
   ApplicationUpdate,
   MutationResult,
@@ -145,6 +146,8 @@ export function ApplicationDetailPanel({
   workingCoverLetterId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const isPhone = usePhoneLayout();
+  const editViewportStyle = useVisibleViewportStyle(isEditing && isPhone);
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
@@ -339,9 +342,13 @@ export function ApplicationDetailPanel({
     <NativeModal
       labelledBy="application-detail-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
+      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
     >
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
+      {/* While editing on a phone, size to what the keyboard leaves visible. */}
+      <div
+        className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover md:rounded-lg"
+        style={editViewportStyle}
+      >
         <header
           className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
             isEditing ? "" : "max-md:border-b-0"
@@ -365,7 +372,7 @@ export function ApplicationDetailPanel({
               <>
                 {/* Phones use the labelled footer actions below instead. */}
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={saveChanges}
                   type="button"
@@ -376,7 +383,7 @@ export function ApplicationDetailPanel({
                   </span>
                 </button>
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={cancelEditing}
                   type="button"
@@ -570,9 +577,9 @@ export function ApplicationDetailPanel({
           )}
         </div>
         {isEditing ? (
-          <footer className="flex justify-end gap-2 border-t border-border px-4 py-3 sm:hidden">
+          <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3 sm:px-6 md:hidden">
             <button
-              className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="h-11 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
               disabled={isSaving}
               onClick={cancelEditing}
               type="button"
@@ -580,7 +587,7 @@ export function ApplicationDetailPanel({
               Cancel
             </button>
             <button
-              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+              className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
               disabled={isSaving}
               onClick={saveChanges}
               type="button"
@@ -1100,10 +1107,10 @@ function EditForm({
               <Upload aria-hidden="true" size={16} />
               Upload new resume
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <input
                 accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control sm:col-span-2"
+                className="field-control md:col-span-2"
                 onChange={(event) =>
                   setResumeUploadFile(event.target.files?.[0] ?? null)
                 }
@@ -1153,10 +1160,10 @@ function EditForm({
               <Upload aria-hidden="true" size={16} />
               Upload new cover letter
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <input
                 accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control sm:col-span-2"
+                className="field-control md:col-span-2"
                 onChange={(event) =>
                   setCoverLetterUploadFile(event.target.files?.[0] ?? null)
                 }
