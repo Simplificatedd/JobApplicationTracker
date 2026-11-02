@@ -123,3 +123,19 @@ describe("phone settings fields", () => {
     for (const field of fields) expect(field).toContain("max-md:h-11");
   });
 });
+
+describe("phone settings choices", () => {
+  it("spreads the choice buttons across the row at 44px on phones", () => {
+    const markup = renderPage();
+
+    // Full width only while the row stacks (below sm); from sm the row is
+    // horizontal and stretching would make the group as tall as the label.
+    expect(openingTag(markup, 'aria-label="Open contacts as"')).toContain(
+      "max-md:grid max-md:grid-cols-2 max-sm:self-stretch",
+    );
+    const radios = markup.match(/<button[^>]*role="radio"[^>]*>/g) ?? [];
+    // Navigation and contacts, two options each.
+    expect(radios).toHaveLength(4);
+    for (const radio of radios) expect(radio).toContain("max-md:h-11");
+  });
+});

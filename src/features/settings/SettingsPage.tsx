@@ -979,7 +979,7 @@ function ToggleButtonField({
       <SettingLabel description={description} label={label} />
       <div
         aria-label={label.replace(/:$/, "")}
-        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5"
+        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5 max-md:grid max-md:grid-cols-2 max-sm:self-stretch"
         role="radiogroup"
       >
         {[
@@ -988,7 +988,7 @@ function ToggleButtonField({
         ].map((option) => (
           <button
             aria-checked={checked === option.isOn}
-            className={`touch-target h-8 rounded-md px-3 text-sm font-medium transition ${
+            className={`touch-target h-8 rounded-md px-3 text-sm font-medium transition max-md:h-11 ${
               checked === option.isOn
                 ? `bg-surface font-semibold shadow-sm ${accent.choice}`
                 : "text-muted hover:text-foreground"
