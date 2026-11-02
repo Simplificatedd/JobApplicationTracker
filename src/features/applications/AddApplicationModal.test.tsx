@@ -34,6 +34,24 @@ describe("AddApplicationModal quick location", () => {
 });
 
 describe("AddApplicationModal on phones", () => {
+  it("fills the screen below md and keeps the dialog layout from md up", () => {
+    const markup = renderModal();
+
+    expect(markup).toMatch(/<dialog[^>]*class="[^"]*\bp-0 md:p-4\b/);
+    expect(markup).toContain(
+      'class="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover max-md:h-full max-md:max-h-none max-md:rounded-none"',
+    );
+  });
+
+  it("pins Cancel and Save in a two-column footer outside the scrolling form", () => {
+    const markup = renderModal();
+    const footer = /<\/form><div class="([^"]*)">([\s\S]*?)<\/div>/.exec(markup);
+
+    expect(footer?.[1]).toContain("max-md:grid max-md:grid-cols-2");
+    expect(footer?.[2]).toMatch(/max-md:h-11[^>]*>Cancel<\/button>/);
+    expect(footer?.[2]).toMatch(/form="add-application-form"[^>]*type="submit"[^>]*>Save<\/button>/);
+  });
+
   it("stacks the upload name and version fields until md", () => {
     const markup = renderModal();
 

@@ -462,10 +462,10 @@ export function AddApplicationModal({
     <NativeModal
       labelledBy="add-application-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4"
     >
-      <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
+      <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover max-md:h-full max-md:max-h-none max-md:rounded-none">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6 md:py-4">
           <h2
             className="text-lg font-semibold text-foreground"
             id="add-application-title"
@@ -1000,9 +1000,9 @@ export function AddApplicationModal({
           </div>
         </form>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 max-md:grid max-md:grid-cols-2 max-md:py-3 sm:px-6">
           <button
-            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             disabled={isSaving}
             onClick={requestClose}
             type="button"
@@ -1010,7 +1010,7 @@ export function AddApplicationModal({
             Cancel
           </button>
           <button
-            className={`h-10 rounded-lg px-4 text-sm font-semibold ${
+            className={`h-10 rounded-lg px-4 text-sm font-semibold max-md:h-11 ${
               canSave
                 ? "bg-primary text-primary-foreground hover:bg-blue-700"
                 : "bg-slate-200 text-slate-500"
