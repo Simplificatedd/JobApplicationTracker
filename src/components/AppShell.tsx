@@ -382,14 +382,14 @@ function BottomNavigation({
 }) {
   const isMoreActive = !bottomNavigationKeys.includes(currentView);
   const tabClass = (isActive: boolean) =>
-    `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-xs font-medium transition ${
+    `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium transition ${
       isActive ? "text-primary" : "text-muted hover:text-foreground"
     }`;
 
   return (
     <nav
       aria-label="Primary navigation"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface px-[max(0.5rem,env(safe-area-inset-left))] pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] md:hidden"
     >
       {items
         .filter((item) => bottomNavigationKeys.includes(item.key))
