@@ -3,54 +3,93 @@ import type { Application } from "../../types/application";
 interface RankedApplication {
   application: Application;
   rank: number;
-  score: number;
 }
+
+interface FuzzyOptions {
+  // Company names are short, so loose abbreviations such as "ms" would match
+  // unrelated companies and outrank every title match.
+  strict?: boolean;
+}
+
+// Field order is the ranking priority: any company match outranks any title
+// match, which outranks any description-only match.
+const SEARCH_FIELDS: Array<{
+  fuzzy: FuzzyOptions;
+  value: (application: Application) => string;
+}> = [
+  { fuzzy: { strict: true }, value: (application) => application.company },
+  { fuzzy: {}, value: (application) => application.jobTitle },
+  { fuzzy: {}, value: (application) => application.jobDescription },
+];
+
+const MATCH_TIERS_PER_FIELD = 4;
 
 export function searchApplications(
   applications: Application[],
   rawQuery: string,
 ) {
-  const query = rawQuery.trim().toLowerCase();
+  const query = normalizeSearchText(rawQuery);
 
   if (!query) {
     return applications;
   }
 
+  // Ranks are fixed tiers rather than scores, so keyword frequency and field
+  // length never matter. The stable sort keeps the caller's order for ties.
   return applications
     .map((application): RankedApplication | null => {
-      const titleScore = fuzzyScore(application.jobTitle, query);
-      const descriptionScore = fuzzyScore(application.jobDescription, query);
-
-      if (titleScore === 0 && descriptionScore === 0) {
-        return null;
-      }
-
-      if (titleScore > 0) {
-        return {
-          application,
-          rank: 0,
-          score: titleScore,
-        };
-      }
-
-      return {
-        application,
-        rank: 1,
-        score: descriptionScore,
-      };
+      const rank = rankApplication(application, query);
+      return rank === null ? null : { application, rank };
     })
     .filter((result): result is RankedApplication => result !== null)
-    .sort((left, right) => {
-      if (left.rank !== right.rank) {
-        return left.rank - right.rank;
-      }
-
-      return right.score - left.score;
-    })
+    .sort((left, right) => left.rank - right.rank)
     .map((result) => result.application);
 }
 
-export function fuzzyScore(value: string, query: string) {
+function rankApplication(application: Application, query: string) {
+  for (const [fieldIndex, field] of SEARCH_FIELDS.entries()) {
+    const tier = matchTier(field.value(application), query, field.fuzzy);
+
+    if (tier !== null) {
+      return fieldIndex * MATCH_TIERS_PER_FIELD + tier;
+    }
+  }
+
+  return null;
+}
+
+// 0 exact, 1 starts with, 2 contains, 3 fuzzy.
+function matchTier(rawValue: string, query: string, fuzzy: FuzzyOptions) {
+  const value = normalizeSearchText(rawValue);
+
+  if (!value) {
+    return null;
+  }
+
+  if (value === query) {
+    return 0;
+  }
+
+  if (value.startsWith(query)) {
+    return 1;
+  }
+
+  if (value.includes(query)) {
+    return 2;
+  }
+
+  return fuzzyScore(value, query, fuzzy) > 0 ? 3 : null;
+}
+
+function normalizeSearchText(value: string | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function fuzzyScore(
+  value: string,
+  query: string,
+  options: FuzzyOptions = {},
+) {
   const normalizedValue = value.trim().toLowerCase();
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -74,7 +113,7 @@ export function fuzzyScore(value: string, query: string) {
   let totalScore = 0;
   for (const keyword of keywords) {
     const score = words.reduce(
-      (best, word) => Math.max(best, fuzzyWordScore(word, keyword)),
+      (best, word) => Math.max(best, fuzzyWordScore(word, keyword, options)),
       0,
     );
     if (score === 0) {
@@ -86,12 +125,24 @@ export function fuzzyScore(value: string, query: string) {
   return Math.min(99, totalScore / keywords.length);
 }
 
-function fuzzyWordScore(value: string, query: string) {
+function fuzzyWordScore(
+  value: string,
+  query: string,
+  options: FuzzyOptions,
+) {
   if (value.includes(query)) {
     return 100 + query.length / value.length;
   }
 
   if (/[.+#]/u.test(query)) {
+    return 0;
+  }
+
+  // Strict matching allows typos such as "gogle" but not abbreviations.
+  if (
+    options.strict &&
+    (query.length < 3 || query.length / value.length < 0.75)
+  ) {
     return 0;
   }
 
@@ -124,4 +175,28 @@ function fuzzyWordScore(value: string, query: string) {
   }
 
   return score / value.length;
+}
+
+export type SearchScope = "all" | "section";
+
+// A typed search looks across active and archived applications unless the
+// user narrows it to the current section; an empty search keeps the split.
+export function selectSearchBase(
+  applications: Application[],
+  viewMode: "active" | "archive",
+  rawQuery: string,
+  scope: SearchScope,
+) {
+  const searchesAll = scope === "all" && normalizeSearchText(rawQuery) !== "";
+
+  return {
+    applications: searchesAll
+      ? applications
+      : applications.filter((application) =>
+          viewMode === "archive"
+            ? Boolean(application.archivedAt)
+            : !application.archivedAt,
+        ),
+    searchesAll,
+  };
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Application } from "../../types/application";
-import { fuzzyScore, searchApplications } from "./applicationSearch";
+import {
+  fuzzyScore,
+  searchApplications,
+  selectSearchBase,
+} from "./applicationSearch";
 
 const baseApplication: Application = {
   id: "app-base",
@@ -81,13 +85,177 @@ describe("searchApplications", () => {
     ).toEqual([titleMatch, descriptionMatch]);
   });
 
-  it("searches title and description without matching company or notes", () => {
-    const unrelated = {
+  it("searches company, title, and description but not notes", () => {
+    const companyMatch = { ...baseApplication, company: "Accounting Co" };
+    const notesOnly = {
       ...baseApplication,
-      company: "Accounting Company",
+      id: "notes-only",
       notes: "Accounting role",
     };
-    expect(searchApplications([unrelated], "accounting")).toEqual([]);
+
+    expect(
+      searchApplications([notesOnly, companyMatch], "accounting"),
+    ).toEqual([companyMatch]);
+  });
+
+  it("ranks company, then title, then description matches", () => {
+    const descriptionOnly = {
+      ...baseApplication,
+      id: "description",
+      company: "Acme",
+      jobTitle: "Analyst",
+      jobDescription: "Partner with Google teams.",
+    };
+    const titleMatch = {
+      ...baseApplication,
+      id: "title",
+      company: "Acme",
+      jobTitle: "Google Cloud Intern",
+    };
+    const companyStartsWith = {
+      ...baseApplication,
+      id: "starts-with",
+      company: "Google Singapore",
+    };
+    const companyExact = { ...baseApplication, id: "exact", company: "Google" };
+
+    expect(
+      searchApplications(
+        [descriptionOnly, titleMatch, companyStartsWith, companyExact],
+        "google",
+      ).map((application) => application.id),
+    ).toEqual(["exact", "starts-with", "title", "description"]);
+  });
+
+  it("ranks exact, starts-with, contains, then fuzzy within a field", () => {
+    const fuzzy = { ...baseApplication, id: "fuzzy", jobTitle: "Anallyst" };
+    const contains = {
+      ...baseApplication,
+      id: "contains",
+      jobTitle: "Senior Data Analyst",
+    };
+    const startsWith = {
+      ...baseApplication,
+      id: "starts-with",
+      jobTitle: "Analyst Intern",
+    };
+    const exact = { ...baseApplication, id: "exact", jobTitle: "Analyst" };
+
+    expect(
+      searchApplications([fuzzy, contains, startsWith, exact], "analyst").map(
+        (application) => application.id,
+      ),
+    ).toEqual(["exact", "starts-with", "contains", "fuzzy"]);
+  });
+
+  it("does not reward repeated keywords or long descriptions", () => {
+    const repeated = {
+      ...baseApplication,
+      id: "repeated",
+      jobTitle: "Intern",
+      jobDescription: `Use ${"python ".repeat(200)}`,
+    };
+    const single = {
+      ...baseApplication,
+      id: "single",
+      jobTitle: "Intern",
+      jobDescription: "Uses Python daily.",
+    };
+
+    expect(searchApplications([single, repeated], "python")).toEqual([
+      single,
+      repeated,
+    ]);
+    expect(searchApplications([repeated, single], "python")).toEqual([
+      repeated,
+      single,
+    ]);
+  });
+
+  it("keeps the incoming sort order for equally ranked results", () => {
+    const first = { ...baseApplication, id: "first", jobTitle: "Data Intern" };
+    const second = { ...baseApplication, id: "second", jobTitle: "Ops Intern" };
+    const third = { ...baseApplication, id: "third", jobTitle: "QA Intern" };
+
+    expect(searchApplications([third, first, second], "intern")).toEqual([
+      third,
+      first,
+      second,
+    ]);
+  });
+
+  it("allows company typos but not loose company abbreviations", () => {
+    const google = { ...baseApplication, id: "google", company: "Google" };
+    const microsoft = {
+      ...baseApplication,
+      id: "microsoft",
+      company: "Microsoft",
+      jobTitle: "Intern",
+    };
+    const titleMatch = {
+      ...baseApplication,
+      id: "title",
+      company: "Acme",
+      jobTitle: "MS Office Specialist",
+    };
+
+    expect(searchApplications([google], "gogle")).toEqual([google]);
+    expect(searchApplications([microsoft, titleMatch], "ms")).toEqual([
+      titleMatch,
+    ]);
+  });
+
+  it("ignores case and repeated whitespace", () => {
+    const match = { ...baseApplication, company: "Google  Singapore" };
+
+    expect(searchApplications([match], "  GOOGLE singapore ")).toEqual([
+      match,
+    ]);
+  });
+
+  it("returns no results when nothing matches", () => {
+    expect(searchApplications([baseApplication], "zzzz")).toEqual([]);
+  });
+});
+
+describe("selectSearchBase", () => {
+  const active = { ...baseApplication, id: "active" };
+  const archived = {
+    ...baseApplication,
+    id: "archived",
+    archivedAt: "2026-10-01T00:00:00.000Z",
+  };
+  const applications = [active, archived];
+
+  it("keeps the section split when no search is typed", () => {
+    expect(selectSearchBase(applications, "active", " ", "all")).toEqual({
+      applications: [active],
+      searchesAll: false,
+    });
+    expect(selectSearchBase(applications, "archive", "", "all")).toEqual({
+      applications: [archived],
+      searchesAll: false,
+    });
+  });
+
+  it("searches active and archived applications by default", () => {
+    expect(selectSearchBase(applications, "active", "eng", "all")).toEqual({
+      applications,
+      searchesAll: true,
+    });
+    expect(selectSearchBase(applications, "archive", "eng", "all")).toEqual({
+      applications,
+      searchesAll: true,
+    });
+  });
+
+  it("limits a search to the current section when asked", () => {
+    expect(
+      selectSearchBase(applications, "active", "eng", "section"),
+    ).toEqual({ applications: [active], searchesAll: false });
+    expect(
+      selectSearchBase(applications, "archive", "eng", "section"),
+    ).toEqual({ applications: [archived], searchesAll: false });
   });
 });
 
