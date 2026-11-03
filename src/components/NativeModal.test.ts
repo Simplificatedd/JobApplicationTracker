@@ -7,7 +7,7 @@ vi.mock("react", () => ({
 import { NativeModal } from "./NativeModal";
 afterEach(() => { host.cleanups.forEach(cleanup => cleanup()); host.cleanups = []; vi.unstubAllGlobals(); });
 it("prevents native cancel until the guarded close request permits dismissal and restores the opener", () => {
-  class Element { isConnected = true; focus = vi.fn(); }
+  class Element { isConnected = true; focus = vi.fn(); getClientRects() { return [{}]; } }
   class Dialog extends EventTarget {
     open = false;
     querySelector() { return null; }
@@ -28,4 +28,37 @@ it("prevents native cancel until the guarded close request permits dismissal and
   modal.props.onMouseDown({ target: dialog, currentTarget: dialog, button: 0 }); expect(requestClose).toHaveBeenCalledTimes(3);
   host.cleanups.forEach(cleanup => cleanup()); expect(dialog.open).toBe(false); expect(opener.focus).toHaveBeenCalled();
   dialog.dispatchEvent(new Event("cancel", { cancelable: true })); expect(requestClose).toHaveBeenCalledTimes(3);
+});
+
+it("focuses the fallback when the opener is no longer rendered, and the opener otherwise", () => {
+  class Element { isConnected = true; rendered = true; focus = vi.fn(); getClientRects() { return this.rendered ? [{}] : []; } }
+  class Dialog extends EventTarget {
+    open = false;
+    querySelector() { return null; }
+    setAttribute = vi.fn();
+    showModal = vi.fn(() => { this.open = true; });
+    close = vi.fn(() => { this.open = false; });
+  }
+  vi.stubGlobal("HTMLElement", Element);
+  const open = (opener: Element, fallback?: Element) => {
+    vi.stubGlobal("document", { activeElement: opener });
+    host.dialog = new Dialog();
+    NativeModal({ className: "x", labelledBy: "t", children: null, onRequestClose: vi.fn(), fallbackFocus: fallback && (() => fallback as unknown as HTMLElement) });
+    host.cleanups.splice(0).forEach(cleanup => cleanup());
+  };
+
+  // A layout change hid the opener: focus the fallback instead.
+  const hidden = new Element(); hidden.rendered = false; const fallback = new Element();
+  open(hidden, fallback);
+  expect(fallback.focus).toHaveBeenCalled(); expect(hidden.focus).not.toHaveBeenCalled();
+
+  // A visible opener always wins over the fallback.
+  const visible = new Element(); const unused = new Element();
+  open(visible, unused);
+  expect(visible.focus).toHaveBeenCalled(); expect(unused.focus).not.toHaveBeenCalled();
+
+  // No fallback: keep the old behaviour of trying the opener.
+  const alone = new Element(); alone.rendered = false;
+  open(alone);
+  expect(alone.focus).toHaveBeenCalled();
 });

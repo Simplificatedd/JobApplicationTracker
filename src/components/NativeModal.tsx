@@ -1,13 +1,20 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
-export function NativeModal({ children, className, labelledBy, onRequestClose, role }: {
+export function NativeModal({ children, className, fallbackFocus, labelledBy, onRequestClose, role }: {
   children: ReactNode;
   className: string;
+  // Where focus goes on close when the opener is no longer rendered, for
+  // example after a layout change hid it.
+  fallbackFocus?: () => HTMLElement | null | undefined;
   labelledBy: string;
   onRequestClose: () => void;
   role?: "alertdialog";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const fallbackFocusRef = useRef(fallbackFocus);
+  useEffect(() => {
+    fallbackFocusRef.current = fallbackFocus;
+  });
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -31,7 +38,9 @@ export function NativeModal({ children, className, labelledBy, onRequestClose, r
     return () => {
       if (dialog.open) dialog.close();
       // React can detach the dialog before passive cleanup; keep opener return.
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      if (!(opener instanceof HTMLElement) || !opener.isConnected) return;
+      const fallback = opener.getClientRects().length === 0 ? fallbackFocusRef.current?.() : null;
+      (fallback ?? opener).focus();
     };
   }, []);
   return (
