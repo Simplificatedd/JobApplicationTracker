@@ -165,7 +165,7 @@ export function InterviewsSection({
         </div>
         {!application.archivedAt && editingId === null ? (
           <button
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11"
             onClick={startAdding}
             type="button"
           >
@@ -507,7 +507,7 @@ function InterviewForm({
       ) : null}
       <div className="mt-4 flex justify-end gap-2">
         <button
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11"
           disabled={isSaving}
           onClick={onCancel}
           type="button"
@@ -515,7 +515,7 @@ function InterviewForm({
           Cancel
         </button>
         <button
-          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 max-md:min-h-11"
           disabled={isSaving}
           onClick={onSave}
           type="button"

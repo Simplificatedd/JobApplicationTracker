@@ -154,3 +154,30 @@ describe("phone activity disclosure", () => {
     expect(summary).toEqual(expect.arrayContaining(["py-3", "text-sm", "cursor-pointer"]));
   });
 });
+
+describe("phone detail panel buttons", () => {
+  const buttonClasses = (html: string, label: string) => {
+    const index = html.indexOf(label);
+    const tag = html.slice(html.lastIndexOf("<button", index));
+    return (/class="([^"]*)"/.exec(tag)?.[1] ?? "").split(" ");
+  };
+
+  it("gives Add assessment, Add interview and Change date 44px on phones and keeps 40px from md", () => {
+    const html = renderPanel();
+
+    for (const label of ["Add assessment", "Add interview", "Change date"]) {
+      expect(buttonClasses(html, label)).toEqual(expect.arrayContaining(["min-h-10", "max-md:min-h-11"]));
+    }
+  });
+
+  it("sizes every 40px stage and assessment editor button the same way", () => {
+    // The editors only render after Add or Edit, so check the source.
+    for (const file of ["./InterviewsSection.tsx", "./AssessmentsSection.tsx"]) {
+      const source = readFileSync(new URL(file, import.meta.url), "utf8");
+      const classes = [...source.matchAll(/className="([^"]*\bmin-h-10\b[^"]*)"/g)].map((match) => match[1]);
+
+      expect(classes.length).toBeGreaterThan(0);
+      for (const list of classes) expect(list.split(" ")).toContain("max-md:min-h-11");
+    }
+  });
+});
