@@ -227,3 +227,15 @@ describe("More sheet focus at the breakpoint", () => {
     expect(sheet.props.fallbackFocus).toBe(findVisibleNavigationTarget);
   });
 });
+
+describe("navigation toggle in landscape on notched phones", () => {
+  it("offsets the toggle by the safe-area insets so it clears the notch", () => {
+    const classes = classOf(renderShell(), "data-navigation-toggle").split(" ");
+
+    expect(classes).toEqual(expect.arrayContaining([
+      "left-[calc(1rem+env(safe-area-inset-left))]",
+      "top-[calc(1rem+env(safe-area-inset-top))]",
+    ]));
+    expect(classes).not.toContain("left-4");
+  });
+});

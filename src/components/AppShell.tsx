@@ -207,7 +207,9 @@ export function AppShell({
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
-        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm max-md:hidden"
+        // Clear of the notch in landscape on notched phones (viewport-fit=cover);
+        // the insets are 0 elsewhere, so this stays at 1rem on desktop.
+        className="icon-button fixed left-[calc(1rem+env(safe-area-inset-left))] top-[calc(1rem+env(safe-area-inset-top))] z-30 bg-surface shadow-sm max-md:hidden"
         data-navigation-toggle
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
