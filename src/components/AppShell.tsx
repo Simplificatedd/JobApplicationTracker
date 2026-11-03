@@ -599,7 +599,11 @@ function NavigationButtons({
             }`}
             key={item.key}
             onBlur={hideTooltip}
-            onClick={() => onViewChange(item.key)}
+            onClick={() => {
+              // A tap on a touch screen never fires mouseleave.
+              hideTooltip();
+              onViewChange(item.key);
+            }}
             onFocus={(event) => showTooltip(event, item.label)}
             onMouseEnter={(event) => showTooltip(event, item.label)}
             onMouseLeave={hideTooltip}
@@ -612,7 +616,8 @@ function NavigationButtons({
           </button>
         );
       })}
-      {tooltip
+      {/* The rail can turn into the row below 1280px while a tooltip shows. */}
+      {tooltip && isCompact
         ? // A portal keeps the tooltip clear of the sidebar and above the
           // sticky header. The label is already the button's name, so screen
           // readers skip the tooltip.
