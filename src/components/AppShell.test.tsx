@@ -173,11 +173,42 @@ describe("AppShell sidebar state", () => {
     expect(renderShell()).toContain('aria-label="Primary navigation"');
   });
 
+  it("renders a saved compact state as a 64px icon rail", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ currentView: "resumes" });
+
+    expect(classOf(markup, "<aside")).toContain("xl:w-16");
+    expect(classOf(markup, "<aside")).not.toContain("--side-navigation-width");
+    expect(markup).not.toContain('aria-label="Resize side navigation"');
+    expect(markup).toContain('aria-label="Job Application Tracker" class=');
+    expect(markup).toMatch(/aria-current="page"[^>]*>.*?<span class="truncate xl:sr-only">Resumes<\/span>/);
+    expect(markup.match(/xl:sr-only/g)).toHaveLength(5);
+    // Compact counts as shown: the toggle still offers to hide it.
+    expect(markup).toContain('aria-label="Hide side navigation"');
+  });
+
+  it("keeps the resizable expanded sidebar by default", () => {
+    stubBrowser();
+    const markup = renderShell();
+
+    expect(classOf(markup, "<aside")).toContain("xl:w-[var(--side-navigation-width)]");
+    expect(markup).toContain('aria-label="Resize side navigation"');
+    expect(markup).not.toContain("xl:sr-only");
+  });
+
   it("ignores a saved state in top navigation", () => {
     stubBrowser({ stored: "hidden" });
     const markup = renderShell({ navigationDisplayMode: "top" });
 
     expect(markup).toContain('aria-label="Hide top navigation"');
     expect(markup).toContain('aria-label="Primary navigation"');
+  });
+
+  it("ignores a saved compact state in top navigation", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).not.toContain("xl:sr-only");
+    expect(markup).not.toContain("xl:w-16");
   });
 });

@@ -141,6 +141,11 @@ export function AppShell({
   );
   const isTopNavigation = navigationDisplayMode === "top";
   const isNavigationHidden = sidebarState === "hidden";
+  // Compact only changes the xl sidebar; below xl it is the usual row.
+  const isCompact = !isTopNavigation && sidebarState === "compact";
+  const [lastVisibleState, setLastVisibleState] = useState<
+    Exclude<SidebarState, "hidden">
+  >(sidebarState === "compact" ? "compact" : "expanded");
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
@@ -197,6 +202,10 @@ export function AppShell({
   function changeSidebarState(next: SidebarState) {
     setSidebarState(next);
 
+    if (next !== "hidden") {
+      setLastVisibleState(next);
+    }
+
     if (isSidebarLayout(isTopNavigation)) {
       writeSidebarState(next);
     }
@@ -242,7 +251,7 @@ export function AppShell({
         aria-label={toggleLabel}
         className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
         onClick={() =>
-          changeSidebarState(isNavigationHidden ? "expanded" : "hidden")
+          changeSidebarState(isNavigationHidden ? lastVisibleState : "hidden")
         }
         type="button"
       >
@@ -255,11 +264,15 @@ export function AppShell({
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
-            className="relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            className={`relative border-b border-border bg-surface px-4 py-3 xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:border-b-0 xl:border-r xl:py-6 ${
+              isCompact
+                ? "xl:w-16 xl:px-2"
+                : "xl:w-[var(--side-navigation-width)] xl:px-5"
+            }`}
             style={sideNavigationStyle}
           >
             <div className="flex items-center justify-between gap-3 xl:block">
-              <NavigationBrand />
+              <NavigationBrand isCompact={isCompact} />
               <MobileNotificationSlot
                 enableNotificationBell={enableNotificationBell}
                 groupedNotifications={groupedNotifications}
@@ -274,33 +287,36 @@ export function AppShell({
             </div>
             <NavigationButtons
               currentView={currentView}
+              isCompact={isCompact}
               items={visibleNavigation}
               layout="side"
               onViewChange={onViewChange}
             />
-            <button
-              aria-label="Resize side navigation"
-              aria-orientation="vertical"
-              aria-valuemax={MAX_SIDE_NAVIGATION_WIDTH}
-              aria-valuemin={MIN_SIDE_NAVIGATION_WIDTH}
-              aria-valuenow={sideNavigationWidth}
-              className="absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none border-0 bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15 xl:block"
-              onDoubleClick={() =>
-                resizeSideNavigation(DEFAULT_SIDE_NAVIGATION_WIDTH)
-              }
-              onKeyDown={(event) => {
-                if (event.key === "ArrowLeft") {
-                  resizeSideNavigation(sideNavigationWidth - 16);
+            {isCompact ? null : (
+              <button
+                aria-label="Resize side navigation"
+                aria-orientation="vertical"
+                aria-valuemax={MAX_SIDE_NAVIGATION_WIDTH}
+                aria-valuemin={MIN_SIDE_NAVIGATION_WIDTH}
+                aria-valuenow={sideNavigationWidth}
+                className="absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none border-0 bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15 xl:block"
+                onDoubleClick={() =>
+                  resizeSideNavigation(DEFAULT_SIDE_NAVIGATION_WIDTH)
                 }
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowLeft") {
+                    resizeSideNavigation(sideNavigationWidth - 16);
+                  }
 
-                if (event.key === "ArrowRight") {
-                  resizeSideNavigation(sideNavigationWidth + 16);
-                }
-              }}
-              onPointerDown={startResizingSideNavigation}
-              role="separator"
-              type="button"
-            />
+                  if (event.key === "ArrowRight") {
+                    resizeSideNavigation(sideNavigationWidth + 16);
+                  }
+                }}
+                onPointerDown={startResizingSideNavigation}
+                role="separator"
+                type="button"
+              />
+            )}
           </aside>
         ) : null}
 
@@ -394,18 +410,35 @@ export function AppShell({
   );
 }
 
-function NavigationBrand() {
+function NavigationBrand({ isCompact }: { isCompact: boolean }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 pl-12 xl:block">
-      <div className="min-w-0">
-        <p className="truncate text-lg font-semibold text-foreground">
-          {APP_NAME}
-        </p>
-        <p className="mt-1 hidden text-sm text-muted xl:block">
-          Internship command center
-        </p>
+    <>
+      {isCompact ? (
+        // The fixed show/hide toggle sits at the top of the rail, so the mark
+        // starts below it.
+        <div
+          aria-label={APP_NAME}
+          className="mx-auto mt-10 hidden size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground xl:flex"
+          role="img"
+        >
+          <span aria-hidden="true">JT</span>
+        </div>
+      ) : null}
+      <div
+        className={`flex min-w-0 items-center justify-between gap-3 pl-12 xl:block ${
+          isCompact ? "xl:hidden" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-foreground">
+            {APP_NAME}
+          </p>
+          <p className="mt-1 hidden text-sm text-muted xl:block">
+            Internship command center
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -452,11 +485,13 @@ function MobileNotificationSlot({
 
 function NavigationButtons({
   currentView,
+  isCompact = false,
   items,
   layout,
   onViewChange,
 }: {
   currentView: ViewKey;
+  isCompact?: boolean;
   items: typeof navigationItems;
   layout: "side" | "top";
   onViewChange: (view: ViewKey) => void;
@@ -470,7 +505,9 @@ function NavigationButtons({
   const navClass =
     layout === "top"
       ? "scroll-strip -m-1 flex min-w-0 basis-full flex-1 gap-2 p-1 sm:basis-auto"
-      : "scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0";
+      : `scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0 ${
+          isCompact ? "xl:mt-4" : "xl:mt-8"
+        }`;
 
   return (
     <nav aria-label="Primary navigation" className={navClass} ref={navRef}>
@@ -480,7 +517,9 @@ function NavigationButtons({
         const buttonLayout =
           layout === "top"
             ? "shrink-0 justify-center"
-            : "shrink-0 justify-center xl:shrink xl:justify-start";
+            : isCompact
+              ? "shrink-0 justify-center xl:shrink xl:px-0"
+              : "shrink-0 justify-center xl:shrink xl:justify-start";
 
         return (
           <button
@@ -495,7 +534,9 @@ function NavigationButtons({
             type="button"
           >
             <Icon aria-hidden="true" size={18} />
-            <span className="truncate">{item.label}</span>
+            <span className={isCompact ? "truncate xl:sr-only" : "truncate"}>
+              {item.label}
+            </span>
           </button>
         );
       })}
