@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type ChartDatum, EmptyChart, useHasMounted } from "./charts";
+import { clearOnMouseLeave, HoverOrTap } from "./pointerDetails";
 
 type ColorFor = (datum: ChartDatum, index: number) => string;
 
@@ -732,14 +733,7 @@ export function FlowChart({
             aria-label={links.map((link) => `${link.from} to ${link.to}: ${link.value}`).join(", ")}
             className="block overflow-visible"
             height={FLOW_HEIGHT}
-            // A screen without hover (touch, most pens) fires pointerleave
-            // straight after a tap, which would hide the tapped flow's
-            // details at once; a scroll that starts on a ribbon cancels the
-            // pointer instead, so that still clears.
-            onPointerCancel={() => setActiveLink(null)}
-            onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") setActiveLink(null);
-            }}
+            {...clearOnMouseLeave(() => setActiveLink(null))}
             role="img"
             width={drawnWidth}
           >
@@ -790,9 +784,7 @@ export function FlowChart({
           ? `${active.link.from} → ${active.link.to}: ${active.link.value} ${active.link.value === 1 ? "change" : "changes"}`
           : (
             <>
-              Left: status before · Right: status after ·{" "}
-              <span className="touch:hidden">hover</span>
-              <span className="hidden touch:inline">tap</span> a flow
+              Left: status before · Right: status after · <HoverOrTap /> a flow
             </>
           )}
       </p>
