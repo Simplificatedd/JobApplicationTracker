@@ -57,7 +57,9 @@ describe("status flow on touch screens", () => {
   it("keeps a pen tap's details too", () => {
     const svg = render().find((element) => element.type === "svg")!;
 
-    (svg.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "pen" });
+    const currentTarget = {};
+    (svg.props.onPointerUp as (event: object) => void)({ currentTarget, pointerType: "pen", timeStamp: 1000 });
+    (svg.props.onPointerLeave as (event: object) => void)({ currentTarget, pointerType: "pen", timeStamp: 1003 });
     expect(state.setActiveLink).not.toHaveBeenCalled();
   });
 

@@ -56,8 +56,12 @@ describe.each(charts)("%s on touch screens", (_name, render) => {
     const handlers = leaveHandlers();
     expect(handlers.length).toBeGreaterThan(0);
     for (const element of handlers) {
-      (element.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "touch" });
-      (element.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "pen" });
+      const currentTarget = {};
+      const call = (name: string, event: object) => (element.props[name] as (event: object) => void)({ currentTarget, ...event });
+      call("onPointerLeave", { pointerType: "touch", timeStamp: 10 });
+      // A pen without hover lifts and leaves in one burst.
+      call("onPointerUp", { pointerType: "pen", timeStamp: 1000 });
+      call("onPointerLeave", { pointerType: "pen", timeStamp: 1003 });
     }
     expect(state.setActive).not.toHaveBeenCalled();
   });

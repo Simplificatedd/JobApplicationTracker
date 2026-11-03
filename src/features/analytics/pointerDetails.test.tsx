@@ -15,13 +15,26 @@ describe("clearOnMouseLeave", () => {
     expect(clear).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps tapped details when a finger or pen lifts", () => {
+  it("keeps tapped details when a finger lifts", () => {
+    const clear = vi.fn();
+    clearOnMouseLeave(clear).onPointerLeave(leave("touch"));
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it("keeps details when a pen lifts but clears when a hovering pen moves away", () => {
     const clear = vi.fn();
     const handlers = clearOnMouseLeave(clear);
+    const target = {};
+    const pen = (timeStamp: number) => ({ currentTarget: target, pointerType: "pen", timeStamp }) as unknown as ReactPointerEvent;
 
-    handlers.onPointerLeave(leave("touch"));
-    handlers.onPointerLeave(leave("pen"));
+    // A pen without hover: pointerleave follows pointerup at once.
+    handlers.onPointerUp(pen(1000));
+    handlers.onPointerLeave(pen(1004));
     expect(clear).not.toHaveBeenCalled();
+
+    // A hover-capable pen that later hovers off the chart.
+    handlers.onPointerLeave(pen(2500));
+    expect(clear).toHaveBeenCalledTimes(1);
   });
 });
 
