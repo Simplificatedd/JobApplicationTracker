@@ -118,7 +118,7 @@ function stubBrowser({
         ? fail
         : (key: string, value: string) => storage.set(key, value),
     },
-    matchMedia: () => ({ matches: desktop, addEventListener() {}, removeEventListener() {} }),
+    matchMedia: (query: string) => ({ matches: query.includes("min-width") && desktop, addEventListener() {}, removeEventListener() {} }),
   });
 
   return storage;
@@ -164,7 +164,7 @@ describe("AppShell sidebar state", () => {
     const markup = renderShell();
 
     expect(markup).toContain('aria-label="Show side navigation"');
-    expect(markup).not.toContain('aria-label="Primary navigation"');
+    expect(markup).not.toContain("<aside");
   });
 
   it("ignores a saved hidden state below 1280px", () => {
