@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppShell, findVisibleCurrentNavItem, MorePanel, navigationItems } from "./AppShell";
+import { AppShell, findVisibleNavigationTarget, MorePanel, navigationItems } from "./AppShell";
 
 function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
   return renderToStaticMarkup(
@@ -197,19 +197,33 @@ describe("AppShell phone primary action", () => {
 describe("More sheet focus at the breakpoint", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("falls back to the current page's visible navigation item", () => {
-    const hidden = { getClientRects: () => [] };
-    const visible = { getClientRects: () => [{}] };
-    const querySelectorAll = vi.fn(() => [hidden, visible]);
-    vi.stubGlobal("document", { querySelectorAll });
+  const hidden = { getClientRects: () => [] };
+  const visible = { getClientRects: () => [{}] };
+  const stubDocument = (matches: Record<string, unknown[]>) =>
+    vi.stubGlobal("document", { querySelectorAll: (selector: string) => matches[selector] ?? [] });
 
-    expect(findVisibleCurrentNavItem()).toBe(visible);
-    expect(querySelectorAll).toHaveBeenCalledWith('nav [aria-current="page"]');
+  it("falls back to the current page's visible navigation item", () => {
+    const toggle = { getClientRects: () => [{}] };
+    stubDocument({ 'nav [aria-current="page"]': [hidden, visible], "[data-navigation-toggle]": [toggle] });
+
+    expect(findVisibleNavigationTarget()).toBe(visible);
+  });
+
+  it("falls back to the navigation toggle when the desktop navigation is hidden", () => {
+    const toggle = { getClientRects: () => [{}] };
+    // Only the phone bottom bar's current item exists, and it's hidden.
+    stubDocument({ 'nav [aria-current="page"]': [hidden], "[data-navigation-toggle]": [toggle] });
+
+    expect(findVisibleNavigationTarget()).toBe(toggle);
+  });
+
+  it("marks the navigation toggle so the fallback can find it", () => {
+    expect(renderShell()).toMatch(/<button aria-pressed="true" aria-label="Hide side navigation"[^>]*data-navigation-toggle="true"/);
   });
 
   it("gives the More sheet that fallback", () => {
     const sheet = MorePanel({ currentView: "settings", items: navigationItems, onClose: vi.fn(), onViewChange: vi.fn() });
 
-    expect(sheet.props.fallbackFocus).toBe(findVisibleCurrentNavItem);
+    expect(sheet.props.fallbackFocus).toBe(findVisibleNavigationTarget);
   });
 });
