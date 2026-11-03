@@ -27,6 +27,7 @@ import {
 import { formatDate, formatDateTime, formatUpdatedAt } from "../../lib/format";
 import { getInterviewTypeLabel } from "../../lib/constants";
 import { getSafeHttpUrl } from "../../lib/urls";
+import { getScrollEdges } from "../../hooks/useScrollStrip";
 import type { ApplicationUpdate } from "../../store/useTrackerStore";
 import type { SortColumn, SortState } from "./applicationFilters";
 
@@ -360,6 +361,33 @@ export function ApplicationsTable({
     (width, column) => width + columnWidths[column.id],
     0,
   );
+  // Whether content is scrolled under the pinned Job Title (before) or
+  // Actions (after) column, so those columns can show an edge.
+  const [scrollEdges, setScrollEdges] = useState({
+    hasMoreAfter: false,
+    hasMoreBefore: false,
+  });
+
+  function updateScrollEdges() {
+    const viewport = tableViewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const next = getScrollEdges(viewport);
+    setScrollEdges((current) =>
+      current.hasMoreAfter === next.hasMoreAfter &&
+      current.hasMoreBefore === next.hasMoreBefore
+        ? current
+        : next,
+    );
+  }
+
+  // The scroll extent also changes when the table or its viewport resizes, and
+  // the viewport remounts at scrollLeft 0 after an empty result.
+  const hasApplications = applications.length > 0;
+  useEffect(updateScrollEdges, [hasApplications, tableWidth, tableViewportWidth]);
 
   useEffect(() => {
     const viewport = tableViewportRef.current;
@@ -522,6 +550,9 @@ export function ApplicationsTable({
           ) : null}
           <div
             className="hidden max-h-[calc(100dvh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
+            data-pinned-edge-end={scrollEdges.hasMoreAfter}
+            data-pinned-edge-start={scrollEdges.hasMoreBefore}
+            onScroll={updateScrollEdges}
             ref={tableViewportRef}
           >
             <table
@@ -766,13 +797,15 @@ function isPinnedColumn(columnId: ApplicationColumnId) {
 }
 
 // Job title and actions stay visible while the table scrolls horizontally.
+// While content is scrolled under them they show a hairline and a soft
+// shadow, so cut-off cells read as passing beneath rather than as clipped.
 function getPinnedColumnClassName(columnId: ApplicationColumnId) {
   if (columnId === "jobTitle") {
-    return "sticky left-0";
+    return "sticky left-0 [[data-pinned-edge-start=true]_&]:shadow-[inset_-1px_0_0_var(--color-border),6px_0_8px_-6px_rgb(15_23_42/0.16)]";
   }
 
   if (columnId === "actions") {
-    return "sticky right-0";
+    return "sticky right-0 [[data-pinned-edge-end=true]_&]:shadow-[inset_1px_0_0_var(--color-border),-6px_0_8px_-6px_rgb(15_23_42/0.16)]";
   }
 
   return "";

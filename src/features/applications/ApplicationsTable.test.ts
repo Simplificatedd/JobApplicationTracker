@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const host = vi.hoisted(() => ({
   viewportWidth: 0,
   setDraft: vi.fn(),
+  setScrollEdges: vi.fn(),
 }));
 vi.mock("react", async (importOriginal) => ({
   ...await importOriginal<typeof import("react")>(),
@@ -15,6 +16,9 @@ vi.mock("react", async (importOriginal) => ({
   useState: (initial: unknown) => {
     if (initial === 0) return [host.viewportWidth, vi.fn()];
     if (initial === null) return [null, host.setDraft];
+    if (typeof initial === "object" && initial && "hasMoreBefore" in initial) {
+      return [initial, host.setScrollEdges];
+    }
     return [initial, vi.fn()];
   },
   useEffect: (effect: () => void) => { effect(); },
@@ -160,5 +164,36 @@ describe("applications table column widths", () => {
     const reset = all.find((e) => e.type === "button" && [e.props.children].flat().includes("Reset column sizes"))!;
     (reset.props.onClick as () => void)();
     expect(onColumnWidthsChange).toHaveBeenLastCalledWith(DEFAULT_COLUMN_WIDTHS);
+  });
+});
+
+describe("pinned column edges", () => {
+  it("starts with no edge and gives the pinned headers an edge for scrolled content", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+    const header = (label: string) => all.find((e) => e.type === "th" && e.props.title === label)!;
+
+    expect(viewport.props["data-pinned-edge-start"]).toBe(false);
+    expect(viewport.props["data-pinned-edge-end"]).toBe(false);
+    expect(header("Job Title").props.className).toContain("sticky left-0 [[data-pinned-edge-start=true]_&]:shadow-");
+    expect(header("Actions").props.className).toContain("sticky right-0 [[data-pinned-edge-end=true]_&]:shadow-");
+    expect(header("Company").props.className).not.toContain("data-pinned-edge");
+  });
+
+  it("shows an edge on whichever side has content scrolled under it", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+    const ref = (viewport as unknown as { ref: { current: unknown } }).ref;
+    const update = (scrollLeft: number) => {
+      host.setScrollEdges.mockClear();
+      ref.current = { clientWidth: 926, scrollLeft, scrollWidth: 1455 };
+      (viewport.props.onScroll as () => void)();
+      const updater = host.setScrollEdges.mock.calls[0][0] as (current: object) => object;
+      return updater({ hasMoreAfter: false, hasMoreBefore: false });
+    };
+
+    expect(update(0)).toEqual({ hasMoreAfter: true, hasMoreBefore: false });
+    expect(update(200)).toEqual({ hasMoreAfter: true, hasMoreBefore: true });
+    expect(update(1455 - 926)).toEqual({ hasMoreAfter: false, hasMoreBefore: true });
   });
 });
