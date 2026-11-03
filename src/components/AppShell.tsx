@@ -208,6 +208,7 @@ export function AppShell({
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
         className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm max-md:hidden"
+        data-navigation-toggle
         onClick={() => setIsNavigationHidden((current) => !current)}
         type="button"
       >
@@ -429,9 +430,17 @@ function BottomNavigation({
   );
 }
 
-export function findVisibleCurrentNavItem() {
-  return [...document.querySelectorAll<HTMLElement>('nav [aria-current="page"]')].find(
-    (item) => item.getClientRects().length > 0,
+export function findVisibleNavigationTarget() {
+  const firstVisible = (selector: string) =>
+    [...document.querySelectorAll<HTMLElement>(selector)].find(
+      (item) => item.getClientRects().length > 0,
+    );
+
+  // The current page's link, or, when the desktop navigation is hidden, the
+  // toggle that brings it back.
+  return (
+    firstVisible('nav [aria-current="page"]') ??
+    firstVisible("[data-navigation-toggle]")
   );
 }
 
@@ -450,8 +459,8 @@ export function MorePanel({
     <NativeModal
       className="modal-overlay sheet-overlay fixed inset-0 z-40 flex items-end"
       // Widening past md closes the sheet and hides the More button, so land
-      // on the current page in the now-visible desktop navigation instead.
-      fallbackFocus={findVisibleCurrentNavItem}
+      // on the desktop navigation instead.
+      fallbackFocus={findVisibleNavigationTarget}
       labelledBy="more-navigation-title"
       onRequestClose={onClose}
     >

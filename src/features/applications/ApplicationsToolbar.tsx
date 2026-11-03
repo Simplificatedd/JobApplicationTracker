@@ -86,6 +86,7 @@ export function ApplicationsToolbar({
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const currentFilters = filters ?? DEFAULT_APPLICATION_FILTERS;
   const activeFilterCount = countActiveFilters(
     currentFilters,
@@ -160,6 +161,7 @@ export function ApplicationsToolbar({
             aria-haspopup="dialog"
             className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={() => setIsMoreFiltersOpen(true)}
+            ref={filtersButtonRef}
             type="button"
           >
             <SlidersHorizontal aria-hidden="true" size={16} />
@@ -221,6 +223,9 @@ export function ApplicationsToolbar({
 
       {isColumnsOpen ? (
         <ColumnsModal
+          // The Columns buttons are desktop-only; if the window shrinks
+          // below md while the dialog is open, return focus beside them.
+          fallbackFocus={() => filtersButtonRef.current}
           onChange={onColumnVisibilityChange}
           onClose={() => setIsColumnsOpen(false)}
           visibleApplicationColumns={visibleApplicationColumns}
@@ -258,10 +263,12 @@ function ColumnsButton({
 }
 
 export function ColumnsModal({
+  fallbackFocus,
   onChange,
   onClose,
   visibleApplicationColumns,
 }: {
+  fallbackFocus?: () => HTMLElement | null | undefined;
   onChange?: (columns: string[]) => void;
   onClose: () => void;
   visibleApplicationColumns: string[];
@@ -290,6 +297,7 @@ export function ColumnsModal({
     // returns focus to the Columns button; Escape and backdrop clicks close.
     <NativeModal
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      fallbackFocus={fallbackFocus}
       labelledBy="columns-title"
       onRequestClose={onClose}
     >

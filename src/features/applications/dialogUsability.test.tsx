@@ -306,6 +306,22 @@ it.each([
   call(modal.props.onRequestClose);
   expect(named(render(() => ApplicationsToolbar({})), component)).toBeUndefined();
 });
+it("returns Columns focus to the Filters button when the Columns buttons are hidden", () => {
+  let tree = render(() => ApplicationsToolbar({}));
+  call(named(tree, "ColumnsButton").props.onClick);
+  tree = render(() => ApplicationsToolbar({}));
+  const filters = elements(tree).find(e => e.type === "button" && text(e.props.children).trim().startsWith("Filters"))!;
+  const filtersButton = { focus: vi.fn() };
+  // React 18 keeps the ref on the element; React 19 moves it into props.
+  const ref = (filters.props.ref ?? (filters as unknown as { ref: unknown }).ref) as { current: unknown };
+  ref.current = filtersButton;
+  const dialog = named(tree, "ColumnsModal");
+  expect(call(dialog.props.fallbackFocus)).toBe(filtersButton);
+  // NativeModal only uses the fallback when the opener is no longer rendered.
+  host.cursor = host.slots.length;
+  const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect(modal.props.fallbackFocus).toBe(dialog.props.fallbackFocus);
+});
 it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
   const listeners = new Map<string, () => void>();
   const visual = { height: 400, offsetTop: 0, scale: 1, addEventListener: (type: string, fn: () => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) };
