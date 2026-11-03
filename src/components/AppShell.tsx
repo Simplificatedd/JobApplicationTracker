@@ -91,6 +91,9 @@ export type SidebarState = "expanded" | "compact" | "hidden";
 // Per-browser, desktop-only preference: never sent to cloud settings, because
 // sidebar density depends on the screen in front of you.
 export const SIDEBAR_STATE_STORAGE_KEY = "jat.sidebarState";
+// Remembers expanded or compact while hidden, so Show restores it after a
+// reload.
+const SIDEBAR_LAST_VISIBLE_STORAGE_KEY = "jat.sidebarLastVisibleState";
 const SIDEBAR_MEDIA_QUERY = "(min-width: 1280px)";
 
 function matchesSidebarMedia() {
@@ -122,21 +125,29 @@ function useIsSidebarMedia() {
   return matches;
 }
 
-export function readSidebarState(): SidebarState {
+function readStorage(key: string) {
   try {
-    const stored = window.localStorage.getItem(SIDEBAR_STATE_STORAGE_KEY);
-    return stored === "compact" || stored === "hidden" ? stored : "expanded";
+    return window.localStorage.getItem(key);
   } catch {
-    return "expanded";
+    return null;
   }
 }
 
-export function writeSidebarState(state: SidebarState) {
+function writeStorage(key: string, value: string) {
   try {
-    window.localStorage.setItem(SIDEBAR_STATE_STORAGE_KEY, state);
+    window.localStorage.setItem(key, value);
   } catch {
     // Storage can be unavailable; the sidebar still changes for this visit.
   }
+}
+
+export function readSidebarState(): SidebarState {
+  const stored = readStorage(SIDEBAR_STATE_STORAGE_KEY);
+  return stored === "compact" || stored === "hidden" ? stored : "expanded";
+}
+
+export function writeSidebarState(state: SidebarState) {
+  writeStorage(SIDEBAR_STATE_STORAGE_KEY, state);
 }
 
 export function AppShell({
@@ -173,7 +184,13 @@ export function AppShell({
   const isCompact = isSidebar && sidebarState === "compact";
   const [lastVisibleState, setLastVisibleState] = useState<
     Exclude<SidebarState, "hidden">
-  >(sidebarState === "compact" ? "compact" : "expanded");
+  >(() =>
+    sidebarState === "compact" ||
+    (sidebarState === "hidden" &&
+      readStorage(SIDEBAR_LAST_VISIBLE_STORAGE_KEY) === "compact")
+      ? "compact"
+      : "expanded",
+  );
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
@@ -232,6 +249,7 @@ export function AppShell({
 
     if (next !== "hidden") {
       setLastVisibleState(next);
+      writeStorage(SIDEBAR_LAST_VISIBLE_STORAGE_KEY, next);
     }
 
     writeSidebarState(next);

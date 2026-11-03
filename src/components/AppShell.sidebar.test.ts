@@ -82,6 +82,17 @@ describe("sidebar state transitions", () => {
     expect(byLabel(shell(), "Resize side navigation")).toBeDefined();
   });
 
+  it("restores compact after hiding it and reloading", () => {
+    const shell = () => render(() => AppShell(props()));
+    call(byLabel(shell(), "Collapse sidebar")!.props.onClick);
+    call(byLabel(shell(), "Hide side navigation")!.props.onClick);
+
+    host.slots = []; host.cleanups = []; // a reload
+    call(byLabel(shell(), "Show side navigation")!.props.onClick);
+    expect(storage.get(SIDEBAR_STATE_STORAGE_KEY)).toBe("compact");
+    expect(byLabel(shell(), "Expand sidebar")).toBeDefined();
+  });
+
   it.each([
     ["below 1280px", false, "side"],
     ["in top navigation", true, "top"],
