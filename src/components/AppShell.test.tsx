@@ -1,7 +1,15 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppShell, findVisibleNavigationTarget, MorePanel, navigationItems } from "./AppShell";
+import {
+  AppShell,
+  findVisibleNavigationTarget,
+  MorePanel,
+  navigationItems,
+  readSidebarState,
+  SIDEBAR_STATE_STORAGE_KEY,
+  writeSidebarState,
+} from "./AppShell";
 
 function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
   return renderToStaticMarkup(
@@ -237,5 +245,143 @@ describe("navigation toggle in landscape on notched phones", () => {
       "top-[calc(1rem+env(safe-area-inset-top))]",
     ]));
     expect(classes).not.toContain("left-4");
+  });
+});
+
+function stubBrowser({
+  desktop = true,
+  stored = null as string | null,
+  storageFails = false,
+} = {}) {
+  const storage = new Map<string, string>();
+
+  if (stored !== null) {
+    storage.set(SIDEBAR_STATE_STORAGE_KEY, stored);
+  }
+
+  const fail = () => {
+    throw new Error("Storage unavailable");
+  };
+  vi.stubGlobal("window", {
+    localStorage: {
+      getItem: storageFails ? fail : (key: string) => storage.get(key) ?? null,
+      setItem: storageFails
+        ? fail
+        : (key: string, value: string) => storage.set(key, value),
+    },
+    matchMedia: (query: string) => ({ matches: query.includes("min-width") && desktop, addEventListener() {}, removeEventListener() {} }),
+  });
+
+  return storage;
+}
+
+describe("AppShell sidebar state", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each(["expanded", "compact", "hidden"] as const)(
+    "reads a saved %s state",
+    (stored) => {
+      stubBrowser({ stored });
+
+      expect(readSidebarState()).toBe(stored);
+    },
+  );
+
+  it.each([null, "", "collapsed", "HIDDEN"])(
+    "falls back to expanded for %j",
+    (stored) => {
+      stubBrowser({ stored });
+
+      expect(readSidebarState()).toBe("expanded");
+    },
+  );
+
+  it("falls back to expanded and keeps working when storage is unavailable", () => {
+    stubBrowser({ storageFails: true });
+
+    expect(readSidebarState()).toBe("expanded");
+    expect(() => writeSidebarState("compact")).not.toThrow();
+  });
+
+  it("saves the state per browser", () => {
+    const storage = stubBrowser();
+    writeSidebarState("hidden");
+
+    expect(storage.get(SIDEBAR_STATE_STORAGE_KEY)).toBe("hidden");
+  });
+
+  it("starts hidden on desktop when hidden was saved", () => {
+    stubBrowser({ stored: "hidden" });
+    const markup = renderShell();
+
+    expect(markup).toContain('aria-label="Show side navigation"');
+    expect(markup).not.toContain("<aside");
+  });
+
+  it("ignores a saved hidden state below 1280px", () => {
+    stubBrowser({ desktop: false, stored: "hidden" });
+
+    expect(renderShell()).toContain('aria-label="Primary navigation"');
+  });
+
+  it("renders a saved compact state as a 64px icon rail", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ currentView: "resumes" });
+
+    expect(classOf(markup, "<aside")).toContain("xl:w-16");
+    expect(classOf(markup, "<aside")).not.toContain("--side-navigation-width");
+    expect(markup).not.toContain('aria-label="Resize side navigation"');
+    expect(markup).toContain('aria-label="Job Application Tracker" class=');
+    expect(markup).toMatch(/aria-current="page"[^>]*>.*?<span class="truncate xl:sr-only">Resumes<\/span>/);
+    expect(markup.match(/xl:sr-only/g)).toHaveLength(5);
+    // Compact counts as shown: the toggle still offers to hide it.
+    expect(markup).toContain('aria-label="Hide side navigation"');
+  });
+
+  it("keeps the resizable expanded sidebar by default", () => {
+    stubBrowser();
+    const markup = renderShell();
+
+    expect(classOf(markup, "<aside")).toContain("xl:w-[var(--side-navigation-width)]");
+    expect(markup).toContain('aria-label="Resize side navigation"');
+    expect(markup).not.toContain("xl:sr-only");
+  });
+
+  it.each([
+    [null, "Collapse sidebar", "true"],
+    ["compact", "Expand sidebar", "false"],
+  ])(
+    "offers one desktop control to switch density (saved %j)",
+    (stored, label, expanded) => {
+      stubBrowser({ stored });
+      const markup = renderShell();
+
+      expect(markup).toContain(`aria-expanded="${expanded}" aria-label="${label}"`);
+      expect(classOf(markup, `aria-label="${label}"`)).toContain("hidden size-11 xl:inline-flex");
+    },
+  );
+
+  it("has no density control in top navigation", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).not.toContain("Expand sidebar");
+    expect(markup).not.toContain("Collapse sidebar");
+  });
+
+  it("ignores a saved state in top navigation", () => {
+    stubBrowser({ stored: "hidden" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).toContain('aria-label="Hide top navigation"');
+    expect(markup).toContain('aria-label="Primary navigation"');
+  });
+
+  it("ignores a saved compact state in top navigation", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).not.toContain("xl:sr-only");
+    expect(markup).not.toContain("xl:w-16");
   });
 });

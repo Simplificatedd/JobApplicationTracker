@@ -2,6 +2,8 @@ import {
   Archive,
   BarChart3,
   BriefcaseBusiness,
+  ChevronsLeft,
+  ChevronsRight,
   FileText,
   MoreHorizontal,
   PanelLeftClose,
@@ -17,11 +19,15 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type SyntheticEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { usePhoneLayout } from "../hooks/usePhoneLayout";
+import { createPortal } from "react-dom";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
@@ -87,6 +93,70 @@ const MIN_SIDE_NAVIGATION_WIDTH = 240;
 const DEFAULT_SIDE_NAVIGATION_WIDTH = 288;
 const MAX_SIDE_NAVIGATION_WIDTH = 448;
 
+export type SidebarState = "expanded" | "compact" | "hidden";
+
+// Per-browser, desktop-only preference: never sent to cloud settings, because
+// sidebar density depends on the screen in front of you.
+export const SIDEBAR_STATE_STORAGE_KEY = "jat.sidebarState";
+// Remembers expanded or compact while hidden, so Show restores it after a
+// reload.
+const SIDEBAR_LAST_VISIBLE_STORAGE_KEY = "jat.sidebarLastVisibleState";
+const SIDEBAR_MEDIA_QUERY = "(min-width: 1280px)";
+
+function matchesSidebarMedia() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.(SIDEBAR_MEDIA_QUERY).matches === true
+  );
+}
+
+// Tracks the 1280px breakpoint, so a saved state reapplies when the window
+// grows back into the sidebar layout.
+function useIsSidebarMedia() {
+  const [matches, setMatches] = useState(matchesSidebarMedia);
+
+  useEffect(() => {
+    const media = window.matchMedia?.(SIDEBAR_MEDIA_QUERY);
+
+    if (!media) {
+      return;
+    }
+
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return matches;
+}
+
+function readStorage(key: string) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage can be unavailable; the sidebar still changes for this visit.
+  }
+}
+
+export function readSidebarState(): SidebarState {
+  const stored = readStorage(SIDEBAR_STATE_STORAGE_KEY);
+  return stored === "compact" || stored === "hidden" ? stored : "expanded";
+}
+
+export function writeSidebarState(state: SidebarState) {
+  writeStorage(SIDEBAR_STATE_STORAGE_KEY, state);
+}
+
 export function AppShell({
   children,
   currentView,
@@ -104,11 +174,30 @@ export function AppShell({
   onUpdateAssessment,
   onViewChange,
 }: AppShellProps) {
-  const [isNavigationHidden, setIsNavigationHidden] = useState(false);
+  const [sidebarState, setSidebarState] =
+    useState<SidebarState>(readSidebarState);
+  // Show/hide for the navigation row (below 1280px) and top navigation stays
+  // per visit, as it always has.
+  const [isRowNavigationHidden, setIsRowNavigationHidden] = useState(false);
   const [sideNavigationWidth, setSideNavigationWidth] = useState(
     DEFAULT_SIDE_NAVIGATION_WIDTH,
   );
   const isTopNavigation = navigationDisplayMode === "top";
+  // The saved state applies only where the sidebar exists.
+  const isSidebar = useIsSidebarMedia() && !isTopNavigation;
+  const isNavigationHidden = isSidebar
+    ? sidebarState === "hidden"
+    : isRowNavigationHidden;
+  const isCompact = isSidebar && sidebarState === "compact";
+  const [lastVisibleState, setLastVisibleState] = useState<
+    Exclude<SidebarState, "hidden">
+  >(() =>
+    sidebarState === "compact" ||
+    (sidebarState === "hidden" &&
+      readStorage(SIDEBAR_LAST_VISIBLE_STORAGE_KEY) === "compact")
+      ? "compact"
+      : "expanded",
+  );
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
@@ -169,6 +258,25 @@ export function AppShell({
     return () => observer.disconnect();
   }, []);
 
+  function changeSidebarState(next: SidebarState) {
+    setSidebarState(next);
+
+    if (next !== "hidden") {
+      setLastVisibleState(next);
+      writeStorage(SIDEBAR_LAST_VISIBLE_STORAGE_KEY, next);
+    }
+
+    writeSidebarState(next);
+  }
+
+  function toggleNavigation() {
+    if (isSidebar) {
+      changeSidebarState(isNavigationHidden ? lastVisibleState : "hidden");
+    } else {
+      setIsRowNavigationHidden((current) => !current);
+    }
+  }
+
   function resizeSideNavigation(nextWidth: number) {
     setSideNavigationWidth(
       Math.min(
@@ -209,9 +317,12 @@ export function AppShell({
         aria-label={toggleLabel}
         // Clear of the notch in landscape on notched phones (viewport-fit=cover);
         // the insets are 0 elsewhere, so this stays at 1rem on desktop.
-        className="icon-button fixed left-[calc(1rem+env(safe-area-inset-left))] top-[calc(1rem+env(safe-area-inset-top))] z-30 bg-surface shadow-sm max-md:hidden"
+        className={`icon-button fixed left-[calc(1rem+env(safe-area-inset-left))] top-[calc(1rem+env(safe-area-inset-top))] z-30 bg-surface shadow-sm max-md:hidden ${
+          // Centre it over the compact rail's icons.
+          isCompact ? "xl:left-3" : ""
+        }`}
         data-navigation-toggle
-        onClick={() => setIsNavigationHidden((current) => !current)}
+        onClick={toggleNavigation}
         type="button"
       >
         <ToggleIcon aria-hidden="true" size={18} />
@@ -223,11 +334,15 @@ export function AppShell({
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
-            className="relative border-b border-border bg-surface px-4 py-3 max-md:hidden xl:sticky xl:top-0 xl:h-dvh xl:w-[var(--side-navigation-width)] xl:shrink-0 xl:border-b-0 xl:border-r xl:px-5 xl:py-6"
+            className={`relative border-b border-border bg-surface px-4 py-3 max-md:hidden xl:sticky xl:top-0 xl:h-dvh xl:shrink-0 xl:border-b-0 xl:border-r xl:py-6 ${
+              isCompact
+                ? "xl:w-16 xl:px-2"
+                : "xl:w-[var(--side-navigation-width)] xl:px-5"
+            }`}
             style={sideNavigationStyle}
           >
             <div className="flex items-center justify-between gap-3 xl:block">
-              <NavigationBrand />
+              <NavigationBrand isCompact={isCompact} />
               <MobileNotificationSlot
                 enableNotificationBell={enableNotificationBell}
                 groupedNotifications={groupedNotifications}
@@ -242,33 +357,52 @@ export function AppShell({
             </div>
             <NavigationButtons
               currentView={currentView}
+              isCompact={isCompact}
               items={visibleNavigation}
               layout="side"
               onViewChange={onViewChange}
             />
+            {/* One button in both states, so focus stays on it after a switch. */}
             <button
-              aria-label="Resize side navigation"
-              aria-orientation="vertical"
-              aria-valuemax={MAX_SIDE_NAVIGATION_WIDTH}
-              aria-valuemin={MIN_SIDE_NAVIGATION_WIDTH}
-              aria-valuenow={sideNavigationWidth}
-              className="absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none border-0 bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15 xl:block"
-              onDoubleClick={() =>
-                resizeSideNavigation(DEFAULT_SIDE_NAVIGATION_WIDTH)
-              }
-              onKeyDown={(event) => {
-                if (event.key === "ArrowLeft") {
-                  resizeSideNavigation(sideNavigationWidth - 16);
-                }
-
-                if (event.key === "ArrowRight") {
-                  resizeSideNavigation(sideNavigationWidth + 16);
-                }
-              }}
-              onPointerDown={startResizingSideNavigation}
-              role="separator"
+              aria-expanded={!isCompact}
+              aria-label={isCompact ? "Expand sidebar" : "Collapse sidebar"}
+              className={`icon-button absolute bottom-4 hidden size-11 xl:inline-flex ${
+                isCompact ? "left-2.5" : "left-5"
+              }`}
+              onClick={() => changeSidebarState(isCompact ? "expanded" : "compact")}
               type="button"
-            />
+            >
+              {isCompact ? (
+                <ChevronsRight aria-hidden="true" size={18} />
+              ) : (
+                <ChevronsLeft aria-hidden="true" size={18} />
+              )}
+            </button>
+            {isCompact ? null : (
+              <button
+                aria-label="Resize side navigation"
+                aria-orientation="vertical"
+                aria-valuemax={MAX_SIDE_NAVIGATION_WIDTH}
+                aria-valuemin={MIN_SIDE_NAVIGATION_WIDTH}
+                aria-valuenow={sideNavigationWidth}
+                className="absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none border-0 bg-transparent transition hover:bg-primary/15 focus-visible:bg-primary/15 xl:block"
+                onDoubleClick={() =>
+                  resizeSideNavigation(DEFAULT_SIDE_NAVIGATION_WIDTH)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowLeft") {
+                    resizeSideNavigation(sideNavigationWidth - 16);
+                  }
+
+                  if (event.key === "ArrowRight") {
+                    resizeSideNavigation(sideNavigationWidth + 16);
+                  }
+                }}
+                onPointerDown={startResizingSideNavigation}
+                role="separator"
+                type="button"
+              />
+            )}
           </aside>
         ) : null}
 
@@ -518,18 +652,35 @@ export function MorePanel({
   );
 }
 
-function NavigationBrand() {
+function NavigationBrand({ isCompact }: { isCompact: boolean }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 pl-12 xl:block">
-      <div className="min-w-0">
-        <p className="truncate text-lg font-semibold text-foreground">
-          {APP_NAME}
-        </p>
-        <p className="mt-1 hidden text-sm text-muted xl:block">
-          Internship command center
-        </p>
+    <>
+      {isCompact ? (
+        // The fixed show/hide toggle sits at the top of the rail, so the mark
+        // starts below it.
+        <div
+          aria-label={APP_NAME}
+          className="mx-auto mt-10 hidden size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground xl:flex"
+          role="img"
+        >
+          <span aria-hidden="true">JT</span>
+        </div>
+      ) : null}
+      <div
+        className={`flex min-w-0 items-center justify-between gap-3 pl-12 xl:block ${
+          isCompact ? "xl:hidden" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-foreground">
+            {APP_NAME}
+          </p>
+          <p className="mt-1 hidden text-sm text-muted xl:block">
+            Internship command center
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -576,16 +727,25 @@ function MobileNotificationSlot({
 
 function NavigationButtons({
   currentView,
+  isCompact = false,
   items,
   layout,
   onViewChange,
 }: {
   currentView: ViewKey;
+  isCompact?: boolean;
   items: typeof navigationItems;
   layout: "side" | "top";
   onViewChange: (view: ViewKey) => void;
 }) {
   const navRef = useRef<HTMLElement>(null);
+  const [tooltip, setTooltip] = useState<{
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
+  const hideTooltip = useCallback(() => setTooltip(null), []);
+  useEscapeKey(tooltip !== null, hideTooltip);
   useScrollActiveIntoView(navRef, currentView);
   useScrollStrip(navRef, items.length);
   // Below xl the side navigation becomes one scrolling row, like top mode,
@@ -594,7 +754,19 @@ function NavigationButtons({
   const navClass =
     layout === "top"
       ? "scroll-strip -m-1 flex min-w-0 basis-full flex-1 gap-2 p-1 sm:basis-auto"
-      : "scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:mt-8 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0";
+      : `scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0 ${
+          isCompact ? "xl:mt-4" : "xl:mt-8"
+        }`;
+
+  // Only the compact rail hides its labels, so only it needs tooltips.
+  function showTooltip(event: SyntheticEvent<HTMLElement>, label: string) {
+    if (!isCompact) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({ label, left: rect.right + 12, top: rect.top + rect.height / 2 });
+  }
 
   return (
     <nav aria-label="Primary navigation" className={navClass} ref={navRef}>
@@ -604,7 +776,9 @@ function NavigationButtons({
         const buttonLayout =
           layout === "top"
             ? "shrink-0 justify-center"
-            : "shrink-0 justify-center xl:shrink xl:justify-start";
+            : isCompact
+              ? "shrink-0 justify-center xl:shrink xl:px-0"
+              : "shrink-0 justify-center xl:shrink xl:justify-start";
 
         return (
           <button
@@ -615,14 +789,40 @@ function NavigationButtons({
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
             }`}
             key={item.key}
-            onClick={() => onViewChange(item.key)}
+            onBlur={hideTooltip}
+            onClick={() => {
+              // A tap on a touch screen never fires mouseleave.
+              hideTooltip();
+              onViewChange(item.key);
+            }}
+            onFocus={(event) => showTooltip(event, item.label)}
+            onMouseEnter={(event) => showTooltip(event, item.label)}
+            onMouseLeave={hideTooltip}
             type="button"
           >
             <Icon aria-hidden="true" size={18} />
-            <span className="truncate">{item.label}</span>
+            <span className={isCompact ? "truncate xl:sr-only" : "truncate"}>
+              {item.label}
+            </span>
           </button>
         );
       })}
+      {/* The rail can turn into the row below 1280px while a tooltip shows. */}
+      {tooltip && isCompact
+        ? // A portal keeps the tooltip clear of the sidebar and above the
+          // sticky header. The label is already the button's name, so screen
+          // readers skip the tooltip.
+          createPortal(
+            <span
+              aria-hidden="true"
+              className="pointer-events-none fixed z-30 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
+              style={{ left: tooltip.left, top: tooltip.top }}
+            >
+              {tooltip.label}
+            </span>,
+            document.body,
+          )
+        : null}
     </nav>
   );
 }
