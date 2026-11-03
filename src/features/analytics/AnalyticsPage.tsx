@@ -61,6 +61,7 @@ import {
   deriveWorkModeMix,
   toCumulative,
 } from "./extraMetrics";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -829,7 +830,7 @@ function ActivityHeatmap({ days }: { days: CalendarDay[] }) {
                     onBlur={() => setActiveDay(null)}
                     onFocus={(event) => showDay(day, event.currentTarget)}
                     onPointerEnter={(event) => showDay(day, event.currentTarget)}
-                    onPointerLeave={() => setActiveDay(null)}
+                    {...clearOnMouseLeave(() => setActiveDay(null))}
                     type="button"
                   />
                 ) : (

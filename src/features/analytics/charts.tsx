@@ -1,5 +1,6 @@
 import { type LucideIcon, Repeat, Table2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 export interface ChartDatum {
   label: string;
@@ -235,7 +236,7 @@ export function HorizontalBarChart({
     <div>
       <ul
         className={`space-y-2.5 ${isExpanded ? "max-h-[22rem] overflow-y-auto pr-1" : ""}`}
-        onPointerLeave={() => setActiveLabel(null)}
+        {...clearOnMouseLeave(() => setActiveLabel(null))}
       >
         {visibleData.map((item, index) => {
           const isActive = activeLabel === item.label;
@@ -468,7 +469,7 @@ export function StackedShareBar({
     <div className="mb-4">
       <div
         className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full"
-        onPointerLeave={() => setActiveLabel(null)}
+        {...clearOnMouseLeave(() => setActiveLabel(null))}
       >
         {segments.map((item) => (
           <span

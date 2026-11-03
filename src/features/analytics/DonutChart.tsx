@@ -5,6 +5,7 @@ import {
   HorizontalBarChart,
   useHasMounted,
 } from "./charts";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 const SIZE = 168;
 const STROKE = 22;
@@ -45,7 +46,7 @@ export function DonutChart({
   return (
     <div
       className="flex flex-col items-center gap-5 sm:flex-row sm:items-center"
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       <div className="relative shrink-0" style={{ height: SIZE, width: SIZE }}>
         <svg

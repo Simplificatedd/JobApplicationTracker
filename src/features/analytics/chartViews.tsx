@@ -96,7 +96,7 @@ export function TreemapChart({
     <div>
       <div
         className="relative w-full overflow-hidden rounded-md"
-        onPointerLeave={() => setActiveLabel(null)}
+        {...clearOnMouseLeave(() => setActiveLabel(null))}
         ref={containerRef}
         style={{ height: TREEMAP_HEIGHT }}
       >
@@ -258,7 +258,7 @@ export function WaffleChart({
   return (
     <div
       className="flex flex-col items-center gap-5 sm:flex-row sm:items-center"
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       <div aria-hidden="true" className="grid shrink-0 grid-cols-10 gap-[3px]">
         {squares.map((item, squareIndex) => (
@@ -342,7 +342,7 @@ export function RadialBarChart({
   return (
     <div
       className="flex flex-col items-center gap-4 sm:flex-row"
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       <svg aria-hidden="true" className="shrink-0" height={RADIAL_SIZE} width={RADIAL_SIZE}>
         {rings.map((item, index) => {
@@ -461,7 +461,7 @@ export function RadarChart({
       <svg
         aria-label={data.map((item) => `${item.label}: ${item.value}`).join(", ")}
         height={RADAR_SIZE}
-        onPointerLeave={() => setActiveIndex(null)}
+        {...clearOnMouseLeave(() => setActiveIndex(null))}
         role="img"
         width={RADAR_SIZE}
       >
@@ -573,7 +573,7 @@ export function StackedColumnChart({
     <div className="relative">
       <div
         className="flex items-end gap-1"
-        onPointerLeave={() => setActiveIndex(null)}
+        {...clearOnMouseLeave(() => setActiveIndex(null))}
         style={{ height: STACK_HEIGHT }}
       >
         {labels.map((label, index) => (
