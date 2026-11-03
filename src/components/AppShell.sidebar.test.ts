@@ -22,7 +22,9 @@ vi.mock("react", async (importOriginal) => ({
     if (!(i in host.slots)) host.slots[i] = { current: initial };
     return host.slots[i];
   },
+  useCallback: (fn: unknown) => fn,
 }));
+vi.mock("react-dom", () => ({ createPortal: (node: unknown) => node }));
 import { AppShell, SIDEBAR_STATE_STORAGE_KEY } from "./AppShell";
 
 type Element = { type: unknown; props: Record<string, unknown> };
@@ -34,16 +36,19 @@ function elements(node: unknown): Element[] {
 function render<T>(component: () => T): T { host.cursor = 0; const tree = component(); host.effects.splice(0).forEach(effect => effect()); return tree; }
 const call = (fn: unknown, ...args: unknown[]) => (fn as (...args: unknown[]) => unknown)(...args);
 const byLabel = (tree: unknown, label: string) => elements(tree).find(e => e.props["aria-label"] === label);
+const named = (tree: unknown, name: string) => elements(tree).find(e => typeof e.type === "function" && e.type.name === name)!;
 
 const storage = new Map<string, string>();
+const listeners = new Map<string, (event: unknown) => void>();
 let desktop = true;
 beforeEach(() => {
   host.cursor = 0; host.slots = []; host.effects = []; host.cleanups = [];
-  storage.clear(); desktop = true;
+  storage.clear(); listeners.clear(); desktop = true;
   vi.stubGlobal("window", {
     localStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) },
     matchMedia: () => ({ matches: desktop }),
   });
+  vi.stubGlobal("document", { addEventListener: (type: string, fn: (event: unknown) => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
 });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -86,5 +91,42 @@ describe("sidebar state transitions", () => {
 
     expect(byLabel(shell(), `Show ${navigationDisplayMode} navigation`)).toBeDefined();
     expect(storage.has(SIDEBAR_STATE_STORAGE_KEY)).toBe(false);
+  });
+});
+
+describe("compact rail tooltips", () => {
+  // Render the shell once to get the navigation element, then render that
+  // component on its own so its hooks get a fresh host.
+  function navigation(stored: string | null) {
+    if (stored) storage.set(SIDEBAR_STATE_STORAGE_KEY, stored);
+    const nav = named(render(() => AppShell(props())), "NavigationButtons");
+    host.slots = []; host.cleanups = [];
+    return () => render(() => (nav.type as (p: unknown) => unknown)(nav.props));
+  }
+  const target = { currentTarget: { getBoundingClientRect: () => ({ right: 56, top: 100, height: 44 }) } };
+  const tooltipText = (tree: unknown) => elements(tree).find(e => e.props["aria-hidden"] === "true" && e.type === "span" && String(e.props.className).includes("fixed"))?.props.children;
+
+  it("shows on focus beside the icon, outside the rail, and hides on Escape", () => {
+    const view = navigation("compact");
+    const resumes = elements(view()).find(e => e.type === "button" && elements(e.props.children).some(c => c.props.children === "Resumes"))!;
+    call(resumes.props.onFocus, target);
+    const tooltip = elements(view()).find(e => e.type === "span" && String(e.props.className).includes("fixed"))!;
+    expect(tooltip.props.children).toBe("Resumes");
+    expect(tooltip.props.style).toEqual({ left: 68, top: 122 });
+
+    call(listeners.get("keydown"), { key: "Escape", preventDefault: vi.fn() });
+    expect(tooltipText(view())).toBeUndefined();
+  });
+
+  it.each([
+    ["the expanded sidebar", null, true],
+    ["a compact state below 1280px", "compact", false],
+  ])("does not show for %s", (_, stored, isDesktop) => {
+    const view = navigation(stored);
+    desktop = isDesktop;
+    const first = elements(view()).find(e => e.type === "button")!;
+    call(first.props.onMouseEnter, target);
+
+    expect(tooltipText(view())).toBeUndefined();
   });
 });

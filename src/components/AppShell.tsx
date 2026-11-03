@@ -17,10 +17,14 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type SyntheticEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
@@ -515,6 +519,13 @@ function NavigationButtons({
   onViewChange: (view: ViewKey) => void;
 }) {
   const navRef = useRef<HTMLElement>(null);
+  const [tooltip, setTooltip] = useState<{
+    label: string;
+    left: number;
+    top: number;
+  } | null>(null);
+  const hideTooltip = useCallback(() => setTooltip(null), []);
+  useEscapeKey(tooltip !== null, hideTooltip);
   useScrollActiveIntoView(navRef, currentView);
   useScrollStrip(navRef, items.length);
   // Below xl the side navigation becomes one scrolling row, like top mode,
@@ -526,6 +537,16 @@ function NavigationButtons({
       : `scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0 ${
           isCompact ? "xl:mt-4" : "xl:mt-8"
         }`;
+
+  // Only the compact rail hides its labels, so only it needs tooltips.
+  function showTooltip(event: SyntheticEvent<HTMLElement>, label: string) {
+    if (!isCompact || !window.matchMedia(SIDEBAR_MEDIA_QUERY).matches) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({ label, left: rect.right + 12, top: rect.top + rect.height / 2 });
+  }
 
   return (
     <nav aria-label="Primary navigation" className={navClass} ref={navRef}>
@@ -548,7 +569,11 @@ function NavigationButtons({
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
             }`}
             key={item.key}
+            onBlur={hideTooltip}
             onClick={() => onViewChange(item.key)}
+            onFocus={(event) => showTooltip(event, item.label)}
+            onMouseEnter={(event) => showTooltip(event, item.label)}
+            onMouseLeave={hideTooltip}
             type="button"
           >
             <Icon aria-hidden="true" size={18} />
@@ -558,6 +583,21 @@ function NavigationButtons({
           </button>
         );
       })}
+      {tooltip
+        ? // A portal keeps the tooltip clear of the sidebar and above the
+          // sticky header. The label is already the button's name, so screen
+          // readers skip the tooltip.
+          createPortal(
+            <span
+              aria-hidden="true"
+              className="pointer-events-none fixed z-30 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-lg"
+              style={{ left: tooltip.left, top: tooltip.top }}
+            >
+              {tooltip.label}
+            </span>,
+            document.body,
+          )
+        : null}
     </nav>
   );
 }
