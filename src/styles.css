@@ -267,10 +267,12 @@
      notifications panel even when its list is too short to scroll. */
   html:has(.notifications-panel[open]) { overflow: hidden; }
 
-  /* The same for the detail panel and the Filters dialog (the phone filter
-     entry point); at md and up the page scrollbar stays put. */
+  /* The same for the detail panel, the full-screen Add job form and the
+     Filters dialog (the phone filter entry point); at md and up the page
+     scrollbar stays put. */
   @media (max-width: 767.98px) {
     html:has(.application-detail-panel[open]),
+    html:has(.add-application-dialog[open]),
     html:has(.applications-filter-dialog[open]) { overflow: hidden; }
   }
 

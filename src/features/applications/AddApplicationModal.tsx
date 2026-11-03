@@ -465,7 +465,7 @@ export function AddApplicationModal({
     <NativeModal
       labelledBy="add-application-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-0 max-md:items-start md:p-4"
+      className="add-application-dialog modal-overlay fixed inset-0 z-50 flex items-center justify-center p-0 max-md:items-start md:p-4"
     >
       {/* Phones fill the screen, sized to what the keyboard leaves visible. */}
       <div
@@ -491,7 +491,7 @@ export function AddApplicationModal({
         </div>
 
         <form
-          className="overflow-y-auto px-4 py-5 sm:px-6"
+          className="overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6"
           id="add-application-form"
           onSubmit={handleSubmit}
         >
