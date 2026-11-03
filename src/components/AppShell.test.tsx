@@ -118,7 +118,7 @@ function stubBrowser({
         ? fail
         : (key: string, value: string) => storage.set(key, value),
     },
-    matchMedia: () => ({ matches: desktop }),
+    matchMedia: () => ({ matches: desktop, addEventListener() {}, removeEventListener() {} }),
   });
 
   return storage;

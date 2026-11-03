@@ -36,17 +36,18 @@ function elements(node: unknown): Element[] {
 function render<T>(component: () => T): T { host.cursor = 0; const tree = component(); host.effects.splice(0).forEach(effect => effect()); return tree; }
 const call = (fn: unknown, ...args: unknown[]) => (fn as (...args: unknown[]) => unknown)(...args);
 const byLabel = (tree: unknown, label: string) => elements(tree).find(e => e.props["aria-label"] === label);
-const named = (tree: unknown, name: string) => elements(tree).find(e => typeof e.type === "function" && e.type.name === name)!;
+const named = (tree: unknown, name: string) => elements(tree).find(e => typeof e.type === "function" && e.type.name === name);
 
 const storage = new Map<string, string>();
 const listeners = new Map<string, (event: unknown) => void>();
 let desktop = true;
+let onMediaChange = () => {};
 beforeEach(() => {
   host.cursor = 0; host.slots = []; host.effects = []; host.cleanups = [];
   storage.clear(); listeners.clear(); desktop = true;
   vi.stubGlobal("window", {
     localStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) },
-    matchMedia: () => ({ matches: desktop }),
+    matchMedia: () => ({ get matches() { return desktop; }, addEventListener: (_: string, fn: () => void) => { onMediaChange = fn; }, removeEventListener() {} }),
   });
   vi.stubGlobal("document", { addEventListener: (type: string, fn: (event: unknown) => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
@@ -70,7 +71,7 @@ describe("sidebar state transitions", () => {
 
     call(byLabel(shell(), "Hide side navigation")!.props.onClick);
     expect(storage.get(SIDEBAR_STATE_STORAGE_KEY)).toBe("hidden");
-    expect(byLabel(shell(), "Primary navigation")).toBeUndefined();
+    expect(named(shell(), "NavigationButtons")).toBeUndefined();
 
     // Show restores the last visible state, not always expanded.
     call(byLabel(shell(), "Show side navigation")!.props.onClick);
@@ -94,12 +95,35 @@ describe("sidebar state transitions", () => {
   });
 });
 
+describe("crossing 1280px", () => {
+  it("keeps the row visible below 1280px and reapplies the saved state above it", () => {
+    storage.set(SIDEBAR_STATE_STORAGE_KEY, "hidden");
+    desktop = false;
+    const shell = () => render(() => AppShell(props()));
+    expect(named(shell(), "NavigationButtons")).toBeDefined();
+
+    desktop = true; onMediaChange();
+    expect(named(shell(), "NavigationButtons")).toBeUndefined();
+    expect(byLabel(shell(), "Show side navigation")).toBeDefined();
+
+    // Hiding the row is per visit and leaves the saved desktop state alone.
+    storage.set(SIDEBAR_STATE_STORAGE_KEY, "compact");
+    host.slots = [];
+    desktop = false; shell();
+    call(byLabel(shell(), "Hide side navigation")!.props.onClick);
+    expect(named(shell(), "NavigationButtons")).toBeUndefined();
+    desktop = true; onMediaChange();
+    expect(byLabel(shell(), "Expand sidebar")).toBeDefined();
+    expect(storage.get(SIDEBAR_STATE_STORAGE_KEY)).toBe("compact");
+  });
+});
+
 describe("compact rail tooltips", () => {
   // Render the shell once to get the navigation element, then render that
   // component on its own so its hooks get a fresh host.
   function navigation(stored: string | null) {
     if (stored) storage.set(SIDEBAR_STATE_STORAGE_KEY, stored);
-    const nav = named(render(() => AppShell(props())), "NavigationButtons");
+    const nav = named(render(() => AppShell(props())), "NavigationButtons")!;
     host.slots = []; host.cleanups = [];
     return () => render(() => (nav.type as (p: unknown) => unknown)(nav.props));
   }
@@ -122,8 +146,8 @@ describe("compact rail tooltips", () => {
     ["the expanded sidebar", null, true],
     ["a compact state below 1280px", "compact", false],
   ])("does not show for %s", (_, stored, isDesktop) => {
-    const view = navigation(stored);
     desktop = isDesktop;
+    const view = navigation(stored);
     const first = elements(view()).find(e => e.type === "button")!;
     call(first.props.onMouseEnter, target);
 

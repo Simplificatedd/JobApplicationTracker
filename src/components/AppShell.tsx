@@ -93,12 +93,33 @@ export type SidebarState = "expanded" | "compact" | "hidden";
 export const SIDEBAR_STATE_STORAGE_KEY = "jat.sidebarState";
 const SIDEBAR_MEDIA_QUERY = "(min-width: 1280px)";
 
-function isSidebarLayout(isTopNavigation: boolean) {
+function matchesSidebarMedia() {
   return (
-    !isTopNavigation &&
     typeof window !== "undefined" &&
     window.matchMedia?.(SIDEBAR_MEDIA_QUERY).matches === true
   );
+}
+
+// Tracks the 1280px breakpoint, so a saved state reapplies when the window
+// grows back into the sidebar layout.
+function useIsSidebarMedia() {
+  const [matches, setMatches] = useState(matchesSidebarMedia);
+
+  useEffect(() => {
+    const media = window.matchMedia?.(SIDEBAR_MEDIA_QUERY);
+
+    if (!media) {
+      return;
+    }
+
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return matches;
 }
 
 export function readSidebarState(): SidebarState {
@@ -135,20 +156,21 @@ export function AppShell({
   onUpdateAssessment,
   onViewChange,
 }: AppShellProps) {
-  // A saved state applies only where the sidebar exists (side layout, 1280px
-  // and up); elsewhere navigation starts shown, as it always has.
-  const [sidebarState, setSidebarState] = useState<SidebarState>(() =>
-    isSidebarLayout(navigationDisplayMode === "top")
-      ? readSidebarState()
-      : "expanded",
-  );
+  const [sidebarState, setSidebarState] =
+    useState<SidebarState>(readSidebarState);
+  // Show/hide for the navigation row (below 1280px) and top navigation stays
+  // per visit, as it always has.
+  const [isRowNavigationHidden, setIsRowNavigationHidden] = useState(false);
   const [sideNavigationWidth, setSideNavigationWidth] = useState(
     DEFAULT_SIDE_NAVIGATION_WIDTH,
   );
   const isTopNavigation = navigationDisplayMode === "top";
-  const isNavigationHidden = sidebarState === "hidden";
-  // Compact only changes the xl sidebar; below xl it is the usual row.
-  const isCompact = !isTopNavigation && sidebarState === "compact";
+  // The saved state applies only where the sidebar exists.
+  const isSidebar = useIsSidebarMedia() && !isTopNavigation;
+  const isNavigationHidden = isSidebar
+    ? sidebarState === "hidden"
+    : isRowNavigationHidden;
+  const isCompact = isSidebar && sidebarState === "compact";
   const [lastVisibleState, setLastVisibleState] = useState<
     Exclude<SidebarState, "hidden">
   >(sidebarState === "compact" ? "compact" : "expanded");
@@ -212,8 +234,14 @@ export function AppShell({
       setLastVisibleState(next);
     }
 
-    if (isSidebarLayout(isTopNavigation)) {
-      writeSidebarState(next);
+    writeSidebarState(next);
+  }
+
+  function toggleNavigation() {
+    if (isSidebar) {
+      changeSidebarState(isNavigationHidden ? lastVisibleState : "hidden");
+    } else {
+      setIsRowNavigationHidden((current) => !current);
     }
   }
 
@@ -259,9 +287,7 @@ export function AppShell({
           // Centre it over the compact rail's icons.
           isCompact ? "xl:left-3" : ""
         }`}
-        onClick={() =>
-          changeSidebarState(isNavigationHidden ? lastVisibleState : "hidden")
-        }
+        onClick={toggleNavigation}
         type="button"
       >
         <ToggleIcon aria-hidden="true" size={18} />
@@ -543,7 +569,7 @@ function NavigationButtons({
 
   // Only the compact rail hides its labels, so only it needs tooltips.
   function showTooltip(event: SyntheticEvent<HTMLElement>, label: string) {
-    if (!isCompact || !window.matchMedia(SIDEBAR_MEDIA_QUERY).matches) {
+    if (!isCompact) {
       return;
     }
 
