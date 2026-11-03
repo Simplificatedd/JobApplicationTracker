@@ -75,6 +75,11 @@ your own Cloudflare account where only the people you allow can sign in.
 
 <sub>Screenshots use fictional demo data.</sub>
 
+**🧭 Compact sidebar.** At 1280px and wider with the side navbar, the chevron at
+the bottom of the sidebar collapses it to a 64px icon rail (with tooltips) to
+give the workspace more room. The top-left toggle still hides and shows it.
+Your choice is saved in this browser only.
+
 ## 🚀 Production deployment
 
 The tracker needs **one Cloudflare Pages project, one application D1 database,
