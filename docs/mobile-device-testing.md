@@ -40,6 +40,7 @@ Mark each item pass or fail. "Phone" means under 768px wide.
 - [ ] The bottom bar switches pages; the current page is highlighted.
 - [ ] **More** opens a sheet with Resumes, Cover Letters and Settings; the sheet closes with its close button and by tapping outside.
 - [ ] With the sheet open, rotate a tablet to landscape (at least 768px): the sheet closes and the desktop navigation shows.
+- [ ] With a keyboard attached, repeat that rotation: focus lands on the current page in the desktop navigation. Then hide the navigation in landscape with the toggle at the top left, rotate to portrait, open **More** and rotate back: focus lands on the navigation toggle.
 
 ### Applications and Archive
 
@@ -47,6 +48,7 @@ Mark each item pass or fail. "Phone" means under 768px wide.
 - [ ] Search, clear search, sort and **Filters** work; the Filters count badge updates and **Reset** clears it.
 - [ ] While Filters is open, the page behind does not scroll; the filter list does.
 - [ ] Tapping a row opens its details.
+- [ ] On a tablet in landscape, open **Columns**, rotate to portrait (under 768px), then close it with a keyboard: focus lands on **Filters**.
 
 ### Application details
 
