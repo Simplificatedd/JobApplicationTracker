@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-import { AppShell, MorePanel, navigationItems } from "./AppShell";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppShell, findVisibleCurrentNavItem, MorePanel, navigationItems } from "./AppShell";
 
 function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
   return renderToStaticMarkup(
@@ -191,5 +191,25 @@ describe("AppShell phone primary action", () => {
     const classes = classOf(renderShell(), 'aria-label="Add job"').split(" ");
 
     expect(classes).toEqual(expect.arrayContaining(["h-10", "min-w-10", "max-md:h-11", "max-md:min-w-11"]));
+  });
+});
+
+describe("More sheet focus at the breakpoint", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("falls back to the current page's visible navigation item", () => {
+    const hidden = { getClientRects: () => [] };
+    const visible = { getClientRects: () => [{}] };
+    const querySelectorAll = vi.fn(() => [hidden, visible]);
+    vi.stubGlobal("document", { querySelectorAll });
+
+    expect(findVisibleCurrentNavItem()).toBe(visible);
+    expect(querySelectorAll).toHaveBeenCalledWith('nav [aria-current="page"]');
+  });
+
+  it("gives the More sheet that fallback", () => {
+    const sheet = MorePanel({ currentView: "settings", items: navigationItems, onClose: vi.fn(), onViewChange: vi.fn() });
+
+    expect(sheet.props.fallbackFocus).toBe(findVisibleCurrentNavItem);
   });
 });

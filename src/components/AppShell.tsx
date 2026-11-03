@@ -429,6 +429,12 @@ function BottomNavigation({
   );
 }
 
+export function findVisibleCurrentNavItem() {
+  return [...document.querySelectorAll<HTMLElement>('nav [aria-current="page"]')].find(
+    (item) => item.getClientRects().length > 0,
+  );
+}
+
 export function MorePanel({
   currentView,
   items,
@@ -443,6 +449,9 @@ export function MorePanel({
   return (
     <NativeModal
       className="modal-overlay sheet-overlay fixed inset-0 z-40 flex items-end"
+      // Widening past md closes the sheet and hides the More button, so land
+      // on the current page in the now-visible desktop navigation instead.
+      fallbackFocus={findVisibleCurrentNavItem}
       labelledBy="more-navigation-title"
       onRequestClose={onClose}
     >

@@ -59,3 +59,13 @@ describe("AddApplicationModal on phones", () => {
     expect(markup.match(/class="mt-3 grid gap-3 md:grid-cols-2"/g)).toHaveLength(2);
   });
 });
+
+describe("phone quick location button", () => {
+  it("matches the 44px phone fields beside it and keeps 40px from md", () => {
+    const markup = renderModal({ quickLocation: "Kuala Lumpur" });
+    const tag = markup.slice(markup.lastIndexOf("<button", markup.indexOf('aria-label="Set location to Kuala Lumpur"')));
+    const classes = (/class="([^"]*)"/.exec(tag)?.[1] ?? "").split(" ");
+
+    expect(classes).toEqual(expect.arrayContaining(["h-10", "max-md:h-11"]));
+  });
+});

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type ChartDatum, EmptyChart, useHasMounted } from "./charts";
+import { clearOnMouseLeave, HoverOrTap } from "./pointerDetails";
 
 type ColorFor = (datum: ChartDatum, index: number) => string;
 
@@ -95,7 +96,7 @@ export function TreemapChart({
     <div>
       <div
         className="relative w-full overflow-hidden rounded-md"
-        onPointerLeave={() => setActiveLabel(null)}
+        {...clearOnMouseLeave(() => setActiveLabel(null))}
         ref={containerRef}
         style={{ height: TREEMAP_HEIGHT }}
       >
@@ -140,7 +141,7 @@ export function TreemapChart({
       <p className="mt-2 h-4 truncate text-xs text-muted">
         {active
           ? `${active.datum.label}: ${active.datum.value} (${sharePercent(active.datum.value, total)}%)`
-          : "Area is proportional to the count · hover a tile for details"}
+          : <>Area is proportional to the count · <HoverOrTap /> a tile for details</>}
       </p>
     </div>
   );
@@ -257,7 +258,7 @@ export function WaffleChart({
   return (
     <div
       className="flex flex-col items-center gap-5 sm:flex-row sm:items-center"
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       <div aria-hidden="true" className="grid shrink-0 grid-cols-10 gap-[3px]">
         {squares.map((item, squareIndex) => (
@@ -341,7 +342,7 @@ export function RadialBarChart({
   return (
     <div
       className="flex flex-col items-center gap-4 sm:flex-row"
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       <svg aria-hidden="true" className="shrink-0" height={RADIAL_SIZE} width={RADIAL_SIZE}>
         {rings.map((item, index) => {
@@ -460,7 +461,7 @@ export function RadarChart({
       <svg
         aria-label={data.map((item) => `${item.label}: ${item.value}`).join(", ")}
         height={RADAR_SIZE}
-        onPointerLeave={() => setActiveIndex(null)}
+        {...clearOnMouseLeave(() => setActiveIndex(null))}
         role="img"
         width={RADAR_SIZE}
       >
@@ -535,7 +536,7 @@ export function RadarChart({
       <p className="h-4 text-xs text-muted">
         {active
           ? `${active.label}: ${active.value}`
-          : "Further from the centre means more · hover a point"}
+          : <>Further from the centre means more · <HoverOrTap /> a point</>}
       </p>
     </div>
   );
@@ -572,7 +573,7 @@ export function StackedColumnChart({
     <div className="relative">
       <div
         className="flex items-end gap-1"
-        onPointerLeave={() => setActiveIndex(null)}
+        {...clearOnMouseLeave(() => setActiveIndex(null))}
         style={{ height: STACK_HEIGHT }}
       >
         {labels.map((label, index) => (
@@ -732,14 +733,7 @@ export function FlowChart({
             aria-label={links.map((link) => `${link.from} to ${link.to}: ${link.value}`).join(", ")}
             className="block overflow-visible"
             height={FLOW_HEIGHT}
-            // A screen without hover (touch, most pens) fires pointerleave
-            // straight after a tap, which would hide the tapped flow's
-            // details at once; a scroll that starts on a ribbon cancels the
-            // pointer instead, so that still clears.
-            onPointerCancel={() => setActiveLink(null)}
-            onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") setActiveLink(null);
-            }}
+            {...clearOnMouseLeave(() => setActiveLink(null))}
             role="img"
             width={drawnWidth}
           >
@@ -790,9 +784,7 @@ export function FlowChart({
           ? `${active.link.from} → ${active.link.to}: ${active.link.value} ${active.link.value === 1 ? "change" : "changes"}`
           : (
             <>
-              Left: status before · Right: status after ·{" "}
-              <span className="touch:hidden">hover</span>
-              <span className="hidden touch:inline">tap</span> a flow
+              Left: status before · Right: status after · <HoverOrTap /> a flow
             </>
           )}
       </p>

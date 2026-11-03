@@ -13,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
   useId,
@@ -27,7 +26,7 @@ import {
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { NativeModal } from "../../components/NativeModal";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import {
   APPLICATION_TABLE_COLUMNS,
@@ -269,13 +268,6 @@ export function ColumnsModal({
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
   const idPrefix = useId();
-  useEscapeKey(true, onClose);
-
-  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
 
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
     if (checked) {
@@ -294,12 +286,12 @@ export function ColumnsModal({
   }
 
   return (
-    <div
-      aria-labelledby="columns-title"
-      aria-modal="true"
+    // NativeModal moves focus in, keeps it there, makes the page inert and
+    // returns focus to the Columns button; Escape and backdrop clicks close.
+    <NativeModal
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={closeFromBackdrop}
-      role="dialog"
+      labelledBy="columns-title"
+      onRequestClose={onClose}
     >
       <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
@@ -396,7 +388,7 @@ export function ColumnsModal({
           </button>
         </footer>
       </div>
-    </div>
+    </NativeModal>
   );
 }
 
@@ -614,21 +606,13 @@ function MoreFiltersModal({
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
 }) {
-  useEscapeKey(true, onClose);
-
-  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
-
   return (
-    <div
-      aria-labelledby="more-filters-title"
-      aria-modal="true"
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={closeFromBackdrop}
-      role="dialog"
+    // Same focus and dismissal handling as the Columns dialog; on phones the
+    // page behind is also scroll-locked (see styles.css).
+    <NativeModal
+      className="applications-filter-dialog modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      labelledBy="more-filters-title"
+      onRequestClose={onClose}
     >
       <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
@@ -984,7 +968,7 @@ function MoreFiltersModal({
           </button>
         </footer>
       </div>
-    </div>
+    </NativeModal>
   );
 }
 

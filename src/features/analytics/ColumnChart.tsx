@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type ChartDatum, EmptyChart, useHasMounted } from "./charts";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 const PLOT_HEIGHT = 160;
 
@@ -28,7 +29,7 @@ export function ColumnChart({
   return (
     <div
       className={`flex items-end ${isDense ? "gap-0.5" : "gap-2"}`}
-      onPointerLeave={() => setActiveLabel(null)}
+      {...clearOnMouseLeave(() => setActiveLabel(null))}
     >
       {data.map((item, index) => {
         const isActive = item.label === activeLabel;

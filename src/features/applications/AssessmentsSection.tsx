@@ -149,7 +149,7 @@ export function AssessmentsSection({
         </div>
         {!application.archivedAt && !draft ? (
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-slate-50 max-md:min-h-11"
             onClick={() => edit()}
             type="button"
           >
@@ -353,7 +353,7 @@ export function AssessmentsSection({
           </fieldset>
           <div className="mt-4 flex gap-2">
             <button
-              className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="min-h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50 max-md:min-h-11"
               disabled={busy}
               onClick={() => void save()}
               type="button"
@@ -361,7 +361,7 @@ export function AssessmentsSection({
               {busy ? "Saving…" : "Save assessment"}
             </button>
             <button
-              className="min-h-10 rounded-lg border border-border px-4 text-sm"
+              className="min-h-10 rounded-lg border border-border px-4 text-sm max-md:min-h-11"
               disabled={busy}
               onClick={() => {
                 setDraft(null);

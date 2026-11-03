@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { AnalyticsSettings } from "../../types/analytics";
 import { type ChartDatum, EmptyChart, useHasMounted } from "./charts";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 type TimeGrouping = AnalyticsSettings["defaultTimeGrouping"];
 
@@ -103,7 +104,9 @@ export function TimeSeriesChart({
       onBlur={() => setActiveIndex(null)}
       onFocus={() => setActiveIndex((current) => current ?? points.length - 1)}
       onKeyDown={moveActiveWithKeyboard}
-      onPointerLeave={() => setActiveIndex(null)}
+      {...clearOnMouseLeave(() => setActiveIndex(null))}
+      // A tap may not move the pointer, so pick the tapped period on press too.
+      onPointerDown={updateActiveFromPointer}
       onPointerMove={updateActiveFromPointer}
       ref={containerRef}
       role="group"

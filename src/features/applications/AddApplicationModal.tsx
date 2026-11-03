@@ -854,7 +854,7 @@ export function AddApplicationModal({
                 {quickLocation ? (
                   <button
                     aria-label={`Set location to ${quickLocation}`}
-                    className="inline-flex h-10 max-w-[45%] shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    className="inline-flex h-10 max-w-[45%] shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
                     onClick={() => updateForm("location", quickLocation)}
                     title={`Set location to ${quickLocation}`}
                     type="button"

@@ -943,7 +943,7 @@ function DetailActionButton({
 }) {
   return (
     <button
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 max-md:min-h-11"
       disabled={disabled}
       onClick={onClick}
       type="button"
