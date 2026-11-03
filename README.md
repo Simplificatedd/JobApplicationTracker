@@ -62,6 +62,13 @@ your own Cloudflare account where only the people you allow can sign in.
   </tr>
 </table>
 
+**📱 Works on phones.** Below 768px the tracker switches to a phone layout: a
+bottom navigation bar with a **More** sheet, compact application rows and
+summary tiles, full-screen details, forms and notifications, 44px touch
+targets, and charts that respond to taps. Tablet and desktop layouts stay the
+same. Before a release, run the [mobile device testing](docs/mobile-device-testing.md)
+checklist on real devices.
+
 <table>
   <tr>
     <td width="50%" valign="top"><img src="docs/images/analytics.png" alt="Analytics dashboard with metrics, timelines, a pipeline treemap, and a status flow"></td>
