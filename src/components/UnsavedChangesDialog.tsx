@@ -43,7 +43,7 @@ export function UnsavedChangesDialog({
 
         <footer className="flex flex-wrap justify-end gap-2 px-4 py-4 sm:px-5">
           <button
-            className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             data-initial-focus
             onClick={onCancel}
             type="button"
@@ -51,7 +51,7 @@ export function UnsavedChangesDialog({
             Keep editing
           </button>
           <button
-            className="h-10 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+            className="h-10 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 max-md:h-11"
             onClick={onConfirm}
             type="button"
           >
