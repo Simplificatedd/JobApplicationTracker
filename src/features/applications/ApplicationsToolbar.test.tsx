@@ -139,3 +139,15 @@ describe("phone filter dialog footer", () => {
     }
   });
 });
+
+describe("phone filter dialog scroll lock", () => {
+  it("marks the Filters dialog and locks the page behind it below md only", () => {
+    const toolbar = readFileSync(new URL("./ApplicationsToolbar.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+    const filters = toolbar.slice(toolbar.indexOf("function MoreFiltersModal"));
+
+    // The dialog only renders after Filters is pressed, so check the source.
+    expect(filters.slice(0, filters.indexOf("</NativeModal>"))).toMatch(/<NativeModal\s+className="applications-filter-dialog /);
+    expect(css).toMatch(/max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
+  });
+});

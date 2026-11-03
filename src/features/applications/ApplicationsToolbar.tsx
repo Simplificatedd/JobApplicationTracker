@@ -607,9 +607,10 @@ function MoreFiltersModal({
   onResetFilters?: () => void;
 }) {
   return (
-    // Same focus and dismissal handling as the Columns dialog.
+    // Same focus and dismissal handling as the Columns dialog; on phones the
+    // page behind is also scroll-locked (see styles.css).
     <NativeModal
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      className="applications-filter-dialog modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
       labelledBy="more-filters-title"
       onRequestClose={onClose}
     >
