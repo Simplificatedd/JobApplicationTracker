@@ -1,6 +1,6 @@
 import { type LucideIcon, Repeat, Table2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { clearOnMouseLeave } from "./pointerDetails";
+import { clearOnMouseLeave, HoverOrTap } from "./pointerDetails";
 
 export interface ChartDatum {
   label: string;
@@ -492,7 +492,7 @@ export function StackedShareBar({
       <p className="mt-1.5 h-4 text-xs text-muted">
         {active
           ? `${active.label}: ${active.value} of ${total} (${Math.round((active.value / total) * 100)}%)`
-          : `${total} applications · hover the strip for a breakdown`}
+          : <>{total} applications · <HoverOrTap /> the strip for a breakdown</>}
       </p>
     </div>
   );

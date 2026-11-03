@@ -141,7 +141,7 @@ export function TreemapChart({
       <p className="mt-2 h-4 truncate text-xs text-muted">
         {active
           ? `${active.datum.label}: ${active.datum.value} (${sharePercent(active.datum.value, total)}%)`
-          : "Area is proportional to the count · hover a tile for details"}
+          : <>Area is proportional to the count · <HoverOrTap /> a tile for details</>}
       </p>
     </div>
   );
@@ -536,7 +536,7 @@ export function RadarChart({
       <p className="h-4 text-xs text-muted">
         {active
           ? `${active.label}: ${active.value}`
-          : "Further from the centre means more · hover a point"}
+          : <>Further from the centre means more · <HoverOrTap /> a point</>}
       </p>
     </div>
   );
