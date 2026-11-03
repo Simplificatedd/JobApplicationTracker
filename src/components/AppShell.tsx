@@ -80,6 +80,8 @@ const MIN_SIDE_NAVIGATION_WIDTH = 240;
 const DEFAULT_SIDE_NAVIGATION_WIDTH = 288;
 const MAX_SIDE_NAVIGATION_WIDTH = 448;
 
+export type SidebarState = "expanded" | "compact" | "hidden";
+
 export function AppShell({
   children,
   currentView,
@@ -97,11 +99,12 @@ export function AppShell({
   onUpdateAssessment,
   onViewChange,
 }: AppShellProps) {
-  const [isNavigationHidden, setIsNavigationHidden] = useState(false);
+  const [sidebarState, setSidebarState] = useState<SidebarState>("expanded");
   const [sideNavigationWidth, setSideNavigationWidth] = useState(
     DEFAULT_SIDE_NAVIGATION_WIDTH,
   );
   const isTopNavigation = navigationDisplayMode === "top";
+  const isNavigationHidden = sidebarState === "hidden";
   const visibleNavigation = navigationItems.filter(
     (item) => !item.beta || enableBetaAnalytics,
   );
@@ -194,7 +197,11 @@ export function AppShell({
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
         className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
-        onClick={() => setIsNavigationHidden((current) => !current)}
+        onClick={() =>
+          setSidebarState((current) =>
+            current === "hidden" ? "expanded" : "hidden",
+          )
+        }
         type="button"
       >
         <ToggleIcon aria-hidden="true" size={18} />
