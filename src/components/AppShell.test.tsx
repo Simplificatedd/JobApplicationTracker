@@ -1,7 +1,12 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
-import { AppShell } from "./AppShell";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  AppShell,
+  readSidebarState,
+  SIDEBAR_STATE_STORAGE_KEY,
+  writeSidebarState,
+} from "./AppShell";
 
 function renderShell(overrides: Partial<ComponentProps<typeof AppShell>> = {}) {
   return renderToStaticMarkup(
@@ -89,5 +94,90 @@ describe("AppShell responsive layout", () => {
     expect(renderShell()).toContain(
       '<p class="hidden text-sm text-muted sm:block">Workspace</p>',
     );
+  });
+});
+
+function stubBrowser({
+  desktop = true,
+  stored = null as string | null,
+  storageFails = false,
+} = {}) {
+  const storage = new Map<string, string>();
+
+  if (stored !== null) {
+    storage.set(SIDEBAR_STATE_STORAGE_KEY, stored);
+  }
+
+  const fail = () => {
+    throw new Error("Storage unavailable");
+  };
+  vi.stubGlobal("window", {
+    localStorage: {
+      getItem: storageFails ? fail : (key: string) => storage.get(key) ?? null,
+      setItem: storageFails
+        ? fail
+        : (key: string, value: string) => storage.set(key, value),
+    },
+    matchMedia: () => ({ matches: desktop }),
+  });
+
+  return storage;
+}
+
+describe("AppShell sidebar state", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each(["expanded", "compact", "hidden"] as const)(
+    "reads a saved %s state",
+    (stored) => {
+      stubBrowser({ stored });
+
+      expect(readSidebarState()).toBe(stored);
+    },
+  );
+
+  it.each([null, "", "collapsed", "HIDDEN"])(
+    "falls back to expanded for %j",
+    (stored) => {
+      stubBrowser({ stored });
+
+      expect(readSidebarState()).toBe("expanded");
+    },
+  );
+
+  it("falls back to expanded and keeps working when storage is unavailable", () => {
+    stubBrowser({ storageFails: true });
+
+    expect(readSidebarState()).toBe("expanded");
+    expect(() => writeSidebarState("compact")).not.toThrow();
+  });
+
+  it("saves the state per browser", () => {
+    const storage = stubBrowser();
+    writeSidebarState("hidden");
+
+    expect(storage.get(SIDEBAR_STATE_STORAGE_KEY)).toBe("hidden");
+  });
+
+  it("starts hidden on desktop when hidden was saved", () => {
+    stubBrowser({ stored: "hidden" });
+    const markup = renderShell();
+
+    expect(markup).toContain('aria-label="Show side navigation"');
+    expect(markup).not.toContain('aria-label="Primary navigation"');
+  });
+
+  it("ignores a saved hidden state below 1280px", () => {
+    stubBrowser({ desktop: false, stored: "hidden" });
+
+    expect(renderShell()).toContain('aria-label="Primary navigation"');
+  });
+
+  it("ignores a saved state in top navigation", () => {
+    stubBrowser({ stored: "hidden" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).toContain('aria-label="Hide top navigation"');
+    expect(markup).toContain('aria-label="Primary navigation"');
   });
 });

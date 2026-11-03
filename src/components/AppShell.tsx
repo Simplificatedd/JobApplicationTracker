@@ -82,6 +82,36 @@ const MAX_SIDE_NAVIGATION_WIDTH = 448;
 
 export type SidebarState = "expanded" | "compact" | "hidden";
 
+// Per-browser, desktop-only preference: never sent to cloud settings, because
+// sidebar density depends on the screen in front of you.
+export const SIDEBAR_STATE_STORAGE_KEY = "jat.sidebarState";
+const SIDEBAR_MEDIA_QUERY = "(min-width: 1280px)";
+
+function isSidebarLayout(isTopNavigation: boolean) {
+  return (
+    !isTopNavigation &&
+    typeof window !== "undefined" &&
+    window.matchMedia?.(SIDEBAR_MEDIA_QUERY).matches === true
+  );
+}
+
+export function readSidebarState(): SidebarState {
+  try {
+    const stored = window.localStorage.getItem(SIDEBAR_STATE_STORAGE_KEY);
+    return stored === "compact" || stored === "hidden" ? stored : "expanded";
+  } catch {
+    return "expanded";
+  }
+}
+
+export function writeSidebarState(state: SidebarState) {
+  try {
+    window.localStorage.setItem(SIDEBAR_STATE_STORAGE_KEY, state);
+  } catch {
+    // Storage can be unavailable; the sidebar still changes for this visit.
+  }
+}
+
 export function AppShell({
   children,
   currentView,
@@ -99,7 +129,13 @@ export function AppShell({
   onUpdateAssessment,
   onViewChange,
 }: AppShellProps) {
-  const [sidebarState, setSidebarState] = useState<SidebarState>("expanded");
+  // A saved state applies only where the sidebar exists (side layout, 1280px
+  // and up); elsewhere navigation starts shown, as it always has.
+  const [sidebarState, setSidebarState] = useState<SidebarState>(() =>
+    isSidebarLayout(navigationDisplayMode === "top")
+      ? readSidebarState()
+      : "expanded",
+  );
   const [sideNavigationWidth, setSideNavigationWidth] = useState(
     DEFAULT_SIDE_NAVIGATION_WIDTH,
   );
@@ -158,6 +194,14 @@ export function AppShell({
     return () => observer.disconnect();
   }, []);
 
+  function changeSidebarState(next: SidebarState) {
+    setSidebarState(next);
+
+    if (isSidebarLayout(isTopNavigation)) {
+      writeSidebarState(next);
+    }
+  }
+
   function resizeSideNavigation(nextWidth: number) {
     setSideNavigationWidth(
       Math.min(
@@ -198,9 +242,7 @@ export function AppShell({
         aria-label={toggleLabel}
         className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
         onClick={() =>
-          setSidebarState((current) =>
-            current === "hidden" ? "expanded" : "hidden",
-          )
+          changeSidebarState(isNavigationHidden ? "expanded" : "hidden")
         }
         type="button"
       >
