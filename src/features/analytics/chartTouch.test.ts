@@ -17,6 +17,8 @@ vi.mock("react", async (importOriginal) => ({
 }));
 import { HorizontalBarChart, StackedShareBar } from "./charts";
 import { ColumnChart } from "./ColumnChart";
+import { MultiSeriesChart } from "./MultiSeriesChart";
+import { TimeSeriesChart } from "./TimeSeriesChart";
 import { DonutChart } from "./DonutChart";
 import { RadarChart, RadialBarChart, StackedColumnChart, TreemapChart, WaffleChart } from "./chartViews";
 
@@ -91,5 +93,38 @@ describe("activity heatmap on touch screens", () => {
     expect(state.setActive).not.toHaveBeenCalled();
     (day.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "mouse" });
     expect(state.setActive).toHaveBeenCalledWith(null);
+  });
+});
+
+const periods = [
+  { label: "2026-10-01", value: 1 }, { label: "2026-10-02", value: 4 }, { label: "2026-10-03", value: 2 },
+];
+describe.each([
+  ["applications over time", () => TimeSeriesChart({ data: periods, grouping: "daily", seriesLabel: "Applications" })],
+  ["activity comparison", () => MultiSeriesChart({
+    grouping: "daily", series: [{ color: "#123456", data: periods, id: "applications", label: "Applications" }],
+  })],
+] as const)("%s on touch screens", (_name, render) => {
+  const group = () => elements(render()).find((element) => element.props.role === "group")!;
+
+  it("picks the tapped period on press and keeps it when the finger lifts", () => {
+    const chart = group();
+    const press = {
+      clientX: 10_000,
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 200 }) },
+    };
+
+    (chart.props.onPointerDown as (event: unknown) => void)(press);
+    // Far right of the plot is the last period.
+    expect(state.setActive).toHaveBeenLastCalledWith(2);
+    (chart.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "touch" });
+    expect(state.setActive).toHaveBeenCalledTimes(1);
+  });
+
+  it("still clears for a mouse and on pointer cancel", () => {
+    const chart = group();
+    (chart.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "mouse" });
+    (chart.props.onPointerCancel as () => void)();
+    expect(state.setActive.mock.calls).toEqual([[null], [null]]);
   });
 });
