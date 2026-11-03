@@ -196,6 +196,28 @@ describe("AppShell sidebar state", () => {
     expect(markup).not.toContain("xl:sr-only");
   });
 
+  it.each([
+    [null, "Collapse sidebar", "true"],
+    ["compact", "Expand sidebar", "false"],
+  ])(
+    "offers one desktop control to switch density (saved %j)",
+    (stored, label, expanded) => {
+      stubBrowser({ stored });
+      const markup = renderShell();
+
+      expect(markup).toContain(`aria-expanded="${expanded}" aria-label="${label}"`);
+      expect(classOf(markup, `aria-label="${label}"`)).toContain("hidden size-11 xl:inline-flex");
+    },
+  );
+
+  it("has no density control in top navigation", () => {
+    stubBrowser({ stored: "compact" });
+    const markup = renderShell({ navigationDisplayMode: "top" });
+
+    expect(markup).not.toContain("Expand sidebar");
+    expect(markup).not.toContain("Collapse sidebar");
+  });
+
   it("ignores a saved state in top navigation", () => {
     stubBrowser({ stored: "hidden" });
     const markup = renderShell({ navigationDisplayMode: "top" });

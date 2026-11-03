@@ -2,6 +2,8 @@ import {
   Archive,
   BarChart3,
   BriefcaseBusiness,
+  ChevronsLeft,
+  ChevronsRight,
   FileText,
   PanelLeftClose,
   PanelLeftOpen,
@@ -292,6 +294,22 @@ export function AppShell({
               layout="side"
               onViewChange={onViewChange}
             />
+            {/* One button in both states, so focus stays on it after a switch. */}
+            <button
+              aria-expanded={!isCompact}
+              aria-label={isCompact ? "Expand sidebar" : "Collapse sidebar"}
+              className={`icon-button absolute bottom-4 hidden size-11 xl:inline-flex ${
+                isCompact ? "left-2.5" : "left-5"
+              }`}
+              onClick={() => changeSidebarState(isCompact ? "expanded" : "compact")}
+              type="button"
+            >
+              {isCompact ? (
+                <ChevronsRight aria-hidden="true" size={18} />
+              ) : (
+                <ChevronsLeft aria-hidden="true" size={18} />
+              )}
+            </button>
             {isCompact ? null : (
               <button
                 aria-label="Resize side navigation"
