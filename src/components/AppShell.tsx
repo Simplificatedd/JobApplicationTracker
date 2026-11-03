@@ -255,7 +255,10 @@ export function AppShell({
       <button
         aria-pressed={!isNavigationHidden}
         aria-label={toggleLabel}
-        className="icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm"
+        className={`icon-button fixed left-4 top-4 z-30 bg-surface shadow-sm ${
+          // Centre it over the compact rail's icons.
+          isCompact ? "xl:left-3" : ""
+        }`}
         onClick={() =>
           changeSidebarState(isNavigationHidden ? lastVisibleState : "hidden")
         }
