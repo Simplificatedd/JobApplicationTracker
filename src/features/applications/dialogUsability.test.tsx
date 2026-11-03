@@ -17,6 +17,7 @@ vi.mock("react", () => ({
     host.slots[i] = deps;
     host.effects.push(() => { host.cleanups[i]?.(); host.cleanups[i] = effect() ?? (() => {}); });
   },
+  useId() { return "test-id"; },
   useRef(initial: unknown) {
     const i = host.cursor++;
     if (!(i in host.slots)) host.slots[i] = { current: initial };
@@ -28,6 +29,7 @@ import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
 import { NotificationBell } from "../../components/NotificationBell";
 import { AppShell } from "../../components/AppShell";
+import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type { ReminderNotification } from "../../lib/reminders";
 
@@ -282,6 +284,27 @@ it("closes the phone More sheet when the layout crosses the phone breakpoint", (
   host.slots[isPhoneSlot] = false;
   render(() => AppShell(props));
   expect(named(render(() => AppShell(props)), "MorePanel")).toBeUndefined();
+});
+it.each([
+  ["Filters", "MoreFiltersModal", "more-filters-title"],
+  ["Columns", "ColumnsModal", "columns-title"],
+])("opens the %s dialog as a native modal and closes it through the modal's request", (trigger, component, title) => {
+  let tree = render(() => ApplicationsToolbar({}));
+  const opener = trigger === "Columns"
+    ? named(tree, "ColumnsButton")
+    : elements(tree).find(e => e.type === "button" && text(e.props.children).trim().startsWith(trigger))!;
+  call(opener.props.onClick);
+  tree = render(() => ApplicationsToolbar({}));
+  const dialog = named(tree, component);
+  // NativeModal (showModal) moves focus in, contains it, makes the page inert
+  // and returns focus to the trigger on close.
+  // Give the dialog its own state slots after the toolbar's.
+  host.cursor = host.slots.length;
+  const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect((modal.type as { name: string }).name).toBe("NativeModal");
+  expect(modal.props.labelledBy).toBe(title);
+  call(modal.props.onRequestClose);
+  expect(named(render(() => ApplicationsToolbar({})), component)).toBeUndefined();
 });
 it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
   const listeners = new Map<string, () => void>();
