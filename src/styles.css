@@ -304,6 +304,13 @@
     line-height: 1.25rem;
   }
 
+  /* 44px fields on phones; 16px text on touch screens already makes them 42px. */
+  @media (max-width: 767.98px) {
+    .field-control {
+      min-height: 2.75rem;
+    }
+  }
+
   .field-control::placeholder {
     color: var(--color-muted);
   }
