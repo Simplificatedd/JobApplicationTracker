@@ -338,7 +338,9 @@ export function ApplicationsTable({
   // Widths shown while dragging; they are saved once the pointer is released.
   const [draftColumnWidths, setDraftColumnWidths] =
     useState<ApplicationColumnWidths | null>(null);
-  const columnWidths = draftColumnWidths ?? savedColumnWidths;
+  // The user's own widths. Stretching to fill the viewport is applied only for
+  // display below, so it is never saved and can shrink back on narrower screens.
+  const baseColumnWidths = draftColumnWidths ?? savedColumnWidths;
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const resumeById = new Map(resumes.map((resume) => [resume.id, resume]));
   const coverLetterById = new Map(
@@ -349,7 +351,11 @@ export function ApplicationsTable({
       !column.canHide || visibleApplicationColumns.includes(column.id),
   );
   const visibleColumnIds = visibleColumns.map((column) => column.id);
-  const visibleColumnKey = visibleColumnIds.join("|");
+  const columnWidths = stretchColumnWidthsToViewport(
+    visibleColumns,
+    baseColumnWidths,
+    tableViewportWidth,
+  );
   const tableWidth = visibleColumns.reduce(
     (width, column) => width + columnWidths[column.id],
     0,
@@ -376,47 +382,43 @@ export function ApplicationsTable({
     return () => resizeObserver.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (tableViewportWidth <= 0) {
-      return;
-    }
-
-    onColumnWidthsChange(
-      stretchColumnWidthsToViewport(
-        visibleColumns,
-        columnWidths,
-        tableViewportWidth,
+  // The base widths that make `column` display at `displayedWidth` once the
+  // other columns are stretched, so a resize lands where the pointer is.
+  function withDisplayedWidth(
+    baseWidths: ApplicationColumnWidths,
+    column: (typeof APPLICATION_TABLE_COLUMNS)[number],
+    displayedWidth: number,
+  ) {
+    return {
+      ...baseWidths,
+      [column.id]: clampColumnWidth(
+        column,
+        getBaseWidthForDisplayedWidth(
+          visibleColumns,
+          baseWidths,
+          column.id,
+          displayedWidth,
+          tableViewportWidth,
+        ),
       ),
-    );
-    // Width changes should only be recalculated when the viewport or visible
-    // column set changes, not after this effect writes the next widths.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableViewportWidth, visibleColumnKey]);
+    };
+  }
 
   function resizeColumn(
     column: (typeof APPLICATION_TABLE_COLUMNS)[number],
-    width: number,
+    displayedWidth: number,
   ) {
-    updateColumnWidths((current) => ({
-      ...current,
-      [column.id]: clampColumnWidth(column, width),
-    }));
-  }
-
-  function resetColumnWidths() {
     onColumnWidthsChange(
-      stretchColumnWidthsToViewport(
-        visibleColumns,
-        DEFAULT_COLUMN_WIDTHS,
-        tableViewportRef.current?.clientWidth ?? tableViewportWidth,
-      ),
+      withDisplayedWidth(savedColumnWidths, column, displayedWidth),
     );
   }
 
-  function updateColumnWidths(
-    updater: (current: ApplicationColumnWidths) => ApplicationColumnWidths,
-  ) {
-    onColumnWidthsChange(updater(columnWidths));
+  function resetColumnWidth(column: (typeof APPLICATION_TABLE_COLUMNS)[number]) {
+    onColumnWidthsChange({ ...savedColumnWidths, [column.id]: column.width });
+  }
+
+  function resetColumnWidths() {
+    onColumnWidthsChange(DEFAULT_COLUMN_WIDTHS);
   }
 
   function startColumnResize(
@@ -427,17 +429,16 @@ export function ApplicationsTable({
     event.stopPropagation();
 
     const startX = event.clientX;
-    const startWidths = columnWidths;
+    const startBaseWidths = savedColumnWidths;
+    const startDisplayedWidth = columnWidths[column.id];
     let latestWidths: ApplicationColumnWidths | null = null;
 
     function handlePointerMove(pointerEvent: PointerEvent) {
-      latestWidths = {
-        ...startWidths,
-        [column.id]: clampColumnWidth(
-          column,
-          startWidths[column.id] + pointerEvent.clientX - startX,
-        ),
-      };
+      latestWidths = withDisplayedWidth(
+        startBaseWidths,
+        column,
+        startDisplayedWidth + pointerEvent.clientX - startX,
+      );
       setDraftColumnWidths(latestWidths);
     }
 
@@ -585,9 +586,7 @@ export function ApplicationsTable({
                             aria-valuemin={column.minWidth}
                             aria-valuenow={columnWidths[column.id]}
                             className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none bg-transparent transition after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent hover:bg-primary/15 hover:after:bg-primary focus-visible:bg-primary/15 focus-visible:after:bg-primary"
-                            onDoubleClick={() =>
-                              resizeColumn(column, column.width)
-                            }
+                            onDoubleClick={() => resetColumnWidth(column)}
                             onKeyDown={(event) => {
                               if (event.key === "ArrowLeft") {
                                 resizeColumn(
@@ -657,7 +656,7 @@ export function ApplicationsTable({
   );
 }
 
-function stretchColumnWidthsToViewport(
+export function stretchColumnWidthsToViewport(
   visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
   columnWidths: Record<ApplicationColumnId, number>,
   viewportWidth: number,
@@ -695,6 +694,31 @@ function stretchColumnWidthsToViewport(
   });
 
   return stretchedWidths;
+}
+
+// Inverse of stretchColumnWidthsToViewport for one column: the base width that
+// displays as `displayedWidth` when the table is stretched to the viewport.
+export function getBaseWidthForDisplayedWidth(
+  visibleColumns: typeof APPLICATION_TABLE_COLUMNS,
+  baseWidths: Record<ApplicationColumnId, number>,
+  columnId: ApplicationColumnId,
+  displayedWidth: number,
+  viewportWidth: number,
+) {
+  const otherBaseWidth = visibleColumns.reduce(
+    (width, column) =>
+      column.id === columnId ? width : width + baseWidths[column.id],
+    0,
+  );
+
+  // Without stretching the column simply shows its base width.
+  if (otherBaseWidth + displayedWidth >= viewportWidth) {
+    return displayedWidth;
+  }
+
+  // Stretching scales every base width by viewport / total, so solve
+  // base * viewport / (others + base) = displayed for base.
+  return (displayedWidth * otherBaseWidth) / (viewportWidth - displayedWidth);
 }
 
 function clampColumnWidth(
