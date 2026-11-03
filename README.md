@@ -144,6 +144,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 | [Backups and recovery](docs/backups.md) | Restore limits, recovery archives, and oversized legacy-file extraction |
 | [Online assessments](docs/online-assessments.md) | How assessments work, plus their storage, migration, and backup compatibility |
 | [Troubleshooting](docs/troubleshooting.md) | Common deployment problems and fixes |
+| [Mobile device testing](docs/mobile-device-testing.md) | A checklist for checking the phone layout on real devices before a release |
 
 ## ❓ FAQ
 
