@@ -342,7 +342,7 @@ export function ApplicationDetailPanel({
     <NativeModal
       labelledBy="application-detail-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
+      className="application-detail-panel modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
     >
       {/* While editing on a phone, size to what the keyboard leaves visible. */}
       <div
@@ -506,7 +506,7 @@ export function ApplicationDetailPanel({
           <label className="block border-b border-border px-4 pb-3 sm:px-6 md:hidden">
             <span className="sr-only">Application status</span>
             <select
-              className="field-control h-9 w-auto max-w-full py-1 text-sm font-semibold"
+              className="field-control h-11 w-auto max-w-full py-1 text-sm font-semibold"
               // Like the actions trigger, it stays enabled while saving so
               // focus is not lost; changes wait for the save to settle.
               disabled={nestedEditorOpen}
@@ -531,7 +531,7 @@ export function ApplicationDetailPanel({
 
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6">
           {isEditing ? (
             <EditForm
               coverLetterUploadError={coverLetterUploadError}
@@ -881,10 +881,11 @@ function ReadOnlyDetails({
     ),
     activity: isPhone ? (
       <details key="activity">
-        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+        {/* Padded to a 44px tap target; display stays list-item to keep the marker. */}
+        <summary className="cursor-pointer py-3 text-sm font-semibold text-foreground">
           Activity ({activities.length})
         </summary>
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           {activities.length === 0 ? (
             <p className="text-sm text-muted">No activity yet.</p>
           ) : (

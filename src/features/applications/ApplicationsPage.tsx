@@ -339,7 +339,7 @@ export function ApplicationsPage({
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4">
         <SummaryMetric
           action={
             <CountScopeToggle
@@ -568,14 +568,18 @@ function SummaryMetric({
         : "text-foreground";
 
   return (
-    <div className="surface-panel rounded-lg px-4 py-3">
+    // Phones put the value beside its label so the list starts higher up.
+    <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2">
       {/* min-h matches the count scope toggle so paired metrics line up. */}
-      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      {/* On phones the label wraps before the value drops to its own line:
+          a zero basis with an automatic minimum makes wrapping use the
+          label's narrowest width rather than its single-line width. */}
+      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1">
         {/* The scope toggle already names the count on phones, where the
             label would push it onto a second line, so the label is only
             visually hidden there. */}
         <p
-          className={`min-w-0 truncate text-sm font-medium text-muted ${
+          className={`min-w-0 truncate text-sm font-medium text-muted max-md:whitespace-normal max-md:text-[13px] max-md:leading-4 ${
             action ? "max-sm:sr-only" : ""
           }`}
         >
@@ -583,7 +587,7 @@ function SummaryMetric({
         </p>
         {action}
       </div>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl ${toneClass}`}>{value}</p>
     </div>
   );
 }

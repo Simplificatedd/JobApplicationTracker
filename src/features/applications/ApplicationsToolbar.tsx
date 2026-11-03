@@ -109,7 +109,7 @@ export function ApplicationsToolbar({
             />
             <span className="sr-only">Search applications</span>
             <input
-              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
+              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted max-md:h-11"
               onChange={(event) => onSearchQueryChange?.(event.target.value)}
               placeholder="Search companies, jobs or descriptions"
               type="search"
@@ -159,7 +159,7 @@ export function ApplicationsToolbar({
 
           <button
             aria-haspopup="dialog"
-            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={() => setIsMoreFiltersOpen(true)}
             type="button"
           >
@@ -968,7 +968,7 @@ function MoreFiltersModal({
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={onResetFilters}
             type="button"
           >
@@ -976,7 +976,7 @@ function MoreFiltersModal({
             Reset
           </button>
           <button
-            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
             onClick={onClose}
             type="button"
           >
@@ -1080,7 +1080,7 @@ function FilterSelect({
       />
       <span className="sr-only">{label}</span>
       <select
-        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground"
+        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground max-md:h-11"
         onChange={(event) => onChange?.(event.target.value)}
         value={value}
       >

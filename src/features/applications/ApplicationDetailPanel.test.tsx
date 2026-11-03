@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { application } from "../../test/assessmentFixtures";
@@ -117,6 +118,39 @@ describe("application detail layout", () => {
 
     expect(header).toMatch(/<label class="block border-b border-border px-4 pb-3 sm:px-6 md:hidden"><span class="sr-only">Application status<\/span><select/);
     expect(header).toMatch(new RegExp(`<option value="${application.status}" selected="">`));
+    // Phone-only, so the 44px tap height applies at every width it shows.
+    expect(header).toMatch(/<select class="field-control h-11 /);
     expect(html).toMatch(/<header class="[^"]*max-md:border-b-0"/);
+  });
+});
+
+describe("phone detail panel scroll lock", () => {
+  it("marks the panel so the page behind it can be locked", () => {
+    const markup = renderPanel();
+    const dialog = markup.slice(markup.indexOf("<dialog"), markup.indexOf(">", markup.indexOf("<dialog")) + 1);
+
+    expect(dialog).toContain("application-detail-panel");
+    // The panel body keeps its own scroll and doesn't hand it to the page.
+    expect(markup).toContain("flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain");
+  });
+
+  it("locks page scrolling only below md and only while the panel is open", () => {
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(
+      /max-width:\s*767\.98px\)\s*\{\s*html:has\(\.application-detail-panel\[open\]\)\s*\{\s*overflow:\s*hidden/,
+    );
+  });
+});
+
+describe("phone activity disclosure", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("pads the Activity summary to a 44px tap target", () => {
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
+    const summary = /<summary class="([^"]*)">Activity/.exec(renderPanel())?.[1].split(" ") ?? [];
+
+    // 20px text line + 12px above and below.
+    expect(summary).toEqual(expect.arrayContaining(["py-3", "text-sm", "cursor-pointer"]));
   });
 });
