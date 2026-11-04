@@ -7,6 +7,15 @@ const dateFormatter = new Intl.DateTimeFormat("en-SG", {
   year: "numeric",
 });
 
+// Date-only values are calendar days; formatting them as UTC midnight in UTC
+// keeps the same day in every viewer time zone.
+const calendarDateFormatter = new Intl.DateTimeFormat("en-SG", {
+  day: "2-digit",
+  month: "short",
+  timeZone: "UTC",
+  year: "numeric",
+});
+
 const dateTimeFormatter = new Intl.DateTimeFormat("en-SG", {
   day: "2-digit",
   hour: "2-digit",
@@ -20,8 +29,17 @@ export function formatDate(value?: string) {
     return "";
   }
 
-  return normalizeFollowUpDateInput(value.split("T")[0]) && (!value.includes("T") || isValidDateTime(value))
-    ? dateFormatter.format(new Date(value)) : "Invalid date";
+  const day = normalizeFollowUpDateInput(value.split("T")[0]);
+
+  if (!day) {
+    return "Invalid date";
+  }
+
+  if (!value.includes("T")) {
+    return calendarDateFormatter.format(new Date(`${day}T00:00:00Z`));
+  }
+
+  return isValidDateTime(value) ? dateFormatter.format(new Date(value)) : "Invalid date";
 }
 
 export function formatDateRange(start?: string, end?: string) {
