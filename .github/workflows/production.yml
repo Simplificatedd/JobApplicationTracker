@@ -15,10 +15,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: cloudflare-production
-  cancel-in-progress: false
-
 jobs:
   deploy:
     # Manual dispatch from main, or a successful CI run for a push to main in
@@ -29,6 +25,11 @@ jobs:
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
+    # Job-level, so runs whose condition is false never enter the group and
+    # cannot replace a pending deployment.
+    concurrency:
+      group: cloudflare-production
+      cancel-in-progress: false
     timeout-minutes: 15
     # Reuse the existing environment and secrets; its name is historical.
     environment: production-admission
