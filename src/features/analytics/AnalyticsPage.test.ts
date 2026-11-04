@@ -7,6 +7,7 @@ import type {
 import {
   deriveActivityCalendarDays,
   deriveApplicationPaths,
+  deriveApplicationsOverTime,
   deriveInterviewsOverTime,
   deriveOutcomes,
   derivePipelineByStatus,
@@ -271,5 +272,39 @@ describe.each(["UTC", "Asia/Singapore", "America/Los_Angeles"])("analytics date 
     const start = new Date(2026, 10, 5);
     expect(isInDateRange(new Date(2026, 10, 5, 0, 1).toISOString(), start)).toBe(true);
     expect(isInDateRange(new Date(2026, 10, 4, 23, 59).toISOString(), start)).toBe(false);
+  });
+});
+
+describe.each(["UTC", "Asia/Singapore", "America/Los_Angeles"])("analytics time buckets in %s (#196)", zone => {
+  afterEach(() => vi.unstubAllEnvs());
+  const applied = (dateApplied: string) => ({ ...baseApplication, id: dateApplied, dateApplied });
+  // 1 Nov 2026 is a Sunday and the day US daylight saving ends.
+  const applications = ["2026-11-01", "2026-11-05", "2026-11-07", "2026-11-30", "2026-12-01"].map(applied);
+
+  it("groups date-only values by their calendar day, Sunday week and month", () => {
+    vi.stubEnv("TZ", zone);
+    expect(deriveApplicationsOverTime(applications, "daily").map(({ label }) => label))
+      .toEqual(["2026-11-01", "2026-11-05", "2026-11-07", "2026-11-30", "2026-12-01"]);
+    expect(deriveApplicationsOverTime(applications, "weekly")).toEqual([
+      { label: "2026-11-01 week", value: 3 },
+      { label: "2026-11-29 week", value: 2 },
+    ]);
+    expect(deriveApplicationsOverTime(applications, "monthly")).toEqual([
+      { label: "2026-11", value: 4 },
+      { label: "2026-12", value: 1 },
+    ]);
+  });
+
+  it("groups timestamps by the viewer's local day", () => {
+    vi.stubEnv("TZ", zone);
+    const early = [{ ...interviews[0], dateTime: "2026-11-05T03:00" }];
+    expect(deriveInterviewsOverTime(early, "daily")).toEqual([{ label: "2026-11-05", value: 1 }]);
+    expect(deriveInterviewsOverTime(early, "weekly")).toEqual([{ label: "2026-11-01 week", value: 1 }]);
+    const instant = [{ ...interviews[0], dateTime: "2026-11-07T18:30:00.000Z" }];
+    const localDay = { UTC: "2026-11-07", "Asia/Singapore": "2026-11-08", "America/Los_Angeles": "2026-11-07" }[zone];
+    expect(deriveInterviewsOverTime(instant, "daily")).toEqual([{ label: localDay, value: 1 }]);
+    expect(deriveInterviewsOverTime(instant, "weekly")).toEqual([
+      { label: zone === "Asia/Singapore" ? "2026-11-08 week" : "2026-11-01 week", value: 1 },
+    ]);
   });
 });
