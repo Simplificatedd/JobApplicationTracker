@@ -123,15 +123,23 @@ test('preflight uses only fixed-origin GETs and rejects moved main or unavailabl
 });
 
 const deployedSha = 'e'.repeat(40);
-const deployedProject = { ...structuredClone(project),
-  canonical_deployment: { deployment_trigger: { metadata: { commit_hash: deployedSha } } } };
+const liveDeployment = { id: 'live-deployment', deployment_trigger: { metadata: { commit_hash: deployedSha } } };
+const deployedProject = { ...structuredClone(project), canonical_deployment: liveDeployment, latest_deployment: liveDeployment };
 const forwardGit = { isAncestor: () => true, changed: () => false };
 
 test('automatic deploys only move production forward and never across a migration change', () => {
   assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA, forwardGit);
-  assert.throws(() => assertAutomaticTarget(project, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
+  assert.throws(() => assertAutomaticTarget(project, automaticEnv.RELEASE_SHA, forwardGit), /not live/);
+  // A dashboard rollback leaves an older deployment live while a newer one exists.
+  const rolledBack = { ...structuredClone(deployedProject), latest_deployment: { id: 'bad-release' } };
+  assert.throws(() => assertAutomaticTarget(rolledBack, automaticEnv.RELEASE_SHA, forwardGit), /rollback/);
+  const noHash = { ...structuredClone(deployedProject) };
+  noHash.canonical_deployment.deployment_trigger = {};
+  noHash.latest_deployment = noHash.canonical_deployment;
+  assert.throws(() => assertAutomaticTarget(noHash, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
   const shortHash = structuredClone(deployedProject);
   shortHash.canonical_deployment.deployment_trigger.metadata.commit_hash = 'abc123';
+  shortHash.latest_deployment = shortHash.canonical_deployment;
   assert.throws(() => assertAutomaticTarget(shortHash, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
   assert.throws(() => assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA,
     { ...forwardGit, isAncestor: () => false }), /not an earlier main commit/);

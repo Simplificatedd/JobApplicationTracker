@@ -116,7 +116,9 @@ in two ways:
 
 An automatic run also reads the commit production currently runs and stops
 unless the new commit comes after it on main, and stops if `migrations/` changed
-between the two, because deployment never applies migrations. Apply a
+between the two, because deployment never applies migrations. It also stops
+while a dashboard rollback (or a failed upload) is in effect, so the next merge
+cannot silently undo a rollback; dispatch manually once the cause is fixed. Apply a
 separately reviewed migration first, then dispatch manually. If main has moved
 past the tested commit, that run stops and the newer commit's run deploys.
 

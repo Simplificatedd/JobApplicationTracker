@@ -86,6 +86,10 @@ export function localGit(root = repositoryRoot) {
 // Automatic runs only move production forward and never across a migration
 // change; those releases (and rollbacks) use the manual dispatch.
 export function assertAutomaticTarget(project, releaseSha, git) {
+  // After a dashboard rollback (or a failed upload) the newest deployment is not
+  // the live one; an automatic run must not quietly undo that decision.
+  requireCondition(project.canonical_deployment?.id && project.latest_deployment?.id === project.canonical_deployment.id,
+    'The newest deployment is not live (a rollback or failed upload); check Cloudflare, then deploy manually.');
   const deployed = project.canonical_deployment?.deployment_trigger?.metadata?.commit_hash;
   requireCondition(/^[0-9a-f]{40}$/.test(deployed ?? ''),
     'The deployed production commit is unknown; deploy this release manually.');
