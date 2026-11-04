@@ -193,8 +193,21 @@ test('workflow deploys code only, uses the existing environment secrets, and nev
   const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
   const workflow = readFileSync(join(root, '.github/workflows/production.yml'), 'utf8');
   const events = workflow.split('\non:\n')[1].split('\npermissions:')[0];
-  assert.deepEqual(events.match(/^ {2}[a-z_]+:/gm), ['  workflow_dispatch:']);
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main'/);
+  assert.deepEqual(events.match(/^ {2}[a-z_]+:/gm), ['  workflow_dispatch:', '  workflow_run:']);
+  assert.match(events, /workflows: \[CI\]\n {4}types: \[completed\]\n {4}branches: \[main\]/);
+  const condition = workflow.split('if: >-')[1].split('\n    runs-on:')[0].replace(/\s+/g, ' ');
+  for (const required of ["github.ref == 'refs/heads/main'", "github.event_name == 'workflow_dispatch'",
+    "github.event.workflow_run.conclusion == 'success'", "github.event.workflow_run.event == 'push'",
+    "github.event.workflow_run.head_branch == 'main'", 'github.event.workflow_run.head_repository.full_name == github.repository']) {
+    assert.ok(condition.includes(required), required);
+  }
+  // The tested commit, not the latest main, is checked out, verified and labelled.
+  assert.match(workflow, /RELEASE_SHA: \$\{\{ inputs.release_sha \|\| github.event.workflow_run.head_sha \}\}/);
+  assert.match(workflow, /ref: \$\{\{ env.RELEASE_SHA \}\}\n {10}# [^\n]*\n {10}fetch-depth: 0/);
+  assert.match(workflow, /--commit-hash="\$RELEASE_SHA"/);
+  assert.doesNotMatch(workflow, /GITHUB_SHA|github\.sha/);
+  assert.equal((workflow.match(/node scripts\/production-preflight\.mjs/g) ?? []).length, 2);
+  assert.match(workflow, /group: cloudflare-production/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /environment: production-admission/);
   assert.deepEqual([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).sort(),
