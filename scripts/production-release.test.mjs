@@ -4,7 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertReleaseRequest, assertCheckout, assertDashboardConfiguration, assertProductionProject, preflightRelease } from './production-preflight.mjs';
+import { spawnSync } from 'node:child_process';
+import { assertReleaseRequest, assertCheckout, assertDashboardConfiguration, assertProductionProject, assertAutomaticTarget,
+  localGit, preflightRelease } from './production-preflight.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40),
@@ -118,6 +120,73 @@ test('preflight uses only fixed-origin GETs and rejects moved main or unavailabl
   await assert.rejects(preflightRelease(env, { fetcher: async () => Response.json({ object: { sha: 'c'.repeat(40) } }) }), /Main moved/);
   await assert.rejects(preflightRelease(env, { fetcher: async () => new Response('private details', { status: 403 }) }),
     error => /HTTP 403/.test(error.message) && !error.message.includes('private details'));
+});
+
+const deployedSha = 'e'.repeat(40);
+const deployedProject = { ...structuredClone(project),
+  canonical_deployment: { deployment_trigger: { metadata: { commit_hash: deployedSha } } } };
+const forwardGit = { isAncestor: () => true, changed: () => false };
+
+test('automatic deploys only move production forward and never across a migration change', () => {
+  assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA, forwardGit);
+  assert.throws(() => assertAutomaticTarget(project, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
+  const shortHash = structuredClone(deployedProject);
+  shortHash.canonical_deployment.deployment_trigger.metadata.commit_hash = 'abc123';
+  assert.throws(() => assertAutomaticTarget(shortHash, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
+  assert.throws(() => assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA,
+    { ...forwardGit, isAncestor: () => false }), /not an earlier main commit/);
+  const changed = [];
+  assert.throws(() => assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA,
+    { ...forwardGit, changed: (...args) => { changed.push(args); return true; } }), /Migrations changed/);
+  assert.deepEqual(changed, [[deployedSha, automaticEnv.RELEASE_SHA, 'migrations']]);
+});
+
+test('automatic preflight checks the tested commit against main and the deployed commit', async () => {
+  const fetcher = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: automaticEnv.RELEASE_SHA } } : { success: true, result: deployedProject });
+  const result = await preflightRelease(automaticEnv, { fetcher, git: forwardGit });
+  assert.deepEqual([result.mode, result.sha], ['automatic', automaticEnv.RELEASE_SHA]);
+  // Main has moved past the tested commit: the newer commit's own run deploys.
+  const moved = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: automaticEnv.GITHUB_SHA } } : { success: true, result: deployedProject });
+  await assert.rejects(preflightRelease(automaticEnv, { fetcher: moved, git: forwardGit }), /Main moved/);
+  await assert.rejects(preflightRelease(automaticEnv, { fetcher, git: { ...forwardGit, isAncestor: () => false } }),
+    /not an earlier main commit/);
+  // Manual dispatches remain the path for migrations and rollbacks.
+  const manualFetcher = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: env.RELEASE_SHA } } : { success: true, result: project });
+  assert.equal((await preflightRelease(env, { fetcher: manualFetcher, git: { isAncestor: () => false, changed: () => true } })).mode,
+    'manual');
+});
+
+test('local git comparison reads ancestry and migration changes from real history', () => {
+  const repository = mkdtempSync(join(tmpdir(), 'tracker-git-test-'));
+  const git = (...args) => {
+    const result = spawnSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args],
+      { cwd: repository, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    git('init', '-q');
+    mkdirSync(join(repository, 'migrations'));
+    writeFileSync(join(repository, 'migrations', '0001.sql'), 'select 1;');
+    git('add', '.'); git('commit', '-q', '-m', 'first');
+    const first = git('rev-parse', 'HEAD');
+    writeFileSync(join(repository, 'app.js'), 'ui');
+    git('add', '.'); git('commit', '-q', '-m', 'ui only');
+    const uiOnly = git('rev-parse', 'HEAD');
+    writeFileSync(join(repository, 'migrations', '0002.sql'), 'select 2;');
+    git('add', '.'); git('commit', '-q', '-m', 'migration');
+    const migration = git('rev-parse', 'HEAD');
+    const local = localGit(repository);
+    assert.equal(local.isAncestor(first, uiOnly), true);
+    assert.equal(local.isAncestor(uiOnly, first), false);
+    assert.equal(local.isAncestor('f'.repeat(40), uiOnly), false);
+    assert.equal(local.changed(first, uiOnly, 'migrations'), false);
+    assert.equal(local.changed(first, migration, 'migrations'), true);
+    assert.throws(() => local.changed('f'.repeat(40), uiOnly, 'migrations'), /Could not compare/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
 test('workflow deploys code only, uses the existing environment secrets, and never publishes previews', () => {
