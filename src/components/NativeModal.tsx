@@ -1,5 +1,13 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
+// The first match that is laid out, for focus fallbacks after a layout change
+// hid an element.
+export function firstVisible(selector: string) {
+  return [...document.querySelectorAll<HTMLElement>(selector)].find(
+    (item) => item.getClientRects().length > 0,
+  );
+}
+
 export function NativeModal({ children, className, fallbackFocus, labelledBy, onRequestClose, role }: {
   children: ReactNode;
   className: string;

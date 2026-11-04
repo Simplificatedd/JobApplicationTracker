@@ -31,7 +31,7 @@ import { useEscapeKey } from "../hooks/useEscapeKey";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
-import { NativeModal } from "./NativeModal";
+import { firstVisible, NativeModal } from "./NativeModal";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
@@ -567,11 +567,6 @@ function BottomNavigation({
 }
 
 export function findVisibleNavigationTarget() {
-  const firstVisible = (selector: string) =>
-    [...document.querySelectorAll<HTMLElement>(selector)].find(
-      (item) => item.getClientRects().length > 0,
-    );
-
   // The current page's link, or, when the desktop navigation is hidden, the
   // toggle that brings it back.
   return (
