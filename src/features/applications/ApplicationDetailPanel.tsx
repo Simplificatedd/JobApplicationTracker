@@ -42,7 +42,7 @@ import {
   confirmApplicationDelete,
 } from "./applicationActions";
 import { moveMenuFocus } from "./TableCells";
-import { NativeModal } from "../../components/NativeModal";
+import { firstVisible, NativeModal } from "../../components/NativeModal";
 import { usePhoneLayout } from "../../hooks/usePhoneLayout";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type {
@@ -340,6 +340,9 @@ export function ApplicationDetailPanel({
 
   return (
     <NativeModal
+      // Crossing 768px swaps the phone row for a card or table row (or back),
+      // hiding the opener; land on this application's visible entry instead.
+      fallbackFocus={() => findApplicationFocusTarget(application.id)}
       labelledBy="application-detail-title"
       onRequestClose={requestClose}
       className="application-detail-panel modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
@@ -1555,4 +1558,11 @@ function isDraftDirty(draft: ApplicationDraft, application: Application) {
 function trimOptional(value: string) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function findApplicationFocusTarget(applicationId: string) {
+  return (
+    firstVisible(`[data-application-id="${CSS.escape(applicationId)}"]`) ??
+    firstVisible('input[type="search"]')
+  );
 }

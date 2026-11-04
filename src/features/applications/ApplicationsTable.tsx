@@ -886,6 +886,7 @@ function ApplicationRow({
   return (
     <tr
       aria-label={`Open details for ${application.jobTitle}`}
+      data-application-id={application.id}
       className="group cursor-pointer align-top [&:last-child>td]:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       onClick={openFromRowClick}
       onKeyDown={openFromRowKeyDown}
@@ -1200,6 +1201,7 @@ function ApplicationCard({
   return (
     <article
       aria-label={`Open details for ${application.jobTitle}`}
+      data-application-id={application.id}
       className="application-card cursor-pointer rounded-lg border border-border bg-surface px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       onClick={openFromCardClick}
       onKeyDown={openFromCardKeyDown}
@@ -1303,6 +1305,7 @@ function MobileApplicationRow({
     <li>
       <button
         className="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+        data-application-id={application.id}
         onClick={() => onOpenApplication(application.id)}
         type="button"
       >
