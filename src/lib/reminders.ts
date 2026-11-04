@@ -1,5 +1,6 @@
 import type { Application, Assessment, Interview } from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
+import { parseDateValue } from "./dateTime";
 import { calculateInterviewDeadline } from "./interviews";
 
 export type ReminderSeverity = "overdue" | "due_today" | "due_soon" | "upcoming";
@@ -40,7 +41,7 @@ export function classifyReminderSeverity(
   dueSoonDays: number,
   now = new Date(),
 ): ReminderSeverity {
-  const dueDate = dueAt instanceof Date ? dueAt : parseDate(dueAt);
+  const dueDate = dueAt instanceof Date ? dueAt : parseDateValue(dueAt);
 
   if (!dueDate || Number.isNaN(dueDate.getTime())) {
     return "upcoming";
@@ -189,7 +190,7 @@ export function deriveApplicationNotifications(
     interviews ?? getProjectedInterviewRecords(application);
 
   interviewRecords.forEach((interview) => {
-    const interviewDate = parseDate(interview.dateTime);
+    const interviewDate = parseDateValue(interview.dateTime);
     const roundLabel = interview.round ? ` ${interview.round}` : "";
 
     if (
@@ -223,7 +224,7 @@ export function deriveApplicationNotifications(
     }
 
     const deadline = calculateInterviewDeadline(interview);
-    const deadlineDate = parseDate(deadline);
+    const deadlineDate = parseDateValue(deadline);
 
     if (
       application.status === "Interviewing" &&
@@ -282,7 +283,7 @@ export function deriveAssessmentNotifications(
         assessmentId: assessment.id,
         group: "assessments" as const,
       };
-      const start = parseDate(assessment.scheduledStart);
+      const start = parseDateValue(assessment.scheduledStart);
       if (
         start &&
         assessment.scheduledStart &&
@@ -311,7 +312,7 @@ export function deriveAssessmentNotifications(
             .join(" / "),
         });
       }
-      const dueDate = parseDate(assessment.deadline);
+      const dueDate = parseDateValue(assessment.deadline);
       if (dueDate && assessment.deadline) {
         const severity =
           dueDate < now
@@ -348,7 +349,7 @@ function deriveOfferDeadlineNotification(
     return [];
   }
 
-  const deadlineDate = parseDate(application.offerDeadline);
+  const deadlineDate = parseDateValue(application.offerDeadline);
 
   if (!deadlineDate) {
     return [];
@@ -430,7 +431,7 @@ export function selectUpcomingEvent(
   let upcoming: { at: number; notification: ReminderNotification } | undefined;
 
   for (const notification of notifications) {
-    const dueDate = parseDate(notification.dueAt);
+    const dueDate = parseDateValue(notification.dueAt);
     const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(notification.dueAt ?? "");
 
     if (!dueDate || dueDate < (isDateOnly ? today : now)) {
@@ -497,34 +498,6 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
-}
-
-function parseDate(value: string | undefined) {
-  if (!value) {
-    return undefined;
-  }
-
-  const dateStampMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-
-  if (dateStampMatch) {
-    const year = Number(dateStampMatch[1]);
-    const monthIndex = Number(dateStampMatch[2]) - 1;
-    const day = Number(dateStampMatch[3]);
-    const localDate = new Date(year, monthIndex, day);
-
-    if (
-      localDate.getFullYear() !== year ||
-      localDate.getMonth() !== monthIndex ||
-      localDate.getDate() !== day
-    ) {
-      return undefined;
-    }
-
-    return localDate;
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 function startOfDay(date: Date) {
