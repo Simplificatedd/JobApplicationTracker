@@ -4,7 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertReleaseRequest, assertCheckout, assertDashboardConfiguration, assertProductionProject, preflightRelease } from './production-preflight.mjs';
+import { spawnSync } from 'node:child_process';
+import { assertReleaseRequest, assertCheckout, assertDashboardConfiguration, assertProductionProject, assertAutomaticTarget,
+  localGit, preflightRelease } from './production-preflight.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: 'a'.repeat(40),
@@ -18,8 +20,11 @@ const project = { id: '22222222-2222-4222-8222-222222222222', name: 'test-tracke
     compatibility_date: '2026-09-22', compatibility_flags: [],
   }, preview: { d1_databases: {}, r2_buckets: {}, env_vars: {} } } };
 
+const automaticEnv = { ...env, GITHUB_EVENT_NAME: 'workflow_run', GITHUB_SHA: 'd'.repeat(40), RELEASE_SHA: 'a'.repeat(40),
+  CI_CONCLUSION: 'success', CI_EVENT: 'push', CI_BRANCH: 'main', CI_REPOSITORY: env.GITHUB_REPOSITORY };
+
 test('only a manual current-main dispatch with explicit matching SHA is accepted', () => {
-  assert.doesNotThrow(() => assertReleaseRequest(env));
+  assert.equal(assertReleaseRequest(env), 'manual');
   for (const changes of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/feature' },
     { RELEASE_SHA: 'c'.repeat(40) }, { RELEASE_SHA: '' }, { GITHUB_SHA: 'short' }]) {
     assert.throws(() => assertReleaseRequest({ ...env, ...changes }));
@@ -27,6 +32,17 @@ test('only a manual current-main dispatch with explicit matching SHA is accepted
   assertCheckout(env.GITHUB_SHA, '', env.GITHUB_SHA);
   assert.throws(() => assertCheckout(env.GITHUB_SHA, '?? unexpected-source\n', env.GITHUB_SHA));
   assert.throws(() => assertCheckout('c'.repeat(40), '', env.GITHUB_SHA));
+});
+
+test('only a successful CI run for a push to main is accepted automatically, for the commit CI tested', () => {
+  // GITHUB_SHA (latest main) may differ from the tested commit; RELEASE_SHA is what deploys.
+  assert.equal(assertReleaseRequest(automaticEnv), 'automatic');
+  for (const changes of [{ CI_CONCLUSION: 'failure' }, { CI_CONCLUSION: 'cancelled' }, { CI_CONCLUSION: undefined },
+    { CI_EVENT: 'pull_request' }, { CI_EVENT: 'workflow_dispatch' }, { CI_BRANCH: 'feature' },
+    { CI_REPOSITORY: 'fork/tracker' }, { GITHUB_REF: 'refs/heads/feature' }, { RELEASE_SHA: 'short' },
+    { GITHUB_EVENT_NAME: 'push' }]) {
+    assert.throws(() => assertReleaseRequest({ ...automaticEnv, ...changes }), undefined, JSON.stringify(changes));
+  }
 });
 
 test('an unexpected local config cannot override production dashboard bindings', () => {
@@ -106,12 +122,100 @@ test('preflight uses only fixed-origin GETs and rejects moved main or unavailabl
     error => /HTTP 403/.test(error.message) && !error.message.includes('private details'));
 });
 
+const deployedSha = 'e'.repeat(40);
+const liveDeployment = { id: 'live-deployment', deployment_trigger: { metadata: { commit_hash: deployedSha } } };
+const deployedProject = { ...structuredClone(project), canonical_deployment: liveDeployment, latest_deployment: liveDeployment };
+const forwardGit = { isAncestor: () => true, changed: () => false };
+
+test('automatic deploys only move production forward and never across a migration change', () => {
+  assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA, forwardGit);
+  assert.throws(() => assertAutomaticTarget(project, automaticEnv.RELEASE_SHA, forwardGit), /not live/);
+  // A dashboard rollback leaves an older deployment live while a newer one exists.
+  const rolledBack = { ...structuredClone(deployedProject), latest_deployment: { id: 'bad-release' } };
+  assert.throws(() => assertAutomaticTarget(rolledBack, automaticEnv.RELEASE_SHA, forwardGit), /rollback/);
+  const noHash = { ...structuredClone(deployedProject) };
+  noHash.canonical_deployment.deployment_trigger = {};
+  noHash.latest_deployment = noHash.canonical_deployment;
+  assert.throws(() => assertAutomaticTarget(noHash, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
+  const shortHash = structuredClone(deployedProject);
+  shortHash.canonical_deployment.deployment_trigger.metadata.commit_hash = 'abc123';
+  shortHash.latest_deployment = shortHash.canonical_deployment;
+  assert.throws(() => assertAutomaticTarget(shortHash, automaticEnv.RELEASE_SHA, forwardGit), /unknown/);
+  assert.throws(() => assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA,
+    { ...forwardGit, isAncestor: () => false }), /not an earlier main commit/);
+  const changed = [];
+  assert.throws(() => assertAutomaticTarget(deployedProject, automaticEnv.RELEASE_SHA,
+    { ...forwardGit, changed: (...args) => { changed.push(args); return true; } }), /Migrations changed/);
+  assert.deepEqual(changed, [[deployedSha, automaticEnv.RELEASE_SHA, 'migrations']]);
+});
+
+test('automatic preflight checks the tested commit against main and the deployed commit', async () => {
+  const fetcher = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: automaticEnv.RELEASE_SHA } } : { success: true, result: deployedProject });
+  const result = await preflightRelease(automaticEnv, { fetcher, git: forwardGit });
+  assert.deepEqual([result.mode, result.sha], ['automatic', automaticEnv.RELEASE_SHA]);
+  // Main has moved past the tested commit: the newer commit's own run deploys.
+  const moved = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: automaticEnv.GITHUB_SHA } } : { success: true, result: deployedProject });
+  await assert.rejects(preflightRelease(automaticEnv, { fetcher: moved, git: forwardGit }), /Main moved/);
+  await assert.rejects(preflightRelease(automaticEnv, { fetcher, git: { ...forwardGit, isAncestor: () => false } }),
+    /not an earlier main commit/);
+  // Manual dispatches remain the path for migrations and rollbacks.
+  const manualFetcher = async url => Response.json(url.startsWith('https://api.github.com/')
+    ? { object: { sha: env.RELEASE_SHA } } : { success: true, result: project });
+  assert.equal((await preflightRelease(env, { fetcher: manualFetcher, git: { isAncestor: () => false, changed: () => true } })).mode,
+    'manual');
+});
+
+test('local git comparison reads ancestry and migration changes from real history', () => {
+  const repository = mkdtempSync(join(tmpdir(), 'tracker-git-test-'));
+  const git = (...args) => {
+    const result = spawnSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args],
+      { cwd: repository, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  try {
+    git('init', '-q');
+    mkdirSync(join(repository, 'migrations'));
+    writeFileSync(join(repository, 'migrations', '0001.sql'), 'select 1;');
+    git('add', '.'); git('commit', '-q', '-m', 'first');
+    const first = git('rev-parse', 'HEAD');
+    writeFileSync(join(repository, 'app.js'), 'ui');
+    git('add', '.'); git('commit', '-q', '-m', 'ui only');
+    const uiOnly = git('rev-parse', 'HEAD');
+    writeFileSync(join(repository, 'migrations', '0002.sql'), 'select 2;');
+    git('add', '.'); git('commit', '-q', '-m', 'migration');
+    const migration = git('rev-parse', 'HEAD');
+    const local = localGit(repository);
+    assert.equal(local.isAncestor(first, uiOnly), true);
+    assert.equal(local.isAncestor(uiOnly, first), false);
+    assert.equal(local.isAncestor('f'.repeat(40), uiOnly), false);
+    assert.equal(local.changed(first, uiOnly, 'migrations'), false);
+    assert.equal(local.changed(first, migration, 'migrations'), true);
+    assert.throws(() => local.changed('f'.repeat(40), uiOnly, 'migrations'), /Could not compare/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
 test('workflow deploys code only, uses the existing environment secrets, and never publishes previews', () => {
   const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
   const workflow = readFileSync(join(root, '.github/workflows/production.yml'), 'utf8');
   const events = workflow.split('\non:\n')[1].split('\npermissions:')[0];
-  assert.deepEqual(events.match(/^ {2}[a-z_]+:/gm), ['  workflow_dispatch:']);
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main'/);
+  assert.deepEqual(events.match(/^ {2}[a-z_]+:/gm), ['  workflow_dispatch:', '  workflow_run:']);
+  assert.match(events, /workflows: \[CI\]\n {4}types: \[completed\]\n {4}branches: \[main\]/);
+  const condition = workflow.split('if: >-')[1].split('\n    runs-on:')[0].replace(/\s+/g, ' ').trim();
+  assert.equal(condition, "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || ( " +
+    "github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && " +
+    "github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository))");
+  // Job-level concurrency: skipped runs must not replace a pending deployment.
+  assert.doesNotMatch(workflow.split('\njobs:')[0], /concurrency:/);
+  // The tested commit, not the latest main, is checked out, verified and labelled.
+  assert.match(workflow, /RELEASE_SHA: \$\{\{ inputs.release_sha \|\| github.event.workflow_run.head_sha \}\}/);
+  assert.match(workflow, /ref: \$\{\{ env.RELEASE_SHA \}\}\n {10}# [^\n]*\n {10}fetch-depth: 0/);
+  assert.match(workflow, /--commit-hash="\$RELEASE_SHA"/);
+  assert.doesNotMatch(workflow, /GITHUB_SHA|github\.sha/);
+  assert.equal((workflow.match(/node scripts\/production-preflight\.mjs/g) ?? []).length, 2);
+  assert.match(workflow, /\n {4}concurrency:\n {6}group: cloudflare-production\n {6}cancel-in-progress: false\n/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /environment: production-admission/);
   assert.deepEqual([...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map(m => m[1]).filter((v, i, a) => a.indexOf(v) === i).sort(),

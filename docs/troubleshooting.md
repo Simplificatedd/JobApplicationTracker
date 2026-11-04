@@ -15,10 +15,11 @@ For an established installation, see [deployment and updates](deployment.md).
 | API returns a configuration error | Confirm the AUD came from the exact production application and that `TEAM_DOMAIN` includes `https://` with no callback path. |
 | D1 reports a missing table | For a new installation, initialize the exact new database using [installation step 3](installation.md#3-create-the-private-document-bucket-and-initialize-d1); local migrations do not initialize hosted D1. For an established installation, stop and verify its database identity/schema. Do not create an empty replacement or run a remote migration as part of a code deployment. |
 | The wildcard cannot be removed | Edit the public hostname destination, leave **Subdomain** completely blank, keep the exact `pages.dev` domain selected, and save. Rename the application if Cloudflare reports a conflict. |
-| CI has no deployment job | Expected: CI validates only. Use the separately approved manual workflow described in [deployment.md](deployment.md). |
+| CI has no deployment job | Expected: CI validates only, without credentials. The separate **Production deployment** workflow deploys after CI passes on main; see [deployment.md](deployment.md). |
+| An automatic deployment stopped before uploading | Read the failed preflight step. *Migrations changed*: apply the reviewed migration, then dispatch manually. *Newest deployment is not live*: a dashboard rollback or failed upload is in effect; fix the cause, then dispatch manually. *Not an earlier main commit* or *deployed commit is unknown*: production runs something unexpected (such as a local upload or a first deployment); check Cloudflare, then dispatch manually. *Main moved*: expected, the newer commit's run deploys. |
 | Cloudflare reports `Project not found` | Set `CLOUDFLARE_PAGES_PROJECT` to the Pages project name, not its `pages.dev` hostname, and confirm the project belongs to `CLOUDFLARE_ACCOUNT_ID`. |
 | Cloudflare rejects the deployment token | Verify its account restriction, expiration and Pages Edit permission. Reuse the environment secret; never rerun a historical uploader or replace unrelated credentials as a workaround. |
-| GitHub shows a successful merge but the live site is old | Expected for Direct Upload: merging does not deploy. A manual production deployment requires separate approval. |
+| GitHub shows a successful merge but the live site is old | Check that CI passed on that main commit, then the Production deployment run it triggered. A stopped preflight explains why it didn't upload. |
 
 Browser cache repair only rebuilds local storage from this session's last
 acknowledged cloud state. It does not send a cloud save, repeat a create or delete,

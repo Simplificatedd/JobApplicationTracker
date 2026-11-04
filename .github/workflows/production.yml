@@ -1,4 +1,4 @@
-name: Manual production deployment
+name: Production deployment
 
 on:
   workflow_dispatch:
@@ -6,23 +6,40 @@ on:
       release_sha:
         description: Full current main SHA to deploy (must match the selected main ref)
         required: true
+  # Deploy each push to main once CI has passed on it.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
-concurrency:
-  group: cloudflare-production
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    # Manual dispatch from main, or a successful CI run for a push to main in
+    # this repository. The preflight checks the same conditions again.
+    if: >-
+      github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (
+      github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
+    # Job-level, so runs whose condition is false never enter the group and
+    # cannot replace a pending deployment.
+    concurrency:
+      group: cloudflare-production
+      cancel-in-progress: false
     timeout-minutes: 15
     # Reuse the existing environment and secrets; its name is historical.
     environment: production-admission
     env:
-      RELEASE_SHA: ${{ inputs.release_sha }}
+      # A CI-triggered run deploys the commit CI tested, not the newest main.
+      RELEASE_SHA: ${{ inputs.release_sha || github.event.workflow_run.head_sha }}
+      CI_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      CI_EVENT: ${{ github.event.workflow_run.event }}
+      CI_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      CI_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
       GITHUB_TOKEN: ${{ github.token }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.ADMISSION_CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
@@ -32,7 +49,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.RELEASE_SHA }}
+          # Full history lets the preflight compare against the deployed commit.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -55,4 +74,4 @@ jobs:
         run: >-
           ./node_modules/.bin/wrangler pages deploy dist
           --project-name="$CLOUDFLARE_PAGES_PROJECT" --branch=main
-          --commit-hash="$GITHUB_SHA" --commit-dirty=false
+          --commit-hash="$RELEASE_SHA" --commit-dirty=false

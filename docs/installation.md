@@ -215,13 +215,14 @@ Never put secret values in source, issues or workflow logs.
 2. Copy the **full 40-character SHA** of your fork's current `main` commit from
    GitHub. For a freshly synchronized local clone, `git rev-parse HEAD` shows it;
    confirm it still matches GitHub's `main` before dispatching.
-3. In Actions, select **Manual production deployment → Run workflow**. Select
+3. In Actions, select **Production deployment → Run workflow**. Select
    branch **main** and paste that SHA into **`release_sha`**. Run it when you are
    ready to publish your own installation.
 4. Wait for success. Preflight checks the current main SHA, your empty Direct
    Upload project's configuration and the supplied D1/R2 identities. It does not
    require an earlier deployment or existing tracker records. It checks again
-   before uploading code to `main`; deployments are serialized.
+   before uploading code to `main`; deployments are serialized. Later pushes to
+   `main` deploy automatically once CI passes.
 
 Do not upload from the dashboard or run an old uploader to get past a preflight
 error. Fix the named configuration and dispatch a new run. If a run fails during
@@ -271,8 +272,9 @@ configuration on your behalf.
 | Upload/download fails | Check the private R2 bucket is bound as `RESUME_FILES`, both D1 migrations are applied, and the PDF/DOCX is nonempty and at most 10 MiB. Public R2 access is not the fix. |
 
 For later application updates, keep your resources, bindings, Access app and
-GitHub environment. Sync/review source updates in your fork, run CI, then use
-the same manual workflow with your fork's new current main SHA. Follow
+GitHub environment. Sync/review source updates in your fork; once CI passes on
+`main`, the update deploys automatically. A release that changes `migrations/`
+stops and needs the manual workflow after the migration is applied. Follow
 [deployment and updates](deployment.md); review any future schema change
 separately rather than rerunning provisioning. Keep full backups for meaningful
 recovery, including document bytes. No control D1, reviewer service, release
