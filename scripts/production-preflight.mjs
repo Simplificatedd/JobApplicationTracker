@@ -6,11 +6,20 @@ import { spawnSync } from 'node:child_process';
 const requireCondition = (condition, message) => { if (!condition) throw new Error(message); };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// Returns 'manual' for a dispatch from main, or 'automatic' for a successful
+// CI run on a push to main. RELEASE_SHA is the exact commit to deploy.
 export function assertReleaseRequest(env) {
-  requireCondition(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main',
-    'Production requires a manual dispatch from main.');
-  requireCondition(/^[0-9a-f]{40}$/.test(env.GITHUB_SHA ?? '') && env.RELEASE_SHA === env.GITHUB_SHA,
-    'Confirm the full SHA selected by this main dispatch.');
+  requireCondition(env.GITHUB_REF === 'refs/heads/main' && /^[0-9a-f]{40}$/.test(env.RELEASE_SHA ?? ''),
+    'Production deploys only a full main commit SHA.');
+  if (env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+    requireCondition(env.RELEASE_SHA === env.GITHUB_SHA, 'Confirm the full SHA selected by this main dispatch.');
+    return 'manual';
+  }
+  // GITHUB_SHA is the latest main here, not the commit CI tested; deploy CI's.
+  requireCondition(env.GITHUB_EVENT_NAME === 'workflow_run' && env.CI_CONCLUSION === 'success' &&
+    env.CI_EVENT === 'push' && env.CI_BRANCH === 'main' && env.CI_REPOSITORY === env.GITHUB_REPOSITORY,
+  'Production requires a manual dispatch from main or a successful CI run for a push to main.');
+  return 'automatic';
 }
 
 export function assertCheckout(sha, status, expected) {
@@ -77,11 +86,11 @@ export async function preflightRelease(env, { fetcher = fetch } = {}) {
     return data;
   }
   const branch = await get(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/git/ref/heads/main`, env.GITHUB_TOKEN);
-  requireCondition(branch.object?.sha === env.GITHUB_SHA, 'Main moved; select the current main SHA in a new dispatch.');
+  requireCondition(branch.object?.sha === env.RELEASE_SHA, 'Main moved; the run for the newer commit deploys it instead.');
   const data = await get(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/pages/projects/${env.CLOUDFLARE_PAGES_PROJECT}`,
     env.CLOUDFLARE_API_TOKEN);
   assertProductionProject(data.result, env);
-  return { sha: env.GITHUB_SHA, project: data.result.name, databaseId: env.PRODUCTION_APP_DATABASE_ID, bucket: env.PRODUCTION_R2_BUCKET };
+  return { sha: env.RELEASE_SHA, project: data.result.name, databaseId: env.PRODUCTION_APP_DATABASE_ID, bucket: env.PRODUCTION_R2_BUCKET };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -91,7 +100,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
     const status = spawnSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8' });
     requireCondition(head.status === 0 && status.status === 0, 'Checkout could not be verified.');
-    assertCheckout(head.stdout, status.stdout, process.env.GITHUB_SHA);
+    assertCheckout(head.stdout, status.stdout, process.env.RELEASE_SHA);
     console.log(JSON.stringify(await preflightRelease(process.env), null, 2));
   } catch (error) {
     console.error(error.message);

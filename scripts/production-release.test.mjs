@@ -18,8 +18,11 @@ const project = { id: '22222222-2222-4222-8222-222222222222', name: 'test-tracke
     compatibility_date: '2026-09-22', compatibility_flags: [],
   }, preview: { d1_databases: {}, r2_buckets: {}, env_vars: {} } } };
 
+const automaticEnv = { ...env, GITHUB_EVENT_NAME: 'workflow_run', GITHUB_SHA: 'd'.repeat(40), RELEASE_SHA: 'a'.repeat(40),
+  CI_CONCLUSION: 'success', CI_EVENT: 'push', CI_BRANCH: 'main', CI_REPOSITORY: env.GITHUB_REPOSITORY };
+
 test('only a manual current-main dispatch with explicit matching SHA is accepted', () => {
-  assert.doesNotThrow(() => assertReleaseRequest(env));
+  assert.equal(assertReleaseRequest(env), 'manual');
   for (const changes of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/feature' },
     { RELEASE_SHA: 'c'.repeat(40) }, { RELEASE_SHA: '' }, { GITHUB_SHA: 'short' }]) {
     assert.throws(() => assertReleaseRequest({ ...env, ...changes }));
@@ -27,6 +30,17 @@ test('only a manual current-main dispatch with explicit matching SHA is accepted
   assertCheckout(env.GITHUB_SHA, '', env.GITHUB_SHA);
   assert.throws(() => assertCheckout(env.GITHUB_SHA, '?? unexpected-source\n', env.GITHUB_SHA));
   assert.throws(() => assertCheckout('c'.repeat(40), '', env.GITHUB_SHA));
+});
+
+test('only a successful CI run for a push to main is accepted automatically, for the commit CI tested', () => {
+  // GITHUB_SHA (latest main) may differ from the tested commit; RELEASE_SHA is what deploys.
+  assert.equal(assertReleaseRequest(automaticEnv), 'automatic');
+  for (const changes of [{ CI_CONCLUSION: 'failure' }, { CI_CONCLUSION: 'cancelled' }, { CI_CONCLUSION: undefined },
+    { CI_EVENT: 'pull_request' }, { CI_EVENT: 'workflow_dispatch' }, { CI_BRANCH: 'feature' },
+    { CI_REPOSITORY: 'fork/tracker' }, { GITHUB_REF: 'refs/heads/feature' }, { RELEASE_SHA: 'short' },
+    { GITHUB_EVENT_NAME: 'push' }]) {
+    assert.throws(() => assertReleaseRequest({ ...automaticEnv, ...changes }), undefined, JSON.stringify(changes));
+  }
 });
 
 test('an unexpected local config cannot override production dashboard bindings', () => {
