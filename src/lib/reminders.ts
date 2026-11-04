@@ -179,7 +179,7 @@ export function deriveApplicationNotifications(
         group: "followups",
         id: buildNotificationId(application.id, "follow_up", followUpDueDate),
         severity,
-        sortAt: new Date(followUpDueDate).getTime(),
+        sortAt: parseDateValue(followUpDueDate)?.getTime() ?? 0,
         title: `Follow up on ${application.jobTitle}`,
         type: "follow_up",
       });
