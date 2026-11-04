@@ -131,8 +131,7 @@ export function AnalyticsPage({
   // The date range is view-only state. Timeline charts filter each record by
   // its own date; outcome classification still sees the full record history.
   const rangeStart = getRangeStart(dateRange);
-  const isInRange = (value?: string) =>
-    !rangeStart || (Boolean(value) && new Date(value as string) >= rangeStart);
+  const isInRange = (value?: string) => isInDateRange(value, rangeStart);
   const rangedApplications = scopedApplications.filter((application) =>
     isInRange(application.dateApplied || application.createdAt),
   );
@@ -575,6 +574,13 @@ const DATE_RANGE_OPTIONS: ReadonlyArray<{ label: string; value: DateRange }> = [
   { label: "90 days", value: "90d" },
   { label: "12 months", value: "12m" },
 ];
+
+// Date-only values count from local midnight, the same as the range start.
+export function isInDateRange(value: string | undefined, rangeStart: Date | null) {
+  if (!rangeStart) return true;
+  const date = value ? parseCalendarDate(value) : null;
+  return Boolean(date && date >= rangeStart);
+}
 
 function getRangeStart(range: DateRange) {
   if (range === "all") {
