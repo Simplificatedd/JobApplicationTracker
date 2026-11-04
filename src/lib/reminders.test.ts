@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Application, Interview } from "../types/application";
 import { DEFAULT_USER_SETTINGS } from "./domain";
 import {
@@ -6,6 +6,7 @@ import {
   classifyReminderSeverity,
   deriveApplicationNotifications,
   selectUpcomingEvent,
+  sortNotifications,
   type ReminderNotification,
 } from "./reminders";
 
@@ -394,5 +395,22 @@ describe("selectUpcomingEvent", () => {
 
     expect(upcoming?.type).toBe("interview");
     expect(upcoming?.dueAt).toBe("2026-11-05T14:30");
+  });
+});
+
+describe.each(["UTC", "Asia/Singapore", "America/Los_Angeles"])("date-only follow-up order in %s (#196)", zone => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("sorts a follow-up from its local calendar day, after an earlier-day deadline", () => {
+    vi.stubEnv("TZ", zone);
+    const now = new Date(2026, 10, 10, 12);
+    const followUp = deriveApplicationNotifications(
+      { ...baseApplication, id: "follow-up", followUpDate: "2026-11-05" }, DEFAULT_USER_SETTINGS, now);
+    const offer = deriveApplicationNotifications(
+      { ...baseApplication, id: "offer", offerDeadline: "2026-11-04T18:00", status: "Offered" }, DEFAULT_USER_SETTINGS, now);
+    expect(followUp.map(({ sortAt, severity }) => [sortAt, severity]))
+      .toEqual([[new Date(2026, 10, 5).getTime(), "overdue"]]);
+    expect(sortNotifications([...followUp, ...offer]).map(({ applicationId }) => applicationId))
+      .toEqual(["offer", "follow-up"]);
   });
 });

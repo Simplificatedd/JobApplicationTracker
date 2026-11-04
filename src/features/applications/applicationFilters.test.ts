@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Application, Interview } from "../../types/application";
 import { normalizeSnapshot } from "../../storage/normalizeSnapshot";
 import { snapshot } from "../../test/assessmentFixtures";
@@ -179,6 +179,48 @@ describe("offer deadline filter", () => {
         offerDeadline: "blank",
       }),
     ).toEqual([noDeadline]);
+  });
+});
+
+describe.each(["UTC", "Asia/Singapore", "America/Los_Angeles"])("date-only deadlines in %s (#196)", zone => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  function at(localTime: string) {
+    vi.stubEnv("TZ", zone);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(localTime));
+  }
+
+  const dueOn = (id: string, offerDeadline: string) => ({ ...baseApplication, id, offerDeadline });
+  const filter = (applications: Application[], offerDeadline: "overdue" | "upcoming") =>
+    applyApplicationFilters(applications, { ...DEFAULT_APPLICATION_FILTERS, offerDeadline }).map(({ id }) => id);
+
+  it("treats a deadline on today's date as upcoming, not overdue", () => {
+    at("2026-11-05T09:00");
+    const applications = [dueOn("yesterday", "2026-11-04"), dueOn("today", "2026-11-05"),
+      dueOn("in-7-days", "2026-11-12"), dueOn("in-8-days", "2026-11-13")];
+    expect(filter(applications, "overdue")).toEqual(["yesterday"]);
+    expect(filter(applications, "upcoming")).toEqual(["today", "in-7-days"]);
+  });
+
+  it("keeps calendar days across the daylight saving change", () => {
+    at("2026-11-01T09:00");
+    const applications = [dueOn("before", "2026-10-31"), dueOn("change-day", "2026-11-01"),
+      dueOn("after", "2026-11-08")];
+    expect(filter(applications, "overdue")).toEqual(["before"]);
+    expect(filter(applications, "upcoming")).toEqual(["change-day", "after"]);
+  });
+
+  it("sorts date-only and timed deadlines by calendar day", () => {
+    vi.stubEnv("TZ", zone);
+    const dayOnly = dueOn("day-only", "2026-11-05");
+    const evening = dueOn("evening-before", "2026-11-04T18:00");
+    const morning = dueOn("next-morning", "2026-11-06T09:00");
+    expect(sortApplications([morning, dayOnly, evening], { column: "offerDeadline", direction: "ascending" })
+      .map(({ id }) => id)).toEqual(["evening-before", "day-only", "next-morning"]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Activity, Application } from "../../types/application";
 import {
   countTopValues,
@@ -153,5 +153,20 @@ describe("deriveStatusTransitions", () => {
       { from: "Awaiting Response", to: "Rejected", value: 2 },
       { from: "Awaiting Response", to: "Interviewing", value: 1 },
     ]);
+  });
+});
+
+describe.each(["UTC", "Asia/Singapore", "America/Los_Angeles"])("time to first response in %s (#196)", zone => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("counts from local midnight of a date-only applied date", () => {
+    vi.stubEnv("TZ", zone);
+    // Applied 5 Nov, first response late on 11 Nov local time: within a week.
+    const respondedAt = new Date(2026, 10, 11, 23).toISOString();
+    const buckets = deriveTimeToFirstResponse([application({ dateApplied: "2026-11-05" })], [{
+      id: "a1", applicationId: "app-1", type: "status_changed", message: "Status changed to Rejected.",
+      statusFrom: "Awaiting Response", statusTo: "Rejected", createdAt: respondedAt,
+    }]);
+    expect(buckets.find((bucket) => bucket.label === "Within 1 week")?.value).toBe(1);
   });
 });
