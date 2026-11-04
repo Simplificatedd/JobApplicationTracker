@@ -134,6 +134,20 @@
     }
   }
 
+  /* Phones show only Filters and Sort: Filters takes its natural width so
+     the sort label has room, and the narrowest toolbars stack the two. */
+  @media (max-width: 767.98px) {
+    .applications-toolbar-controls {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+  }
+
+  @container (max-width: 18rem) {
+    .applications-toolbar-controls {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   /* Narrow application cards list fields as label/value rows; wider cards
      pair stacked fields. Same container-query approach as the toolbar. */
   .application-card {
@@ -249,12 +263,35 @@
   .native-modal:not([open]) { display: none; }
   .native-modal::backdrop { background: transparent; }
 
+  /* An inert page can still scroll; lock it behind the full-screen phone
+     notifications panel even when its list is too short to scroll. */
+  html:has(.notifications-panel[open]) { overflow: hidden; }
+
+  /* The same for the detail panel, the full-screen Add job form and the
+     Filters dialog (the phone filter entry point); at md and up the page
+     scrollbar stays put. */
+  @media (max-width: 767.98px) {
+    html:has(.application-detail-panel[open]),
+    html:has(.add-application-dialog[open]),
+    html:has(.applications-filter-dialog[open]) { overflow: hidden; }
+  }
+
   .modal-overlay {
     /* Overlays are pinned to the viewport, so they must not pick up
        space-y-* margins from the stack they happen to be rendered in. */
     margin: 0 !important;
     background: rgba(15, 23, 42, 0.48);
     backdrop-filter: blur(6px);
+    /* A transparent border keeps overlay content out of notches and the home
+       indicator without touching each overlay's own padding utilities. */
+    border: solid transparent !important;
+    border-width: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+  }
+
+  /* Bottom sheets run under the home indicator and pad their own content. */
+  .modal-overlay.sheet-overlay {
+    border-bottom-width: 0 !important;
   }
 
   .field-control {
@@ -267,6 +304,13 @@
     color: var(--color-foreground);
     font-size: 0.875rem;
     line-height: 1.25rem;
+  }
+
+  /* 44px fields on phones; 16px text on touch screens already makes them 42px. */
+  @media (max-width: 767.98px) {
+    .field-control {
+      min-height: 2.75rem;
+    }
   }
 
   .field-control::placeholder {

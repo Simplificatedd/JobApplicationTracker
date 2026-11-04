@@ -17,6 +17,7 @@ vi.mock("react", () => ({
     host.slots[i] = deps;
     host.effects.push(() => { host.cleanups[i]?.(); host.cleanups[i] = effect() ?? (() => {}); });
   },
+  useId() { return "test-id"; },
   useRef(initial: unknown) {
     const i = host.cursor++;
     if (!(i in host.slots)) host.slots[i] = { current: initial };
@@ -26,6 +27,11 @@ vi.mock("react", () => ({
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
+import { NotificationBell } from "../../components/NotificationBell";
+import { AppShell } from "../../components/AppShell";
+import { ApplicationsToolbar } from "./ApplicationsToolbar";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
+import type { ReminderNotification } from "../../lib/reminders";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function elements(node: unknown): Element[] {
@@ -178,4 +184,175 @@ it("returns focus to the trigger when the trigger closes the menu", () => {
   call(button(tree, "More actions").props.onClick);
   expect(focus).toHaveBeenCalled();
   expect(button(render(() => ApplicationDetailPanel(props)), "More actions").props["aria-expanded"]).toBe(false);
+});
+it("changes the status from the phone header through the guarded header action", async () => {
+  let resolve!: (value: unknown) => void;
+  const props = { ...detailProps(), onUpdate: vi.fn().mockReturnValue(new Promise(resolvePromise => { resolve = resolvePromise; })) };
+  const picker = (tree: unknown) => elements(tree).find(e => e.type === "select" && e.props.className?.toString().includes("field-control h-11"))!;
+  let tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.value).toBe(application.status);
+  call(picker(tree).props.onChange, { target: { value: "Offered" } });
+  expect(props.onUpdate).toHaveBeenCalledWith(application.id, { status: "Offered" });
+  tree = render(() => ApplicationDetailPanel(props));
+  // The choice stays shown and focusable while saving, and a second change waits.
+  expect(picker(tree).props.value).toBe("Offered");
+  expect(picker(tree).props.disabled).toBe(false);
+  call(picker(tree).props.onChange, { target: { value: "Rejected" } });
+  expect(props.onUpdate).toHaveBeenCalledTimes(1);
+  resolve({ ok: false, error: "Status could not be saved." });
+  for (let i = 0; i < 4; i++) await Promise.resolve();
+  tree = render(() => ApplicationDetailPanel(props));
+  expect(picker(tree).props.value).toBe(application.status);
+  expect(elements(tree).some(e => e.props.role === "alert" && text(e.props.children) === "Status could not be saved.")).toBe(true);
+  call(named(tree, "ReadOnlyDetails").props.onInterviewEditingChange, true);
+  expect(picker(render(() => ApplicationDetailPanel(props))).props.disabled).toBe(true);
+});
+function bellProps(): ComponentProps<typeof NotificationBell> {
+  const notification = {
+    application, applicationId: application.id, body: "Example / Due soon", group: "followups", id: "follow-up",
+    severity: "due_soon", sortAt: 0, title: `Follow up on ${application.jobTitle}`, type: "follow_up", dueAt: "2026-11-04",
+  } as ReminderNotification;
+  return {
+    grouped: false, notifications: [notification], onDismiss: vi.fn(), onMarkOpened: vi.fn(), onOpenApplication: vi.fn(),
+    onUpdateApplication: vi.fn(), onUpdateAssessment: vi.fn(), onUpdateInterview: vi.fn(),
+  };
+}
+function openBell(props: ComponentProps<typeof NotificationBell>, phone: boolean) {
+  vi.stubGlobal("window", { confirm: () => true, matchMedia: () => ({ matches: phone, addEventListener() {}, removeEventListener() {} }) });
+  const tree = render(() => NotificationBell(props));
+  call(elements(tree).find(e => e.props.title === "Notifications")!.props.onClick);
+  return render(() => NotificationBell(props));
+}
+it("opens a full-screen notifications panel on phones and marks reminders opened", () => {
+  const props = bellProps(); const tree = openBell(props, true);
+  const panel = named(tree, "NativeModal");
+  expect(props.onMarkOpened).toHaveBeenCalledTimes(1);
+  expect(panel.props.className).toContain("fixed inset-0");
+  expect(panel.props.className).toContain("pt-[env(safe-area-inset-top)]");
+  expect(elements(tree).some(e => e.props.role === "dialog" && e.props["aria-label"] === "Notifications")).toBe(false);
+  const close = elements(panel).find(e => e.props["aria-label"] === "Close notifications")!;
+  expect(close.props["data-initial-focus"]).toBe(true);
+  call(panel.props.onRequestClose);
+  expect(named(render(() => NotificationBell(props)), "NativeModal")).toBeUndefined();
+});
+it("keeps notification actions working from the phone panel", () => {
+  const props = bellProps(); let tree = openBell(props, true);
+  const item = named(tree, "NotificationItem");
+  call(item.props.onDismiss, "follow-up"); expect(props.onDismiss).toHaveBeenCalledWith("follow-up");
+  call(item.props.onOpenApplication, application.id);
+  expect(props.onOpenApplication).toHaveBeenCalledWith(application.id);
+  tree = render(() => NotificationBell(props));
+  expect(named(tree, "NativeModal")).toBeUndefined();
+});
+it("keeps the anchored popover on tablets and desktops", () => {
+  const tree = openBell(bellProps(), false);
+  expect(named(tree, "NativeModal")).toBeUndefined();
+  const popover = elements(tree).find(e => e.props.role === "dialog" && e.props["aria-label"] === "Notifications")!;
+  expect(popover.props.className).toContain("absolute right-0 top-12");
+  expect(popover.props.className).not.toContain("max-md:");
+});
+it("closes the notifications panel when the layout crosses the phone breakpoint", () => {
+  const props = bellProps(); openBell(props, true);
+  expect(named(render(() => NotificationBell(props)), "NativeModal")).toBeDefined();
+  // The breakpoint listener reports a wider screen.
+  // The open flag is the first true slot; the phone flag is the last one.
+  const isPhoneSlot = host.slots.lastIndexOf(true);
+  expect(isPhoneSlot).toBeGreaterThan(host.slots.indexOf(true));
+  host.slots[isPhoneSlot] = false;
+  render(() => NotificationBell(props));
+  const tree = render(() => NotificationBell(props));
+  expect(named(tree, "NativeModal")).toBeUndefined();
+  expect(elements(tree).some(e => e.props.role === "dialog")).toBe(false);
+});
+it("closes the phone More sheet when the layout crosses the phone breakpoint", () => {
+  vi.stubGlobal("window", { confirm: () => true, matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  const props = {
+    children: null, currentView: "applications", enableBetaAnalytics: false, enableNotificationBell: false, groupedNotifications: false,
+    navigationDisplayMode: "side", notifications: [], onDismissNotification: vi.fn(), onMarkNotificationsOpened: vi.fn(),
+    onOpenApplicationFromNotification: vi.fn(), onPrimaryAction: vi.fn(), onUpdateApplication: vi.fn(), onUpdateAssessment: vi.fn(),
+    onUpdateInterview: vi.fn(), onViewChange: vi.fn(),
+  } as ComponentProps<typeof AppShell>;
+  let tree = render(() => AppShell(props));
+  call(named(tree, "BottomNavigation").props.onOpenMore);
+  tree = render(() => AppShell(props));
+  expect(named(tree, "MorePanel")).toBeDefined();
+  // The More flag is the first true slot; the phone flag is the one after it.
+  const isMoreSlot = host.slots.indexOf(true);
+  const isPhoneSlot = host.slots.indexOf(true, isMoreSlot + 1);
+  expect(isPhoneSlot).toBeGreaterThan(isMoreSlot);
+  host.slots[isPhoneSlot] = false;
+  render(() => AppShell(props));
+  expect(named(render(() => AppShell(props)), "MorePanel")).toBeUndefined();
+});
+it.each([
+  ["Filters", "MoreFiltersModal", "more-filters-title"],
+  ["Columns", "ColumnsModal", "columns-title"],
+])("opens the %s dialog as a native modal and closes it through the modal's request", (trigger, component, title) => {
+  let tree = render(() => ApplicationsToolbar({}));
+  const opener = trigger === "Columns"
+    ? named(tree, "ColumnsButton")
+    : elements(tree).find(e => e.type === "button" && text(e.props.children).trim().startsWith(trigger))!;
+  call(opener.props.onClick);
+  tree = render(() => ApplicationsToolbar({}));
+  const dialog = named(tree, component);
+  // NativeModal (showModal) moves focus in, contains it, makes the page inert
+  // and returns focus to the trigger on close.
+  // Give the dialog its own state slots after the toolbar's.
+  host.cursor = host.slots.length;
+  const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect((modal.type as { name: string }).name).toBe("NativeModal");
+  expect(modal.props.labelledBy).toBe(title);
+  call(modal.props.onRequestClose);
+  expect(named(render(() => ApplicationsToolbar({})), component)).toBeUndefined();
+});
+it("returns Columns focus to the Filters button when the Columns buttons are hidden", () => {
+  let tree = render(() => ApplicationsToolbar({}));
+  call(named(tree, "ColumnsButton").props.onClick);
+  tree = render(() => ApplicationsToolbar({}));
+  const filters = elements(tree).find(e => e.type === "button" && text(e.props.children).trim().startsWith("Filters"))!;
+  const filtersButton = { focus: vi.fn() };
+  // React 18 keeps the ref on the element; React 19 moves it into props.
+  const ref = (filters.props.ref ?? (filters as unknown as { ref: unknown }).ref) as { current: unknown };
+  ref.current = filtersButton;
+  const dialog = named(tree, "ColumnsModal");
+  expect(call(dialog.props.fallbackFocus)).toBe(filtersButton);
+  // NativeModal only uses the fallback when the opener is no longer rendered.
+  host.cursor = host.slots.length;
+  const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect(modal.props.fallbackFocus).toBe(dialog.props.fallbackFocus);
+});
+it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
+  const listeners = new Map<string, () => void>();
+  const visual = { height: 400, offsetTop: 0, scale: 1, addEventListener: (type: string, fn: () => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) };
+  const focused = { scrollIntoView: vi.fn() };
+  vi.stubGlobal("HTMLElement", class {});
+  Object.setPrototypeOf(focused, (globalThis as unknown as { HTMLElement: { prototype: object } }).HTMLElement.prototype);
+  vi.stubGlobal("document", { activeElement: focused });
+  vi.stubGlobal("window", { visualViewport: visual, requestAnimationFrame: (fn: () => void) => fn() });
+  let active = true;
+  const view = () => render(() => useVisibleViewportStyle(active));
+  view();
+  expect(view()).toEqual({ height: "calc(400px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: undefined });
+  // The keyboard opens and Safari scrolls the visual viewport.
+  visual.height = 300; visual.offsetTop = 120; listeners.get("resize")!();
+  expect(view()).toEqual({ height: "calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: "translateY(120px)" });
+  expect(focused.scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+  // Safari scrolls the visual viewport without resizing it.
+  visual.offsetTop = 60; listeners.get("scroll")!();
+  expect(view()).toEqual({ height: "calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))", transform: "translateY(60px)" });
+  // A pinch-zoom leaves the form as it was.
+  visual.scale = 2; visual.height = 150; listeners.get("resize")!();
+  expect(view()?.height).toBe("calc(300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))");
+  active = false; view();
+  expect(view()).toBeUndefined();
+  expect(listeners.size).toBe(0);
+});
+it("shows labelled Save and Cancel in the phone edit footer and hides the header icons below md", () => {
+  const props = detailProps(); let tree = render(() => ApplicationDetailPanel(props));
+  call(button(tree, "Edit").props.onClick); tree = render(() => ApplicationDetailPanel(props));
+  const footer = elements(tree).find(e => e.type === "footer")!;
+  expect(footer.props.className).toContain("md:hidden");
+  expect(button(footer, "Cancel")).toBeDefined(); expect(button(footer, "Save")).toBeDefined();
+  expect(elements(tree).filter(e => e.type === "button" && String(e.props.className).includes("hidden md:inline-flex"))).toHaveLength(2);
 });

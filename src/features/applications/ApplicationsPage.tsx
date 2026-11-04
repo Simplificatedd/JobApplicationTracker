@@ -8,6 +8,7 @@ import {
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { ContactsPanel } from "./ContactsPanel";
 import {
+  countActiveFilters,
   applyApplicationFilters,
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
@@ -27,7 +28,10 @@ import {
 } from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
-import { deriveApplicationNotifications } from "../../lib/reminders";
+import {
+  deriveApplicationNotifications,
+  selectUpcomingEvent,
+} from "../../lib/reminders";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import type {
   ApplicationUpdate,
@@ -219,6 +223,33 @@ export function ApplicationsPage({
       )
     : filteredApplications;
   const visibleApplications = focusedApplications;
+  // Rows show the next event however far ahead it is, so the attention
+  // window and the interview-attention setting are widened for this lookup.
+  const upcomingEventSettings = {
+    ...settings,
+    dueSoonDays: 36500,
+    includeUpcomingInterviewsInAttention: true,
+  };
+  const upcomingEvents = new Map(
+    visibleApplications.flatMap((application) => {
+      const event = selectUpcomingEvent(
+        deriveApplicationNotifications(
+          application,
+          upcomingEventSettings,
+          now,
+          interviews.filter(
+            (interview) => interview.applicationId === application.id,
+          ),
+          assessments.filter((item) => item.applicationId === application.id),
+        ),
+        now,
+      );
+      return event ? [[application.id, event] as const] : [];
+    }),
+  );
+  const isFiltered =
+    countActiveFilters(filters, needsAttentionOnly) > 0 &&
+    searchBase.applications.length > 0;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -308,7 +339,7 @@ export function ApplicationsPage({
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4">
         <SummaryMetric
           action={
             <CountScopeToggle
@@ -357,8 +388,10 @@ export function ApplicationsPage({
         }}
         onSearchQueryChange={setSearchQuery}
         onSearchScopeChange={setSearchScope}
+        onSortChange={setSort}
         searchQuery={searchQuery}
         searchScope={searchScope}
+        sort={sort}
         viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
@@ -383,14 +416,18 @@ export function ApplicationsPage({
             ? searchBase.searchesAll
               ? "No active or archived applications match that company, title, or description."
               : "No applications match that company, title, or description."
-            : viewMode === "archive"
+            : isFiltered
+              ? "Clear or change the filters to see more applications."
+              : viewMode === "archive"
               ? "Archived applications will appear here."
               : "New entries will appear here once they are added."
         }
         emptyTitle={
           searchQuery.trim()
             ? "No matching applications"
-            : viewMode === "archive"
+            : isFiltered
+              ? "No applications match these filters"
+              : viewMode === "archive"
               ? "No archived applications"
               : "No applications yet"
         }
@@ -409,6 +446,7 @@ export function ApplicationsPage({
         resumes={resumes}
         workingResumeId={workingResumeId}
         sort={sort}
+        upcomingEvents={upcomingEvents}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
@@ -530,14 +568,18 @@ function SummaryMetric({
         : "text-foreground";
 
   return (
-    <div className="surface-panel rounded-lg px-4 py-3">
+    // Phones put the value beside its label so the list starts higher up.
+    <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2">
       {/* min-h matches the count scope toggle so paired metrics line up. */}
-      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      {/* On phones the label wraps before the value drops to its own line:
+          a zero basis with an automatic minimum makes wrapping use the
+          label's narrowest width rather than its single-line width. */}
+      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1">
         {/* The scope toggle already names the count on phones, where the
             label would push it onto a second line, so the label is only
             visually hidden there. */}
         <p
-          className={`min-w-0 truncate text-sm font-medium text-muted ${
+          className={`min-w-0 truncate text-sm font-medium text-muted max-md:whitespace-normal max-md:text-[13px] max-md:leading-4 ${
             action ? "max-sm:sr-only" : ""
           }`}
         >
@@ -545,7 +587,7 @@ function SummaryMetric({
         </p>
         {action}
       </div>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl ${toneClass}`}>{value}</p>
     </div>
   );
 }

@@ -204,7 +204,7 @@ export function ResumesPage({
             Upload buttons and reappears if it receives keyboard focus. */}
         <div className="grid gap-3 md:grid-cols-[1.2fr_0.9fr_0.9fr_auto]">
           <Field
-            className="max-sm:sr-only max-sm:focus-within:not-sr-only"
+            className="max-md:sr-only max-md:focus-within:not-sr-only"
             label="File"
           >
             <input
@@ -217,7 +217,7 @@ export function ResumesPage({
             />
           </Field>
           <Field
-            className={showUploadDetails ? "" : "max-sm:hidden"}
+            className={showUploadDetails ? "" : "max-md:hidden"}
             id={`${uploadDetailsId}-name`}
             label="Display Name"
           >
@@ -230,7 +230,7 @@ export function ResumesPage({
             />
           </Field>
           <Field
-            className={showUploadDetails ? "" : "max-sm:hidden"}
+            className={showUploadDetails ? "" : "max-md:hidden"}
             id={`${uploadDetailsId}-version`}
             label="Version"
           >
@@ -243,7 +243,7 @@ export function ResumesPage({
             />
           </Field>
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 md:self-end"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11 md:self-end"
             disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             type="button"
@@ -254,7 +254,7 @@ export function ResumesPage({
           <button
             aria-controls={`${uploadDetailsId}-name ${uploadDetailsId}-version`}
             aria-expanded={showUploadDetails}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 sm:hidden"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11 md:hidden"
             onClick={() => setShowUploadDetails((current) => !current)}
             type="button"
           >
@@ -639,15 +639,15 @@ function ResumeCard({
         <>
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="break-words font-semibold">{resume.displayName}</p>
-              <p className="mt-1 truncate text-xs text-muted">
+              <p className="break-words font-semibold max-md:text-[15px]">{resume.displayName}</p>
+              <p className="mt-1 truncate text-xs text-muted max-md:text-[13px]">
                 {resume.versionLabel || "No version label"}
               </p>
             </div>
             <StorageBadge resume={resume} />
           </div>
           {resume.notes ? (
-            <p className="mt-2 line-clamp-2 text-xs text-muted">{resume.notes}</p>
+            <p className="mt-2 line-clamp-2 text-xs text-muted max-md:text-[13px]">{resume.notes}</p>
           ) : null}
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-3 text-xs">
             <DocumentMeta isWide label="Original file">
@@ -668,7 +668,7 @@ function ResumeCard({
           </dl>
         </>
       )}
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+      <div className="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap">
         <DocumentActions
           documentLabel={documentLabel}
           editor={editor}
@@ -699,7 +699,7 @@ function DocumentMeta({
       <dt className="font-semibold uppercase tracking-[0.08em] text-muted">
         {label}
       </dt>
-      <dd className="mt-0.5 break-words text-sm text-foreground">{children}</dd>
+      <dd className="mt-0.5 break-words text-sm text-foreground max-md:text-[13px]">{children}</dd>
     </div>
   );
 }
@@ -877,7 +877,7 @@ function IconAction({
     <button
       aria-label={label}
       className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
-        showLabel ? "px-3 text-sm font-semibold" : "w-9"
+        showLabel ? "px-3 text-sm font-semibold max-md:h-11" : "w-9"
       } ${
         tone === "danger"
           ? "text-destructive hover:bg-red-50"

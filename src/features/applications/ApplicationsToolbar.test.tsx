@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
-import { ColumnsModal, SearchScopeToggle } from "./ApplicationsToolbar";
+import { ColumnsModal, PhoneSortSelect, SearchScopeToggle } from "./ApplicationsToolbar";
+import { DEFAULT_SORT_STATE } from "./applicationFilters";
 
 function renderColumnsModal() {
   return renderToStaticMarkup(
@@ -88,4 +90,64 @@ describe("Search scope toggle", () => {
       expect(onChange).toHaveBeenLastCalledWith("all");
     },
   );
+});
+
+describe("phone sort control", () => {
+  it("lists the phone sorts with the current one selected", () => {
+    const markup = renderToStaticMarkup(
+      <PhoneSortSelect onChange={vi.fn()} sort={{ column: "company", direction: "ascending" }} />,
+    );
+
+    expect([...markup.matchAll(/<option[^>]*>([^<]+)<\/option>/g)].map((match) => match[1])).toEqual([
+      "Last updated",
+      "Newest applied",
+      "Oldest applied",
+      "Company A–Z",
+      "Job title A–Z",
+      "Status",
+    ]);
+    expect(markup).toMatch(/value="company:ascending" selected=""/);
+  });
+
+  it("keeps a table-only sort visible until another is chosen", () => {
+    const onChange = vi.fn();
+    const element = PhoneSortSelect({
+      onChange,
+      sort: { column: "priority", direction: "descending" },
+    });
+
+    expect(renderToStaticMarkup(element)).toMatch(/<option disabled="" value="priority:descending" selected="">Table sort<\/option>/);
+    (element.props.onChange as (value: string) => void)("updatedAt:descending");
+    expect(onChange).toHaveBeenCalledWith(DEFAULT_SORT_STATE);
+  });
+});
+
+describe("phone filter dialog footer", () => {
+  it("gives Reset and Done 44px on phones", () => {
+    // The dialog only renders after Filters is pressed, so check the source.
+    const source = readFileSync(new URL("./ApplicationsToolbar.tsx", import.meta.url), "utf8");
+    const start = source.indexOf("<footer", source.indexOf("function MoreFiltersModal"));
+    const footer = source.slice(start, source.indexOf("</footer>", start));
+    // Each footer button's class list, found by the button's own label.
+    const buttonClasses = (label: string) => {
+      const button = footer.slice(footer.lastIndexOf("<button", footer.indexOf(label)));
+      return /className="([^"]*)"/.exec(button)?.[1].split(" ") ?? [];
+    };
+
+    for (const label of ["Reset", "Done"]) {
+      expect(buttonClasses(label)).toEqual(expect.arrayContaining(["h-10", "max-md:h-11"]));
+    }
+  });
+});
+
+describe("phone filter dialog scroll lock", () => {
+  it("marks the Filters dialog and locks the page behind it below md only", () => {
+    const toolbar = readFileSync(new URL("./ApplicationsToolbar.tsx", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+    const filters = toolbar.slice(toolbar.indexOf("function MoreFiltersModal"));
+
+    // The dialog only renders after Filters is pressed, so check the source.
+    expect(filters.slice(0, filters.indexOf("</NativeModal>"))).toMatch(/<NativeModal\s+className="applications-filter-dialog /);
+    expect(css).toMatch(/max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
+  });
 });

@@ -1,4 +1,5 @@
 import {
+  ArrowUpDown,
   CalendarDays,
   ChevronDown,
   ClipboardCheck,
@@ -12,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
   useId,
@@ -26,15 +26,18 @@ import {
   INTERVIEW_TYPE_OPTIONS,
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { NativeModal } from "../../components/NativeModal";
 import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
 } from "./ApplicationsTable";
 import {
+  countActiveFilters,
   DEFAULT_APPLICATION_FILTERS,
+  DEFAULT_SORT_STATE,
   type ApplicationFilters,
+  type SortState,
 } from "./applicationFilters";
 import type { SearchScope } from "./applicationSearch";
 import type {
@@ -55,8 +58,10 @@ interface ApplicationsToolbarProps {
   onResetFilters?: () => void;
   onSearchQueryChange?: (value: string) => void;
   onSearchScopeChange?: (scope: SearchScope) => void;
+  onSortChange?: (sort: SortState) => void;
   searchQuery?: string;
   searchScope?: SearchScope;
+  sort?: SortState;
   viewMode?: "active" | "archive";
   visibleApplicationColumns?: string[];
 }
@@ -72,13 +77,16 @@ export function ApplicationsToolbar({
   onResetFilters,
   onSearchQueryChange,
   onSearchScopeChange,
+  onSortChange,
   searchQuery = "",
   searchScope = "all",
+  sort = DEFAULT_SORT_STATE,
   viewMode = "active",
   visibleApplicationColumns = [],
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const currentFilters = filters ?? DEFAULT_APPLICATION_FILTERS;
   const activeFilterCount = countActiveFilters(
     currentFilters,
@@ -101,7 +109,7 @@ export function ApplicationsToolbar({
             />
             <span className="sr-only">Search applications</span>
             <input
-              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted"
+              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted max-md:h-11"
               onChange={(event) => onSearchQueryChange?.(event.target.value)}
               placeholder="Search companies, jobs or descriptions"
               type="search"
@@ -151,8 +159,9 @@ export function ApplicationsToolbar({
 
           <button
             aria-haspopup="dialog"
-            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={() => setIsMoreFiltersOpen(true)}
+            ref={filtersButtonRef}
             type="button"
           >
             <SlidersHorizontal aria-hidden="true" size={16} />
@@ -165,7 +174,7 @@ export function ApplicationsToolbar({
           </button>
 
           <button
-            className="applications-toolbar-reset h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="applications-toolbar-reset h-10 items-center max-md:hidden justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={onResetFilters}
             type="button"
           >
@@ -173,9 +182,16 @@ export function ApplicationsToolbar({
             Reset
           </button>
 
+          {/* Phones have no table headers, so sorting sits beside Filters. */}
+          {onSortChange ? (
+            <div className="min-w-0 md:hidden">
+              <PhoneSortSelect onChange={onSortChange} sort={sort} />
+            </div>
+          ) : null}
+
           {/* Narrow toolbars show Columns beside Filters instead of in a
-              footer row of its own. */}
-          <div className="applications-toolbar-columns-inline min-w-0">
+              footer row of its own. Phone rows ignore columns entirely. */}
+          <div className="applications-toolbar-columns-inline min-w-0 max-md:hidden">
             <ColumnsButton
               className="w-full"
               hiddenColumnCount={hiddenColumnCount}
@@ -185,7 +201,7 @@ export function ApplicationsToolbar({
         </div>
       </div>
 
-      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3">
+      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3 max-md:hidden">
         <ColumnsButton
           hiddenColumnCount={hiddenColumnCount}
           onClick={() => setIsColumnsOpen(true)}
@@ -207,6 +223,9 @@ export function ApplicationsToolbar({
 
       {isColumnsOpen ? (
         <ColumnsModal
+          // The Columns buttons are desktop-only; if the window shrinks
+          // below md while the dialog is open, return focus beside them.
+          fallbackFocus={() => filtersButtonRef.current}
           onChange={onColumnVisibilityChange}
           onClose={() => setIsColumnsOpen(false)}
           visibleApplicationColumns={visibleApplicationColumns}
@@ -244,23 +263,18 @@ function ColumnsButton({
 }
 
 export function ColumnsModal({
+  fallbackFocus,
   onChange,
   onClose,
   visibleApplicationColumns,
 }: {
+  fallbackFocus?: () => HTMLElement | null | undefined;
   onChange?: (columns: string[]) => void;
   onClose: () => void;
   visibleApplicationColumns: string[];
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
   const idPrefix = useId();
-  useEscapeKey(true, onClose);
-
-  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
 
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
     if (checked) {
@@ -279,12 +293,13 @@ export function ColumnsModal({
   }
 
   return (
-    <div
-      aria-labelledby="columns-title"
-      aria-modal="true"
+    // NativeModal moves focus in, keeps it there, makes the page inert and
+    // returns focus to the Columns button; Escape and backdrop clicks close.
+    <NativeModal
       className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={closeFromBackdrop}
-      role="dialog"
+      fallbackFocus={fallbackFocus}
+      labelledBy="columns-title"
+      onRequestClose={onClose}
     >
       <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
@@ -381,7 +396,7 @@ export function ColumnsModal({
           </button>
         </footer>
       </div>
-    </div>
+    </NativeModal>
   );
 }
 
@@ -599,21 +614,13 @@ function MoreFiltersModal({
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
 }) {
-  useEscapeKey(true, onClose);
-
-  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  }
-
   return (
-    <div
-      aria-labelledby="more-filters-title"
-      aria-modal="true"
-      className="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
-      onMouseDown={closeFromBackdrop}
-      role="dialog"
+    // Same focus and dismissal handling as the Columns dialog; on phones the
+    // page behind is also scroll-locked (see styles.css).
+    <NativeModal
+      className="applications-filter-dialog modal-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      labelledBy="more-filters-title"
+      onRequestClose={onClose}
     >
       <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface shadow-popover">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
@@ -953,7 +960,7 @@ function MoreFiltersModal({
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             onClick={onResetFilters}
             type="button"
           >
@@ -961,7 +968,7 @@ function MoreFiltersModal({
             Reset
           </button>
           <button
-            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
             onClick={onClose}
             type="button"
           >
@@ -969,41 +976,10 @@ function MoreFiltersModal({
           </button>
         </footer>
       </div>
-    </div>
+    </NativeModal>
   );
 }
 
-function countActiveFilters(
-  filters: ApplicationFilters,
-  needsAttentionOnly: boolean,
-) {
-  return [
-    filters.applicationUrl,
-    filters.contacts,
-    filters.coverLetterVersion,
-    filters.dateApplied,
-    filters.offerDeadline,
-    filters.status,
-    filters.followUp,
-    filters.followUpPromptDays,
-    filters.interview,
-    filters.interviewRound,
-    filters.interviewType,
-    filters.jobDescription,
-    filters.resume,
-    filters.source,
-    filters.jobType,
-    filters.location,
-    filters.notes,
-    filters.priority,
-    filters.roleEndDate,
-    filters.roleStartDate,
-    filters.salary,
-    filters.updatedAt,
-    filters.workMode,
-    needsAttentionOnly,
-  ].filter(Boolean).length;
-}
 
 function PresenceFilterSelect({
   label,
@@ -1024,6 +1000,52 @@ function PresenceFilterSelect({
       <option value="">{label}</option>
       <option value="filled">Has value</option>
       <option value="blank">Blank</option>
+    </FilterSelect>
+  );
+}
+
+const PHONE_SORT_OPTIONS: Array<{ label: string; sort: SortState }> = [
+  { label: "Last updated", sort: DEFAULT_SORT_STATE },
+  { label: "Newest applied", sort: { column: "dateApplied", direction: "descending" } },
+  { label: "Oldest applied", sort: { column: "dateApplied", direction: "ascending" } },
+  { label: "Company A–Z", sort: { column: "company", direction: "ascending" } },
+  { label: "Job title A–Z", sort: { column: "jobTitle", direction: "ascending" } },
+  { label: "Status", sort: { column: "status", direction: "ascending" } },
+];
+
+const sortKey = (sort: SortState) => `${sort.column}:${sort.direction}`;
+
+export function PhoneSortSelect({
+  onChange,
+  sort,
+}: {
+  onChange: (sort: SortState) => void;
+  sort: SortState;
+}) {
+  const value = sortKey(sort);
+  const isTableSort = !PHONE_SORT_OPTIONS.some((option) => sortKey(option.sort) === value);
+
+  return (
+    <FilterSelect
+      icon={ArrowUpDown}
+      label="Sort applications"
+      onChange={(next) => {
+        const option = PHONE_SORT_OPTIONS.find((item) => sortKey(item.sort) === next);
+        if (option) onChange(option.sort);
+      }}
+      value={value}
+    >
+      {/* A column sort chosen on a wider screen stays selected until changed. */}
+      {isTableSort ? (
+        <option disabled value={value}>
+          Table sort
+        </option>
+      ) : null}
+      {PHONE_SORT_OPTIONS.map((option) => (
+        <option key={sortKey(option.sort)} value={sortKey(option.sort)}>
+          {option.label}
+        </option>
+      ))}
     </FilterSelect>
   );
 }
@@ -1050,7 +1072,7 @@ function FilterSelect({
       />
       <span className="sr-only">{label}</span>
       <select
-        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground"
+        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground max-md:h-11"
         onChange={(event) => onChange?.(event.target.value)}
         value={value}
       >

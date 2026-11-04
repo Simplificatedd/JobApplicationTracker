@@ -61,6 +61,7 @@ import {
   deriveWorkModeMix,
   toCumulative,
 } from "./extraMetrics";
+import { clearOnMouseLeave } from "./pointerDetails";
 
 interface AnalyticsPageProps {
   activities: Activity[];
@@ -203,7 +204,7 @@ export function AnalyticsPage({
               options={TIME_GROUPING_OPTIONS}
               value={analyticsSettings.defaultTimeGrouping}
             />
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50">
+            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50 max-md:h-11">
               <input
                 checked={analyticsSettings.includeArchived}
                 className="h-4 w-4 rounded border-border text-primary"
@@ -219,7 +220,7 @@ export function AnalyticsPage({
             <button
               aria-controls={customizePanelId}
               aria-expanded={isCustomizing}
-              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition max-md:h-11 ${
                 isCustomizing
                   ? "border-primary bg-blue-50 text-primary"
                   : "border-border text-foreground hover:bg-slate-50"
@@ -257,7 +258,7 @@ export function AnalyticsPage({
 
                         return (
                           <label
-                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                            className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition max-md:min-h-11 ${
                               isVisible
                                 ? "border-primary/40 bg-blue-50 text-foreground"
                                 : "border-border bg-surface text-muted hover:text-foreground"
@@ -679,7 +680,7 @@ function KeyMetrics({
   return (
     <section
       aria-label="Key metrics"
-      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-3 xl:grid-cols-4"
     >
       <StatTile
         detail={dateRange === "all" ? "All time" : `Applied in the last ${rangeLabel.toLowerCase()}`}
@@ -829,7 +830,7 @@ function ActivityHeatmap({ days }: { days: CalendarDay[] }) {
                     onBlur={() => setActiveDay(null)}
                     onFocus={(event) => showDay(day, event.currentTarget)}
                     onPointerEnter={(event) => showDay(day, event.currentTarget)}
-                    onPointerLeave={() => setActiveDay(null)}
+                    {...clearOnMouseLeave(() => setActiveDay(null))}
                     type="button"
                   />
                 ) : (

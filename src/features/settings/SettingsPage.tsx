@@ -202,14 +202,14 @@ export function SettingsPage({
               </div>
             </div>
             <a
-              className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="touch-target inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
               href="/cdn-cgi/access/logout"
             >
               <LogOut aria-hidden="true" size={16} />
               Sign out
             </a>
           </div>
-          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted">
+          <div className="flex items-start gap-3 py-4 text-xs leading-5 text-muted max-md:text-[13px]">
             <Cloud aria-hidden="true" className="mt-0.5 shrink-0 text-info" size={16} />
             <p>
               D1 stores your tracker data and R2 stores resume and cover letter
@@ -242,7 +242,7 @@ export function SettingsPage({
           </div>
           <div className="pb-4 text-sm text-muted">
             <p>Full backups support up to 100 MiB of documents, 10 MiB per file, and the cloud tracker-data limit. Restoring requires available cloud upload space.</p>
-            <button className="mt-2 font-semibold text-primary hover:underline" onClick={() => exportFullBackup(true)} type="button">
+            <button className="mt-2 font-semibold text-primary hover:underline max-md:h-11" onClick={() => exportFullBackup(true)} type="button">
               Export recovery archive
             </button>
             <p>Preserve data that exceeds restore limits for offline recovery. This archive may need repair before import.</p>
@@ -289,9 +289,9 @@ export function SettingsPage({
                     value={backupPreview.coverLetterFiles}
                   />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2 max-md:grid">
                   <button
-                    className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isImportingBackup}
                     onClick={importBackup}
                     type="button"
@@ -300,7 +300,7 @@ export function SettingsPage({
                     Replace cloud data
                   </button>
                   <button
-                    className="touch-target h-9 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    className="touch-target h-9 rounded-lg border border-border bg-surface px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
                     disabled={isImportingBackup}
                     onClick={clearBackupSelection}
                     type="button"
@@ -337,6 +337,9 @@ export function SettingsPage({
         >
           <ToggleButtonField
             checked={settings.navigationDisplayMode === "top"}
+            // Phones always use the bottom bar. The next row's divider would
+            // otherwise double the header's border.
+            className="max-md:hidden max-md:[&+*]:!border-t-0"
             description="Choose whether the main navigation sits on the left edge or across the top of the workspace."
             label="Show navigation as:"
             offLabel="Side navbar"
@@ -547,13 +550,13 @@ export function SettingsPage({
           title="Reset preferences"
         >
           <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-muted">
+            <p className="text-xs leading-5 text-muted max-md:text-[13px]">
               Your applications, contacts and files are not affected.
             </p>
             {isConfirmingReset ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 max-sm:grid">
                 <button
-                  className="touch-target inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+                  className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700"
                   onClick={() => {
                     onResetSettings();
                     setIsConfirmingReset(false);
@@ -564,7 +567,7 @@ export function SettingsPage({
                   Confirm reset
                 </button>
                 <button
-                  className="touch-target h-9 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+                  className="touch-target h-9 rounded-lg border border-border px-3 text-sm max-md:h-11 font-semibold text-foreground hover:bg-slate-50"
                   onClick={() => setIsConfirmingReset(false)}
                   type="button"
                 >
@@ -573,7 +576,7 @@ export function SettingsPage({
               </div>
             ) : (
               <button
-                className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
+                className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 max-md:h-11 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
                 onClick={() => setIsConfirmingReset(true)}
                 type="button"
               >
@@ -599,6 +602,10 @@ const SETTINGS_SECTIONS = [
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+// Hidden below md, with their strip entries: every setting in them only
+// affects the desktop table. Stored values are left untouched.
+const DESKTOP_ONLY_SECTIONS = new Set<SettingsSectionId>(["table"]);
 
 // Each section has its own accent so the page is easier to scan. Class names are
 // written out in full so Tailwind can find them.
@@ -711,6 +718,8 @@ function useActiveSection() {
 
         if (
           element &&
+          // A section hidden on phones has no box and would always count.
+          element.getClientRects().length > 0 &&
           isSectionReached(
             element.getBoundingClientRect().top,
             parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
@@ -765,7 +774,9 @@ function SettingsNav({
         return (
           <a
             aria-current={isActive ? "true" : undefined}
-            className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+            className={`touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 max-md:h-11 text-sm font-medium transition ${
+              DESKTOP_ONLY_SECTIONS.has(section.id) ? "max-md:hidden" : ""
+            } ${
               isActive
                 ? `${accent.navActive} font-semibold`
                 : "text-muted hover:bg-slate-100 hover:text-foreground"
@@ -816,9 +827,9 @@ function SettingsSection({
   return (
     <section
       aria-labelledby={`settings-${id}-title`}
-      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
+      className={`surface-panel relative scroll-mt-[calc(var(--app-header-height,0px)+4rem)] max-md:scroll-mt-[calc(var(--app-header-height,0px)+4.5rem)] overflow-hidden lg:scroll-mt-28 rounded-lg ${
         id === "reset" ? "border-red-200" : ""
-      }`}
+      } ${DESKTOP_ONLY_SECTIONS.has(id) ? "max-md:hidden" : ""}`}
       id={`settings-${id}`}
     >
       <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${accent.strip}`} />
@@ -836,7 +847,7 @@ function SettingsSection({
           >
             {title}
           </h3>
-          <p className="text-xs text-muted">{description}</p>
+          <p className="text-xs text-muted max-md:text-[13px]">{description}</p>
         </div>
       </header>
       <SectionAccentContext.Provider value={accent}>
@@ -871,7 +882,7 @@ function ExportTile({
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-foreground">{label}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-muted">{description}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">{description}</span>
       </span>
     </button>
   );
@@ -946,6 +957,7 @@ function ToggleField({
 
 function ToggleButtonField({
   checked,
+  className = "",
   description,
   label,
   offLabel,
@@ -953,6 +965,7 @@ function ToggleButtonField({
   onLabel,
 }: {
   checked: boolean;
+  className?: string;
   description: string;
   label: string;
   offLabel: string;
@@ -962,11 +975,11 @@ function ToggleButtonField({
   const accent = useContext(SectionAccentContext);
 
   return (
-    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className={`flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between ${className}`}>
       <SettingLabel description={description} label={label} />
       <div
         aria-label={label.replace(/:$/, "")}
-        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5"
+        className="inline-flex shrink-0 self-start rounded-lg border border-border bg-background p-0.5 max-md:grid max-md:grid-cols-2 max-sm:self-stretch"
         role="radiogroup"
       >
         {[
@@ -975,7 +988,7 @@ function ToggleButtonField({
         ].map((option) => (
           <button
             aria-checked={checked === option.isOn}
-            className={`touch-target h-8 rounded-md px-3 text-sm font-medium transition ${
+            className={`touch-target h-8 rounded-md px-3 text-sm font-medium transition max-md:h-11 ${
               checked === option.isOn
                 ? `bg-surface font-semibold shadow-sm ${accent.choice}`
                 : "text-muted hover:text-foreground"
@@ -1040,7 +1053,7 @@ function NumberField({
       <SettingLabel description={description} label={label} />
       <span className="inline-flex shrink-0 items-center gap-2 self-start">
         <input
-          className="field-control h-9 w-20 text-right tabular-nums"
+          className="field-control h-9 w-20 text-right tabular-nums max-md:h-11"
           min={min}
           onChange={(event) =>
             onChange(Math.max(min, Math.floor(Number(event.target.value)) || min))
@@ -1095,7 +1108,7 @@ function TextField({
     >
       <SettingLabel description={description} label={label} />
       <input
-        className="field-control h-9 w-full shrink-0 self-start sm:w-48"
+        className="field-control h-9 w-full shrink-0 self-start max-md:h-11 sm:w-48"
         disabled={disabled}
         maxLength={80}
         onBlur={commitDraft}
@@ -1123,7 +1136,7 @@ function SettingLabel({
 }) {
   return (
     <span className="min-w-0">
-      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground max-md:text-[15px]">
         {label.replace(/:$/, "")}
         {badge ? (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
@@ -1132,7 +1145,7 @@ function SettingLabel({
         ) : null}
       </span>
       {description ? (
-        <span className="mt-0.5 block text-xs leading-5 text-muted">
+        <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">
           {description}
         </span>
       ) : null}

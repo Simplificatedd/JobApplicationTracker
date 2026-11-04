@@ -14,7 +14,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   APPLICATION_STATUSES,
   getInterviewTypeLabel,
@@ -43,6 +43,8 @@ import {
 } from "./applicationActions";
 import { moveMenuFocus } from "./TableCells";
 import { NativeModal } from "../../components/NativeModal";
+import { usePhoneLayout } from "../../hooks/usePhoneLayout";
+import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type {
   ApplicationUpdate,
   MutationResult,
@@ -63,6 +65,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import { StatusBadge } from "./StatusBadge";
+import { createStatusQuickEdit } from "./applicationQuickEdits";
 import {
   AssessmentsSection,
   type AssessmentSectionProps,
@@ -143,12 +146,16 @@ export function ApplicationDetailPanel({
   workingCoverLetterId,
 }: ApplicationDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const isPhone = usePhoneLayout();
+  const editViewportStyle = useVisibleViewportStyle(isEditing && isPhone);
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
   const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
   const [isActionPending, setIsActionPending] = useState(false);
   const [actionError, setActionError] = useState("");
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  // Shows a chosen status while it saves; cleared when the save settles.
+  const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(null);
   const headerActionsDisabled = nestedEditorOpen || isActionPending;
   const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(application));
@@ -335,10 +342,18 @@ export function ApplicationDetailPanel({
     <NativeModal
       labelledBy="application-detail-title"
       onRequestClose={requestClose}
-      className="modal-overlay fixed inset-0 z-40 flex justify-end p-0 sm:p-4"
+      className="application-detail-panel modal-overlay fixed inset-0 z-40 flex justify-end p-0 md:p-4"
     >
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover sm:rounded-lg">
-        <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
+      {/* While editing on a phone, size to what the keyboard leaves visible. */}
+      <div
+        className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-surface shadow-popover md:rounded-lg"
+        style={editViewportStyle}
+      >
+        <header
+          className={`flex items-start justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 md:py-4 ${
+            isEditing ? "" : "max-md:border-b-0"
+          }`}
+        >
           <div className="min-w-0">
             {application.company ? (
               <p className="text-sm font-medium text-muted">
@@ -357,7 +372,7 @@ export function ApplicationDetailPanel({
               <>
                 {/* Phones use the labelled footer actions below instead. */}
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={saveChanges}
                   type="button"
@@ -368,7 +383,7 @@ export function ApplicationDetailPanel({
                   </span>
                 </button>
                 <button
-                  className="icon-button hidden sm:inline-flex"
+                  className="icon-button hidden md:inline-flex"
                   disabled={isSaving}
                   onClick={cancelEditing}
                   type="button"
@@ -485,9 +500,38 @@ export function ApplicationDetailPanel({
           </div>
         </header>
 
+        {/* Phones keep the status in the sticky header area and change it in
+            place; the table's quick-edit popover cannot open in a modal. */}
+        {!isEditing ? (
+          <label className="block border-b border-border px-4 pb-3 sm:px-6 md:hidden">
+            <span className="sr-only">Application status</span>
+            <select
+              className="field-control h-11 w-auto max-w-full py-1 text-sm font-semibold"
+              // Like the actions trigger, it stays enabled while saving so
+              // focus is not lost; changes wait for the save to settle.
+              disabled={nestedEditorOpen}
+              onChange={(event) => {
+                if (isActionPending) return;
+                const status = event.target.value as ApplicationStatus;
+                setPendingStatus(status);
+                void runHeaderAction((id) =>
+                  onUpdate(id, createStatusQuickEdit(status)),
+                ).finally(() => setPendingStatus(null));
+              }}
+              value={pendingStatus ?? application.status}
+            >
+              {APPLICATION_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
-        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+        <div className="flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6">
           {isEditing ? (
             <EditForm
               coverLetterUploadError={coverLetterUploadError}
@@ -533,9 +577,9 @@ export function ApplicationDetailPanel({
           )}
         </div>
         {isEditing ? (
-          <footer className="flex justify-end gap-2 border-t border-border px-4 py-3 sm:hidden">
+          <footer className="grid grid-cols-2 gap-2 border-t border-border px-4 py-3 sm:px-6 md:hidden">
             <button
-              className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
+              className="h-11 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50"
               disabled={isSaving}
               onClick={cancelEditing}
               type="button"
@@ -543,7 +587,7 @@ export function ApplicationDetailPanel({
               Cancel
             </button>
             <button
-              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
+              className="h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700"
               disabled={isSaving}
               onClick={saveChanges}
               type="button"
@@ -661,137 +705,152 @@ function ReadOnlyDetails({
     onUpdate(application.id, createHandledFollowUpUpdate(application));
   }
 
-  return (
-    <div className="space-y-6">
-      <section className="grid gap-3 sm:grid-cols-3">
-        <InfoTile label="Status">
-          <StatusBadge status={application.status} />
-        </InfoTile>
-        <InfoTile label="Priority">{application.priority}</InfoTile>
-        <InfoTile label="Last updated">
-          {formatUpdatedAt(application.updatedAt)}
-        </InfoTile>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2">
-        <DetailRow label="Location" value={application.location} />
-        <DetailRow label="Work mode" value={application.workMode} />
-        <DetailRow label="Job type" value={application.jobType} />
-        <DetailRow label="Source" value={application.source} />
-        <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
-        {application.status === "Offered" || application.offerDeadline ? (
-          <DetailRow
-            label="Offer deadline"
-            value={formatDateTime(application.offerDeadline)}
-          />
+  const isPhone = usePhoneLayout();
+  const sections = {
+    facts: (
+      <Fragment key="facts">
+        {isPhone ? (
+          <h3 className="text-sm font-semibold text-foreground">Key facts</h3>
         ) : null}
-        <DetailRow
-          label="Role dates"
-          value={formatDateRange(
-            application.roleStartDate,
-            application.roleEndDate,
-          )}
-        />
-        <DetailRow
-          label="Follow-up"
-          value={
-            application.followUpNeeded
-              ? application.followUpDate
-                ? `Compulsory / ${formatDate(application.followUpDate)}`
-                : "Compulsory / Date required"
-              : application.followUpDate
-                ? `Optional / ${formatDate(application.followUpDate)}`
-                : "No Follow-Up"
-          }
-        />
-        <DetailRow
-          label="Follow-up auto-reset"
-          value={
-            application.followUpAutoResetEnabled
-              ? `On / ${application.followUpPromptDays ?? 7} days`
-              : "Off"
-          }
-        />
-        <DetailRow
-          label="Current interview"
-          value={formatInterviewSummary(application)}
-        />
-        <ResumeDetail
-          error={resumeActionError}
-          isWorking={resume?.id === workingResumeId}
-          onDownload={onDownloadResume}
-          onPreview={onPreviewResume}
-          resume={resume}
-        />
-        <DocumentDetail
-          document={coverLetter}
-          error={coverLetterActionError}
-          isWorking={coverLetter?.id === workingCoverLetterId}
-          label="Cover letter"
-          onDownload={onDownloadCoverLetter}
-          onPreview={onPreviewCoverLetter}
-        />
-        <DetailRow label="Salary / pay" value={application.salary} />
-      </section>
-
-      {!application.archivedAt ? (
-        <section>
-          <h3 className="text-sm font-semibold text-foreground">
-            Follow-up actions
-          </h3>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <DetailActionButton onClick={changeFollowUpDate}>
-              <CalendarPlus aria-hidden="true" size={16} />
-              Change date
-            </DetailActionButton>
-            {!application.followUpNeeded && application.followUpDate ? (
-              <DetailActionButton onClick={clearFollowUpDate}>
-                <CalendarX aria-hidden="true" size={16} />
-                Clear date
-              </DetailActionButton>
-            ) : null}
-            {application.followUpDate ? (
-              <DetailActionButton onClick={handleFollowUp}>
-              <CalendarCheck aria-hidden="true" size={16} />
-                Follow-up handled
-              </DetailActionButton>
-            ) : null}
-          </div>
+        <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          <InfoTile className="max-md:hidden" label="Status">
+            <StatusBadge status={application.status} />
+          </InfoTile>
+          <InfoTile label="Priority">{application.priority}</InfoTile>
+          <InfoTile label="Last updated">
+            {formatUpdatedAt(application.updatedAt)}
+          </InfoTile>
         </section>
-      ) : null}
 
-      {safeApplicationUrl ? (
-        <a
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700"
-          href={safeApplicationUrl}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Open application link
-          <ExternalLink aria-hidden="true" size={16} />
-        </a>
-      ) : null}
+        <section className="grid gap-3 sm:grid-cols-2">
+          <DetailRow label="Location" value={application.location} />
+          <DetailRow label="Work mode" value={application.workMode} />
+          <DetailRow label="Job type" value={application.jobType} />
+          <DetailRow label="Source" value={application.source} />
+          <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
+          {application.status === "Offered" || application.offerDeadline ? (
+            <DetailRow
+              label="Offer deadline"
+              value={formatDateTime(application.offerDeadline)}
+            />
+          ) : null}
+          <DetailRow
+            label="Role dates"
+            value={formatDateRange(
+              application.roleStartDate,
+              application.roleEndDate,
+            )}
+          />
+          <DetailRow
+            label="Follow-up"
+            value={
+              application.followUpNeeded
+                ? application.followUpDate
+                  ? `Compulsory / ${formatDate(application.followUpDate)}`
+                  : "Compulsory / Date required"
+                : application.followUpDate
+                  ? `Optional / ${formatDate(application.followUpDate)}`
+                  : "No Follow-Up"
+            }
+          />
+          <DetailRow
+            label="Follow-up auto-reset"
+            value={
+              application.followUpAutoResetEnabled
+                ? `On / ${application.followUpPromptDays ?? 7} days`
+                : "Off"
+            }
+          />
+          <DetailRow
+            label="Current interview"
+            value={formatInterviewSummary(application)}
+          />
+          <ResumeDetail
+            error={resumeActionError}
+            isWorking={resume?.id === workingResumeId}
+            onDownload={onDownloadResume}
+            onPreview={onPreviewResume}
+            resume={resume}
+          />
+          <DocumentDetail
+            document={coverLetter}
+            error={coverLetterActionError}
+            isWorking={coverLetter?.id === workingCoverLetterId}
+            label="Cover letter"
+            onDownload={onDownloadCoverLetter}
+            onPreview={onPreviewCoverLetter}
+          />
+          <DetailRow label="Salary / pay" value={application.salary} />
+        </section>
 
-      <TextBlock label="Job description" value={application.jobDescription} />
-      <TextBlock label="Notes" value={application.notes} />
+        {!application.archivedAt ? (
+          <section>
+            <h3 className="text-sm font-semibold text-foreground">
+              Follow-up actions
+            </h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <DetailActionButton onClick={changeFollowUpDate}>
+                <CalendarPlus aria-hidden="true" size={16} />
+                Change date
+              </DetailActionButton>
+              {!application.followUpNeeded && application.followUpDate ? (
+                <DetailActionButton onClick={clearFollowUpDate}>
+                  <CalendarX aria-hidden="true" size={16} />
+                  Clear date
+                </DetailActionButton>
+              ) : null}
+              {application.followUpDate ? (
+                <DetailActionButton onClick={handleFollowUp}>
+                <CalendarCheck aria-hidden="true" size={16} />
+                  Follow-up handled
+                </DetailActionButton>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
-      <AssessmentsSection
-        onEditingChange={onAssessmentEditingChange}
-        application={application}
-        assessments={assessments}
-        assessmentActions={assessmentActions}
+        {safeApplicationUrl ? (
+          <a
+            className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-blue-700"
+            href={safeApplicationUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open application link
+            <ExternalLink aria-hidden="true" size={16} />
+          </a>
+        ) : null}
+      </Fragment>
+    ),
+    description: (
+      <TextBlock
+        key="description"
+        label="Job description"
+        value={application.jobDescription}
       />
-      <InterviewsSection
-        onEditingChange={onInterviewEditingChange}
-        onConvert={assessmentActions.convertInterviewToAssessment}
-        application={application}
-        interviews={interviews}
-        onAdd={onAddInterview}
-        onDelete={onDeleteInterview}
-        onUpdate={onUpdateInterview}
-      />
-
-      <section>
+    ),
+    notes: <TextBlock key="notes" label="Notes" value={application.notes} />,
+    schedule: (
+      <Fragment key="schedule">
+        <AssessmentsSection
+          onEditingChange={onAssessmentEditingChange}
+          application={application}
+          assessments={assessments}
+          assessmentActions={assessmentActions}
+        />
+        <InterviewsSection
+          onEditingChange={onInterviewEditingChange}
+          onConvert={assessmentActions.convertInterviewToAssessment}
+          application={application}
+          interviews={interviews}
+          onAdd={onAddInterview}
+          onDelete={onDeleteInterview}
+          onUpdate={onUpdateInterview}
+        />
+      </Fragment>
+    ),
+    contacts: (
+      <section key="contacts">
         <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
         <div className="mt-3 grid gap-2">
           {contacts.length === 0 ? (
@@ -819,8 +878,30 @@ function ReadOnlyDetails({
           )}
         </div>
       </section>
-
-      <section>
+    ),
+    activity: isPhone ? (
+      <details key="activity">
+        {/* Padded to a 44px tap target; display stays list-item to keep the marker. */}
+        <summary className="cursor-pointer py-3 text-sm font-semibold text-foreground">
+          Activity ({activities.length})
+        </summary>
+        <div className="space-y-2">
+          {activities.length === 0 ? (
+            <p className="text-sm text-muted">No activity yet.</p>
+          ) : (
+            activities.map((activity) => (
+              <div className="rounded-lg border border-border px-3 py-2" key={activity.id}>
+                <p className="text-sm text-foreground">{activity.message}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {formatUpdatedAt(activity.createdAt)}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </details>
+    ) : (
+      <section key="activity">
         <h3 className="text-sm font-semibold text-foreground">Activity</h3>
         <div className="mt-3 space-y-2">
           {activities.length === 0 ? (
@@ -837,9 +918,19 @@ function ReadOnlyDetails({
           )}
         </div>
       </section>
-    </div>
+    ),
+  };
+  // Phones read the description first; wider screens keep the original order.
+  // Keyed sections move without losing an open interview or assessment edit.
+  const order: Array<keyof typeof sections> = isPhone
+    ? ["description", "notes", "schedule", "facts", "contacts", "activity"]
+    : ["facts", "description", "notes", "schedule", "contacts", "activity"];
+
+  return (
+    <div className="space-y-6">{order.map((key) => sections[key])}</div>
   );
 }
+
 
 function DetailActionButton({
   children,
@@ -852,7 +943,7 @@ function DetailActionButton({
 }) {
   return (
     <button
-      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 max-md:min-h-11"
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -1017,10 +1108,10 @@ function EditForm({
               <Upload aria-hidden="true" size={16} />
               Upload new resume
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <input
                 accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control sm:col-span-2"
+                className="field-control md:col-span-2"
                 onChange={(event) =>
                   setResumeUploadFile(event.target.files?.[0] ?? null)
                 }
@@ -1070,10 +1161,10 @@ function EditForm({
               <Upload aria-hidden="true" size={16} />
               Upload new cover letter
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <input
                 accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control sm:col-span-2"
+                className="field-control md:col-span-2"
                 onChange={(event) =>
                   setCoverLetterUploadFile(event.target.files?.[0] ?? null)
                 }
@@ -1214,13 +1305,15 @@ function DateField({
 
 function InfoTile({
   children,
+  className = "",
   label,
 }: {
   children: React.ReactNode;
+  className?: string;
   label: string;
 }) {
   return (
-    <div className="rounded-lg border border-border px-3 py-3">
+    <div className={`rounded-lg border border-border px-3 py-3 ${className}`}>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
       <div className="mt-2 text-sm font-medium capitalize text-foreground">
         {children}
