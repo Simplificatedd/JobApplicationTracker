@@ -204,7 +204,7 @@ describe("detail panel focus fallback (#217)", () => {
     expect(findApplicationFocusTarget("app-1")).toBe(search);
   });
 
-  it("escapes the application id in the selector", () => {
+  it("passes the application id through CSS.escape", () => {
     const row = element(true);
     stubPage({ '[data-application-id="a\\"b"]': [row] });
     expect(findApplicationFocusTarget('a"b')).toBe(row);
