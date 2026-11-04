@@ -8,7 +8,7 @@ it does not require access to the upstream maintainer's account.
 Use the existing Direct Upload Pages project, application D1 and private R2
 bucket. Preserve the existing Access application, policies, team domain and AUD.
 There is no control database or hosted preview environment. CI validates only.
-Merging this change does not deploy; production deployment needs separate approval.
+Merging to main deploys automatically once CI passes on it; see [Deployment](#deployment).
 
 ## Short configuration checklist
 
@@ -78,8 +78,8 @@ Merging this change does not deploy; production deployment needs separate approv
 
 ## MVP readiness criteria
 
-- **Essential:** passing CI; protected main; manual deployment using the current
-  main SHA; environment-scoped credentials; deployment concurrency; correct
+- **Essential:** passing CI; protected main; deployment of the exact main commit
+  that passed CI; environment-scoped credentials; deployment concurrency; correct
   application D1/R2 bindings and compatible schema/runtime; server-side Access JWT
   validation, ownership checks and existing data-integrity protections; unused
   previews without storage or deployment credentials; an available recovery path.
@@ -101,14 +101,26 @@ verify their names/scopes and the workflow's authenticated project read without
 printing them. Runtime JWT verification remains authoritative when encrypted
 Access identifiers are opaque to the configuration API.
 
-## Later deployment, only after explicit approval
+## Deployment
 
-Use Node 22.23.4 / npm 10.9.9. After the PR is reviewed, explicitly approved and
-merged, wait for CI on the resulting main commit. In GitHub → Actions → Manual
-production deployment → Run workflow, select main and enter that full current
-SHA as `release_sha`. Do not dispatch from an unmerged branch or an old run.
+Use Node 22.23.4 / npm 10.9.9. **Production deployment** (`production.yml`) runs
+in two ways:
 
-The workflow checks the selected SHA against current main, a clean checkout, the
+- **Automatically**, when CI completes successfully for a push to main in this
+  repository. It deploys the commit CI tested, not whatever main is by then.
+  Failed or cancelled CI, pull-request runs and manual CI runs never deploy.
+- **Manually**, from GitHub → Actions → Production deployment → Run workflow:
+  select main and enter the full current main SHA as `release_sha`. Use this for
+  the first deployment of an empty project, for a release that changes
+  `migrations/`, and to redeploy current main after a rollback.
+
+An automatic run also reads the commit production currently runs and stops
+unless the new commit comes after it on main, and stops if `migrations/` changed
+between the two, because deployment never applies migrations. Apply a
+separately reviewed migration first, then dispatch manually. If main has moved
+past the tested commit, that run stops and the newer commit's run deploys.
+
+Both kinds of run check the release SHA against current main, a clean checkout, the
 existing Direct Upload project and its production D1/R2 identities, configured
 Access identifiers, runtime compatibility, and absence of preview storage and
 deployment credentials. It runs the application tests/build and backup recovery

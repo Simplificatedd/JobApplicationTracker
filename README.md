@@ -110,10 +110,13 @@ flowchart LR
     Pages --> R2[(Your private R2)]
 ```
 
-GitHub CI checks pull requests and main without deploying. A separate manual
-workflow deploys only a confirmed current main SHA, checks the existing resource
-bindings, and serializes deployments. Preview publishing is disabled; do not
-bind preview code to production storage. Merging a PR does not deploy it.
+GitHub CI checks pull requests and main without deployment credentials. When CI
+passes on a push to main, the **Production deployment** workflow deploys that
+exact commit to the existing project, after checking the resource bindings.
+Deployments are serialized and never run migrations: a release that changes
+`migrations/`, or isn't ahead of what production runs, stops and needs a manual
+dispatch. Preview publishing is disabled; do not bind preview code to production
+storage.
 
 ## 💻 Local development
 
@@ -150,7 +153,7 @@ Never commit real resumes, exported backups, `.dev.vars`, or `wrangler.jsonc`.
 | Guide | What it covers |
 | --- | --- |
 | [First-time installation](docs/installation.md) | Your own Cloudflare resources, initial schema, Access sign-in and first manual deployment |
-| [Deployment guide](docs/deployment.md) | Existing production resources, short setup checklist, manual deployment and recovery |
+| [Deployment guide](docs/deployment.md) | Existing production resources, short setup checklist, automatic and manual deployment, and recovery |
 | [Privacy, security, and limits](docs/privacy-and-security.md) | How sign-in and storage work, privacy notes, and usage guardrails |
 | [Data model](docs/data-model.md) | How follow-ups, statuses, deadlines, deletion, and resumes behave |
 | [Backups and recovery](docs/backups.md) | Restore limits, recovery archives, and oversized legacy-file extraction |
