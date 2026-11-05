@@ -562,11 +562,10 @@ describe("store with two independent revision-aware cloud adapters", () => {
 
     it("keeps unrelated application fields edited in another session", async () => {
       const { a, api, store } = await sessions(createSnapshot({ applications: [awaiting] }));
-      await a.commitMutation({ applications: [{ ...awaiting, company: "Edited elsewhere", notes: "Other notes" }] });
+      const elsewhere = { company: "Edited elsewhere", notes: "Other notes", priority: "high" as const, location: "Remote" };
+      await a.commitMutation({ applications: [{ ...awaiting, ...elsewhere }] });
       expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
-      expect(api.state.snapshot.applications[0]).toMatchObject({
-        status: "Online Assessment", company: "Edited elsewhere", notes: "Other notes",
-      });
+      expect(api.state.snapshot.applications[0]).toMatchObject({ status: "Online Assessment", ...elsewhere });
     });
 
     it("saves nothing when the status changed in another session", async () => {
