@@ -393,6 +393,34 @@ describe("stage status rules (#228)", () => {
     expect(committed()).toEqual({ status: "Rejected", statusChanges: [] });
   });
 
+  const assessmentInput = {
+    applicationId: application.id, type: "coding" as const, proctored: "unknown" as const,
+    progress: "not-started" as const, result: "unknown" as const,
+  };
+
+  it("moves Awaiting Response to Online Assessment when an assessment is added (R3)", async () => {
+    const store = await mounted({ ...application, status: "Awaiting Response" });
+    expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+    expect(committed()).toEqual({ status: "Online Assessment", statusChanges: [["Awaiting Response", "Online Assessment"]] });
+  });
+
+  it("checks the assessment's status move against the record the rule read, not an older display", async () => {
+    // A queued status change already saved Awaiting Response; the display still shows Online Assessment.
+    const store = await mounted({ ...application, status: "Online Assessment" });
+    storage.getApplication.mockResolvedValue({ ...application, status: "Awaiting Response" });
+    expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+    const mutation = storage.commitMutation.mock.calls.at(-1)![0];
+    expect(mutation.expected.applications[0]).toMatchObject({ status: "Awaiting Response" });
+    expect(committed()).toEqual({ status: "Online Assessment", statusChanges: [["Awaiting Response", "Online Assessment"]] });
+  });
+
+  it.each(["Online Assessment", "Interviewing", "Offered", "Accepted", "Rejected", "Withdrawn"] as const)(
+    "leaves %s alone when an assessment is added (R3, R5)", async (status) => {
+      const store = await mounted({ ...application, status });
+      expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+      expect(committed()).toEqual({ status, statusChanges: [] });
+    });
+
   it("never changes the status when an interview or assessment is deleted (R6, R7 prompt in the UI)", async () => {
     const store = await mounted(application);
     storage.listInterviews.mockResolvedValue([undated]);

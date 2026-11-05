@@ -64,6 +64,7 @@ import {
   updateInterviewRecord,
 } from "../lib/interviews";
 import {
+  statusAfterAssessmentAdded,
   statusAfterInterviewAdded,
   statusAfterInterviewEdited,
 } from "../lib/stageStatus";
@@ -814,11 +815,15 @@ export function useTrackerStore(): TrackerStore {
         await cloudStorageAdapter.listAssessments(input.applicationId),
         timestamp,
       );
+      const status = statusAfterAssessmentAdded(application.status);
       const result = await commitMutation({
+        // The status rule read this record, so it is also the conflict baseline.
+        expected: { applications: [application] },
         creates: { assessments: [assessment.id] },
         assessments: [assessment],
-        applications: [{ ...application, updatedAt: timestamp }],
+        applications: [{ ...application, status, updatedAt: timestamp }],
         activities: [
+          ...statusChangeActivities(application, status, timestamp),
           createActivity(
             application.id,
             "updated",
