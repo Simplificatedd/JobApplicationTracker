@@ -27,7 +27,7 @@ vi.mock("react", () => ({
 import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { InterviewsSection } from "./InterviewsSection";
 import { AssessmentsSection } from "./AssessmentsSection";
-import { NotificationBell } from "../../components/NotificationBell";
+import { findVisibleNotificationsBell, NotificationBell } from "../../components/NotificationBell";
 import { AppShell } from "../../components/AppShell";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
@@ -243,6 +243,15 @@ it("keeps notification actions working from the phone panel", () => {
   expect(props.onOpenApplication).toHaveBeenCalledWith(application.id);
   tree = render(() => NotificationBell(props));
   expect(named(tree, "NativeModal")).toBeUndefined();
+});
+it("gives the detail panel and phone notifications their breakpoint focus fallbacks (#217)", () => {
+  const row = { getClientRects: () => [{}] };
+  vi.stubGlobal("CSS", { escape: (value: string) => value });
+  vi.stubGlobal("document", { ...document, querySelectorAll: (selector: string) =>
+    selector === `[data-application-id="${application.id}"]` ? [row] : [] });
+  const detail = render(() => ApplicationDetailPanel(detailProps()));
+  expect(call(detail.props.fallbackFocus)).toBe(row);
+  expect(named(openBell(bellProps(), true), "NativeModal").props.fallbackFocus).toBe(findVisibleNotificationsBell);
 });
 it("keeps the anchored popover on tablets and desktops", () => {
   const tree = openBell(bellProps(), false);
