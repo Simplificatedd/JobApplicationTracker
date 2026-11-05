@@ -512,6 +512,7 @@ describe("store with two independent revision-aware cloud adapters", () => {
     storage.getCurrentSnapshot.mockImplementation(b.getCurrentSnapshot);
     storage.getApplication.mockImplementation(b.getApplication);
     storage.listInterviews.mockImplementation(b.listInterviews);
+    storage.listAssessments.mockImplementation(b.listAssessments);
     storage.listResumeMetadata.mockImplementation(b.listResumeMetadata);
     storage.listCoverLetterMetadata.mockImplementation(b.listCoverLetterMetadata);
     storage.listContacts.mockImplementation(b.listContacts);
@@ -534,6 +535,64 @@ describe("store with two independent revision-aware cloud adapters", () => {
     await vi.waitFor(() => expect(RenderStore().isStorageLoading).toBe(false));
     return { api, a, b, cache, store: RenderStore() };
   }
+
+  // #228: a new assessment's status move is saved atomically with the assessment
+  // and its activities, keeps unrelated concurrent edits, and conflicts on status.
+  describe("assessment status moves across sessions (#228)", () => {
+    const awaiting = { ...application, status: "Awaiting Response" as const };
+    const assessmentInput = {
+      applicationId: application.id, type: "coding" as const, proctored: "unknown" as const,
+      progress: "not-started" as const, result: "unknown" as const,
+    };
+    const statusActivities = (activities: { type: string; applicationId: string }[]) =>
+      activities.filter((item) => item.type === "status_changed" && item.applicationId === application.id);
+
+    it("saves the assessment, status move and activities in one revision", async () => {
+      const { api, store } = await sessions(createSnapshot({ applications: [awaiting] }));
+      const revision = api.state.revision;
+      expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+      expect(api.state.revision).toBe(revision + 1);
+      expect(api.state.snapshot.applications[0].status).toBe("Online Assessment");
+      expect(api.state.snapshot.assessments).toHaveLength(1);
+      expect(statusActivities(api.state.snapshot.activities)).toMatchObject([
+        { statusFrom: "Awaiting Response", statusTo: "Online Assessment" },
+      ]);
+      expect(RenderStore().applications[0].status).toBe("Online Assessment");
+    });
+
+    it("keeps unrelated application fields edited in another session", async () => {
+      const { a, api, store } = await sessions(createSnapshot({ applications: [awaiting] }));
+      await a.commitMutation({ applications: [{ ...awaiting, company: "Edited elsewhere", notes: "Other notes" }] });
+      expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+      expect(api.state.snapshot.applications[0]).toMatchObject({
+        status: "Online Assessment", company: "Edited elsewhere", notes: "Other notes",
+      });
+    });
+
+    it("saves nothing when the status changed in another session", async () => {
+      const { a, api, store } = await sessions(createSnapshot({ applications: [awaiting] }));
+      await a.commitMutation({ applications: [{ ...awaiting, status: "Rejected" }] });
+      const revision = api.state.revision;
+      expect((await store.addAssessment(assessmentInput)).ok).toBe(false);
+      expect(api.state.revision).toBe(revision);
+      expect(api.state.snapshot.applications[0].status).toBe("Rejected");
+      expect(api.state.snapshot.assessments ?? []).toHaveLength(0);
+      expect(statusActivities(api.state.snapshot.activities)).toHaveLength(0);
+      expect(RenderStore().applications[0].status).toBe("Rejected");
+    });
+
+    it("never lets an assessment edit or delete change the status", async () => {
+      const { a, api, store } = await sessions(createSnapshot({ applications: [awaiting] }));
+      expect((await store.addAssessment(assessmentInput)).ok).toBe(true);
+      const saved = api.state.snapshot.assessments![0];
+      await a.refresh();
+      await a.commitMutation({ applications: [{ ...api.state.snapshot.applications[0], status: "Interviewing" }] });
+      expect((await RenderStore().updateAssessment(saved.id, { result: "passed" }, saved)).ok).toBe(true);
+      expect(api.state.snapshot.applications[0].status).toBe("Interviewing");
+      expect((await RenderStore().deleteAssessment(saved.id)).ok).toBe(true);
+      expect(api.state.snapshot.applications[0].status).toBe("Interviewing");
+    });
+  });
 
   it("reports size failures without changing displayed data, and retains repair/Retry responsibilities", async () => {
     const { api, store } = await sessions();
