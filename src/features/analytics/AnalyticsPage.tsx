@@ -131,8 +131,7 @@ export function AnalyticsPage({
   // The date range is view-only state. Timeline charts filter each record by
   // its own date; outcome classification still sees the full record history.
   const rangeStart = getRangeStart(dateRange);
-  const isInRange = (value?: string) =>
-    !rangeStart || (Boolean(value) && new Date(value as string) >= rangeStart);
+  const isInRange = (value?: string) => isInDateRange(value, rangeStart);
   const rangedApplications = scopedApplications.filter((application) =>
     isInRange(application.dateApplied || application.createdAt),
   );
@@ -576,6 +575,13 @@ const DATE_RANGE_OPTIONS: ReadonlyArray<{ label: string; value: DateRange }> = [
   { label: "12 months", value: "12m" },
 ];
 
+// Date-only values count from local midnight, the same as the range start.
+export function isInDateRange(value: string | undefined, rangeStart: Date | null) {
+  if (!rangeStart) return true;
+  const date = value ? parseCalendarDate(value) : null;
+  return Boolean(date && date >= rangeStart);
+}
+
 function getRangeStart(range: DateRange) {
   if (range === "all") {
     return null;
@@ -938,7 +944,7 @@ function LegendItem({
   );
 }
 
-function deriveApplicationsOverTime(
+export function deriveApplicationsOverTime(
   applications: Application[],
   grouping: AnalyticsSettings["defaultTimeGrouping"],
 ) {
@@ -1242,9 +1248,9 @@ function groupDates(
   grouping: AnalyticsSettings["defaultTimeGrouping"],
 ) {
   return dates.reduce((counts, value) => {
-    const date = new Date(value);
+    const date = parseCalendarDate(value);
 
-    if (Number.isNaN(date.getTime())) {
+    if (!date) {
       return counts;
     }
 
@@ -1264,17 +1270,18 @@ function getGroupKey(
   date: Date,
   grouping: AnalyticsSettings["defaultTimeGrouping"],
 ) {
+  // Keys are the viewer's local calendar days, like the activity calendar.
   if (grouping === "daily") {
-    return date.toISOString().slice(0, 10);
+    return createDateStamp(date);
   }
 
   if (grouping === "monthly") {
-    return date.toISOString().slice(0, 7);
+    return createDateStamp(date).slice(0, 7);
   }
 
   const start = new Date(date);
   start.setDate(date.getDate() - date.getDay());
-  return `${start.toISOString().slice(0, 10)} week`;
+  return `${createDateStamp(start)} week`;
 }
 
 function startOfMonth(date: Date) {

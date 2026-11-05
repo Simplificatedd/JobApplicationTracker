@@ -7,6 +7,21 @@ export function isValidDateTime(value: string) {
     Number(match[4] ?? 0) <= 59 && Number.isFinite(Date.parse(value)));
 }
 
+// Date-only values ("2026-11-05") are calendar days: parse them as local
+// midnight rather than UTC midnight. Other values are parsed as given.
+export function parseDateValue(value?: string) {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  const [year, monthIndex, day] = [Number(match[1]), Number(match[2]) - 1, Number(match[3])];
+  const date = new Date(year, monthIndex, day);
+  return date.getFullYear() === year && date.getMonth() === monthIndex && date.getDate() === day
+    ? date : undefined;
+}
+
 export function toDateTimeLocal(value?: string) {
   if (!value || !isValidDateTime(value)) return "";
   if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return value.slice(0, 16);

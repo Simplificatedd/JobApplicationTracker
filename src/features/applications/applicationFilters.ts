@@ -9,6 +9,7 @@ import type {
   WorkMode,
 } from "../../types/application";
 import type { UserSettings } from "../../types/settings";
+import { parseDateValue } from "../../lib/dateTime";
 import { normalizeInterviewType } from "../../lib/interviews";
 import { deriveApplicationNotifications } from "../../lib/reminders";
 
@@ -446,7 +447,7 @@ export function sortApplications(
 
 function getSortValue(application: Application, column: SortColumn) {
   if (column === "followUp") {
-    return application.followUpDate ? new Date(application.followUpDate).getTime() : 0;
+    return parseDateValue(application.followUpDate)?.getTime() ?? 0;
   }
 
   if (
@@ -457,7 +458,7 @@ function getSortValue(application: Application, column: SortColumn) {
     column === "interviewDateTime" ||
     column === "updatedAt"
   ) {
-    return application[column] ? new Date(application[column]).getTime() : 0;
+    return parseDateValue(application[column])?.getTime() ?? 0;
   }
 
   if (column === "followUpPromptDays") {
@@ -524,8 +525,14 @@ function matchesDeadline(value: string | undefined, filter: DeadlineFilter) {
     return false;
   }
 
+  const parsed = parseDateValue(value);
+
+  if (!parsed) {
+    return false;
+  }
+
   const today = startOfDay(new Date());
-  const deadline = startOfDay(new Date(value));
+  const deadline = startOfDay(parsed);
 
   if (filter === "overdue") {
     return deadline < today;

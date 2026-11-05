@@ -1,4 +1,5 @@
 import { getInterviewTypeLabel } from "../../lib/constants";
+import { parseDateValue } from "../../lib/dateTime";
 import type {
   Activity,
   Application,
@@ -192,7 +193,7 @@ export function deriveTimeToFirstResponse(
 
   applications.forEach((application) => {
     const respondedAt = firstResponseByApplication.get(application.id);
-    const appliedAt = new Date(getApplicationDate(application)).getTime();
+    const appliedAt = parseDateValue(getApplicationDate(application))?.getTime() ?? Number.NaN;
 
     if (respondedAt === undefined || Number.isNaN(appliedAt)) {
       return;
