@@ -60,10 +60,13 @@ import {
   buildInterviewRecord,
   createInterviewRecord,
   isValidInterviewRound,
-  isUpcomingInterview,
   selectCurrentInterview,
   updateInterviewRecord,
 } from "../lib/interviews";
+import {
+  statusAfterInterviewAdded,
+  statusAfterInterviewEdited,
+} from "../lib/stageStatus";
 import {
   assessmentFromInterview,
   createAssessment,
@@ -983,27 +986,13 @@ export function useTrackerStore(): TrackerStore {
       const timestamp = createTimestamp();
       const interview = createInterviewRecord(input, timestamp);
       const applicationInterviews = [interview, ...currentInterviews];
-      const status =
-        isUpcomingInterview(interview, new Date(timestamp)) &&
-        !INTERVIEW_STATUS_LOCKED_STATUSES.has(application.status)
-          ? "Interviewing"
-          : application.status;
+      const status = statusAfterInterviewAdded(application.status);
       const updatedApplication = applyInterviewProjection(
         { ...application, status, updatedAt: timestamp },
         selectCurrentInterview(applicationInterviews, new Date(timestamp)),
       );
       const activities = [
-        ...(status !== application.status
-          ? [
-              createActivity(
-                application.id,
-                "status_changed",
-                `Status changed to ${status}.`,
-                timestamp,
-                { statusFrom: application.status, statusTo: status },
-              ),
-            ]
-          : []),
+        ...statusChangeActivities(application, status, timestamp),
         createActivity(
           application.id,
           "updated",
@@ -1061,19 +1050,26 @@ export function useTrackerStore(): TrackerStore {
         .map((candidate) =>
           candidate.id === id ? updatedInterview : candidate,
         );
+      // The rules don't apply to an application archived in the meantime.
+      const status = application.archivedAt
+        ? application.status
+        : statusAfterInterviewEdited(application.status, interview, updatedInterview, new Date(timestamp));
       const updatedApplication = applyInterviewProjection(
-        { ...application, updatedAt: timestamp },
+        { ...application, status, updatedAt: timestamp },
         selectCurrentInterview(applicationInterviews, new Date(timestamp)),
       );
-      const activity = createActivity(
-        application.id,
-        "updated",
-        `Updated ${formatInterviewActivityLabel(updatedInterview)}.`,
-        timestamp,
-      );
+      const activities = [
+        ...statusChangeActivities(application, status, timestamp),
+        createActivity(
+          application.id,
+          "updated",
+          `Updated ${formatInterviewActivityLabel(updatedInterview)}.`,
+          timestamp,
+        ),
+      ];
       const result = await commitMutation({
         expected: { applications: [application], interviews: [expectedRecord(interview, expectedInterview ?? interviews.find((item) => item.id === id), input)] },
-        activities: [activity],
+        activities,
         applications: [updatedApplication],
         interviews: [updatedInterview],
       });
@@ -1928,12 +1924,24 @@ function sortResumes(resumes: ResumeMetadata[]) {
   );
 }
 
-const INTERVIEW_STATUS_LOCKED_STATUSES = new Set([
-  "Offered",
-  "Accepted",
-  "Rejected",
-  "Withdrawn",
-]);
+// One status_changed activity when a stage rule moved the application.
+function statusChangeActivities(
+  application: Application,
+  status: Application["status"],
+  createdAt: string,
+) {
+  return status === application.status
+    ? []
+    : [
+        createActivity(
+          application.id,
+          "status_changed",
+          `Status changed to ${status}.`,
+          createdAt,
+          { statusFrom: application.status, statusTo: status },
+        ),
+      ];
+}
 
 function formatInterviewActivityLabel(interview: Interview) {
   return interview.round ? `stage ${interview.round}` : "stage";

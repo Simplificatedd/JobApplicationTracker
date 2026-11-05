@@ -60,7 +60,7 @@ const storage = vi.hoisted(() => ({
   getNotificationState: vi.fn(), saveNotificationState: vi.fn(),
   getAnalyticsSettings: vi.fn(), saveAnalyticsSettings: vi.fn(),
   getTablePreferences: vi.fn(), saveTablePreferences: vi.fn(), exportSnapshot: vi.fn(), getCurrentSnapshot: vi.fn(),
-  getApplication: vi.fn(), listInterviews: vi.fn(), listResumeMetadata: vi.fn(),
+  getApplication: vi.fn(), listInterviews: vi.fn(), listAssessments: vi.fn(), listResumeMetadata: vi.fn(),
   listCoverLetterMetadata: vi.fn(), listContacts: vi.fn(), deleteApplication: vi.fn(),
   importSnapshot: vi.fn(), getResumeFile: vi.fn(),
   getDocumentCleanupWarning: vi.fn(), subscribeDocumentCleanupWarning: vi.fn(),
@@ -112,6 +112,7 @@ beforeEach(() => {
   storage.getCurrentSnapshot.mockReturnValue(snapshot);
   storage.getApplication.mockResolvedValue(application);
   storage.listInterviews.mockResolvedValue([]);
+  storage.listAssessments.mockResolvedValue([]);
   storage.listResumeMetadata.mockResolvedValue([]);
   storage.listCoverLetterMetadata.mockResolvedValue([]);
   storage.listContacts.mockResolvedValue([]);
@@ -314,6 +315,85 @@ describe("store reconciliation after mutations", () => {
   });
 });
 
+
+describe("stage status rules (#228)", () => {
+  const undated = interview(1);
+  async function mounted(app: typeof application) {
+    const initial = { ...snapshot, applications: [app] };
+    storage.initialize.mockResolvedValue(initial);
+    storage.getCurrentSnapshot.mockReturnValue(initial);
+    storage.getApplication.mockResolvedValue(app);
+    RenderStore(); await flush();
+    return RenderStore();
+  }
+  function committed() {
+    const mutation = storage.commitMutation.mock.calls.at(-1)![0];
+    return {
+      status: mutation.applications[0].status,
+      statusChanges: mutation.activities
+        .filter((activity: { type: string }) => activity.type === "status_changed")
+        .map((activity: { statusFrom: string; statusTo: string }) => [activity.statusFrom, activity.statusTo]),
+    };
+  }
+  const { id: _id, createdAt: _created, updatedAt: _updated, ...undatedInput } = undated;
+  void _id; void _created; void _updated;
+
+  it.each([
+    ["Awaiting Response", "undated", undefined],
+    ["Awaiting Response", "past", "2020-01-01T10:00"],
+    ["Online Assessment", "past", "2020-01-01T10:00"],
+    ["Online Assessment", "future", "2099-01-01T10:00"],
+  ] as const)("moves %s to Interviewing when a %s interview is added (R1)", async (status, _kind, dateTime) => {
+    const store = await mounted({ ...application, status });
+    expect((await store.addInterview({ ...undatedInput, dateTime })).ok).toBe(true);
+    expect(committed()).toEqual({ status: "Interviewing", statusChanges: [[status, "Interviewing"]] });
+  });
+
+  it.each(["Interviewing", "Offered", "Accepted", "Rejected", "Withdrawn"] as const)(
+    "leaves %s alone when an interview is added (R1, R5)", async (status) => {
+      const store = await mounted({ ...application, status });
+      expect((await store.addInterview({ ...undatedInput, dateTime: "2099-01-01T10:00" })).ok).toBe(true);
+      expect(committed()).toEqual({ status, statusChanges: [] });
+    });
+
+  it("moves Online Assessment to Interviewing when an interview gains a future date (R2)", async () => {
+    const store = await mounted({ ...application, status: "Online Assessment" });
+    storage.listInterviews.mockResolvedValue([undated]);
+    expect((await store.updateInterview(undated.id, { dateTime: "2099-01-01T10:00" }, undated)).ok).toBe(true);
+    expect(committed()).toEqual({ status: "Interviewing", statusChanges: [["Online Assessment", "Interviewing"]] });
+  });
+
+  it("keeps the status when an interview is edited to a past date or loses its date (R2)", async () => {
+    const future = { ...undated, dateTime: "2099-01-01T10:00" };
+    const store = await mounted({ ...application, status: "Online Assessment" });
+    storage.listInterviews.mockResolvedValue([future]);
+    await store.updateInterview(future.id, { dateTime: "2020-01-01T10:00" }, future);
+    expect(committed()).toEqual({ status: "Online Assessment", statusChanges: [] });
+    await store.updateInterview(future.id, { dateTime: undefined }, future);
+    expect(committed()).toEqual({ status: "Online Assessment", statusChanges: [] });
+  });
+
+  it("does not apply the rules when an interview of an archived application is edited", async () => {
+    const store = await mounted({ ...application, status: "Online Assessment", archivedAt: application.updatedAt });
+    storage.listInterviews.mockResolvedValue([undated]);
+    await store.updateInterview(undated.id, { dateTime: "2099-01-01T10:00" }, undated);
+    expect(committed()).toEqual({ status: "Online Assessment", statusChanges: [] });
+  });
+
+  it("never changes a final status when an interview is edited (R5)", async () => {
+    const store = await mounted({ ...application, status: "Rejected" });
+    storage.listInterviews.mockResolvedValue([undated]);
+    await store.updateInterview(undated.id, { dateTime: "2099-01-01T10:00" }, undated);
+    expect(committed()).toEqual({ status: "Rejected", statusChanges: [] });
+  });
+
+  it("never changes the status when an interview or assessment is deleted (R6, R7 prompt in the UI)", async () => {
+    const store = await mounted(application);
+    storage.listInterviews.mockResolvedValue([undated]);
+    expect((await store.deleteInterview(undated.id)).ok).toBe(true);
+    expect(committed()).toEqual({ status: "Interviewing", statusChanges: [] });
+  });
+});
 
 describe("store with two independent revision-aware cloud adapters", () => {
   async function sessions(data = createSnapshot()) {
