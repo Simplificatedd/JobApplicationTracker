@@ -632,7 +632,7 @@ export function useTrackerStore(): TrackerStore {
     }
 
     const updatedAt = createTimestamp();
-    const updatedApplication: Application = {
+    const editedApplication: Application = {
       ...currentApplication,
       ...input,
       resumeId:
@@ -645,13 +645,31 @@ export function useTrackerStore(): TrackerStore {
           : currentApplication.coverLetterId),
       updatedAt,
     };
+    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
+    // #228: an interview change that doesn't set a status itself (the table's
+    // scheduled-date edit) follows the shared interview rules. With no interview
+    // yet it adds one (R1); otherwise it edits the current one (R2), dated or not.
+    // The interview is saved either way, even when the status stays put.
+    const ruleInterview = shouldPersistInterviewUpdate(input) && !("status" in input)
+      ? buildInterviewRecord(
+          { ...editedApplication, status: "Interviewing" },
+          currentInterviews, updatedAt, currentInterview?.id,
+        )
+      : undefined;
+    const updatedApplication: Application = ruleInterview && !currentApplication.archivedAt
+      ? {
+          ...editedApplication,
+          status: currentInterview
+            ? statusAfterInterviewEdited(currentApplication.status, currentInterview, ruleInterview, new Date(updatedAt))
+            : statusAfterInterviewAdded(currentApplication.status),
+        }
+      : editedApplication;
     const newActivities = buildApplicationUpdateActivities(
       currentApplication,
       updatedApplication,
       input,
       updatedAt,
     );
-    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
     const displayedInterview = selectCurrentInterview(
       interviews.filter((item) => item.applicationId === id), new Date(updatedAt),
     );
@@ -659,14 +677,14 @@ export function useTrackerStore(): TrackerStore {
       displayedInterview?.id !== currentInterview?.id) {
       throw new StorageConflictError("The current interview changed while this table edit was open.");
     }
-    const updatedInterview = shouldPersistInterviewUpdate(input)
+    const updatedInterview = ruleInterview ?? (shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
           updatedAt,
           currentInterview?.id,
         )
-      : undefined;
+      : undefined);
     // Application interview fields are projections. Carry their displayed values
     // into the canonical interview baseline, where conflict checks actually run.
     const expectedInterview = updatedInterview && currentInterview

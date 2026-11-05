@@ -429,6 +429,75 @@ describe("stage status rules (#228)", () => {
   });
 });
 
+describe("table scheduling follows the shared interview rules (#228)", () => {
+  async function mountedWith(app: typeof application, existing: ReturnType<typeof interview>[]) {
+    const initial = { ...snapshot, applications: [app], interviews: existing };
+    storage.initialize.mockResolvedValue(initial);
+    storage.getCurrentSnapshot.mockReturnValue(initial);
+    storage.getApplication.mockResolvedValue(app);
+    storage.listInterviews.mockResolvedValue(existing);
+    RenderStore(); await flush();
+    return RenderStore();
+  }
+  function saved() {
+    const mutation = storage.commitMutation.mock.calls.at(-1)![0];
+    return {
+      status: mutation.applications[0].status,
+      interview: mutation.interviews?.[0],
+      created: mutation.creates.interviews,
+      statusChanges: mutation.activities
+        .filter((activity: { type: string }) => activity.type === "status_changed")
+        .map((activity: { statusFrom: string; statusTo: string }) => [activity.statusFrom, activity.statusTo]),
+    };
+  }
+  const undated = interview(1);
+  const awaiting = { ...application, status: "Awaiting Response" as const };
+
+  it("adds an interview and moves the status when none exists yet, whatever the date (R1)", async () => {
+    const store = await mountedWith(awaiting, []);
+    await store.updateApplication(application.id, { interviewDateTime: "2020-01-01T10:00" });
+    const result = saved();
+    expect(result.status).toBe("Interviewing");
+    expect(result.created).toEqual([result.interview.id]);
+    expect(result.interview.dateTime).toBe("2020-01-01T10:00");
+    expect(result.statusChanges).toEqual([["Awaiting Response", "Interviewing"]]);
+  });
+
+  it("saves a past date on an existing undated interview without changing the status (R2)", async () => {
+    const store = await mountedWith(awaiting, [undated]);
+    await store.updateApplication(application.id, { interviewDateTime: "2020-01-01T10:00" });
+    const result = saved();
+    expect(result).toMatchObject({ status: "Awaiting Response", created: [], statusChanges: [] });
+    expect(result.interview).toMatchObject({ id: undated.id, dateTime: "2020-01-01T10:00" });
+  });
+
+  it("saves a new future date on an already future interview without changing the status (R2)", async () => {
+    const future = { ...undated, dateTime: "2099-01-01T10:00" };
+    const store = await mountedWith(awaiting, [future]);
+    await store.updateApplication(application.id, { interviewDateTime: "2099-02-01T10:00" });
+    expect(saved()).toMatchObject({ status: "Awaiting Response", statusChanges: [], interview: { id: future.id, dateTime: "2099-02-01T10:00" } });
+  });
+
+  it("moves Online Assessment to Interviewing when an existing interview gets its first future date (R2)", async () => {
+    const past = { ...undated, dateTime: "2020-01-01T10:00" };
+    const store = await mountedWith({ ...application, status: "Online Assessment" }, [past]);
+    await store.updateApplication(application.id, { interviewDateTime: "2099-01-01T10:00" });
+    expect(saved()).toMatchObject({ status: "Interviewing", statusChanges: [["Online Assessment", "Interviewing"]] });
+  });
+
+  it("leaves an explicit status from the edit form alone", async () => {
+    const store = await mountedWith(application, [undated]);
+    await store.updateApplication(application.id, { status: "Rejected", interviewDateTime: "2099-01-01T10:00" });
+    expect(saved()).toMatchObject({ status: "Rejected", statusChanges: [["Interviewing", "Rejected"]] });
+  });
+
+  it("saves the interview but does not change the status of an archived application", async () => {
+    const store = await mountedWith({ ...awaiting, archivedAt: application.updatedAt }, []);
+    await store.updateApplication(application.id, { interviewDateTime: "2099-01-01T10:00" });
+    expect(saved()).toMatchObject({ status: "Awaiting Response", statusChanges: [], interview: { dateTime: "2099-01-01T10:00" } });
+  });
+});
+
 describe("store with two independent revision-aware cloud adapters", () => {
   async function sessions(data = createSnapshot()) {
     const { createCloudStorageAdapter } = await vi.importActual<typeof import("../storage/cloudStorageAdapter")>("../storage/cloudStorageAdapter");
