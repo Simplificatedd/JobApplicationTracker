@@ -23,7 +23,7 @@ import {
 } from "../lib/reminders";
 import type { ApplicationUpdate } from "../store/useTrackerStore";
 import type { AssessmentUpdate, InterviewUpdate } from "../types/application";
-import { NativeModal } from "./NativeModal";
+import { firstVisible, NativeModal } from "./NativeModal";
 
 interface NotificationBellProps {
   grouped: boolean;
@@ -145,6 +145,7 @@ export function NotificationBell({
         aria-haspopup="dialog"
         aria-label={`Notifications${count > 0 ? `, ${count} needs attention` : ""}`}
         className="icon-button relative"
+        data-notifications-bell
         onClick={togglePanel}
         title="Notifications"
         type="button"
@@ -162,6 +163,9 @@ export function NotificationBell({
         // The top bar's backdrop blur would trap a fixed popover inside it.
         <NativeModal
           className="notifications-panel fixed inset-0 z-50 flex flex-col overscroll-contain bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]"
+          // Widening past 768px closes this panel; from 768 to 1023px the
+          // header bell that opened it is hidden, so land on the visible one.
+          fallbackFocus={findVisibleNotificationsBell}
           labelledBy="notifications-panel-title"
           onRequestClose={() => setIsOpen(false)}
         >
@@ -589,4 +593,8 @@ export function changeAssessmentDate(
   if (edited === notification.dueAt) return;
   onUpdateAssessment(notification.assessmentId, notification.type === "assessment_start"
     ? { scheduledStart: edited } : { deadline: edited });
+}
+
+export function findVisibleNotificationsBell() {
+  return firstVisible("[data-notifications-bell]");
 }

@@ -475,3 +475,13 @@ describe("phone list toolbar", () => {
     }
   });
 });
+
+describe("application entries across layouts (#217)", () => {
+  it("marks the phone row, card and table row of each application for focus fallback", () => {
+    const html = renderPage("");
+    for (const id of [titleMatch.id, descriptionMatch.id]) {
+      const marked = html.match(new RegExp(`<(\\w+)[^>]*data-application-id="${id}"`, "g")) ?? [];
+      expect(marked.map((tag) => tag.slice(1, tag.indexOf(" "))).sort()).toEqual(["article", "button", "tr"]);
+    }
+  });
+});

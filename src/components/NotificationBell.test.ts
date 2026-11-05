@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { changeAssessmentDate, changeDate } from "./NotificationBell";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { changeAssessmentDate, changeDate, findVisibleNotificationsBell, NotificationBell } from "./NotificationBell";
 import { application } from "../test/assessmentFixtures";
 import type { ReminderNotification } from "../lib/reminders";
 const notice: ReminderNotification = {
@@ -36,4 +38,17 @@ it("rejects rolled-over assessment dates and preserves unchanged assessment inst
   changeAssessmentDate(assessment, update); expect(update).not.toHaveBeenCalled();
   vi.stubGlobal("window", { prompt: (_message: string, current: string) => current, alert: vi.fn() });
   changeAssessmentDate(assessment, update); expect(update).not.toHaveBeenCalled();
+});
+
+it("marks the bell and finds the visible one after the phone panel closes at 768-1023px (#217)", () => {
+  const html = renderToStaticMarkup(createElement(NotificationBell, {
+    grouped: false, notifications: [], onDismiss: vi.fn(), onMarkOpened: vi.fn(), onOpenApplication: vi.fn(),
+    onUpdateApplication: vi.fn(), onUpdateAssessment: vi.fn(), onUpdateInterview: vi.fn(),
+  }));
+  expect(html).toMatch(/<button[^>]*data-notifications-bell="true"[^>]*title="Notifications"/);
+  const headerBell = { getClientRects: () => [] }, navigationBell = { getClientRects: () => [{}] };
+  const querySelectorAll = vi.fn(() => [headerBell, navigationBell]);
+  vi.stubGlobal("document", { querySelectorAll });
+  expect(findVisibleNotificationsBell()).toBe(navigationBell);
+  expect(querySelectorAll).toHaveBeenCalledWith("[data-notifications-bell]");
 });

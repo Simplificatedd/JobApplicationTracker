@@ -57,6 +57,16 @@ it("focuses the fallback when the opener is no longer rendered, and the opener o
   open(visible, unused);
   expect(visible.focus).toHaveBeenCalled(); expect(unused.focus).not.toHaveBeenCalled();
 
+  // An update removed the opener (for example an archived row): use the fallback.
+  const removed = new Element(); removed.isConnected = false; const replacement = new Element();
+  open(removed, replacement);
+  expect(replacement.focus).toHaveBeenCalled(); expect(removed.focus).not.toHaveBeenCalled();
+
+  // A removed opener without a fallback is left alone, as before.
+  const orphan = new Element(); orphan.isConnected = false;
+  open(orphan);
+  expect(orphan.focus).not.toHaveBeenCalled();
+
   // No fallback: keep the old behaviour of trying the opener.
   const alone = new Element(); alone.rendered = false;
   open(alone);

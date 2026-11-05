@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { application } from "../../test/assessmentFixtures";
-import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
+import { ApplicationDetailPanel, findApplicationFocusTarget } from "./ApplicationDetailPanel";
 
 function renderPanel(
   overrides: Partial<ComponentProps<typeof ApplicationDetailPanel>> = {},
@@ -179,5 +179,34 @@ describe("phone detail panel buttons", () => {
       expect(classes.length).toBeGreaterThan(0);
       for (const list of classes) expect(list.split(" ")).toContain("max-md:min-h-11");
     }
+  });
+});
+
+describe("detail panel focus fallback (#217)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const element = (rendered: boolean) => ({ getClientRects: () => (rendered ? [{}] : []) });
+
+  function stubPage(matches: Record<string, ReturnType<typeof element>[]>) {
+    vi.stubGlobal("CSS", { escape: (value: string) => value.replace(/"/g, '\\"') });
+    vi.stubGlobal("document", { querySelectorAll: (selector: string) => matches[selector] ?? [] });
+  }
+
+  it("focuses the application's visible row, card or table row", () => {
+    const hiddenPhoneRow = element(false);
+    const card = element(true);
+    stubPage({ '[data-application-id="app-1"]': [hiddenPhoneRow, card], 'input[type="search"]': [element(true)] });
+    expect(findApplicationFocusTarget("app-1")).toBe(card);
+  });
+
+  it("falls back to the visible search field when the application has no visible entry", () => {
+    const search = element(true);
+    stubPage({ '[data-application-id="app-1"]': [element(false)], 'input[type="search"]': [element(false), search] });
+    expect(findApplicationFocusTarget("app-1")).toBe(search);
+  });
+
+  it("passes the application id through CSS.escape", () => {
+    const row = element(true);
+    stubPage({ '[data-application-id="a\\"b"]': [row] });
+    expect(findApplicationFocusTarget('a"b')).toBe(row);
   });
 });
