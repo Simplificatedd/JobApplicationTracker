@@ -60,3 +60,26 @@ describe("application quick-edit updates", () => {
 it("does not write an unchanged schedule", () => {
   expect(createInterviewQuickEdit({ ...application, status: "Interviewing", interviewDateTime: "2026-10-01T14:30" }, "2026-10-01T14:30")).toEqual({});
 });
+
+describe("table scheduling follows the #228 interview rules", () => {
+  const now = new Date("2026-11-05T12:00:00");
+  const scheduled = { ...application, status: "Online Assessment" as const, interviewDateTime: "2026-11-10T10:00" };
+
+  it("moves the status when an interview is scheduled for the first time, whatever the date (R1)", () => {
+    expect(createInterviewQuickEdit(application, "2020-01-01T10:00", now)).toMatchObject({ status: "Interviewing" });
+  });
+
+  it("moves the status when an existing past interview is moved to a future date (R2)", () => {
+    const past = { ...scheduled, interviewDateTime: "2026-11-01T10:00" };
+    expect(createInterviewQuickEdit(past, "2026-11-20T10:00", now)).toMatchObject({ status: "Interviewing" });
+  });
+
+  it("keeps the status when an already future interview gets another future date (R2)", () => {
+    const manual = { ...scheduled, status: "Awaiting Response" as const };
+    expect(createInterviewQuickEdit(manual, "2026-11-20T10:00", now)).toEqual({ interviewDateTime: "2026-11-20T10:00" });
+  });
+
+  it("keeps the status when an existing interview is moved into the past (R2)", () => {
+    expect(createInterviewQuickEdit(scheduled, "2026-11-01T10:00", now)).toEqual({ interviewDateTime: "2026-11-01T10:00" });
+  });
+});
