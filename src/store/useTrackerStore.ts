@@ -983,6 +983,10 @@ export function useTrackerStore(): TrackerStore {
         return failure("Application could not be found.");
       }
 
+      if (application.archivedAt) {
+        return failure("Active application could not be found.");
+      }
+
       const timestamp = createTimestamp();
       const interview = createInterviewRecord(input, timestamp);
       const applicationInterviews = [interview, ...currentInterviews];

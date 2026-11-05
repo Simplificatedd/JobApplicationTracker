@@ -356,6 +356,12 @@ describe("stage status rules (#228)", () => {
       expect(committed()).toEqual({ status, statusChanges: [] });
     });
 
+  it("refuses to add an interview to an archived application", async () => {
+    const store = await mounted({ ...application, status: "Awaiting Response", archivedAt: application.updatedAt });
+    expect((await store.addInterview(undatedInput)).ok).toBe(false);
+    expect(storage.commitMutation).not.toHaveBeenCalled();
+  });
+
   it("moves Online Assessment to Interviewing when an interview gains a future date (R2)", async () => {
     const store = await mounted({ ...application, status: "Online Assessment" });
     storage.listInterviews.mockResolvedValue([undated]);
