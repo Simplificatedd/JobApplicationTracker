@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { ComponentProps } from "react";
-import { application } from "../../test/assessmentFixtures";
+import { application, interview } from "../../test/assessmentFixtures";
 
 // The same small hook-host approach used by the existing store tests. Exercise
 // real editor handlers without adding a browser/DOM dependency to the project.
@@ -18,6 +18,7 @@ vi.mock("react", () => ({
     host.effects.push(() => { host.cleanups[i]?.(); host.cleanups[i] = effect() ?? (() => {}); });
   },
   useId() { return "test-id"; },
+  Fragment: "react-fragment",
   useRef(initial: unknown) {
     const i = host.cursor++;
     if (!(i in host.slots)) host.slots[i] = { current: initial };
@@ -32,6 +33,8 @@ import { AppShell } from "../../components/AppShell";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
 import type { ReminderNotification } from "../../lib/reminders";
+import type { Assessment } from "../../types/application";
+import type { AssessmentActions } from "../../lib/assessments";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function elements(node: unknown): Element[] {
@@ -364,4 +367,134 @@ it("shows labelled Save and Cancel in the phone edit footer and hides the header
   expect(footer.props.className).toContain("md:hidden");
   expect(button(footer, "Cancel")).toBeDefined(); expect(button(footer, "Save")).toBeDefined();
   expect(elements(tree).filter(e => e.type === "button" && String(e.props.className).includes("hidden md:inline-flex"))).toHaveLength(2);
+});
+
+// #228: after the last interview or assessment goes, the detail panel offers a
+// status change. Keep status is the default; confirming saves with a baseline.
+describe("status prompt after removing the last interview or assessment (#228)", () => {
+  const assessment = (id: string): Assessment => ({
+    id, applicationId: application.id, number: 1, type: "coding", proctored: "unknown",
+    progress: "not-started", result: "unknown", createdAt: application.createdAt, updatedAt: application.updatedAt,
+  });
+  let addButtons: { focus: Mock; getClientRects: () => object[] }[] = [];
+  beforeEach(() => {
+    addButtons = [];
+    vi.stubGlobal("document", { ...document, querySelectorAll: (selector: string) =>
+      selector.startsWith("[data-stage-add=") ? addButtons : [] });
+  });
+  function setup(overrides: Partial<ComponentProps<typeof ApplicationDetailPanel>> = {}) {
+    const props = { ...detailProps(), ...overrides };
+    // Like the store, a successful action publishes the remaining records first.
+    props.onDeleteInterview = vi.fn(async (id: string) => {
+      props.interviews = props.interviews.filter((item) => item.id !== id);
+      return { ok: true as const, value: undefined };
+    });
+    props.onUpdate = vi.fn().mockResolvedValue({ ok: true });
+    props.assessmentActions = { ...assessmentActions(),
+      deleteAssessment: vi.fn(async (id: string) => {
+        props.assessments = props.assessments.filter((item) => item.id !== id);
+        return { ok: true as const, value: undefined };
+      }),
+      convertInterviewToAssessment: vi.fn(async (id: string) => {
+        props.interviews = props.interviews.filter((item) => item.id !== id);
+        props.assessments = [...props.assessments, assessment(id)];
+        return { ok: true as const, value: assessment(id) };
+      }) };
+    // Run the panel and its read-only details with stable hook slots.
+    const view = () => render(() => {
+      const details = named(ApplicationDetailPanel(props), "ReadOnlyDetails");
+      return (details.type as (value: unknown) => unknown)(details.props);
+    });
+    const prompt = () => named(view(), "UnsavedChangesDialog");
+    const deleteInterview = (id: string) => call(named(view(), "InterviewsSection").props.onDelete, id);
+    const deleteAssessment = (id: string) =>
+      call((named(view(), "AssessmentsSection").props.assessmentActions as AssessmentActions).deleteAssessment, id);
+    return { props, view, prompt, deleteInterview, deleteAssessment };
+  }
+
+  it("offers Awaiting Response after the last interview is deleted, and Keep status changes nothing", async () => {
+    const { props, prompt, deleteInterview } = setup({ interviews: [interview(1)] });
+    await deleteInterview("round-1");
+    expect(prompt().props).toMatchObject({ title: "Change status?", cancelLabel: "Keep status", confirmLabel: "Change status" });
+    expect(prompt().props.body).toContain("from Interviewing back to Awaiting Response");
+    call(prompt().props.onCancel);
+    expect(prompt()).toBeUndefined();
+    expect(props.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("saves the suggested status against the application as shown in the prompt", async () => {
+    const { props, prompt, deleteInterview } = setup({ interviews: [interview(1)], assessments: [assessment("oa-1")] });
+    await deleteInterview("round-1");
+    expect(prompt().props.body).toContain("back to Online Assessment");
+    await call(prompt().props.onConfirm);
+    expect(props.onUpdate).toHaveBeenCalledWith(application.id, { status: "Online Assessment" }, undefined, undefined, application);
+    expect(prompt()).toBeUndefined();
+  });
+
+  it("shows the error when the status change is rejected, for example by a conflict", async () => {
+    const { props, view, prompt, deleteInterview } = setup({ interviews: [interview(1)] });
+    (props.onUpdate as Mock).mockResolvedValue({ ok: false, error: "Status changed in another session." });
+    await deleteInterview("round-1");
+    call(prompt().props.onConfirm); await Promise.resolve(); await Promise.resolve();
+    expect(elements(view()).find(e => e.props.role === "alert")?.props.children).toBe("Status changed in another session.");
+    // A conflict loads the other session's status; the error stays until the next attempt.
+    props.application = { ...application, status: "Offered" };
+    expect(elements(view()).find(e => e.props.role === "alert")).toBeDefined();
+  });
+
+  it("returns focus to the section's add button before the prompt opens", async () => {
+    const { prompt, deleteInterview } = setup({ interviews: [interview(1)] });
+    const hidden = { focus: vi.fn(), getClientRects: () => [] }, visible = { focus: vi.fn(), getClientRects: () => [{}] };
+    addButtons = [hidden, visible];
+    await deleteInterview("round-1");
+    expect(visible.focus).toHaveBeenCalled(); expect(hidden.focus).not.toHaveBeenCalled();
+    expect(prompt()).toBeDefined();
+  });
+
+  it("does not prompt while another interview remains, or when the delete fails", async () => {
+    const { prompt, deleteInterview } = setup({ interviews: [interview(1), interview(2)] });
+    await deleteInterview("round-1");
+    expect(prompt()).toBeUndefined();
+    const single = setup({ interviews: [interview(1)] });
+    single.props.onDeleteInterview = vi.fn().mockResolvedValue({ ok: false, error: "Conflict" });
+    await single.deleteInterview("round-1");
+    expect(single.prompt()).toBeUndefined();
+  });
+
+  it("drops the prompt when the status changes elsewhere, so it can't come back on its own", async () => {
+    const { props, prompt, deleteInterview } = setup({ interviews: [interview(1)] });
+    await deleteInterview("round-1");
+    expect(prompt()).toBeDefined();
+    props.application = { ...application, status: "Rejected" };
+    expect(prompt()).toBeUndefined();
+    // Later the user sets Interviewing by hand, with no interviews left.
+    props.application = application;
+    expect(prompt()).toBeUndefined();
+  });
+
+  it("offers Online Assessment after converting the last interview (R9)", async () => {
+    const { props, view, prompt } = setup({ interviews: [interview(1)] });
+    await call(named(view(), "InterviewsSection").props.onConvert, "round-1");
+    expect(props.assessmentActions.convertInterviewToAssessment).toHaveBeenCalledWith("round-1");
+    expect(prompt().props.body).toContain("from Interviewing back to Online Assessment");
+  });
+
+  it("offers Awaiting Response after the last assessment is deleted while in Online Assessment", async () => {
+    const { prompt, deleteAssessment } = setup({ application: { ...application, status: "Online Assessment" }, assessments: [assessment("oa-1")] });
+    await deleteAssessment("oa-1");
+    expect(prompt().props.body).toContain("No assessments remain");
+    expect(prompt().props.body).toContain("back to Awaiting Response");
+  });
+
+  it("does not prompt after deleting an assessment while Interviewing", async () => {
+    const { prompt, deleteAssessment } = setup({ assessments: [assessment("oa-1")] });
+    await deleteAssessment("oa-1");
+    expect(prompt()).toBeUndefined();
+  });
+
+  it.each(["Offered", "Accepted", "Rejected", "Withdrawn"] as const)("never prompts for %s", async (status) => {
+    const { prompt, deleteInterview } = setup({ application: { ...application, status }, interviews: [interview(1)] });
+    await deleteInterview("round-1");
+    expect(prompt()).toBeUndefined();
+  });
 });

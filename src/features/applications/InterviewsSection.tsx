@@ -166,6 +166,7 @@ export function InterviewsSection({
         {!application.archivedAt && editingId === null ? (
           <button
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11"
+            data-stage-add="interview"
             onClick={startAdding}
             type="button"
           >

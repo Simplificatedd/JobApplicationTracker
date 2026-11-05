@@ -3,7 +3,10 @@ import { NativeModal } from "./NativeModal";
 
 interface UnsavedChangesDialogProps {
   body?: string;
+  cancelLabel?: string;
   confirmLabel?: string;
+  // "primary" for a non-destructive choice such as a suggested status change.
+  confirmTone?: "danger" | "primary";
   onCancel: () => void;
   onConfirm: () => void;
   title?: string;
@@ -11,7 +14,9 @@ interface UnsavedChangesDialogProps {
 
 export function UnsavedChangesDialog({
   body = "You have unsaved changes. Discard them?",
+  cancelLabel = "Keep editing",
   confirmLabel = "Discard",
+  confirmTone = "danger",
   onCancel,
   onConfirm,
   title = "Discard changes?",
@@ -48,10 +53,14 @@ export function UnsavedChangesDialog({
             onClick={onCancel}
             type="button"
           >
-            Keep editing
+            {cancelLabel}
           </button>
           <button
-            className="h-10 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 max-md:h-11"
+            className={`h-10 rounded-lg px-3 text-sm font-semibold max-md:h-11 ${
+              confirmTone === "danger"
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-primary text-primary-foreground hover:bg-blue-700"
+            }`}
             onClick={onConfirm}
             type="button"
           >

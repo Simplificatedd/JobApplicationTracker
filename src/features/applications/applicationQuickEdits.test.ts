@@ -29,10 +29,9 @@ describe("application quick-edit updates", () => {
     expect(createStatusQuickEdit("Accepted")).toEqual({ status: "Accepted" });
   });
 
-  it("moves an application into Interviewing when scheduling an interview", () => {
+  it("proposes only the date; the store applies the interview status rules (#228)", () => {
     expect(createInterviewQuickEdit(application, "2026-10-01T14:30")).toEqual({
       interviewDateTime: "2026-10-01T14:30",
-      status: "Interviewing",
     });
   });
 

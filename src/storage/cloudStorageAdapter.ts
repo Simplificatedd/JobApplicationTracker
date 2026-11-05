@@ -102,7 +102,10 @@ export function applyStorageMutation(
         )
           return write;
         // Assessment actions update activity timestamps, never overwrite a concurrently
-        // changed application status, archive state, or other application metadata.
+        // changed archive state or other application metadata. The one exception is
+        // the status move when an assessment is created (#228): the rebase above
+        // already kept a status changed elsewhere or rejected the conflict. Edits,
+        // deletes and conversions never write the status.
         const current = snapshot.applications.find(
           (item) => item.id === write.id,
         );
@@ -110,7 +113,14 @@ export function applyStorageMutation(
           throw new Error(
             "The assessment’s application no longer exists. Refresh the tracker.",
           );
-        return { ...current, updatedAt: write.updatedAt };
+        // Archived applications never change status automatically (#228).
+        if (mutation.creates?.assessments?.length && current.archivedAt && write.status !== current.status)
+          throw new StorageConflictError("The application was archived in another session.");
+        return {
+          ...current,
+          status: mutation.creates?.assessments?.length ? write.status : current.status,
+          updatedAt: write.updatedAt,
+        };
       }),
     ),
     contacts: removeRecords(

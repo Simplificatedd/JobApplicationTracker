@@ -60,10 +60,14 @@ import {
   buildInterviewRecord,
   createInterviewRecord,
   isValidInterviewRound,
-  isUpcomingInterview,
   selectCurrentInterview,
   updateInterviewRecord,
 } from "../lib/interviews";
+import {
+  statusAfterAssessmentAdded,
+  statusAfterInterviewAdded,
+  statusAfterInterviewEdited,
+} from "../lib/stageStatus";
 import {
   assessmentFromInterview,
   createAssessment,
@@ -628,7 +632,7 @@ export function useTrackerStore(): TrackerStore {
     }
 
     const updatedAt = createTimestamp();
-    const updatedApplication: Application = {
+    const editedApplication: Application = {
       ...currentApplication,
       ...input,
       resumeId:
@@ -641,13 +645,31 @@ export function useTrackerStore(): TrackerStore {
           : currentApplication.coverLetterId),
       updatedAt,
     };
+    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
+    // #228: an interview change that doesn't set a status itself (the table's
+    // scheduled-date edit) follows the shared interview rules. With no interview
+    // yet it adds one (R1); otherwise it edits the current one (R2), dated or not.
+    // The interview is saved either way, even when the status stays put.
+    const ruleInterview = shouldPersistInterviewUpdate(input) && !("status" in input)
+      ? buildInterviewRecord(
+          { ...editedApplication, status: "Interviewing" },
+          currentInterviews, updatedAt, currentInterview?.id,
+        )
+      : undefined;
+    const updatedApplication: Application = ruleInterview && !currentApplication.archivedAt
+      ? {
+          ...editedApplication,
+          status: currentInterview
+            ? statusAfterInterviewEdited(currentApplication.status, currentInterview, ruleInterview, new Date(updatedAt))
+            : statusAfterInterviewAdded(currentApplication.status),
+        }
+      : editedApplication;
     const newActivities = buildApplicationUpdateActivities(
       currentApplication,
       updatedApplication,
       input,
       updatedAt,
     );
-    const currentInterview = selectCurrentInterview(currentInterviews, new Date(updatedAt));
     const displayedInterview = selectCurrentInterview(
       interviews.filter((item) => item.applicationId === id), new Date(updatedAt),
     );
@@ -655,14 +677,14 @@ export function useTrackerStore(): TrackerStore {
       displayedInterview?.id !== currentInterview?.id) {
       throw new StorageConflictError("The current interview changed while this table edit was open.");
     }
-    const updatedInterview = shouldPersistInterviewUpdate(input)
+    const updatedInterview = ruleInterview ?? (shouldPersistInterviewUpdate(input)
       ? buildInterviewRecord(
           updatedApplication,
           currentInterviews,
           updatedAt,
           currentInterview?.id,
         )
-      : undefined;
+      : undefined);
     // Application interview fields are projections. Carry their displayed values
     // into the canonical interview baseline, where conflict checks actually run.
     const expectedInterview = updatedInterview && currentInterview
@@ -811,11 +833,15 @@ export function useTrackerStore(): TrackerStore {
         await cloudStorageAdapter.listAssessments(input.applicationId),
         timestamp,
       );
+      const status = statusAfterAssessmentAdded(application.status);
       const result = await commitMutation({
+        // The status rule read this record, so it is also the conflict baseline.
+        expected: { applications: [application] },
         creates: { assessments: [assessment.id] },
         assessments: [assessment],
-        applications: [{ ...application, updatedAt: timestamp }],
+        applications: [{ ...application, status, updatedAt: timestamp }],
         activities: [
+          ...statusChangeActivities(application, status, timestamp),
           createActivity(
             application.id,
             "updated",
@@ -980,30 +1006,20 @@ export function useTrackerStore(): TrackerStore {
         return failure("Application could not be found.");
       }
 
+      if (application.archivedAt) {
+        return failure("Active application could not be found.");
+      }
+
       const timestamp = createTimestamp();
       const interview = createInterviewRecord(input, timestamp);
       const applicationInterviews = [interview, ...currentInterviews];
-      const status =
-        isUpcomingInterview(interview, new Date(timestamp)) &&
-        !INTERVIEW_STATUS_LOCKED_STATUSES.has(application.status)
-          ? "Interviewing"
-          : application.status;
+      const status = statusAfterInterviewAdded(application.status);
       const updatedApplication = applyInterviewProjection(
         { ...application, status, updatedAt: timestamp },
         selectCurrentInterview(applicationInterviews, new Date(timestamp)),
       );
       const activities = [
-        ...(status !== application.status
-          ? [
-              createActivity(
-                application.id,
-                "status_changed",
-                `Status changed to ${status}.`,
-                timestamp,
-                { statusFrom: application.status, statusTo: status },
-              ),
-            ]
-          : []),
+        ...statusChangeActivities(application, status, timestamp),
         createActivity(
           application.id,
           "updated",
@@ -1061,19 +1077,26 @@ export function useTrackerStore(): TrackerStore {
         .map((candidate) =>
           candidate.id === id ? updatedInterview : candidate,
         );
+      // The rules don't apply to an application archived in the meantime.
+      const status = application.archivedAt
+        ? application.status
+        : statusAfterInterviewEdited(application.status, interview, updatedInterview, new Date(timestamp));
       const updatedApplication = applyInterviewProjection(
-        { ...application, updatedAt: timestamp },
+        { ...application, status, updatedAt: timestamp },
         selectCurrentInterview(applicationInterviews, new Date(timestamp)),
       );
-      const activity = createActivity(
-        application.id,
-        "updated",
-        `Updated ${formatInterviewActivityLabel(updatedInterview)}.`,
-        timestamp,
-      );
+      const activities = [
+        ...statusChangeActivities(application, status, timestamp),
+        createActivity(
+          application.id,
+          "updated",
+          `Updated ${formatInterviewActivityLabel(updatedInterview)}.`,
+          timestamp,
+        ),
+      ];
       const result = await commitMutation({
         expected: { applications: [application], interviews: [expectedRecord(interview, expectedInterview ?? interviews.find((item) => item.id === id), input)] },
-        activities: [activity],
+        activities,
         applications: [updatedApplication],
         interviews: [updatedInterview],
       });
@@ -1928,12 +1951,24 @@ function sortResumes(resumes: ResumeMetadata[]) {
   );
 }
 
-const INTERVIEW_STATUS_LOCKED_STATUSES = new Set([
-  "Offered",
-  "Accepted",
-  "Rejected",
-  "Withdrawn",
-]);
+// One status_changed activity when a stage rule moved the application.
+function statusChangeActivities(
+  application: Application,
+  status: Application["status"],
+  createdAt: string,
+) {
+  return status === application.status
+    ? []
+    : [
+        createActivity(
+          application.id,
+          "status_changed",
+          `Status changed to ${status}.`,
+          createdAt,
+          { statusFrom: application.status, statusTo: status },
+        ),
+      ];
+}
 
 function formatInterviewActivityLabel(interview: Interview) {
   return interview.round ? `stage ${interview.round}` : "stage";

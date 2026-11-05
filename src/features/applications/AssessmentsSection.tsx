@@ -150,6 +150,7 @@ export function AssessmentsSection({
         {!application.archivedAt && !draft ? (
           <button
             className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold hover:bg-slate-50 max-md:min-h-11"
+            data-stage-add="assessment"
             onClick={() => edit()}
             type="button"
           >

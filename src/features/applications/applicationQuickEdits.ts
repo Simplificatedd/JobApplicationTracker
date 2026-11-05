@@ -27,11 +27,7 @@ export function createInterviewQuickEdit(
   if (!canQuickEditInterview(application)) return {} satisfies ApplicationUpdate;
   const value = dateTimeEditValue(interviewDateTime, application.interviewDateTime);
   if (value === application.interviewDateTime) return {} satisfies ApplicationUpdate;
-  return {
-    interviewDateTime: value,
-    ...(interviewDateTime &&
-      !INTERVIEW_STATUS_LOCKED_STATUSES.has(application.status)
-      ? { status: "Interviewing" as const }
-      : {}),
-  } satisfies ApplicationUpdate;
+  // The store decides the status from the stored interviews (#228 R1/R2), the
+  // same rules as the detail panel; the table only sees the projected date.
+  return { interviewDateTime: value } satisfies ApplicationUpdate;
 }

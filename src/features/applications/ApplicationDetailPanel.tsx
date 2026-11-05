@@ -71,6 +71,7 @@ import {
   type AssessmentSectionProps,
 } from "./AssessmentsSection";
 import { InterviewsSection } from "./InterviewsSection";
+import { suggestStatusAfterRemoval } from "../../lib/stageStatus";
 import {
   FollowUpAutoResetControls,
   FollowUpScheduleControls,
@@ -655,6 +656,9 @@ function ReadOnlyDetails({
   onUpdate: (
     id: string,
     input: ApplicationUpdate,
+    pendingResume?: PendingResumeUpload,
+    pendingCoverLetter?: PendingResumeUpload,
+    expectedApplication?: Application,
   ) => Promise<MutationResult>;
   onUpdateInterview: (
     id: string,
@@ -709,6 +713,77 @@ function ReadOnlyDetails({
   }
 
   const isPhone = usePhoneLayout();
+  const [statusPrompt, setStatusPrompt] = useState<RemovedStage | null>(null);
+  const [statusChangeError, setStatusChangeError] = useState("");
+  // Derived from what is shown now, so a later delete, or a status changed
+  // elsewhere while the prompt is open, is taken into account.
+  const suggestedStatus = statusPrompt
+    ? suggestStatusAfterRemoval(application.status, statusPrompt, {
+        interviews: interviews.length,
+        assessments: assessments.length,
+      })
+    : undefined;
+  // A prompt hidden because the status changed elsewhere is dropped, so it
+  // can't reappear later without the user removing anything.
+  useEffect(() => {
+    if (statusPrompt && !suggestedStatus) setStatusPrompt(null);
+  }, [statusPrompt, suggestedStatus]);
+
+  // R6-R9 (#228): after the last interview or assessment goes, offer the
+  // status the remaining records support. Keep status is the default.
+  function offerStatusChange(
+    removed: RemovedStage,
+    remaining: { interviews: number; assessments: number },
+  ) {
+    if (!suggestStatusAfterRemoval(application.status, removed, remaining)) return;
+    // The delete or convert button is gone; return focus to this section.
+    firstVisible(`[data-stage-add="${removed}"]`)?.focus();
+    setStatusChangeError("");
+    setStatusPrompt(removed);
+  }
+
+  async function deleteInterview(id: string) {
+    const result = await onDeleteInterview(id);
+    if (result.ok) {
+      offerStatusChange("interview", {
+        interviews: interviews.filter((item) => item.id !== id).length,
+        assessments: assessments.length,
+      });
+    }
+    return result;
+  }
+
+  async function convertInterview(id: string) {
+    const result = await assessmentActions.convertInterviewToAssessment(id);
+    if (result.ok) {
+      offerStatusChange("interview", {
+        interviews: interviews.filter((item) => item.id !== id).length,
+        assessments: assessments.length + 1,
+      });
+    }
+    return result;
+  }
+
+  async function deleteAssessment(id: string) {
+    const result = await assessmentActions.deleteAssessment(id);
+    if (result.ok) {
+      offerStatusChange("assessment", {
+        interviews: interviews.length,
+        assessments: assessments.filter((item) => item.id !== id).length,
+      });
+    }
+    return result;
+  }
+
+  async function changeStatus(to: ApplicationStatus) {
+    setStatusPrompt(null);
+    setStatusChangeError("");
+    // The status shown in the prompt is the baseline, so a change made
+    // elsewhere in the meantime is a conflict instead of an overwrite.
+    const result = await onUpdate(application.id, createStatusQuickEdit(to), undefined, undefined, application);
+    if (!result.ok) setStatusChangeError(result.error);
+  }
+
   const sections = {
     facts: (
       <Fragment key="facts">
@@ -835,19 +910,24 @@ function ReadOnlyDetails({
     notes: <TextBlock key="notes" label="Notes" value={application.notes} />,
     schedule: (
       <Fragment key="schedule">
+        {statusChangeError ? (
+          <p className="text-sm font-medium text-destructive" role="alert">
+            {statusChangeError}
+          </p>
+        ) : null}
         <AssessmentsSection
           onEditingChange={onAssessmentEditingChange}
           application={application}
           assessments={assessments}
-          assessmentActions={assessmentActions}
+          assessmentActions={{ ...assessmentActions, deleteAssessment }}
         />
         <InterviewsSection
           onEditingChange={onInterviewEditingChange}
-          onConvert={assessmentActions.convertInterviewToAssessment}
+          onConvert={convertInterview}
           application={application}
           interviews={interviews}
           onAdd={onAddInterview}
-          onDelete={onDeleteInterview}
+          onDelete={deleteInterview}
           onUpdate={onUpdateInterview}
         />
       </Fragment>
@@ -930,9 +1010,24 @@ function ReadOnlyDetails({
     : ["facts", "description", "notes", "schedule", "contacts", "activity"];
 
   return (
-    <div className="space-y-6">{order.map((key) => sections[key])}</div>
+    <div className="space-y-6">
+      {order.map((key) => sections[key])}
+      {statusPrompt && suggestedStatus ? (
+        <UnsavedChangesDialog
+          body={`No ${statusPrompt}s remain. Move this application from ${application.status} back to ${suggestedStatus}? You can change the status again at any time.`}
+          cancelLabel="Keep status"
+          confirmLabel="Change status"
+          confirmTone="primary"
+          onCancel={() => setStatusPrompt(null)}
+          onConfirm={() => void changeStatus(suggestedStatus)}
+          title="Change status?"
+        />
+      ) : null}
+    </div>
   );
 }
+
+type RemovedStage = "interview" | "assessment";
 
 
 function DetailActionButton({
