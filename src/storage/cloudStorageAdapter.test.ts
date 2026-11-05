@@ -790,6 +790,27 @@ describe("assessment cloud migration and conflicts", () => {
       status: "Online Assessment", company: application.company,
     });
   });
+  it("rejects a new assessment's status move when the application was archived in another session (#228)", async () => {
+    const api = new FakeCloudApi();
+    api.state = { revision: 1, snapshot: { ...createSnapshot([application]), dataVersion: 3, assessments: [] }, updatedAt: application.updatedAt };
+    const adapter = createCloudStorageAdapter({ api, cache: createCache("assessment-status-archived") });
+    const initialized = await adapter.initialize();
+    api.conflictState = {
+      revision: 2,
+      snapshot: { ...initialized, applications: [{ ...initialized.applications[0], archivedAt: "2026-12-01T00:00:00.000Z" }] },
+      updatedAt: application.updatedAt,
+    };
+    await expect(adapter.commitMutation({
+      creates: { assessments: ["oa"] },
+      assessments: [{
+        id: "oa", applicationId: application.id, number: 1, type: "coding", proctored: "unknown",
+        progress: "not-started", result: "unknown", createdAt: application.createdAt, updatedAt: application.updatedAt,
+      }],
+      applications: [{ ...initialized.applications[0], status: "Online Assessment" }],
+    })).rejects.toBeInstanceOf(StorageConflictError);
+    expect(await adapter.getApplication(application.id)).toMatchObject({ status: application.status });
+    expect(await adapter.listAssessments()).toEqual([]);
+  });
   it("never lets an assessment edit write the application status (#228)", async () => {
     const existing = {
       id: "oa", applicationId: application.id, number: 1, type: "coding" as const, proctored: "unknown" as const,

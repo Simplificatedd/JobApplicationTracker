@@ -113,6 +113,9 @@ export function applyStorageMutation(
           throw new Error(
             "The assessment’s application no longer exists. Refresh the tracker.",
           );
+        // Archived applications never change status automatically (#228).
+        if (mutation.creates?.assessments?.length && current.archivedAt && write.status !== current.status)
+          throw new StorageConflictError("The application was archived in another session.");
         return {
           ...current,
           status: mutation.creates?.assessments?.length ? write.status : current.status,
