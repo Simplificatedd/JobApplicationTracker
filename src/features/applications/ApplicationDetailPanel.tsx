@@ -723,6 +723,11 @@ function ReadOnlyDetails({
         assessments: assessments.length,
       })
     : undefined;
+  // A prompt hidden because the status changed elsewhere is dropped, so it
+  // can't reappear later without the user removing anything.
+  useEffect(() => {
+    if (statusPrompt && !suggestedStatus) setStatusPrompt(null);
+  }, [statusPrompt, suggestedStatus]);
 
   // R6-R9 (#228): after the last interview or assessment goes, offer the
   // status the remaining records support. Keep status is the default.
@@ -772,6 +777,7 @@ function ReadOnlyDetails({
 
   async function changeStatus(to: ApplicationStatus) {
     setStatusPrompt(null);
+    setStatusChangeError("");
     // The status shown in the prompt is the baseline, so a change made
     // elsewhere in the meantime is a conflict instead of an overwrite.
     const result = await onUpdate(application.id, createStatusQuickEdit(to), undefined, undefined, application);

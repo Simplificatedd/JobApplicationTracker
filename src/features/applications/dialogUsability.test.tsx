@@ -437,6 +437,9 @@ describe("status prompt after removing the last interview or assessment (#228)",
     await deleteInterview("round-1");
     call(prompt().props.onConfirm); await Promise.resolve(); await Promise.resolve();
     expect(elements(view()).find(e => e.props.role === "alert")?.props.children).toBe("Status changed in another session.");
+    // A conflict loads the other session's status; the error stays until the next attempt.
+    props.application = { ...application, status: "Offered" };
+    expect(elements(view()).find(e => e.props.role === "alert")).toBeDefined();
   });
 
   it("returns focus to the section's add button before the prompt opens", async () => {
@@ -458,11 +461,14 @@ describe("status prompt after removing the last interview or assessment (#228)",
     expect(single.prompt()).toBeUndefined();
   });
 
-  it("hides the prompt when the status changes elsewhere while it is open", async () => {
+  it("drops the prompt when the status changes elsewhere, so it can't come back on its own", async () => {
     const { props, prompt, deleteInterview } = setup({ interviews: [interview(1)] });
     await deleteInterview("round-1");
     expect(prompt()).toBeDefined();
     props.application = { ...application, status: "Rejected" };
+    expect(prompt()).toBeUndefined();
+    // Later the user sets Interviewing by hand, with no interviews left.
+    props.application = application;
     expect(prompt()).toBeUndefined();
   });
 
