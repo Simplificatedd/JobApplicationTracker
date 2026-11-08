@@ -331,7 +331,7 @@ describe("AppShell sidebar state", () => {
     expect(classOf(markup, "<aside")).toContain("xl:w-16");
     expect(classOf(markup, "<aside")).not.toContain("--side-navigation-width");
     expect(markup).not.toContain('aria-label="Resize side navigation"');
-    expect(markup).toContain('aria-label="Job Application Tracker" class=');
+    expect(markup).toContain('alt="Job Application Tracker"');
     expect(markup).toMatch(/aria-current="page"[^>]*>.*?<span class="truncate xl:sr-only">Resumes<\/span>/);
     expect(markup.match(/xl:sr-only/g)).toHaveLength(5);
     // Compact counts as shown: the toggle still offers to hide it.

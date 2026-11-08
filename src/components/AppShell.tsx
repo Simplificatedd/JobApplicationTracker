@@ -655,13 +655,11 @@ function NavigationBrand({ isCompact }: { isCompact: boolean }) {
       {isCompact ? (
         // The fixed show/hide toggle and the expand button sit at the top of
         // the rail, so the mark starts below them.
-        <div
-          aria-label={APP_NAME}
-          className="mx-auto mt-[5.5rem] hidden size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground xl:flex"
-          role="img"
-        >
-          <span aria-hidden="true">JT</span>
-        </div>
+        <img
+          alt={APP_NAME}
+          className="mx-auto mt-[5.5rem] hidden size-10 xl:block"
+          src="/favicon.svg"
+        />
       ) : null}
       <div
         className={`flex min-w-0 items-center justify-between gap-3 pl-12 xl:block ${
