@@ -82,8 +82,8 @@ checklist on real devices.
 
 <sub>Screenshots use fictional demo data.</sub>
 
-**🧭 Compact sidebar.** At 1280px and wider with the side navbar, the chevron at
-the bottom of the sidebar collapses it to a 64px icon rail (with tooltips) to
+**🧭 Compact sidebar.** At 1280px and wider with the side navbar, the chevron just
+below the top-left toggle collapses it to a 64px icon rail (with tooltips) to
 give the workspace more room. The top-left toggle still hides and shows it.
 Your choice is saved in this browser only.
 
