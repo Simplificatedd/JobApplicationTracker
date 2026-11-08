@@ -36,7 +36,6 @@ export const DEFAULT_VISIBLE_APPLICATION_COLUMNS = [
 export const REQUIRED_APPLICATION_COLUMNS = [
   "jobTitle",
   "status",
-  "contacts",
   "actions",
 ];
 

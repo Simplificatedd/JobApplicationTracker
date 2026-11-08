@@ -263,7 +263,7 @@ export const APPLICATION_TABLE_COLUMNS: Array<{
     width: 150,
   },
   {
-    canHide: false,
+    canHide: true,
     id: "contacts",
     key: "contacts",
     label: "Contacts",
