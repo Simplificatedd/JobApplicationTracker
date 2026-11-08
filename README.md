@@ -10,7 +10,7 @@ your own Cloudflare account where only the people you allow can sign in.
 [![CI](https://github.com/Simplificatedd/JobApplicationTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Simplificatedd/JobApplicationTracker/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![React](https://img.shields.io/github/package-json/dependency-version/Simplificatedd/JobApplicationTracker/react?logo=react&logoColor=white&color=61DAFB&label=React)
-![TypeScript](https://img.shields.io/github/package-json/dependency-version/Simplificatedd/JobApplicationTracker/dev/typescript?logo=typescript&logoColor=white&color=3178C6&label=TypeScript)
+![TypeScript](https://img.shields.io/github/package-json/dependency-version/Simplificatedd/JobApplicationTracker/dev/typescript?label=TypeScript&logo=typescript&logoColor=white&color=3178C6)
 ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-F38020?logo=cloudflare&logoColor=white)
 ![Private by default](https://img.shields.io/badge/access-private-2ea44f)
 
