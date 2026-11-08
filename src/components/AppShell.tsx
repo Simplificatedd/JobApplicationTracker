@@ -362,12 +362,14 @@ export function AppShell({
               layout="side"
               onViewChange={onViewChange}
             />
-            {/* One button in both states, so focus stays on it after a switch. */}
+            {/* One button in both states, so focus stays on it after a switch.
+                It sits right under the show/hide toggle, so both sidebar
+                controls are found together. */}
             <button
               aria-expanded={!isCompact}
               aria-label={isCompact ? "Expand sidebar" : "Collapse sidebar"}
-              className={`icon-button absolute bottom-4 hidden size-11 xl:inline-flex ${
-                isCompact ? "left-2.5" : "left-5"
+              className={`icon-button absolute top-16 hidden size-11 xl:inline-flex ${
+                isCompact ? "left-2.5" : "left-3.5"
               }`}
               onClick={() => changeSidebarState(isCompact ? "expanded" : "compact")}
               type="button"
@@ -651,11 +653,11 @@ function NavigationBrand({ isCompact }: { isCompact: boolean }) {
   return (
     <>
       {isCompact ? (
-        // The fixed show/hide toggle sits at the top of the rail, so the mark
-        // starts below it.
+        // The fixed show/hide toggle and the expand button sit at the top of
+        // the rail, so the mark starts below them.
         <div
           aria-label={APP_NAME}
-          className="mx-auto mt-10 hidden size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground xl:flex"
+          className="mx-auto mt-[5.5rem] hidden size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground xl:flex"
           role="img"
         >
           <span aria-hidden="true">JT</span>
@@ -750,7 +752,8 @@ function NavigationButtons({
     layout === "top"
       ? "scroll-strip -m-1 flex min-w-0 basis-full flex-1 gap-2 p-1 sm:basis-auto"
       : `scroll-strip -mx-1 mt-2 flex min-w-0 gap-2 p-1 xl:mx-0 xl:grid xl:grid-cols-1 xl:overflow-visible xl:p-0 ${
-          isCompact ? "xl:mt-4" : "xl:mt-8"
+          // Leaves room for the expand/collapse button under the toggle.
+          isCompact ? "xl:mt-4" : "xl:mt-12"
         }`;
 
   // Only the compact rail hides its labels, so only it needs tooltips.
