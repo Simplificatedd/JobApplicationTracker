@@ -348,16 +348,18 @@ describe("AppShell sidebar state", () => {
   });
 
   it.each([
-    [null, "Collapse sidebar", "true"],
-    ["compact", "Expand sidebar", "false"],
+    [null, "Collapse sidebar", "true", "left-3.5"],
+    ["compact", "Expand sidebar", "false", "left-2.5"],
   ])(
-    "offers one desktop control to switch density (saved %j)",
-    (stored, label, expanded) => {
+    "offers one desktop control to switch density near the toggle (saved %j)",
+    (stored, label, expanded, position) => {
       stubBrowser({ stored });
       const markup = renderShell();
 
       expect(markup).toContain(`aria-expanded="${expanded}" aria-label="${label}"`);
       expect(classOf(markup, `aria-label="${label}"`)).toContain("hidden size-11 xl:inline-flex");
+      expect(classOf(markup, `aria-label="${label}"`)).toContain(`absolute top-16`);
+      expect(classOf(markup, `aria-label="${label}"`)).toContain(position);
     },
   );
 
