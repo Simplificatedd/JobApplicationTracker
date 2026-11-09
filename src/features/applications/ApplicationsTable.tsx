@@ -497,7 +497,7 @@ export function ApplicationsTable({
   }
 
   return (
-    <section className="surface-panel overflow-hidden rounded-lg">
+    <section className={`surface-panel overflow-hidden rounded-lg xl:flex xl:min-h-0 xl:flex-col ${applications.length > 0 ? "xl:flex-1" : "xl:overflow-y-auto"}`}>
       {applications.length === 0 ? (
         <div className="flex min-h-[280px] items-center justify-center px-6 py-12 text-center">
           <div className="max-w-sm">
@@ -556,7 +556,7 @@ export function ApplicationsTable({
             ))}
           </div>
           <div
-            className="hidden max-h-[calc(100dvh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
+            className="hidden min-h-0 min-w-0 overflow-auto overscroll-contain xl:block xl:flex-1"
             data-pinned-edge-end={scrollEdges.hasMoreAfter}
             data-pinned-edge-start={scrollEdges.hasMoreBefore}
             onScroll={updateScrollEdges}

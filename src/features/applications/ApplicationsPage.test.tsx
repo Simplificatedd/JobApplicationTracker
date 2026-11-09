@@ -363,7 +363,7 @@ describe("remembered table view", () => {
 describe("applications page on narrow screens", () => {
   it("pairs the summary metrics at every width below xl", () => {
     expect(renderPage("")).toContain(
-      'class="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4"',
+      'class="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4 xl:shrink-0"',
     );
   });
 

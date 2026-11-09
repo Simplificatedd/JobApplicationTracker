@@ -110,6 +110,15 @@
     }
   }
 
+  @media (min-width: 1280px) {
+    @container (min-width: 48rem) {
+      .applications-toolbar-grid {
+        align-items: start;
+        grid-template-columns: minmax(200px, 1fr) minmax(0, 1.25fr);
+      }
+    }
+  }
+
   @container (min-width: 84rem) {
     .applications-toolbar-grid {
       align-items: start;

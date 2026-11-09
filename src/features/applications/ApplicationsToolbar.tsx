@@ -100,7 +100,7 @@ export function ApplicationsToolbar({
   ).length;
 
   return (
-    <section className="surface-panel applications-toolbar rounded-lg p-4">
+    <section className="surface-panel applications-toolbar rounded-lg p-4 xl:shrink-0">
       <div className="applications-toolbar-grid grid gap-3">
         <div className="grid min-w-0 gap-2">
           <label className="relative block min-w-0">

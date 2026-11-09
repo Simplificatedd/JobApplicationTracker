@@ -166,6 +166,14 @@ describe("applications table column widths", () => {
 });
 
 describe("pinned column edges", () => {
+  it("fits the desktop viewport into its flex parent instead of guessing its height", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+    expect(viewport.props.className).toContain("min-h-0");
+    expect(viewport.props.className).toContain("xl:flex-1");
+    expect(viewport.props.className).not.toContain("max-h-");
+  });
+
   it("starts with no edge and gives the pinned headers an edge for scrolled content", () => {
     const { all } = renderTable(926);
     const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
