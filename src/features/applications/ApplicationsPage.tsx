@@ -163,9 +163,7 @@ export function ApplicationsPage({
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
     rememberedTablePreferences?.needsAttentionOnly ?? false,
   );
-  const [searchQuery, setSearchQuery] = useState(
-    rememberedTablePreferences?.searchQuery ?? "",
-  );
+  const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState(
     normalizeApplicationSort(rememberedTablePreferences?.sort),
   );
@@ -300,7 +298,8 @@ export function ApplicationsPage({
       columnWidths,
       filters,
       needsAttentionOnly,
-      searchQuery,
+      // Keep the stored shape compatible with existing backups.
+      searchQuery: "",
       sort,
       visibleApplicationColumns: settings.visibleApplicationColumns,
     });
@@ -311,7 +310,6 @@ export function ApplicationsPage({
     columnWidths,
     filters,
     needsAttentionOnly,
-    searchQuery,
     settings.rememberTableState,
     settings.visibleApplicationColumns,
     sort,

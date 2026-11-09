@@ -424,7 +424,7 @@ export function SettingsPage({
         >
           <ToggleField
             checked={settings.rememberTableState}
-            description="Keeps your current search, filters, and sorting preferences during the session."
+            description="Keeps your filters, sorting, attention filter, and column widths across reloads. Search is not remembered."
             label="Remember table view"
             onChange={(checked) =>
               onUpdateSettings({ rememberTableState: checked })

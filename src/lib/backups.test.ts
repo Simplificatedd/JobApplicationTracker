@@ -13,6 +13,7 @@ import {
   parseBackupFile,
 } from "./backups";
 import { MAX_RESUME_FILE_BYTES } from "./resumeFiles";
+import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "../features/applications/applicationFilters";
 
 const timestamp = "2026-09-21T00:00:00.000Z";
 
@@ -116,6 +117,19 @@ describe("createApplicationsCsv", () => {
 });
 
 describe("parseBackupFile", () => {
+  it("accepts existing backups with a saved search in table preferences", async () => {
+    const tablePreferences = {
+      columnWidths: { jobTitle: 320 },
+      filters: DEFAULT_APPLICATION_FILTERS,
+      needsAttentionOnly: true,
+      searchQuery: "legacy search",
+      sort: DEFAULT_SORT_STATE,
+      visibleApplicationColumns: DEFAULT_USER_SETTINGS.visibleApplicationColumns,
+    };
+    const backup = await parseBackupFile(createBackupFile(createSnapshot({ tablePreferences })));
+    expect(backup.snapshot.tablePreferences).toEqual(tablePreferences);
+  });
+
   it("accepts a valid empty backup", async () => {
     await expect(parseBackupFile(createBackupFile(createSnapshot()))).resolves
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
