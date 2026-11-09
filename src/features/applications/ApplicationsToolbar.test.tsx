@@ -5,17 +5,23 @@ import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
 import { ColumnsModal, PhoneSortSelect, SearchScopeToggle } from "./ApplicationsToolbar";
 import { DEFAULT_SORT_STATE } from "./applicationFilters";
 
-function renderColumnsModal() {
+function renderColumnsModal(onResetColumnWidths?: () => void) {
   return renderToStaticMarkup(
     <ColumnsModal
       onChange={vi.fn()}
       onClose={vi.fn()}
+      onResetColumnWidths={onResetColumnWidths}
       visibleApplicationColumns={["company"]}
     />,
   );
 }
 
 describe("Columns dialog", () => {
+  it("offers size reset only when resizing is enabled", () => {
+    expect(renderColumnsModal(vi.fn())).toContain("Reset column sizes");
+    expect(renderColumnsModal()).not.toContain("Reset column sizes");
+  });
+
   it("labels every column checkbox with its column name", () => {
     const markup = renderColumnsModal();
     const checkboxIds = [...markup.matchAll(/<input[^>]*type="checkbox"[^>]*>/g)].map(

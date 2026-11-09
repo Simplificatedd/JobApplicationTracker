@@ -384,6 +384,11 @@ export function ApplicationsPage({
         onResetFilters={() => {
           resetTableView();
         }}
+        onResetColumnWidths={
+          settings.enableDraggableColumnWidths
+            ? () => setColumnWidths(DEFAULT_COLUMN_WIDTHS)
+            : undefined
+        }
         onSearchQueryChange={setSearchQuery}
         onSearchScopeChange={setSearchScope}
         onSortChange={setSort}

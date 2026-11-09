@@ -155,15 +155,13 @@ describe("applications table column widths", () => {
     expect(onColumnWidthsChange.mock.calls[0][0]).toEqual({ ...DEFAULT_COLUMN_WIDTHS, company: DEFAULT_COLUMN_WIDTHS.company + 40 });
   });
 
-  it("resets one column, or all of them, to the unstretched defaults", () => {
+  it("resets a column to its unstretched default without a separate reset strip", () => {
     const wide = { ...DEFAULT_COLUMN_WIDTHS, status: 400 };
     const { all, onColumnWidthsChange, separator } = renderTable(1566, wide);
     (separator("Status").props.onDoubleClick as () => void)();
     expect(onColumnWidthsChange).toHaveBeenLastCalledWith({ ...wide, status: DEFAULT_COLUMN_WIDTHS.status });
 
-    const reset = all.find((e) => e.type === "button" && [e.props.children].flat().includes("Reset column sizes"))!;
-    (reset.props.onClick as () => void)();
-    expect(onColumnWidthsChange).toHaveBeenLastCalledWith(DEFAULT_COLUMN_WIDTHS);
+    expect(all.find((e) => e.type === "button" && [e.props.children].flat().includes("Reset column sizes"))).toBeUndefined();
   });
 });
 

@@ -96,8 +96,7 @@
   }
 
   .applications-primary-filter,
-  .applications-toolbar-reset,
-  .applications-toolbar-footer {
+  .applications-toolbar-reset {
     display: none;
   }
 
@@ -109,14 +108,6 @@
     .applications-toolbar-reset {
       display: inline-flex;
     }
-
-    .applications-toolbar-footer {
-      display: flex;
-    }
-
-    .applications-toolbar-columns-inline {
-      display: none;
-    }
   }
 
   @container (min-width: 84rem) {
@@ -126,7 +117,7 @@
     }
 
     .applications-toolbar-controls {
-      grid-template-columns: repeat(5, minmax(128px, 1fr));
+      grid-template-columns: repeat(6, minmax(128px, 1fr));
     }
 
     .applications-primary-filter {

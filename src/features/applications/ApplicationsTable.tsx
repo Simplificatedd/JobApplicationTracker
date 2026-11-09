@@ -13,7 +13,6 @@ import {
   ArrowUpDown,
   CalendarClock,
   ArrowUpWideNarrow,
-  RotateCcw,
 } from "lucide-react";
 import {
   ContactsButton,
@@ -456,10 +455,6 @@ export function ApplicationsTable({
     onColumnWidthsChange({ ...savedColumnWidths, [column.id]: column.width });
   }
 
-  function resetColumnWidths() {
-    onColumnWidthsChange(DEFAULT_COLUMN_WIDTHS);
-  }
-
   function startColumnResize(
     column: (typeof APPLICATION_TABLE_COLUMNS)[number],
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -560,18 +555,6 @@ export function ApplicationsTable({
               />
             ))}
           </div>
-          {enableDraggableColumnWidths ? (
-            <div className="hidden items-center justify-end border-b border-border px-3 py-2 xl:flex">
-              <button
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-                onClick={resetColumnWidths}
-                type="button"
-              >
-                <RotateCcw aria-hidden="true" size={16} />
-                Reset column sizes
-              </button>
-            </div>
-          ) : null}
           <div
             className="hidden max-h-[calc(100dvh-7rem)] min-w-0 overflow-auto overscroll-contain xl:block"
             data-pinned-edge-end={scrollEdges.hasMoreAfter}

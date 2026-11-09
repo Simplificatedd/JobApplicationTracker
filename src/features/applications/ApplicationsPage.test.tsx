@@ -6,6 +6,7 @@ import type { Application } from "../../types/application";
 import type { TablePreferences } from "../../types/tablePreferences";
 import { ApplicationsPage } from "./ApplicationsPage";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
+import { ApplicationsTable, DEFAULT_COLUMN_WIDTHS } from "./ApplicationsTable";
 import {
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
@@ -391,14 +392,30 @@ describe("applications page on narrow screens", () => {
     );
   });
 
-  it("offers Columns beside Filters as well as in the wide-toolbar footer, but not on phones", () => {
+  it("offers Columns inline at every toolbar width, but not on phones", () => {
     const html = renderPage("");
 
     expect(html).toContain('class="applications-toolbar-columns-inline min-w-0 max-md:hidden"');
-    expect(html).toMatch(/class="applications-toolbar-footer [^"]*max-md:hidden"/);
-    expect(html).toContain('class="applications-toolbar-footer ');
-    expect(html.match(/<span class="truncate">Columns<\/span>/g)).toHaveLength(2);
+    expect(html).not.toContain("applications-toolbar-footer");
+    expect(html.match(/<span class="truncate">Columns<\/span>/g)).toHaveLength(1);
   });
+});
+
+it("resets only column widths from the toolbar when resizing is enabled", () => {
+  const page = mountPage({
+    settings: { ...DEFAULT_USER_SETTINGS, enableDraggableColumnWidths: true },
+    tablePreferences: { ...tablePreferences, columnWidths: { company: 400 } },
+  });
+  toolbar(page.render()).onSearchQueryChange!("engineer");
+  toolbar(page.render()).onResetColumnWidths!();
+  const tree = page.render();
+  const table = tree.props.children.find((child: ReactElement) => child?.type === ApplicationsTable);
+  expect(table.props.columnWidths).toEqual(DEFAULT_COLUMN_WIDTHS);
+  expect(toolbar(tree).searchQuery).toBe("engineer");
+  expect(page.props.resetTablePreferences).not.toHaveBeenCalled();
+
+  const disabled = mountPage({ settings: { ...DEFAULT_USER_SETTINGS, enableDraggableColumnWidths: false } });
+  expect(toolbar(disabled.render()).onResetColumnWidths).toBeUndefined();
 });
 
 describe("applications page on phones", () => {
