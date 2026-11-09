@@ -1,14 +1,40 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
 import type { Application } from "../../types/application";
 import type { TablePreferences } from "../../types/tablePreferences";
 import { ApplicationsPage } from "./ApplicationsPage";
+import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import {
   DEFAULT_APPLICATION_FILTERS,
   DEFAULT_SORT_STATE,
 } from "./applicationFilters";
+
+// Run the page's handlers and effects; let its children use real React during
+// static rendering, following the hook-host pattern in the sidebar tests.
+const host = vi.hoisted(() => ({ active: false, cursor: 0, slots: [] as unknown[], effects: [] as (() => void)[] }));
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  return {
+    ...react,
+    useState(initial: unknown) {
+      if (!host.active) return react.useState(initial);
+      const i = host.cursor++;
+      if (!(i in host.slots)) host.slots[i] = typeof initial === "function" ? initial() : initial;
+      return [host.slots[i], (value: unknown) => { host.slots[i] = typeof value === "function" ? value(host.slots[i]) : value; }];
+    },
+    useMemo: (calculate: () => unknown, deps: unknown[]) => host.active ? calculate() : react.useMemo(calculate, deps),
+    useEffect(effect: () => void, deps: unknown[]) {
+      if (!host.active) return react.useEffect(effect, deps);
+      const i = host.cursor++;
+      const previous = host.slots[i] as unknown[] | undefined;
+      if (previous && deps.every((value, index) => Object.is(value, previous[index]))) return;
+      host.slots[i] = deps;
+      host.effects.push(effect);
+    },
+  };
+});
 
 const titleMatch: Application = {
   id: "title",
@@ -41,11 +67,11 @@ const tablePreferences: TablePreferences = {
   visibleApplicationColumns: DEFAULT_USER_SETTINGS.visibleApplicationColumns,
 };
 
-function renderPage(
-  query: string,
+function mountPage(
   overrides: Partial<ComponentProps<typeof ApplicationsPage>> = {},
 ) {
-  return renderToStaticMarkup(
+  host.slots = [];
+  const element = (
     <ApplicationsPage
       activities={[]}
       assessments={[]}
@@ -71,7 +97,7 @@ function renderPage(
       restoreApplication={vi.fn()}
       resumes={[]}
       settings={DEFAULT_USER_SETTINGS}
-      tablePreferences={{ ...tablePreferences, searchQuery: query }}
+      tablePreferences={tablePreferences}
       resetTablePreferences={vi.fn()}
       updateContact={vi.fn()}
       updateInterview={vi.fn()}
@@ -79,8 +105,36 @@ function renderPage(
       updateSettings={vi.fn()}
       updateTablePreferences={vi.fn()}
       {...overrides}
-    />,
+    />
   );
+  const props = { ...element.props } as ComponentProps<typeof ApplicationsPage>;
+  const render = () => {
+    host.cursor = 0;
+    host.active = true;
+    let tree;
+    try {
+      tree = ApplicationsPage(props);
+    } finally {
+      host.active = false;
+    }
+    host.effects.splice(0).forEach((effect) => effect());
+    return tree;
+  };
+  return { props, render };
+}
+
+function toolbar(tree: ReturnType<typeof ApplicationsPage>) {
+  return tree.props.children.find((child: ReactElement) => child?.type === ApplicationsToolbar)
+    .props as ComponentProps<typeof ApplicationsToolbar>;
+}
+
+function renderPage(
+  query: string,
+  overrides: Partial<ComponentProps<typeof ApplicationsPage>> = {},
+) {
+  const page = mountPage(overrides);
+  toolbar(page.render()).onSearchQueryChange!(query);
+  return renderToStaticMarkup(page.render());
 }
 
 describe("application search results in the table", () => {
@@ -222,14 +276,6 @@ describe("application search results in the table", () => {
     expect(html).not.toContain(titleMatch.jobTitle);
   });
 
-  it("ignores saved searches when remembering table state is disabled", () => {
-    const html = renderPage("accounting", {
-      settings: { ...DEFAULT_USER_SETTINGS, rememberTableState: false },
-    });
-    expect(html).toContain(titleMatch.jobTitle);
-    expect(html).toContain(descriptionMatch.jobTitle);
-  });
-
   it.each(["active", "archive"] as const)(
     "treats whitespace as an empty search in the %s empty state",
     (viewMode) => {
@@ -240,6 +286,77 @@ describe("application search results in the table", () => {
       expect(html).not.toContain("No matching applications");
     },
   );
+});
+
+describe("remembered table view", () => {
+  it.each([true, false])("starts with an empty search when remembering is %s", (rememberTableState) => {
+    const page = mountPage({
+      settings: { ...DEFAULT_USER_SETTINGS, rememberTableState },
+      tablePreferences: { ...tablePreferences, searchQuery: "accounting" },
+    });
+    const tree = page.render();
+    expect(toolbar(tree).searchQuery).toBe("");
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain(titleMatch.jobTitle);
+    expect(html).toContain(descriptionMatch.jobTitle);
+  });
+
+  it("keeps search through view switches and cloud updates, but clears it on remount", () => {
+    const page = mountPage();
+    toolbar(page.render()).onSearchQueryChange!("engineer");
+    expect(toolbar(page.render()).searchQuery).toBe("engineer");
+    page.props.viewMode = "archive";
+    page.props.tablePreferences = { ...tablePreferences, searchQuery: "remote search" };
+    expect(toolbar(page.render()).searchQuery).toBe("engineer");
+    page.props.viewMode = "active";
+    expect(toolbar(page.render()).searchQuery).toBe("engineer");
+
+    expect(toolbar(mountPage(page.props).render()).searchQuery).toBe("");
+  });
+
+  it("remembers other preferences while saving an empty search and avoids saving on keystrokes", () => {
+    const updateTablePreferences = vi.fn();
+    const preferences: TablePreferences = {
+      ...tablePreferences,
+      columnWidths: { jobTitle: 320 },
+      filters: { ...DEFAULT_APPLICATION_FILTERS, status: "Rejected" },
+      needsAttentionOnly: true,
+      sort: { column: "company", direction: "ascending" },
+    };
+    const page = mountPage({ tablePreferences: preferences, updateTablePreferences });
+    const tree = page.render();
+    expect(toolbar(tree)).toMatchObject({
+      filters: preferences.filters,
+      needsAttentionOnly: true,
+      sort: preferences.sort,
+    });
+    expect(updateTablePreferences).toHaveBeenCalledExactlyOnceWith({
+      ...preferences,
+      columnWidths: expect.objectContaining(preferences.columnWidths),
+      searchQuery: "",
+    });
+
+    toolbar(tree).onSearchQueryChange!("engineer");
+    toolbar(page.render()).onSearchQueryChange!("software");
+    toolbar(page.render()).onFilterChange!({ company: "Example Company" });
+    page.render();
+    expect(updateTablePreferences).toHaveBeenCalledTimes(2);
+    expect(updateTablePreferences).toHaveBeenLastCalledWith(expect.objectContaining({
+      searchQuery: "",
+      filters: { ...preferences.filters, company: "Example Company" },
+    }));
+  });
+
+  it("does not save preferences when remembering is disabled", () => {
+    const updateTablePreferences = vi.fn();
+    const page = mountPage({
+      settings: { ...DEFAULT_USER_SETTINGS, rememberTableState: false },
+      updateTablePreferences,
+    });
+    toolbar(page.render()).onSearchQueryChange!("engineer");
+    page.render();
+    expect(updateTablePreferences).not.toHaveBeenCalled();
+  });
 });
 
 describe("applications page on narrow screens", () => {
