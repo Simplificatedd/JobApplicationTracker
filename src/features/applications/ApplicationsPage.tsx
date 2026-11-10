@@ -575,10 +575,12 @@ function SummaryMetric({
     // list starts higher up.
     <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2 short:flex short:items-center short:gap-x-3 short:py-1.5">
       {/* min-h matches the count scope toggle so paired metrics line up. */}
+      {/* Short desktop windows keep the label and toggle on one line, so a
+          long label like "Total applications" truncates instead of wrapping. */}
       {/* On phones the label wraps before the value drops to its own line:
           a zero basis with an automatic minimum makes wrapping use the
           label's narrowest width rather than its single-line width. */}
-      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1 short:flex-1">
+      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1 short:flex-1 short:flex-nowrap">
         {/* The scope toggle already names the count on phones, where the
             label would push it onto a second line, so the label is only
             visually hidden there. */}
