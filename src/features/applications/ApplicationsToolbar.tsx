@@ -271,6 +271,8 @@ export function ColumnsModal({
   visibleApplicationColumns: string[];
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
+  // The dialog covers the table, so confirm the reset in the button itself.
+  const [hasResetColumnWidths, setHasResetColumnWidths] = useState(false);
   const idPrefix = useId();
 
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
@@ -356,10 +358,15 @@ export function ColumnsModal({
           {onResetColumnWidths ? (
             <button
               className="mr-auto h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
-              onClick={onResetColumnWidths}
+              onClick={() => {
+                onResetColumnWidths();
+                setHasResetColumnWidths(true);
+              }}
               type="button"
             >
-              Reset column sizes
+              <span aria-live="polite">
+                {hasResetColumnWidths ? "Column sizes reset" : "Reset column sizes"}
+              </span>
             </button>
           ) : null}
           <button

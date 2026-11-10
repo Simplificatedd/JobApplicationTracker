@@ -348,6 +348,8 @@ it("resets column sizes from Columns without applying or closing its visibility 
   expect(onResetColumnWidths).toHaveBeenCalledTimes(1);
   expect(onColumnVisibilityChange).not.toHaveBeenCalled();
   expect(named(render(() => ApplicationsToolbar(props)), "ColumnsModal")).toBeDefined();
+  const resetModal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect(button(resetModal, "Column sizes reset")).toBeDefined();
 });
 it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
   const listeners = new Map<string, () => void>();
