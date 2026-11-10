@@ -5,6 +5,12 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      screens: {
+        // short: desktop windows too short for the full Applications chrome
+        // above the table (heavy zoom, small laptop windows). A screen, not a
+        // plugin variant, so its rules come after and override xl: ones.
+        short: { raw: "(min-width: 1280px) and (max-height: 700px)" },
+      },
       colors: {
         background: "var(--color-background)",
         foreground: "var(--color-foreground)",
