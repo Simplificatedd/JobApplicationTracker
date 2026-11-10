@@ -53,6 +53,16 @@ function classOf(markup: string, marker: string) {
 }
 
 describe("AppShell responsive layout", () => {
+  it.each(["applications", "archive", "analytics", "resumes", "coverLetters", "settings"] as const)(
+    "constrains desktop height only for table views: %s",
+    (currentView) => {
+      const html = renderShell({ currentView });
+      const isTable = currentView === "applications" || currentView === "archive";
+      expect(classOf(html, "app-container").includes("xl:h-dvh")).toBe(isTable);
+      expect(classOf(html, "<main").includes("xl:min-h-0")).toBe(isTable);
+    },
+  );
+
   it("shows side navigation as one scrolling row below xl", () => {
     const navClass = classOf(renderShell(), 'aria-label="Primary navigation"');
 

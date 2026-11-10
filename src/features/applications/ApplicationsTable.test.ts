@@ -155,19 +155,38 @@ describe("applications table column widths", () => {
     expect(onColumnWidthsChange.mock.calls[0][0]).toEqual({ ...DEFAULT_COLUMN_WIDTHS, company: DEFAULT_COLUMN_WIDTHS.company + 40 });
   });
 
-  it("resets one column, or all of them, to the unstretched defaults", () => {
+  it("resets a column to its unstretched default without a separate reset strip", () => {
     const wide = { ...DEFAULT_COLUMN_WIDTHS, status: 400 };
     const { all, onColumnWidthsChange, separator } = renderTable(1566, wide);
     (separator("Status").props.onDoubleClick as () => void)();
     expect(onColumnWidthsChange).toHaveBeenLastCalledWith({ ...wide, status: DEFAULT_COLUMN_WIDTHS.status });
 
-    const reset = all.find((e) => e.type === "button" && [e.props.children].flat().includes("Reset column sizes"))!;
-    (reset.props.onClick as () => void)();
-    expect(onColumnWidthsChange).toHaveBeenLastCalledWith(DEFAULT_COLUMN_WIDTHS);
+    expect(all.find((e) => e.type === "button" && [e.props.children].flat().includes("Reset column sizes"))).toBeUndefined();
   });
 });
 
 describe("pinned column edges", () => {
+  it("fits the desktop viewport into its flex parent instead of guessing its height", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+    expect(viewport.props.className).toContain("min-h-0");
+    expect(viewport.props.className).toContain("xl:flex-1");
+    expect(viewport.props.className).not.toContain("max-h-");
+  });
+
+  it("keeps a usable table height on short desktop windows so the page scrolls instead", () => {
+    const { all } = renderTable(926);
+    const panel = all.find((e) => e.type === "section")!;
+    expect(panel.props.className).toContain("xl:min-h-64");
+    expect(panel.props.className).not.toContain("xl:min-h-0");
+  });
+
+  it("sizes the panel to its rows instead of stretching short lists to the window", () => {
+    const { all } = renderTable(926);
+    const panel = all.find((e) => e.type === "section")!;
+    expect(panel.props.className).not.toContain("flex-1");
+  });
+
   it("starts with no edge and gives the pinned headers an edge for scrolled content", () => {
     const { all } = renderTable(926);
     const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;

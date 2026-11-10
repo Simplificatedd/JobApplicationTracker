@@ -334,6 +334,23 @@ it("returns Columns focus to the Filters button when the Columns buttons are hid
   const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
   expect(modal.props.fallbackFocus).toBe(dialog.props.fallbackFocus);
 });
+it("resets column sizes from Columns without applying or closing its visibility draft", () => {
+  const onResetColumnWidths = vi.fn();
+  const onColumnVisibilityChange = vi.fn();
+  const props = { onResetColumnWidths, onColumnVisibilityChange };
+  let tree = render(() => ApplicationsToolbar(props));
+  call(named(tree, "ColumnsButton").props.onClick);
+  tree = render(() => ApplicationsToolbar(props));
+  const dialog = named(tree, "ColumnsModal");
+  host.cursor = host.slots.length;
+  const modal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  call(button(modal, "Reset column sizes").props.onClick);
+  expect(onResetColumnWidths).toHaveBeenCalledTimes(1);
+  expect(onColumnVisibilityChange).not.toHaveBeenCalled();
+  expect(named(render(() => ApplicationsToolbar(props)), "ColumnsModal")).toBeDefined();
+  const resetModal = (dialog.type as (props: unknown) => Element)(dialog.props);
+  expect(button(resetModal, "Column sizes reset")).toBeDefined();
+});
 it("sizes an active phone form to the visible viewport and stops listening when inactive", () => {
   const listeners = new Map<string, () => void>();
   const visual = { height: 400, offsetTop: 0, scale: 1, addEventListener: (type: string, fn: () => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) };

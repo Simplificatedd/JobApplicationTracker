@@ -202,6 +202,7 @@ export function AppShell({
     (item) => !item.beta || enableBetaAnalytics,
   );
   const showAddButton = currentView !== "settings";
+  const isApplicationsView = currentView === "applications" || currentView === "archive";
   const isDocumentLibrary =
     currentView === "resumes" || currentView === "coverLetters";
   const addLabel =
@@ -330,7 +331,7 @@ export function AppShell({
       <div
         className={`app-container flex min-h-dvh min-w-0 flex-col ${
           isTopNavigation ? "" : "xl:flex-row"
-        }`}
+        } ${isApplicationsView ? "xl:h-dvh xl:min-h-0" : ""}`}
       >
         {!isTopNavigation && !isNavigationHidden ? (
           <aside
@@ -409,7 +410,7 @@ export function AppShell({
         ) : null}
 
         {isTopNavigation && !isNavigationHidden ? (
-          <div className="border-b border-border bg-surface px-4 py-3 max-md:hidden lg:px-6 xl:px-8">
+          <div className="shrink-0 border-b border-border bg-surface px-4 py-3 max-md:hidden lg:px-6 xl:px-8">
             <div className="flex min-w-0 flex-wrap items-center gap-3 pl-12 sm:flex-nowrap">
               <div className="min-w-0 flex-1 sm:max-w-64 sm:shrink-0 sm:flex-none">
                 <p className="truncate text-lg font-semibold text-foreground">
@@ -440,9 +441,9 @@ export function AppShell({
           </div>
         ) : null}
 
-        <main className="min-w-0 flex-1">
+        <main className={`min-w-0 flex-1 ${isApplicationsView ? "xl:flex xl:min-h-0 xl:flex-col" : ""}`}>
           <header
-            className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:py-4 lg:px-6 xl:px-8"
+            className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:py-4 lg:px-6 xl:px-8"
             ref={headerRef}
           >
             <div className="flex items-center justify-between gap-3">
@@ -489,7 +490,7 @@ export function AppShell({
             </div>
           </header>
 
-          <div className="min-w-0 px-4 py-5 max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-7 xl:px-8 xl:py-8">
+          <div className={`min-w-0 px-4 py-5 max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-7 xl:px-8 ${isApplicationsView ? "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:py-4" : "xl:py-8"}`}>
             {children}
           </div>
         </main>

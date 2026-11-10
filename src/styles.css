@@ -96,8 +96,7 @@
   }
 
   .applications-primary-filter,
-  .applications-toolbar-reset,
-  .applications-toolbar-footer {
+  .applications-toolbar-reset {
     display: none;
   }
 
@@ -109,13 +108,14 @@
     .applications-toolbar-reset {
       display: inline-flex;
     }
+  }
 
-    .applications-toolbar-footer {
-      display: flex;
-    }
-
-    .applications-toolbar-columns-inline {
-      display: none;
+  @media (min-width: 1280px) {
+    @container (min-width: 48rem) {
+      .applications-toolbar-grid {
+        align-items: start;
+        grid-template-columns: minmax(200px, 1fr) minmax(0, 1.25fr);
+      }
     }
   }
 
@@ -126,7 +126,7 @@
     }
 
     .applications-toolbar-controls {
-      grid-template-columns: repeat(5, minmax(128px, 1fr));
+      grid-template-columns: repeat(6, minmax(128px, 1fr));
     }
 
     .applications-primary-filter {

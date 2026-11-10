@@ -56,6 +56,7 @@ interface ApplicationsToolbarProps {
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
+  onResetColumnWidths?: () => void;
   onSearchQueryChange?: (value: string) => void;
   onSearchScopeChange?: (scope: SearchScope) => void;
   onSortChange?: (sort: SortState) => void;
@@ -75,6 +76,7 @@ export function ApplicationsToolbar({
   onFilterChange,
   onNeedsAttentionOnlyChange,
   onResetFilters,
+  onResetColumnWidths,
   onSearchQueryChange,
   onSearchScopeChange,
   onSortChange,
@@ -98,7 +100,7 @@ export function ApplicationsToolbar({
   ).length;
 
   return (
-    <section className="surface-panel applications-toolbar rounded-lg p-4">
+    <section className="surface-panel applications-toolbar rounded-lg p-4 xl:shrink-0">
       <div className="applications-toolbar-grid grid gap-3">
         <div className="grid min-w-0 gap-2">
           <label className="relative block min-w-0">
@@ -189,8 +191,7 @@ export function ApplicationsToolbar({
             </div>
           ) : null}
 
-          {/* Narrow toolbars show Columns beside Filters instead of in a
-              footer row of its own. Phone rows ignore columns entirely. */}
+          {/* Phone rows ignore columns entirely. */}
           <div className="applications-toolbar-columns-inline min-w-0 max-md:hidden">
             <ColumnsButton
               className="w-full"
@@ -199,13 +200,6 @@ export function ApplicationsToolbar({
             />
           </div>
         </div>
-      </div>
-
-      <div className="applications-toolbar-footer mt-3 justify-end border-t border-border pt-3 max-md:hidden">
-        <ColumnsButton
-          hiddenColumnCount={hiddenColumnCount}
-          onClick={() => setIsColumnsOpen(true)}
-        />
       </div>
 
       {isMoreFiltersOpen ? (
@@ -228,6 +222,7 @@ export function ApplicationsToolbar({
           fallbackFocus={() => filtersButtonRef.current}
           onChange={onColumnVisibilityChange}
           onClose={() => setIsColumnsOpen(false)}
+          onResetColumnWidths={onResetColumnWidths}
           visibleApplicationColumns={visibleApplicationColumns}
         />
       ) : null}
@@ -266,14 +261,18 @@ export function ColumnsModal({
   fallbackFocus,
   onChange,
   onClose,
+  onResetColumnWidths,
   visibleApplicationColumns,
 }: {
   fallbackFocus?: () => HTMLElement | null | undefined;
   onChange?: (columns: string[]) => void;
   onClose: () => void;
+  onResetColumnWidths?: () => void;
   visibleApplicationColumns: string[];
 }) {
   const [draftColumns, setDraftColumns] = useState(visibleApplicationColumns);
+  // The dialog covers the table, so confirm the reset in the button itself.
+  const [hasResetColumnWidths, setHasResetColumnWidths] = useState(false);
   const idPrefix = useId();
 
   function updateColumn(columnId: ApplicationColumnId, checked: boolean) {
@@ -356,6 +355,20 @@ export function ColumnsModal({
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">
+          {onResetColumnWidths ? (
+            <button
+              className="mr-auto h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
+              onClick={() => {
+                onResetColumnWidths();
+                setHasResetColumnWidths(true);
+              }}
+              type="button"
+            >
+              <span aria-live="polite">
+                {hasResetColumnWidths ? "Column sizes reset" : "Reset column sizes"}
+              </span>
+            </button>
+          ) : null}
           <button
             className="h-10 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50"
             onClick={() =>
