@@ -174,6 +174,13 @@ describe("pinned column edges", () => {
     expect(viewport.props.className).not.toContain("max-h-");
   });
 
+  it("keeps a usable table height on short desktop windows so the page scrolls instead", () => {
+    const { all } = renderTable(926);
+    const panel = all.find((e) => e.type === "section")!;
+    expect(panel.props.className).toContain("xl:min-h-64");
+    expect(panel.props.className).not.toContain("xl:min-h-0");
+  });
+
   it("starts with no edge and gives the pinned headers an edge for scrolled content", () => {
     const { all } = renderTable(926);
     const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;

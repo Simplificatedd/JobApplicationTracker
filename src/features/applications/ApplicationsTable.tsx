@@ -497,7 +497,7 @@ export function ApplicationsTable({
   }
 
   return (
-    <section className={`surface-panel overflow-hidden rounded-lg xl:flex xl:min-h-0 xl:flex-col ${applications.length > 0 ? "xl:flex-1" : "xl:overflow-y-auto"}`}>
+    <section className={`surface-panel overflow-hidden rounded-lg xl:flex xl:flex-col ${applications.length > 0 ? "xl:min-h-64 xl:flex-1" : "xl:min-h-0 xl:overflow-y-auto"}`}>
       {applications.length === 0 ? (
         <div className="flex min-h-[280px] items-center justify-center px-6 py-12 text-center">
           <div className="max-w-sm">
