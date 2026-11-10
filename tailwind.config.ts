@@ -5,12 +5,6 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      screens: {
-        // short: desktop windows too short for the full Applications chrome
-        // above the table (heavy zoom, small laptop windows). A screen, not a
-        // plugin variant, so its rules come after and override xl: ones.
-        short: { raw: "(min-width: 1280px) and (max-height: 700px)" },
-      },
       colors: {
         background: "var(--color-background)",
         foreground: "var(--color-foreground)",
@@ -48,6 +42,11 @@ export default {
     // .touch-target and field sizing rules in styles.css.
     plugin(({ addVariant }) => {
       addVariant("touch", "@media (pointer: coarse)");
+      // short: desktop windows too short for the full Applications chrome
+      // above the table (heavy zoom, small laptop windows). A variant, not a
+      // raw screen, because raw screens switch off every max-* variant; the
+      // :root prefix lets its rules override xl: ones regardless of order.
+      addVariant("short", "@media (min-width: 1280px) and (max-height: 700px) { :root & }");
     }),
   ],
 } satisfies Config;
