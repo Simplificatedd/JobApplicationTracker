@@ -336,7 +336,7 @@ export function ApplicationsPage({
   }
 
   return (
-    <div className="space-y-5 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:gap-3 xl:space-y-0">
+    <div className="space-y-5 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:gap-3 xl:space-y-0 short:gap-2">
       <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4 xl:shrink-0">
         <SummaryMetric
           action={

@@ -443,7 +443,7 @@ export function AppShell({
 
         <main className={`min-w-0 flex-1 ${isApplicationsView ? "xl:flex xl:min-h-0 xl:flex-col" : ""}`}>
           <header
-            className="sticky top-0 z-20 shrink-0 border-b border-border bg-background/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:py-4 lg:px-6 xl:px-8"
+            className={`sticky top-0 z-20 shrink-0 border-b border-border bg-background/95 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:py-4 lg:px-6 xl:px-8 ${isApplicationsView ? "short:py-2.5" : ""}`}
             ref={headerRef}
           >
             <div className="flex items-center justify-between gap-3">
@@ -451,7 +451,7 @@ export function AppShell({
                 className={`flex min-w-0 items-center gap-3 md:pl-12 ${headerTitlePadding}`}
               >
                 <div className="min-w-0">
-                  <p className="hidden text-sm text-muted sm:block">Workspace</p>
+                  <p className={`hidden text-sm text-muted sm:block ${isApplicationsView ? "short:hidden" : ""}`}>Workspace</p>
                   <h1 className="truncate text-xl font-semibold text-foreground sm:text-2xl">
                     {pageTitle[currentView]}
                   </h1>
@@ -490,7 +490,7 @@ export function AppShell({
             </div>
           </header>
 
-          <div className={`min-w-0 px-4 py-5 max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-7 xl:px-8 ${isApplicationsView ? "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:py-4" : "xl:py-8"}`}>
+          <div className={`min-w-0 px-4 py-5 max-md:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:px-6 lg:py-7 xl:px-8 ${isApplicationsView ? "xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:py-4 short:py-2" : "xl:py-8"}`}>
             {children}
           </div>
         </main>

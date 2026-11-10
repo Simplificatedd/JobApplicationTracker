@@ -60,6 +60,7 @@ describe("AppShell responsive layout", () => {
       const isTable = currentView === "applications" || currentView === "archive";
       expect(classOf(html, "app-container").includes("xl:h-dvh")).toBe(isTable);
       expect(classOf(html, "<main").includes("xl:min-h-0")).toBe(isTable);
+      expect(classOf(html, "<header").includes("short:py-2.5")).toBe(isTable);
     },
   );
 
@@ -118,9 +119,12 @@ describe("AppShell responsive layout", () => {
     },
   );
 
-  it("hides the Workspace eyebrow on phones", () => {
+  it("hides the Workspace eyebrow on phones, and on short desktop table views", () => {
     expect(renderShell()).toContain(
-      '<p class="hidden text-sm text-muted sm:block">Workspace</p>',
+      '<p class="hidden text-sm text-muted sm:block short:hidden">Workspace</p>',
+    );
+    expect(renderShell({ currentView: "settings" })).toContain(
+      '<p class="hidden text-sm text-muted sm:block ">Workspace</p>',
     );
   });
 });
