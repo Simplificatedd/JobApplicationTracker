@@ -42,6 +42,11 @@ export default {
     // .touch-target and field sizing rules in styles.css.
     plugin(({ addVariant }) => {
       addVariant("touch", "@media (pointer: coarse)");
+      // short: desktop windows too short for the full Applications chrome
+      // above the table (heavy zoom, small laptop windows). A variant, not a
+      // raw screen, because raw screens switch off every max-* variant; the
+      // :root prefix lets its rules override xl: ones regardless of order.
+      addVariant("short", "@media (min-width: 1280px) and (max-height: 700px) { :root & }");
     }),
   ],
 } satisfies Config;

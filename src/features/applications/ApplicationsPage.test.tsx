@@ -367,6 +367,10 @@ describe("applications page on narrow screens", () => {
     );
   });
 
+  it("keeps each metric's label and toggle on one line on short desktop windows", () => {
+    expect(renderPage("")).toMatch(/class="flex min-h-\[26px\][^"]*short:flex-nowrap"/);
+  });
+
   it("keeps the scoped metric's label for screen readers but hides it beside the toggle on phones", () => {
     const html = renderPage("");
 

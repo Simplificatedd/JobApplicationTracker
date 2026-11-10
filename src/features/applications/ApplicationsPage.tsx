@@ -336,7 +336,7 @@ export function ApplicationsPage({
   }
 
   return (
-    <div className="space-y-5 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:gap-3 xl:space-y-0">
+    <div className="space-y-5 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:gap-3 xl:space-y-0 short:gap-2">
       <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4 xl:shrink-0">
         <SummaryMetric
           action={
@@ -571,13 +571,16 @@ function SummaryMetric({
         : "text-foreground";
 
   return (
-    // Phones put the value beside its label so the list starts higher up.
-    <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2">
+    // Phones and short desktop windows put the value beside its label so the
+    // list starts higher up.
+    <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2 short:flex short:items-center short:gap-x-3 short:py-1.5">
       {/* min-h matches the count scope toggle so paired metrics line up. */}
+      {/* Short desktop windows keep the label and toggle on one line, so a
+          long label like "Total applications" truncates instead of wrapping. */}
       {/* On phones the label wraps before the value drops to its own line:
           a zero basis with an automatic minimum makes wrapping use the
           label's narrowest width rather than its single-line width. */}
-      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1">
+      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1 short:flex-1 short:flex-nowrap">
         {/* The scope toggle already names the count on phones, where the
             label would push it onto a second line, so the label is only
             visually hidden there. */}
@@ -590,7 +593,7 @@ function SummaryMetric({
         </p>
         {action}
       </div>
-      <p className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl ${toneClass}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl short:mt-0 short:text-lg ${toneClass}`}>{value}</p>
     </div>
   );
 }
