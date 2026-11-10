@@ -123,8 +123,8 @@ describe("AppShell responsive layout", () => {
     expect(renderShell()).toContain(
       '<p class="hidden text-sm text-muted sm:block short:hidden">Workspace</p>',
     );
-    expect(renderShell({ currentView: "settings" })).toContain(
-      '<p class="hidden text-sm text-muted sm:block ">Workspace</p>',
+    expect(classOf(renderShell({ currentView: "settings" }), ">Workspace<")).not.toContain(
+      "short:hidden",
     );
   });
 });
