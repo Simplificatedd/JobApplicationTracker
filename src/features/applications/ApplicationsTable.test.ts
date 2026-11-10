@@ -181,6 +181,12 @@ describe("pinned column edges", () => {
     expect(panel.props.className).not.toContain("xl:min-h-0");
   });
 
+  it("sizes the panel to its rows instead of stretching short lists to the window", () => {
+    const { all } = renderTable(926);
+    const panel = all.find((e) => e.type === "section")!;
+    expect(panel.props.className).not.toContain("flex-1");
+  });
+
   it("starts with no edge and gives the pinned headers an edge for scrolled content", () => {
     const { all } = renderTable(926);
     const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
