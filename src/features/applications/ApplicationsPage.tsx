@@ -218,28 +218,32 @@ export function ApplicationsPage({
   const visibleApplications = focusedApplications;
   // Rows show the next event however far ahead it is, so the attention
   // window and the interview-attention setting are widened for this lookup.
-  const upcomingEventSettings = {
-    ...settings,
-    dueSoonDays: 36500,
-    includeUpcomingInterviewsInAttention: true,
-  };
-  const upcomingEvents = new Map(
-    visibleApplications.flatMap((application) => {
-      const event = selectUpcomingEvent(
-        deriveApplicationNotifications(
-          application,
-          upcomingEventSettings,
-          now,
-          interviews.filter(
-            (interview) => interview.applicationId === application.id,
+  // Worked out once per data change for every entry, not on each keystroke
+  // for the visible ones; the table looks rows up by id.
+  const upcomingEvents = useMemo(() => {
+    const upcomingEventSettings = {
+      ...settings,
+      dueSoonDays: 36500,
+      includeUpcomingInterviewsInAttention: true,
+    };
+    return new Map(
+      applications.flatMap((application) => {
+        const event = selectUpcomingEvent(
+          deriveApplicationNotifications(
+            application,
+            upcomingEventSettings,
+            now,
+            interviews.filter(
+              (interview) => interview.applicationId === application.id,
+            ),
+            assessments.filter((item) => item.applicationId === application.id),
           ),
-          assessments.filter((item) => item.applicationId === application.id),
-        ),
-        now,
-      );
-      return event ? [[application.id, event] as const] : [];
-    }),
-  );
+          now,
+        );
+        return event ? [[application.id, event] as const] : [];
+      }),
+    );
+  }, [applications, assessments, interviews, now, settings]);
   const isFiltered =
     countActiveFilters(filters, needsAttentionOnly) > 0 &&
     baseApplications.length > 0;

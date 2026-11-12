@@ -283,7 +283,7 @@ function stubBrowser({
         ? fail
         : (key: string, value: string) => storage.set(key, value),
     },
-    matchMedia: (query: string) => ({ matches: query.includes("min-width") && desktop, addEventListener() {}, removeEventListener() {} }),
+    matchMedia: (query: string) => ({ matches: query === "(min-width: 1280px)" && desktop, addEventListener() {}, removeEventListener() {} }),
   });
 
   return storage;

@@ -136,7 +136,7 @@
 
   /* Phones show only Filters and Sort: Filters takes its natural width so
      the sort label has room, and the narrowest toolbars stack the two. */
-  @media (max-width: 767.98px) {
+  @media not all and (min-width: 768px) {
     .applications-toolbar-controls {
       grid-template-columns: auto minmax(0, 1fr);
     }
@@ -270,7 +270,7 @@
   /* The same for the detail panel, the full-screen Add job form and the
      Filters dialog (the phone filter entry point); at md and up the page
      scrollbar stays put. */
-  @media (max-width: 767.98px) {
+  @media not all and (min-width: 768px) {
     html:has(.application-detail-panel[open]),
     html:has(.add-application-dialog[open]),
     html:has(.applications-filter-dialog[open]) { overflow: hidden; }
@@ -307,7 +307,7 @@
   }
 
   /* 44px fields on phones; 16px text on touch screens already makes them 42px. */
-  @media (max-width: 767.98px) {
+  @media not all and (min-width: 768px) {
     .field-control {
       min-height: 2.75rem;
     }

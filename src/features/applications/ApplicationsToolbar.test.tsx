@@ -111,6 +111,6 @@ describe("phone filter dialog scroll lock", () => {
 
     // The dialog only renders after Filters is pressed, so check the source.
     expect(filters.slice(0, filters.indexOf("</NativeModal>"))).toMatch(/<NativeModal\s+className="applications-filter-dialog /);
-    expect(css).toMatch(/max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
+    expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
   });
 });

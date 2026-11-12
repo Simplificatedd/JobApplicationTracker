@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 
-// Phones are below Tailwind's md breakpoint (768px).
-const PHONE_LAYOUT_QUERY = "(max-width: 767.98px)";
+// Phones are below Tailwind's md breakpoint. This is the exact query behind
+// Tailwind's max-md: variant (and the phone rules in styles.css), so the
+// JavaScript and CSS layouts agree at fractional widths such as 767.99px.
+// Range syntax like (width < 768px) would be shorter but needs Safari 16.4.
+export const PHONE_LAYOUT_QUERY = "not all and (min-width: 768px)";
 
 export function usePhoneLayout() {
   const [isPhone, setIsPhone] = useState(

@@ -26,7 +26,15 @@ vi.mock("react", async (importOriginal) => {
       if (!(i in host.slots)) host.slots[i] = typeof initial === "function" ? initial() : initial;
       return [host.slots[i], (value: unknown) => { host.slots[i] = typeof value === "function" ? value(host.slots[i]) : value; }];
     },
-    useMemo: (calculate: () => unknown, deps: unknown[]) => host.active ? calculate() : react.useMemo(calculate, deps),
+    useMemo(calculate: () => unknown, deps: unknown[]) {
+      if (!host.active) return react.useMemo(calculate, deps);
+      const i = host.cursor++;
+      const previous = host.slots[i] as { deps: unknown[]; value: unknown } | undefined;
+      if (previous && deps.every((value, index) => Object.is(value, previous.deps[index]))) return previous.value;
+      const value = calculate();
+      host.slots[i] = { deps, value };
+      return value;
+    },
     useEffect(effect: () => void, deps: unknown[]) {
       if (!host.active) return react.useEffect(effect, deps);
       const i = host.cursor++;
@@ -301,6 +309,30 @@ describe("application search results in the table", () => {
       expect(html).not.toContain("No matching applications");
     },
   );
+});
+
+describe("upcoming events", () => {
+  function tableProps(node: unknown): ComponentProps<typeof ApplicationsTable> | undefined {
+    if (Array.isArray(node)) return node.map(tableProps).find(Boolean);
+    if (!node || typeof node !== "object" || !("props" in node)) return undefined;
+    const element = node as ReactElement<{ children?: unknown }>;
+    return element.type === ApplicationsTable
+      ? (element.props as unknown as ComponentProps<typeof ApplicationsTable>)
+      : tableProps(element.props.children);
+  }
+
+  it("works them out per data change, not per search keystroke", () => {
+    const followUp = { ...descriptionMatch, followUpNeeded: true, followUpDate: "2026-11-20" };
+    const page = mountPage({ applications: [titleMatch, followUp], now: new Date(2026, 10, 2, 12, 0) });
+    const first = tableProps(page.render())!.upcomingEvents!;
+    expect(first.get(followUp.id)).toBeDefined();
+
+    toolbar(page.render()).onSearchQueryChange!("software");
+    expect(tableProps(page.render())!.upcomingEvents).toBe(first);
+
+    page.props.applications = [titleMatch];
+    expect(tableProps(page.render())!.upcomingEvents).not.toBe(first);
+  });
 });
 
 describe("remembered table view", () => {

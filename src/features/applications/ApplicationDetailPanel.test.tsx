@@ -138,7 +138,7 @@ describe("phone detail panel scroll lock", () => {
     const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
 
     expect(css).toMatch(
-      /max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.application-detail-panel\[open\]\)[^{]*\{\s*overflow:\s*hidden/,
+      /not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.application-detail-panel\[open\]\)[^{]*\{\s*overflow:\s*hidden/,
     );
   });
 });
