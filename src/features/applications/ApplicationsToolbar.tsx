@@ -27,7 +27,7 @@ import {
 } from "../../lib/constants";
 import { APPLICATION_SOURCES } from "../../lib/domain";
 import { NativeModal } from "../../components/NativeModal";
-import { getAnchoredMenuPosition } from "../../lib/anchoredMenu";
+import { getAnchoredMenuPosition, offsetForContainingBlock } from "../../lib/anchoredMenu";
 import {
   APPLICATION_TABLE_COLUMNS,
   type ApplicationColumnId,
@@ -444,15 +444,8 @@ function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
       viewportHeight: window.innerHeight,
       viewportWidth: window.innerWidth,
     });
-    const dialog = buttonRef.current?.closest("dialog");
-    if (dialog) {
-      // The filtered dialog contains fixed descendants; its safe-area border
-      // shifts their origin from the viewport to the dialog's padding edge.
-      const rect = dialog.getBoundingClientRect();
-      position.left -= rect.left + dialog.clientLeft;
-      position.top -= rect.top + dialog.clientTop;
-    }
-    setPosition(position);
+    // The filtered dialog's safe-area border shifts the fixed tooltip's origin.
+    setPosition(offsetForContainingBlock(position, buttonRef.current?.closest("dialog")));
   }, [isOpen]);
 
   useEffect(() => {
