@@ -315,13 +315,19 @@ export function ApplicationsPage({
     sort,
   ]);
 
-  async function deleteAndCloseApplication(id: string) {
-    const result = await deleteApplication(id);
-    if (result.ok && id === selectedApplicationId) {
-      setSelectedApplicationId(null);
-    }
-    return result;
+  // Delete, archive and restore move the entry out of the current list, so
+  // the detail panel closes; on phones it covers the list and would otherwise
+  // give no sign that anything happened.
+  function closeAfter(action: (id: string) => Promise<MutationResult>) {
+    return async (id: string) => {
+      const result = await action(id);
+      if (result.ok && id === selectedApplicationId) {
+        setSelectedApplicationId(null);
+      }
+      return result;
+    };
   }
+  const deleteAndCloseApplication = closeAfter(deleteApplication);
 
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
@@ -481,10 +487,10 @@ export function ApplicationsPage({
           )}
           enableDeleteActiveApplications={enableDeleteActiveApplications}
           onAddInterview={addInterview}
-          onArchive={archiveApplication}
+          onArchive={closeAfter(archiveApplication)}
           onClose={() => setSelectedApplicationId(null)}
           onDelete={deleteAndCloseApplication}
-          onRestore={restoreApplication}
+          onRestore={closeAfter(restoreApplication)}
           onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}

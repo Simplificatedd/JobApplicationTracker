@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
 import type { Application } from "../../types/application";
 import type { TablePreferences } from "../../types/tablePreferences";
+import { ApplicationDetailPanel } from "./ApplicationDetailPanel";
 import { ApplicationsPage } from "./ApplicationsPage";
 import { ApplicationsToolbar } from "./ApplicationsToolbar";
 import { ApplicationsTable, DEFAULT_COLUMN_WIDTHS } from "./ApplicationsTable";
@@ -621,5 +622,45 @@ describe("application entries across layouts (#217)", () => {
       const marked = html.match(new RegExp(`<(\\w+)[^>]*data-application-id="${id}"`, "g")) ?? [];
       expect(marked.map((tag) => tag.slice(1, tag.indexOf(" "))).sort()).toEqual(["article", "button", "tr"]);
     }
+  });
+});
+
+describe("detail panel actions", () => {
+  type Panel = ComponentProps<typeof ApplicationDetailPanel>;
+
+  function detailPanel(node: unknown): Panel | undefined {
+    if (Array.isArray(node)) return node.map(detailPanel).find(Boolean);
+    if (!node || typeof node !== "object" || !("props" in node)) return undefined;
+    const element = node as ReactElement<{ children?: unknown }>;
+    return element.type === ApplicationDetailPanel
+      ? (element.props as unknown as Panel)
+      : detailPanel(element.props.children);
+  }
+
+  function openPanel(overrides: Partial<ComponentProps<typeof ApplicationsPage>>) {
+    const page = mountPage({ openApplicationId: titleMatch.id, ...overrides });
+    page.render(); // runs the effect that opens the requested application
+    return page;
+  }
+
+  it.each([
+    ["archiving", "onArchive", "archiveApplication"],
+    ["restoring", "onRestore", "restoreApplication"],
+    ["deleting", "onDelete", "deleteApplication"],
+  ] as const)("closes the panel after %s succeeds", async (_, handler, prop) => {
+    const action = vi.fn().mockResolvedValue({ ok: true });
+    const page = openPanel({ [prop]: action });
+
+    await expect(detailPanel(page.render())![handler](titleMatch.id)).resolves.toEqual({ ok: true });
+    expect(action).toHaveBeenCalledWith(titleMatch.id);
+    expect(detailPanel(page.render())).toBeUndefined();
+  });
+
+  it("keeps the panel open when archiving fails", async () => {
+    const failure = { ok: false, error: "Could not archive" };
+    const page = openPanel({ archiveApplication: vi.fn().mockResolvedValue(failure) });
+
+    await expect(detailPanel(page.render())!.onArchive(titleMatch.id)).resolves.toEqual(failure);
+    expect(detailPanel(page.render())?.application.id).toBe(titleMatch.id);
   });
 });
