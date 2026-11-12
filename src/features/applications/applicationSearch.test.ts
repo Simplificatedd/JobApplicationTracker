@@ -3,7 +3,6 @@ import type { Application } from "../../types/application";
 import {
   fuzzyScore,
   searchApplications,
-  selectSearchBase,
 } from "./applicationSearch";
 
 const baseApplication: Application = {
@@ -241,47 +240,6 @@ describe("searchApplications", () => {
 
   it("returns no results when nothing matches", () => {
     expect(searchApplications([baseApplication], "zzzz")).toEqual([]);
-  });
-});
-
-describe("selectSearchBase", () => {
-  const active = { ...baseApplication, id: "active" };
-  const archived = {
-    ...baseApplication,
-    id: "archived",
-    archivedAt: "2026-10-01T00:00:00.000Z",
-  };
-  const applications = [active, archived];
-
-  it("keeps the section split when no search is typed", () => {
-    expect(selectSearchBase(applications, "active", " ", "all")).toEqual({
-      applications: [active],
-      searchesAll: false,
-    });
-    expect(selectSearchBase(applications, "archive", "", "all")).toEqual({
-      applications: [archived],
-      searchesAll: false,
-    });
-  });
-
-  it("searches active and archived applications by default", () => {
-    expect(selectSearchBase(applications, "active", "eng", "all")).toEqual({
-      applications,
-      searchesAll: true,
-    });
-    expect(selectSearchBase(applications, "archive", "eng", "all")).toEqual({
-      applications,
-      searchesAll: true,
-    });
-  });
-
-  it("limits a search to the current section when asked", () => {
-    expect(
-      selectSearchBase(applications, "active", "eng", "section"),
-    ).toEqual({ applications: [active], searchesAll: false });
-    expect(
-      selectSearchBase(applications, "archive", "eng", "section"),
-    ).toEqual({ applications: [archived], searchesAll: false });
   });
 });
 
