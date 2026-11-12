@@ -139,7 +139,7 @@ describe("compact rail tooltips", () => {
     host.slots = []; host.cleanups = [];
     return () => render(() => (nav.type as (p: unknown) => unknown)(nav.props));
   }
-  const target = { currentTarget: { getBoundingClientRect: () => ({ right: 56, top: 100, height: 44 }) } };
+  const target = { currentTarget: { matches: (selector: string) => selector === ":focus-visible", getBoundingClientRect: () => ({ right: 56, top: 100, height: 44 }) } };
   const tooltipText = (tree: unknown) => elements(tree).find(e => e.props["aria-hidden"] === "true" && e.type === "span" && String(e.props.className).includes("fixed"))?.props.children;
 
   it("shows on focus beside the icon, outside the rail, and hides on Escape", () => {

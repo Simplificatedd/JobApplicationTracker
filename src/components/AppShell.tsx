@@ -795,7 +795,11 @@ function NavigationButtons({
               hideTooltip();
               onViewChange(item.key);
             }}
-            onFocus={(event) => showTooltip(event, item.label)}
+            onFocus={(event) => {
+              if (event.currentTarget.matches(":focus-visible")) {
+                showTooltip(event, item.label);
+              }
+            }}
             onMouseEnter={(event) => showTooltip(event, item.label)}
             onMouseLeave={hideTooltip}
             type="button"
