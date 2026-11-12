@@ -32,4 +32,10 @@ describe("AppLogo", () => {
     expect(markup).toContain('class="app-logo-clipboard"');
   });
 
+  it("keeps the logo still for reduced motion", () => {
+    const css = readFileSync("src/styles.css", "utf8");
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{\s*\.app-logo-bouncing \.app-logo-doc,\s*\.app-logo-bouncing \.app-logo-clipboard\s*\{\s*animation: none;/,
+    );
+  });
 });
