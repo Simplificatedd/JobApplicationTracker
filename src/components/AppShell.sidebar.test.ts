@@ -48,7 +48,7 @@ beforeEach(() => {
   vi.stubGlobal("window", {
     localStorage: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) },
     // Only the 1280px query follows `desktop`, so other breakpoint hooks see a non-phone layout.
-    matchMedia: (query: string) => ({ get matches() { return query.includes("min-width") && desktop; }, addEventListener: (_: string, fn: () => void) => { if (query.includes("min-width")) onMediaChange = fn; }, removeEventListener() {} }),
+    matchMedia: (query: string) => ({ get matches() { return query === "(min-width: 1280px)" && desktop; }, addEventListener: (_: string, fn: () => void) => { if (query === "(min-width: 1280px)") onMediaChange = fn; }, removeEventListener() {} }),
   });
   vi.stubGlobal("document", { addEventListener: (type: string, fn: (event: unknown) => void) => listeners.set(type, fn), removeEventListener: (type: string) => listeners.delete(type) });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });

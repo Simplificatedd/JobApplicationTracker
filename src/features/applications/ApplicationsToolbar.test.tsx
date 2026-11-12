@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
-import { ColumnsModal, PhoneSortSelect, SearchScopeToggle } from "./ApplicationsToolbar";
+import { ColumnsModal, PhoneSortSelect } from "./ApplicationsToolbar";
 import { DEFAULT_SORT_STATE } from "./applicationFilters";
 
 function renderColumnsModal(onResetColumnWidths?: () => void) {
@@ -53,49 +53,6 @@ describe("Columns dialog", () => {
       APPLICATION_TABLE_COLUMNS.length,
     );
   });
-});
-
-type ToggleElement = {
-  props: { children?: unknown; onClick?: () => void; "aria-pressed"?: boolean };
-  type: unknown;
-};
-
-function toggleButtons(node: unknown): ToggleElement[] {
-  if (Array.isArray(node)) return node.flatMap(toggleButtons);
-  if (!node || typeof node !== "object" || !("props" in node)) return [];
-  const element = node as ToggleElement;
-  return [
-    ...(element.type === "button" ? [element] : []),
-    ...toggleButtons(element.props.children),
-  ];
-}
-
-describe("Search scope toggle", () => {
-  it.each([
-    ["active", "Active only"],
-    ["archive", "Archived only"],
-  ] as const)(
-    "switches between all applications and the %s section",
-    (viewMode, sectionLabel) => {
-      const onChange = vi.fn();
-      const buttons = toggleButtons(
-        SearchScopeToggle({ onChange, scope: "all", viewMode }),
-      );
-
-      expect(buttons.map((button) => button.props.children)).toEqual([
-        "Active and archived",
-        sectionLabel,
-      ]);
-      expect(buttons.map((button) => button.props["aria-pressed"])).toEqual([
-        true,
-        false,
-      ]);
-      buttons[1].props.onClick?.();
-      expect(onChange).toHaveBeenCalledWith("section");
-      buttons[0].props.onClick?.();
-      expect(onChange).toHaveBeenLastCalledWith("all");
-    },
-  );
 });
 
 describe("phone sort control", () => {
@@ -154,6 +111,6 @@ describe("phone filter dialog scroll lock", () => {
 
     // The dialog only renders after Filters is pressed, so check the source.
     expect(filters.slice(0, filters.indexOf("</NativeModal>"))).toMatch(/<NativeModal\s+className="applications-filter-dialog /);
-    expect(css).toMatch(/max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
+    expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
   });
 });

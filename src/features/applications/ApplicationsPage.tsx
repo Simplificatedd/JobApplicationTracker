@@ -21,11 +21,7 @@ import {
   type ApplicationFilters,
   type SortColumn,
 } from "./applicationFilters";
-import {
-  type SearchScope,
-  searchApplications,
-  selectSearchBase,
-} from "./applicationSearch";
+import { searchApplications } from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import {
@@ -164,42 +160,41 @@ export function ApplicationsPage({
     rememberedTablePreferences?.needsAttentionOnly ?? false,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(
+    rememberedTablePreferences?.includeArchived ?? false,
+  );
   const [sort, setSort] = useState(
     normalizeApplicationSort(rememberedTablePreferences?.sort),
   );
-  const activeApplications = applications.filter(
-    (application) => !application.archivedAt,
-  );
-  const archivedApplications = applications.filter(
-    (application) => application.archivedAt,
-  );
-  const baseApplications =
-    viewMode === "archive" ? archivedApplications : activeApplications;
-  const viewLabel = viewMode === "archive" ? "Archived" : "Active";
-  const [countScope, setCountScope] = useState<"view" | "total">("view");
-  // Kept out of the remembered table view so stored preferences keep their
-  // shape. Like the search itself, it carries over between Applications and
-  // Archive because both views share this page instance.
-  const [searchScope, setSearchScope] = useState<SearchScope>("all");
-  const searchBase = selectSearchBase(
-    applications,
-    viewMode,
-    searchQuery,
-    searchScope,
-  );
-  // A value picked from cross-archive results stays listed after the search
-  // is cleared, so the active filter is never hidden from its own dropdown.
+  // Archive lists only archived entries; Applications adds them under Total.
+  const showsArchivedInActiveView = viewMode === "active" && includeArchived;
+  const baseApplications = showsArchivedInActiveView
+    ? applications
+    : applications.filter((application) =>
+        viewMode === "archive"
+          ? Boolean(application.archivedAt)
+          : !application.archivedAt,
+      );
+  // Applications and Archive share this page instance, so switching tabs
+  // starts a fresh search like any other navigation.
+  const [searchViewMode, setSearchViewMode] = useState(viewMode);
+  if (searchViewMode !== viewMode) {
+    setSearchViewMode(viewMode);
+    setSearchQuery("");
+  }
+  // A value picked under Total stays listed after switching back to Active,
+  // so the active filter is never hidden from its own dropdown.
   const companyOptions = includeSelectedFilterOption(
-    getApplicationFilterOptions(searchBase.applications, "company"),
+    getApplicationFilterOptions(baseApplications, "company"),
     filters.company,
   );
   const locationOptions = includeSelectedFilterOption(
-    getApplicationFilterOptions(searchBase.applications, "location"),
+    getApplicationFilterOptions(baseApplications, "location"),
     filters.location,
   );
   // Search relevance takes priority; the selected column orders equal matches.
   const searchedApplications = searchApplications(
-    sortApplications(searchBase.applications, sort),
+    sortApplications(baseApplications, sort),
     searchQuery,
   );
   const filteredApplications = applyApplicationFilters(
@@ -223,31 +218,35 @@ export function ApplicationsPage({
   const visibleApplications = focusedApplications;
   // Rows show the next event however far ahead it is, so the attention
   // window and the interview-attention setting are widened for this lookup.
-  const upcomingEventSettings = {
-    ...settings,
-    dueSoonDays: 36500,
-    includeUpcomingInterviewsInAttention: true,
-  };
-  const upcomingEvents = new Map(
-    visibleApplications.flatMap((application) => {
-      const event = selectUpcomingEvent(
-        deriveApplicationNotifications(
-          application,
-          upcomingEventSettings,
-          now,
-          interviews.filter(
-            (interview) => interview.applicationId === application.id,
+  // Worked out once per data change for every entry, not on each keystroke
+  // for the visible ones; the table looks rows up by id.
+  const upcomingEvents = useMemo(() => {
+    const upcomingEventSettings = {
+      ...settings,
+      dueSoonDays: 36500,
+      includeUpcomingInterviewsInAttention: true,
+    };
+    return new Map(
+      applications.flatMap((application) => {
+        const event = selectUpcomingEvent(
+          deriveApplicationNotifications(
+            application,
+            upcomingEventSettings,
+            now,
+            interviews.filter(
+              (interview) => interview.applicationId === application.id,
+            ),
+            assessments.filter((item) => item.applicationId === application.id),
           ),
-          assessments.filter((item) => item.applicationId === application.id),
-        ),
-        now,
-      );
-      return event ? [[application.id, event] as const] : [];
-    }),
-  );
+          now,
+        );
+        return event ? [[application.id, event] as const] : [];
+      }),
+    );
+  }, [applications, assessments, interviews, now, settings]);
   const isFiltered =
     countActiveFilters(filters, needsAttentionOnly) > 0 &&
-    searchBase.applications.length > 0;
+    baseApplications.length > 0;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -261,7 +260,7 @@ export function ApplicationsPage({
       ).length > 0,
   ).length;
   const summary = countApplicationSummary(
-    countScope === "total" ? applications : baseApplications,
+    baseApplications,
     interviews,
     assessments,
   );
@@ -297,6 +296,7 @@ export function ApplicationsPage({
     updateTablePreferences({
       columnWidths,
       filters,
+      includeArchived,
       needsAttentionOnly,
       // Keep the stored shape compatible with existing backups.
       searchQuery: "",
@@ -309,23 +309,31 @@ export function ApplicationsPage({
   }, [
     columnWidths,
     filters,
+    includeArchived,
     needsAttentionOnly,
     settings.rememberTableState,
     settings.visibleApplicationColumns,
     sort,
   ]);
 
-  async function deleteAndCloseApplication(id: string) {
-    const result = await deleteApplication(id);
-    if (result.ok && id === selectedApplicationId) {
-      setSelectedApplicationId(null);
-    }
-    return result;
+  // Delete, archive and restore move the entry out of the current list, so
+  // the detail panel closes; on phones it covers the list and would otherwise
+  // give no sign that anything happened.
+  function closeAfter(action: (id: string) => Promise<MutationResult>) {
+    return async (id: string) => {
+      const result = await action(id);
+      if (result.ok && id === selectedApplicationId) {
+        setSelectedApplicationId(null);
+      }
+      return result;
+    };
   }
+  const deleteAndCloseApplication = closeAfter(deleteApplication);
 
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
     setFilters(DEFAULT_APPLICATION_FILTERS);
+    setIncludeArchived(false);
     setNeedsAttentionOnly(false);
     setSearchQuery("");
     setSort(DEFAULT_SORT_STATE);
@@ -340,13 +348,20 @@ export function ApplicationsPage({
       <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4 xl:shrink-0">
         <SummaryMetric
           action={
-            <CountScopeToggle
-              onChange={setCountScope}
-              scope={countScope}
-              viewLabel={viewLabel}
-            />
+            viewMode === "active" ? (
+              <CountScopeToggle
+                includeArchived={includeArchived}
+                onChange={setIncludeArchived}
+              />
+            ) : null
           }
-          label={countScope === "total" ? "Total applications" : viewLabel}
+          label={
+            viewMode === "archive"
+              ? "Archived"
+              : includeArchived
+                ? "Total applications"
+                : "Active"
+          }
           value={String(summary.applications)}
         />
         <SummaryMetric
@@ -390,12 +405,9 @@ export function ApplicationsPage({
             : undefined
         }
         onSearchQueryChange={setSearchQuery}
-        onSearchScopeChange={setSearchScope}
         onSortChange={setSort}
         searchQuery={searchQuery}
-        searchScope={searchScope}
         sort={sort}
-        viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
@@ -416,7 +428,7 @@ export function ApplicationsPage({
         columnWidths={columnWidths}
         emptyBody={
           searchQuery.trim()
-            ? searchBase.searchesAll
+            ? showsArchivedInActiveView
               ? "No active or archived applications match that company, title, or description."
               : "No applications match that company, title, or description."
             : isFiltered
@@ -436,7 +448,7 @@ export function ApplicationsPage({
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
-        markArchivedApplications={searchBase.searchesAll}
+        markArchivedApplications={showsArchivedInActiveView}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={deleteAndCloseApplication}
@@ -481,10 +493,10 @@ export function ApplicationsPage({
           )}
           enableDeleteActiveApplications={enableDeleteActiveApplications}
           onAddInterview={addInterview}
-          onArchive={archiveApplication}
+          onArchive={closeAfter(archiveApplication)}
           onClose={() => setSelectedApplicationId(null)}
           onDelete={deleteAndCloseApplication}
-          onRestore={restoreApplication}
+          onRestore={closeAfter(restoreApplication)}
           onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}
@@ -599,34 +611,32 @@ function SummaryMetric({
 }
 
 function CountScopeToggle({
+  includeArchived,
   onChange,
-  scope,
-  viewLabel,
 }: {
-  onChange: (scope: "view" | "total") => void;
-  scope: "view" | "total";
-  viewLabel: string;
+  includeArchived: boolean;
+  onChange: (includeArchived: boolean) => void;
 }) {
   const options = [
-    { value: "view", label: viewLabel },
-    { value: "total", label: "Total" },
+    { value: false, label: "Active" },
+    { value: true, label: "Total" },
   ] as const;
 
   return (
     <div
-      aria-label="Application count scope"
+      aria-label="Applications shown"
       className="inline-flex shrink-0 rounded-md border border-border bg-background p-0.5"
       role="group"
     >
       {options.map((option) => (
         <button
-          aria-pressed={scope === option.value}
+          aria-pressed={includeArchived === option.value}
           className={`touch-target rounded px-2 py-0.5 text-xs font-semibold transition ${
-            scope === option.value
+            includeArchived === option.value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
           }`}
-          key={option.value}
+          key={option.label}
           onClick={() => onChange(option.value)}
           type="button"
         >
