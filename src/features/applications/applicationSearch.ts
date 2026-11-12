@@ -179,27 +179,3 @@ function fuzzyWordScore(
 
   return score / value.length;
 }
-
-export type SearchScope = "all" | "section";
-
-// A typed search looks across active and archived applications unless the
-// user narrows it to the current section; an empty search keeps the split.
-export function selectSearchBase(
-  applications: Application[],
-  viewMode: "active" | "archive",
-  rawQuery: string,
-  scope: SearchScope,
-) {
-  const searchesAll = scope === "all" && normalizeSearchText(rawQuery) !== "";
-
-  return {
-    applications: searchesAll
-      ? applications
-      : applications.filter((application) =>
-          viewMode === "archive"
-            ? Boolean(application.archivedAt)
-            : !application.archivedAt,
-        ),
-    searchesAll,
-  };
-}

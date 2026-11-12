@@ -21,11 +21,7 @@ import {
   type ApplicationFilters,
   type SortColumn,
 } from "./applicationFilters";
-import {
-  type SearchScope,
-  searchApplications,
-  selectSearchBase,
-} from "./applicationSearch";
+import { searchApplications } from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import {
@@ -164,49 +160,41 @@ export function ApplicationsPage({
     rememberedTablePreferences?.needsAttentionOnly ?? false,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(
+    rememberedTablePreferences?.includeArchived ?? false,
+  );
   const [sort, setSort] = useState(
     normalizeApplicationSort(rememberedTablePreferences?.sort),
   );
-  const activeApplications = applications.filter(
-    (application) => !application.archivedAt,
-  );
-  const archivedApplications = applications.filter(
-    (application) => application.archivedAt,
-  );
-  const baseApplications =
-    viewMode === "archive" ? archivedApplications : activeApplications;
-  const viewLabel = viewMode === "archive" ? "Archived" : "Active";
-  const [countScope, setCountScope] = useState<"view" | "total">("view");
-  // Kept out of the remembered table view so stored preferences keep their
-  // shape.
-  const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  // Archive lists only archived entries; Applications adds them under Total.
+  const showsArchivedInActiveView = viewMode === "active" && includeArchived;
+  const baseApplications = showsArchivedInActiveView
+    ? applications
+    : applications.filter((application) =>
+        viewMode === "archive"
+          ? Boolean(application.archivedAt)
+          : !application.archivedAt,
+      );
   // Applications and Archive share this page instance, so switching tabs
   // starts a fresh search like any other navigation.
   const [searchViewMode, setSearchViewMode] = useState(viewMode);
   if (searchViewMode !== viewMode) {
     setSearchViewMode(viewMode);
     setSearchQuery("");
-    setSearchScope("all");
   }
-  const searchBase = selectSearchBase(
-    applications,
-    viewMode,
-    searchQuery,
-    searchScope,
-  );
-  // A value picked from cross-archive results stays listed after the search
-  // is cleared, so the active filter is never hidden from its own dropdown.
+  // A value picked under Total stays listed after switching back to Active,
+  // so the active filter is never hidden from its own dropdown.
   const companyOptions = includeSelectedFilterOption(
-    getApplicationFilterOptions(searchBase.applications, "company"),
+    getApplicationFilterOptions(baseApplications, "company"),
     filters.company,
   );
   const locationOptions = includeSelectedFilterOption(
-    getApplicationFilterOptions(searchBase.applications, "location"),
+    getApplicationFilterOptions(baseApplications, "location"),
     filters.location,
   );
   // Search relevance takes priority; the selected column orders equal matches.
   const searchedApplications = searchApplications(
-    sortApplications(searchBase.applications, sort),
+    sortApplications(baseApplications, sort),
     searchQuery,
   );
   const filteredApplications = applyApplicationFilters(
@@ -254,7 +242,7 @@ export function ApplicationsPage({
   );
   const isFiltered =
     countActiveFilters(filters, needsAttentionOnly) > 0 &&
-    searchBase.applications.length > 0;
+    baseApplications.length > 0;
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -268,7 +256,7 @@ export function ApplicationsPage({
       ).length > 0,
   ).length;
   const summary = countApplicationSummary(
-    countScope === "total" ? applications : baseApplications,
+    baseApplications,
     interviews,
     assessments,
   );
@@ -304,6 +292,7 @@ export function ApplicationsPage({
     updateTablePreferences({
       columnWidths,
       filters,
+      includeArchived,
       needsAttentionOnly,
       // Keep the stored shape compatible with existing backups.
       searchQuery: "",
@@ -316,6 +305,7 @@ export function ApplicationsPage({
   }, [
     columnWidths,
     filters,
+    includeArchived,
     needsAttentionOnly,
     settings.rememberTableState,
     settings.visibleApplicationColumns,
@@ -333,6 +323,7 @@ export function ApplicationsPage({
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
     setFilters(DEFAULT_APPLICATION_FILTERS);
+    setIncludeArchived(false);
     setNeedsAttentionOnly(false);
     setSearchQuery("");
     setSort(DEFAULT_SORT_STATE);
@@ -347,13 +338,20 @@ export function ApplicationsPage({
       <section className="grid grid-cols-2 gap-3 max-md:gap-2 xl:grid-cols-4 xl:shrink-0">
         <SummaryMetric
           action={
-            <CountScopeToggle
-              onChange={setCountScope}
-              scope={countScope}
-              viewLabel={viewLabel}
-            />
+            viewMode === "active" ? (
+              <CountScopeToggle
+                includeArchived={includeArchived}
+                onChange={setIncludeArchived}
+              />
+            ) : null
           }
-          label={countScope === "total" ? "Total applications" : viewLabel}
+          label={
+            viewMode === "archive"
+              ? "Archived"
+              : includeArchived
+                ? "Total applications"
+                : "Active"
+          }
           value={String(summary.applications)}
         />
         <SummaryMetric
@@ -397,12 +395,9 @@ export function ApplicationsPage({
             : undefined
         }
         onSearchQueryChange={setSearchQuery}
-        onSearchScopeChange={setSearchScope}
         onSortChange={setSort}
         searchQuery={searchQuery}
-        searchScope={searchScope}
         sort={sort}
-        viewMode={viewMode}
         visibleApplicationColumns={settings.visibleApplicationColumns}
       />
 
@@ -423,7 +418,7 @@ export function ApplicationsPage({
         columnWidths={columnWidths}
         emptyBody={
           searchQuery.trim()
-            ? searchBase.searchesAll
+            ? showsArchivedInActiveView
               ? "No active or archived applications match that company, title, or description."
               : "No applications match that company, title, or description."
             : isFiltered
@@ -443,7 +438,7 @@ export function ApplicationsPage({
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
-        markArchivedApplications={searchBase.searchesAll}
+        markArchivedApplications={showsArchivedInActiveView}
         onPreviewResume={previewResume}
         onArchiveApplication={archiveApplication}
         onDeleteApplication={deleteAndCloseApplication}
@@ -606,34 +601,32 @@ function SummaryMetric({
 }
 
 function CountScopeToggle({
+  includeArchived,
   onChange,
-  scope,
-  viewLabel,
 }: {
-  onChange: (scope: "view" | "total") => void;
-  scope: "view" | "total";
-  viewLabel: string;
+  includeArchived: boolean;
+  onChange: (includeArchived: boolean) => void;
 }) {
   const options = [
-    { value: "view", label: viewLabel },
-    { value: "total", label: "Total" },
+    { value: false, label: "Active" },
+    { value: true, label: "Total" },
   ] as const;
 
   return (
     <div
-      aria-label="Application count scope"
+      aria-label="Applications shown"
       className="inline-flex shrink-0 rounded-md border border-border bg-background p-0.5"
       role="group"
     >
       {options.map((option) => (
         <button
-          aria-pressed={scope === option.value}
+          aria-pressed={includeArchived === option.value}
           className={`touch-target rounded px-2 py-0.5 text-xs font-semibold transition ${
-            scope === option.value
+            includeArchived === option.value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
           }`}
-          key={option.value}
+          key={option.label}
           onClick={() => onChange(option.value)}
           type="button"
         >
