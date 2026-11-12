@@ -31,6 +31,7 @@ import { useEscapeKey } from "../hooks/useEscapeKey";
 import { useScrollActiveIntoView } from "../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../hooks/useScrollStrip";
 import { APP_NAME } from "../lib/constants";
+import { AppLogo } from "./AppLogo";
 import { firstVisible, NativeModal } from "./NativeModal";
 import { NotificationBell } from "./NotificationBell";
 import type { ReminderNotification } from "../lib/reminders";
@@ -656,11 +657,7 @@ function NavigationBrand({ isCompact }: { isCompact: boolean }) {
       {isCompact ? (
         // The fixed show/hide toggle and the expand button sit at the top of
         // the rail, so the mark starts below them.
-        <img
-          alt={APP_NAME}
-          className="mx-auto mt-[5.5rem] hidden size-10 xl:block"
-          src="/favicon.svg"
-        />
+        <AppLogo className="mx-auto mt-[5.5rem] hidden size-10 xl:block" />
       ) : null}
       <div
         className={`flex min-w-0 items-center justify-between gap-3 pl-12 xl:block ${
