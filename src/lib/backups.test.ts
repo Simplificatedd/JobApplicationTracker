@@ -130,6 +130,25 @@ describe("parseBackupFile", () => {
     expect(backup.snapshot.tablePreferences).toEqual(tablePreferences);
   });
 
+  it("accepts a remembered Active/Total choice and rejects a non-boolean one", async () => {
+    const tablePreferences = {
+      columnWidths: {},
+      filters: DEFAULT_APPLICATION_FILTERS,
+      includeArchived: true,
+      needsAttentionOnly: false,
+      searchQuery: "",
+      sort: DEFAULT_SORT_STATE,
+      visibleApplicationColumns: DEFAULT_USER_SETTINGS.visibleApplicationColumns,
+    };
+    const backup = await parseBackupFile(createBackupFile(createSnapshot({ tablePreferences })));
+    expect(backup.snapshot.tablePreferences).toEqual(tablePreferences);
+
+    const invalid = { ...tablePreferences, includeArchived: "yes" };
+    await expect(
+      parseBackupFile(createBackupFile(createSnapshot({ tablePreferences: invalid as never }))),
+    ).rejects.toThrow();
+  });
+
   it("accepts a valid empty backup", async () => {
     await expect(parseBackupFile(createBackupFile(createSnapshot()))).resolves
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });

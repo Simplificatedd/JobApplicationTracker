@@ -39,7 +39,6 @@ import {
   type ApplicationFilters,
   type SortState,
 } from "./applicationFilters";
-import type { SearchScope } from "./applicationSearch";
 import type {
   InterviewType,
   JobType,
@@ -58,12 +57,9 @@ interface ApplicationsToolbarProps {
   onResetFilters?: () => void;
   onResetColumnWidths?: () => void;
   onSearchQueryChange?: (value: string) => void;
-  onSearchScopeChange?: (scope: SearchScope) => void;
   onSortChange?: (sort: SortState) => void;
   searchQuery?: string;
-  searchScope?: SearchScope;
   sort?: SortState;
-  viewMode?: "active" | "archive";
   visibleApplicationColumns?: string[];
 }
 
@@ -78,12 +74,9 @@ export function ApplicationsToolbar({
   onResetFilters,
   onResetColumnWidths,
   onSearchQueryChange,
-  onSearchScopeChange,
   onSortChange,
   searchQuery = "",
-  searchScope = "all",
   sort = DEFAULT_SORT_STATE,
-  viewMode = "active",
   visibleApplicationColumns = [],
 }: ApplicationsToolbarProps) {
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
@@ -128,13 +121,6 @@ export function ApplicationsToolbar({
               </button>
             ) : null}
           </label>
-          {searchQuery.trim() && onSearchScopeChange ? (
-            <SearchScopeToggle
-              onChange={onSearchScopeChange}
-              scope={searchScope}
-              viewMode={viewMode}
-            />
-          ) : null}
         </div>
 
         <div className="applications-toolbar-controls grid min-w-0 gap-2">
@@ -1097,52 +1083,5 @@ function FilterSelect({
         size={16}
       />
     </label>
-  );
-}
-
-export function SearchScopeToggle({
-  onChange,
-  scope,
-  viewMode,
-}: {
-  onChange: (scope: SearchScope) => void;
-  scope: SearchScope;
-  viewMode: "active" | "archive";
-}) {
-  const options = [
-    { value: "all", label: "Active and archived" },
-    {
-      value: "section",
-      label: viewMode === "archive" ? "Archived only" : "Active only",
-    },
-  ] as const;
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-      <span className="font-medium text-muted" id="search-scope-label">
-        Searching
-      </span>
-      <div
-        aria-labelledby="search-scope-label"
-        className="inline-flex shrink-0 rounded-md border border-border bg-background p-0.5"
-        role="group"
-      >
-        {options.map((option) => (
-          <button
-            aria-pressed={scope === option.value}
-            className={`touch-target rounded px-2 py-0.5 font-semibold transition ${
-              scope === option.value
-                ? "bg-surface text-foreground shadow-sm"
-                : "text-muted hover:text-foreground"
-            }`}
-            key={option.value}
-            onClick={() => onChange(option.value)}
-            type="button"
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

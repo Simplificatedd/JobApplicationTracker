@@ -927,6 +927,8 @@ function isTablePreferences(value: unknown) {
     ) &&
     Object.values(value.filters).every((filter) => typeof filter === "string") &&
     typeof value.needsAttentionOnly === "boolean" &&
+    (value.includeArchived === undefined ||
+      typeof value.includeArchived === "boolean") &&
     typeof value.searchQuery === "string" &&
     typeof value.sort.column === "string" &&
     isOneOf(value.sort.direction, ["ascending", "descending"]) &&
