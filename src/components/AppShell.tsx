@@ -740,6 +740,9 @@ function NavigationButtons({
     left: number;
     top: number;
   } | null>(null);
+  useEffect(() => {
+    if (!isCompact) setTooltip(null);
+  }, [isCompact]);
   const hideTooltip = useCallback(() => setTooltip(null), []);
   useEscapeKey(tooltip !== null, hideTooltip);
   useScrollActiveIntoView(navRef, currentView);
@@ -804,7 +807,6 @@ function NavigationButtons({
           </button>
         );
       })}
-      {/* The rail can turn into the row below 1280px while a tooltip shows. */}
       {tooltip && isCompact
         ? // A portal keeps the tooltip clear of the sidebar and above the
           // sticky header. The label is already the button's name, so screen
