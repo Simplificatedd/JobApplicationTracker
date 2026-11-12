@@ -302,15 +302,15 @@ describe("remembered table view", () => {
     expect(html).toContain(descriptionMatch.jobTitle);
   });
 
-  it("keeps search through view switches and cloud updates, but clears it on remount", () => {
+  it("keeps search through cloud updates, but clears it on view switches and remount", () => {
     const page = mountPage();
     toolbar(page.render()).onSearchQueryChange!("engineer");
-    expect(toolbar(page.render()).searchQuery).toBe("engineer");
-    page.props.viewMode = "archive";
+    toolbar(page.render()).onSearchScopeChange!("section");
     page.props.tablePreferences = { ...tablePreferences, searchQuery: "remote search" };
-    expect(toolbar(page.render()).searchQuery).toBe("engineer");
-    page.props.viewMode = "active";
-    expect(toolbar(page.render()).searchQuery).toBe("engineer");
+    expect(toolbar(page.render())).toMatchObject({ searchQuery: "engineer", searchScope: "section" });
+    page.props.viewMode = "archive";
+    page.render();
+    expect(toolbar(page.render())).toMatchObject({ searchQuery: "", searchScope: "all" });
 
     expect(toolbar(mountPage(page.props).render()).searchQuery).toBe("");
   });

@@ -178,9 +178,16 @@ export function ApplicationsPage({
   const viewLabel = viewMode === "archive" ? "Archived" : "Active";
   const [countScope, setCountScope] = useState<"view" | "total">("view");
   // Kept out of the remembered table view so stored preferences keep their
-  // shape. Like the search itself, it carries over between Applications and
-  // Archive because both views share this page instance.
+  // shape.
   const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  // Applications and Archive share this page instance, so switching tabs
+  // starts a fresh search like any other navigation.
+  const [searchViewMode, setSearchViewMode] = useState(viewMode);
+  if (searchViewMode !== viewMode) {
+    setSearchViewMode(viewMode);
+    setSearchQuery("");
+    setSearchScope("all");
+  }
   const searchBase = selectSearchBase(
     applications,
     viewMode,
