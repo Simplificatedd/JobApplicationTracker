@@ -36,3 +36,20 @@ export function getAnchoredMenuPosition({
 
   return { left, top };
 }
+
+export function offsetForContainingBlock(
+  position: { left: number; top: number },
+  container: {
+    getBoundingClientRect(): { left: number; top: number };
+    clientLeft: number;
+    clientTop: number;
+  } | null | undefined,
+) {
+  if (!container) return { ...position };
+
+  const rect = container.getBoundingClientRect();
+  return {
+    left: position.left - (rect.left + container.clientLeft),
+    top: position.top - (rect.top + container.clientTop),
+  };
+}
