@@ -84,6 +84,6 @@ describe("phone Add job scroll lock", () => {
   it("locks the page behind it below md only", () => {
     const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
 
-    expect(css).toMatch(/max-width:\s*767\.98px\)\s*\{[^}]*html:has\(\.add-application-dialog\[open\]\)[^{]*\{\s*overflow:\s*hidden/);
+    expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.add-application-dialog\[open\]\)[^{]*\{\s*overflow:\s*hidden/);
   });
 });
