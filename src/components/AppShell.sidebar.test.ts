@@ -139,7 +139,7 @@ describe("compact rail tooltips", () => {
     host.slots = []; host.cleanups = [];
     return () => render(() => (nav.type as (p: unknown) => unknown)(nav.props));
   }
-  const target = { currentTarget: { getBoundingClientRect: () => ({ right: 56, top: 100, height: 44 }) } };
+  const target = { currentTarget: { matches: (selector: string) => selector === ":focus-visible", getBoundingClientRect: () => ({ right: 56, top: 100, height: 44 }) } };
   const tooltipText = (tree: unknown) => elements(tree).find(e => e.props["aria-hidden"] === "true" && e.type === "span" && String(e.props.className).includes("fixed"))?.props.children;
 
   it("shows on focus beside the icon, outside the rail, and hides on Escape", () => {
@@ -164,13 +164,37 @@ describe("compact rail tooltips", () => {
     expect(tooltipText(view())).toBeUndefined();
   });
 
-  it("hides when the window narrows below 1280px while it shows", () => {
+  it("only shows on focus when the icon matches :focus-visible", () => {
+    const view = navigation("compact");
+    const first = () => elements(view()).find(e => e.type === "button")!;
+    const matches = vi.fn().mockReturnValue(false);
+    const focusTarget = { currentTarget: { ...target.currentTarget, matches } };
+    call(first().props.onFocus, focusTarget);
+    expect(matches).toHaveBeenCalledWith(":focus-visible");
+    expect(tooltipText(view())).toBeUndefined();
+
+    matches.mockReturnValue(true);
+    call(first().props.onFocus, focusTarget);
+    expect(tooltipText(view())).toBe("Applications");
+  });
+
+  it.each(["onMouseLeave", "onBlur"])("hides on %s after hovering", (handler) => {
+    const view = navigation("compact");
+    const first = () => elements(view()).find(e => e.type === "button")!;
+    call(first().props.onMouseEnter, target);
+    expect(tooltipText(view())).toBe("Applications");
+
+    call(first().props[handler]);
+    expect(tooltipText(view())).toBeUndefined();
+  });
+
+  it("clears a hovered tooltip when leaving compact mode and keeps it hidden on return", () => {
     storage.set(SIDEBAR_STATE_STORAGE_KEY, "compact");
     const shell = () => render(() => AppShell(props()));
     const nav = named(shell(), "NavigationButtons")!;
     const navSlots = host.slots; host.slots = [];
     const navigationView = (navProps: Record<string, unknown>) => render(() => (nav.type as (p: unknown) => unknown)(navProps));
-    call(elements(navigationView(nav.props)).find(e => e.type === "button")!.props.onFocus, target);
+    call(elements(navigationView(nav.props)).find(e => e.type === "button")!.props.onMouseEnter, target);
     expect(tooltipText(navigationView(nav.props))).toBe("Applications");
 
     // Re-render the shell narrow to get the row's props, keeping the nav's state.
@@ -179,6 +203,13 @@ describe("compact rail tooltips", () => {
     const narrowProps = named(shell(), "NavigationButtons")!.props;
     host.slots = navState;
     expect(tooltipText(navigationView(narrowProps))).toBeUndefined();
+
+    host.slots = navSlots;
+    desktop = true; onMediaChange();
+    const compactProps = named(shell(), "NavigationButtons")!.props;
+    expect(compactProps.isCompact).toBe(true);
+    host.slots = navState;
+    expect(tooltipText(navigationView(compactProps))).toBeUndefined();
   });
 
   it.each([

@@ -1,9 +1,42 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
 import { ColumnsModal, PhoneSortSelect, SearchScopeToggle } from "./ApplicationsToolbar";
 import { DEFAULT_SORT_STATE } from "./applicationFilters";
+
+// Opt into the hook-host style used by AppShell.sidebar.test.ts only for the
+// positioning tests; static-markup tests continue using React's real hooks.
+const host = vi.hoisted(() => ({ active: false, cursor: 0, slots: [] as unknown[], effects: [] as (() => void)[] }));
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  return {
+    ...react,
+    useState(initial: unknown) {
+      if (!host.active) return react.useState(initial);
+      const i = host.cursor++;
+      if (!(i in host.slots)) host.slots[i] = typeof initial === "function" ? initial() : initial;
+      return [host.slots[i], (value: unknown) => { host.slots[i] = typeof value === "function" ? value(host.slots[i]) : value; }];
+    },
+    useRef(initial: unknown) {
+      if (!host.active) return react.useRef(initial);
+      const i = host.cursor++;
+      if (!(i in host.slots)) host.slots[i] = { current: initial };
+      return host.slots[i];
+    },
+    useId() { return host.active ? "test-columns" : react.useId(); },
+    useEffect(...args: Parameters<typeof react.useEffect>) {
+      if (!host.active) return react.useEffect(...args);
+    },
+    useLayoutEffect(effect: () => void, deps: unknown[]) {
+      if (!host.active) return react.useLayoutEffect(effect, deps);
+      const i = host.cursor++; const previous = host.slots[i] as unknown[] | undefined;
+      if (previous && deps.every((d, n) => Object.is(d, previous[n]))) return;
+      host.slots[i] = deps;
+      host.effects.push(effect);
+    },
+  };
+});
 
 function renderColumnsModal(onResetColumnWidths?: () => void) {
   return renderToStaticMarkup(
@@ -52,6 +85,54 @@ describe("Columns dialog", () => {
     expect(markup.match(/<button aria-expanded="false"/g)).toHaveLength(
       APPLICATION_TABLE_COLUMNS.length,
     );
+  });
+});
+
+describe("column info tooltip position", () => {
+  type Element = { type: unknown; props: Record<string, unknown> };
+  function elements(node: unknown): Element[] {
+    if (Array.isArray(node)) return node.flatMap(elements);
+    if (!node || typeof node !== "object" || !("props" in node)) return [];
+    const element = node as Element;
+    return [element, ...elements(element.props.children)];
+  }
+
+  beforeEach(() => {
+    host.active = true; host.cursor = 0; host.slots = []; host.effects = [];
+    vi.stubGlobal("window", { innerWidth: 852, innerHeight: 393 });
+  });
+  afterEach(() => { host.active = false; vi.unstubAllGlobals(); });
+
+  it.each([
+    ["a dialog with a safe-area border", { left: 17, top: 23, clientLeft: 59, clientTop: 11 }, { left: 100, top: 134 }],
+    ["a zero-offset dialog", { left: 0, top: 0, clientLeft: 0, clientTop: 0 }, { left: 176, top: 168 }],
+    ["no dialog ancestor", null, { left: 176, top: 168 }],
+  ])("positions relative to %s", (_, offset, expected) => {
+    const modal = ColumnsModal({ onChange: vi.fn(), onClose: vi.fn(), visibleApplicationColumns: ["company"] });
+    const info = elements(modal).find(e => typeof e.type === "function" && e.type.name === "ColumnInfoTooltip")!;
+    // Give the tooltip its own hook host, as a mounted child would have.
+    host.slots = []; host.effects = [];
+    const closest = vi.fn().mockReturnValue(offset && {
+      getBoundingClientRect: () => ({ left: offset.left, top: offset.top }),
+      clientLeft: offset.clientLeft, clientTop: offset.clientTop,
+    });
+    const view = () => {
+      host.cursor = 0;
+      const tree = (info.type as (props: unknown) => Element)(info.props);
+      const refs = host.slots.filter(slot => slot && typeof slot === "object" && "current" in slot) as { current: unknown }[];
+      refs[0].current = { closest, getBoundingClientRect: () => ({ left: 380, right: 400, top: 140, bottom: 160 }) };
+      refs[1].current = elements(tree).some(e => e.type === "span")
+        ? { getBoundingClientRect: () => ({ width: 224, height: 60 }) } : null;
+      host.effects.splice(0).forEach(effect => effect());
+      return tree;
+    };
+
+    const closed = view();
+    (closed.props.onClick as () => void)();
+    view(); // Layout positioning runs after the tooltip ref is attached.
+    const tooltip = elements(view()).find(e => e.type === "span")!;
+    expect(closest).toHaveBeenCalledWith("dialog");
+    expect(tooltip.props.style).toEqual(expected);
   });
 });
 

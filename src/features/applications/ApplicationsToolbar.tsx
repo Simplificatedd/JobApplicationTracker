@@ -437,15 +437,22 @@ function ColumnInfoTooltip({ columnId }: { columnId: ApplicationColumnId }) {
       return;
     }
 
-    setPosition(
-      getAnchoredMenuPosition({
-        anchor,
-        menuHeight: tooltip.height,
-        menuWidth: tooltip.width,
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
-      }),
-    );
+    const position = getAnchoredMenuPosition({
+      anchor,
+      menuHeight: tooltip.height,
+      menuWidth: tooltip.width,
+      viewportHeight: window.innerHeight,
+      viewportWidth: window.innerWidth,
+    });
+    const dialog = buttonRef.current?.closest("dialog");
+    if (dialog) {
+      // The filtered dialog contains fixed descendants; its safe-area border
+      // shifts their origin from the viewport to the dialog's padding edge.
+      const rect = dialog.getBoundingClientRect();
+      position.left -= rect.left + dialog.clientLeft;
+      position.top -= rect.top + dialog.clientTop;
+    }
+    setPosition(position);
   }, [isOpen]);
 
   useEffect(() => {
