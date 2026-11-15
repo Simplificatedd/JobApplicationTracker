@@ -489,6 +489,11 @@ function AnchoredQuickEdit({
     }
 
     updatePosition();
+    // The editor is portaled away from its trigger, so keyboard users would
+    // otherwise have to tab through the rest of the page to reach it.
+    editorRef.current
+      ?.querySelector<HTMLElement>("input, select, textarea, button")
+      ?.focus();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
 
