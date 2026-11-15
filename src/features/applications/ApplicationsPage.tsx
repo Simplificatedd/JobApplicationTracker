@@ -447,6 +447,7 @@ export function ApplicationsPage({
               : "No applications yet"
         }
         enableDraggableColumnWidths={settings.enableDraggableColumnWidths}
+        showFullJobTitles={settings.showFullJobTitles}
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         markArchivedApplications={showsArchivedInActiveView}
         onPreviewResume={previewResume}

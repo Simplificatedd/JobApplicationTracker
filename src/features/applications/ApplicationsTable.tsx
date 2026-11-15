@@ -58,6 +58,7 @@ interface ApplicationsTableProps {
   onSortChange: (column: SortColumn) => void;
   onUpdateApplication: (applicationId: string, input: ApplicationUpdate) => void;
   resumes: ResumeFile[];
+  showFullJobTitles?: boolean;
   sort: SortState;
   // Phone rows show each application's next event, keyed by application id.
   upcomingEvents?: Map<string, ReminderNotification>;
@@ -340,6 +341,7 @@ export function ApplicationsTable({
   onSortChange,
   onUpdateApplication,
   resumes,
+  showFullJobTitles = false,
   sort,
   upcomingEvents,
   visibleApplicationColumns,
@@ -497,7 +499,10 @@ export function ApplicationsTable({
   }
 
   return (
-    <section className={`surface-panel overflow-hidden rounded-lg xl:flex xl:flex-col ${applications.length > 0 ? "xl:min-h-64" : "xl:min-h-0 xl:overflow-y-auto"}`}>
+    <section
+      className={`surface-panel overflow-hidden rounded-lg xl:flex xl:flex-col ${applications.length > 0 ? "xl:min-h-64" : "xl:min-h-0 xl:overflow-y-auto"}`}
+      data-full-job-titles={showFullJobTitles}
+    >
       {applications.length === 0 ? (
         <div className="flex min-h-[280px] items-center justify-center px-6 py-12 text-center">
           <div className="max-w-sm">
@@ -950,6 +955,10 @@ function getCellClassName(columnId: ApplicationColumnId) {
     .join(" ");
 }
 
+// With the Show full job titles setting on, titles wrap instead of truncating.
+const FULL_JOB_TITLE_WRAP =
+  "[[data-full-job-titles=true]_&]:whitespace-normal [[data-full-job-titles=true]_&]:break-words";
+
 function getCellContentClassName(columnId: ApplicationColumnId) {
   const isUtilityCell = isUtilityColumn(columnId);
 
@@ -992,7 +1001,7 @@ function ApplicationColumnCell({
 }) {
   if (columnId === "jobTitle") {
     const title = (
-      <span className="block max-w-full truncate text-left text-sm font-semibold text-foreground underline-offset-2 group-hover:text-primary group-hover:underline">
+      <span className={`block max-w-full truncate text-left text-sm font-semibold text-foreground underline-offset-2 group-hover:text-primary group-hover:underline ${FULL_JOB_TITLE_WRAP}`}>
         {application.jobTitle}
       </span>
     );
@@ -1325,8 +1334,8 @@ function MobileApplicationRow({
         onClick={() => onOpenApplication(application.id)}
         type="button"
       >
-        <span className="flex w-full min-w-0 items-center justify-between gap-3">
-          <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+        <span className="flex w-full min-w-0 items-center justify-between gap-3 [[data-full-job-titles=true]_&]:items-start">
+          <span className={`min-w-0 truncate text-sm font-semibold text-foreground ${FULL_JOB_TITLE_WRAP}`}>
             {application.jobTitle}
           </span>
           <span className="flex max-w-[55%] shrink-0">
