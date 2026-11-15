@@ -489,6 +489,11 @@ function AnchoredQuickEdit({
     }
 
     updatePosition();
+    // The editor is portaled away from its trigger, so keyboard users would
+    // otherwise have to tab through the rest of the page to reach it.
+    editorRef.current
+      ?.querySelector<HTMLElement>("input, select, textarea, button")
+      ?.focus();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
 
@@ -580,13 +585,16 @@ export function ResumeCell({
 
 export function ContactsButton({
   count,
+  jobTitle,
   onClick,
 }: {
   count: number;
+  jobTitle: string;
   onClick?: () => void;
 }) {
   return (
     <button
+      aria-label={`Contacts for ${jobTitle}: ${count}`}
       className="touch-target inline-flex h-9 max-w-full items-center justify-center gap-1.5 justify-self-start rounded-lg border border-border px-2 text-center text-sm font-medium text-foreground hover:bg-slate-50"
       onClick={onClick}
       type="button"
@@ -752,7 +760,7 @@ export function RowActionsMenu({
         type="button"
       >
         <MoreHorizontal aria-hidden="true" size={18} />
-        <span className="sr-only">Open row actions</span>
+        <span className="sr-only">Actions for {application.jobTitle}</span>
       </button>
       {isOpen
         ? createPortal(
