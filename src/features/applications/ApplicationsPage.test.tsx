@@ -476,7 +476,7 @@ describe("applications page on phones", () => {
       match[1].replace(/<[^>]+>/g, "|").replace(/\|+/g, "|").replace(/^\||\|$/g, ""),
     );
 
-  it("shows company, status, title and details as read-only rows", () => {
+  it("shows title, status, company and details as read-only rows", () => {
     const html = renderPage("", {
       applications: [
         { ...titleMatch, dateApplied: "2026-10-20", location: "Singapore", workMode: "hybrid" },
@@ -484,12 +484,12 @@ describe("applications page on phones", () => {
     });
 
     expect(rowTexts(html)).toEqual([
-      "Example Company|Awaiting Response|Software Engineer|Applied 20 Oct 2026 · Singapore · Hybrid",
+      "Software Engineer|Awaiting Response|Example Company|Applied 20 Oct 2026 · Singapore · Hybrid",
     ]);
     expect(phoneRows(html)).not.toMatch(/<(input|select)|role="menu/);
   });
 
-  it("leaves out missing optional fields and falls back to the job title", () => {
+  it("leaves out the company line and other missing optional fields", () => {
     const html = renderPage("", {
       applications: [{ ...titleMatch, company: "" }],
     });
