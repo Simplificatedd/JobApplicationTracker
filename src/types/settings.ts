@@ -6,6 +6,7 @@ export interface UserSettings {
   addJobPresentation: "modal" | "page";
   visibleApplicationColumns: string[];
   enableDraggableColumnWidths: boolean;
+  showFullJobTitles: boolean;
   rememberTableState: boolean;
   enableDeleteActiveApplications: boolean;
   enableNotificationBell: boolean;

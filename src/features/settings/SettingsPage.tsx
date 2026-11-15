@@ -350,6 +350,14 @@ export function SettingsPage({
             }
             onLabel="Top navbar"
           />
+          <ToggleField
+            checked={settings.showFullJobTitles}
+            description="Wraps long job titles in the applications table and phone list instead of cutting them off. Rows get taller."
+            label="Show full job titles"
+            onChange={(checked) =>
+              onUpdateSettings({ showFullJobTitles: checked })
+            }
+          />
           <NumberField
             description="Whole days before a newly added application should prompt you to follow up. Decimals round down; minimum 1."
             label="Follow-up prompt after:"
