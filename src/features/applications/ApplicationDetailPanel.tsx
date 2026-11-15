@@ -1142,6 +1142,14 @@ function EditForm({
           <option value="high">High</option>
         </select>
       </Field>
+      <Field label="Salary / Pay">
+        <input
+          className="field-control"
+          onChange={(event) => updateDraft("salary", event.target.value)}
+          type="text"
+          value={draft.salary}
+        />
+      </Field>
       {draft.status === "Offered" ? (
         <Field label="Offer Deadline">
           <input
