@@ -28,7 +28,7 @@ vi.mock("react", () => {
   };
 });
 vi.mock("react-dom", () => ({ createPortal: (node: unknown) => node }));
-import { StatusQuickEditCell } from "./TableCells";
+import { ContactsButton, StatusQuickEditCell } from "./TableCells";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function elements(node: unknown): Element[] {
@@ -72,5 +72,12 @@ describe("quick-edit popover keyboard focus", () => {
     // focus back to the first control.
     open();
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("table row control names", () => {
+  it("names the Contacts button with the job title and count", () => {
+    const button = ContactsButton({ count: 2, jobTitle: "Software Intern" }) as unknown as Element;
+    expect(button.props["aria-label"]).toBe("Contacts for Software Intern: 2");
   });
 });

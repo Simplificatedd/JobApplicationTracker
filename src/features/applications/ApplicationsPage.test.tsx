@@ -438,7 +438,7 @@ describe("applications page on narrow screens", () => {
     // Card values stretch to their column so long text truncates; the
     // contacts button opts out so it does not become a full-width bar.
     expect(renderPage("")).toMatch(
-      /<button class="[^"]*\bjustify-self-start\b[^"]*"[^>]*><svg[^>]*lucide-message-square-text/,
+      /<button [^>]*class="[^"]*\bjustify-self-start\b[^"]*"[^>]*><svg[^>]*lucide-message-square-text/,
     );
   });
 

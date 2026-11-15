@@ -1121,6 +1121,7 @@ function ApplicationColumnCell({
     return (
       <ContactsButton
         count={application.contactsCount}
+        jobTitle={application.jobTitle}
         onClick={() => onOpenContacts(application.id)}
       />
     );
