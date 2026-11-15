@@ -1327,7 +1327,7 @@ function MobileApplicationRow({
       >
         <span className="flex w-full min-w-0 items-center justify-between gap-3">
           <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-            {application.company || application.jobTitle}
+            {application.jobTitle}
           </span>
           <span className="flex max-w-[55%] shrink-0">
             <StatusBadge status={application.status} />
@@ -1335,7 +1335,7 @@ function MobileApplicationRow({
         </span>
         {application.company ? (
           <span className="w-full truncate text-sm text-foreground">
-            {application.jobTitle}
+            {application.company}
           </span>
         ) : null}
         {details.length > 0 ? (
