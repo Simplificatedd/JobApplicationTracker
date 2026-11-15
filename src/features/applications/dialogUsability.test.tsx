@@ -515,3 +515,49 @@ describe("status prompt after removing the last interview or assessment (#228)",
     expect(prompt()).toBeUndefined();
   });
 });
+
+// #268: the Edit form exposes Salary / Pay through the existing draft wiring.
+describe("Salary / Pay in the Edit form (#268)", () => {
+  function setup() {
+    const props = { ...detailProps(), application: { ...application, salary: "$30/hr" }, onUpdate: vi.fn().mockResolvedValue({ ok: true }) };
+    const view = () => render(() => ApplicationDetailPanel(props));
+    call(button(view(), "Edit").props.onClick);
+    const salaryInput = () => {
+      const form = named(view(), "EditForm");
+      const field = elements(call(form.type, form.props)).find(e => typeof e.type === "function" && e.props.label === "Salary / Pay")!;
+      return elements(field.props.children).find(e => e.type === "input")!;
+    };
+    const type = (value: string) => call(salaryInput().props.onChange, { target: { value } });
+    return { props, view, salaryInput, type };
+  }
+
+  it("shows the current value", () => {
+    expect(setup().salaryInput().props.value).toBe("$30/hr");
+  });
+
+  it("saves a changed value, trimmed like the Add form", () => {
+    const { props, view, type } = setup();
+    type("  $35/hr ");
+    call(button(view(), "Save").props.onClick);
+    expect((props.onUpdate as Mock).mock.calls[0][1]).toEqual({ salary: "$35/hr" });
+  });
+
+  it("removes the value when cleared", () => {
+    const { props, view, type } = setup();
+    type("");
+    call(button(view(), "Save").props.onClick);
+    expect((props.onUpdate as Mock).mock.calls[0][1]).toEqual({ salary: undefined });
+  });
+
+  it("discards a salary edit on Cancel and prompts before closing with one", () => {
+    const { props, view, salaryInput, type } = setup();
+    type("$99/hr");
+    call(button(view(), "Close").props.onClick);
+    expect(named(view(), "UnsavedChangesDialog")).toBeDefined();
+    call(named(view(), "UnsavedChangesDialog").props.onCancel);
+    call(button(view(), "Cancel").props.onClick);
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    call(button(view(), "Edit").props.onClick);
+    expect(salaryInput().props.value).toBe("$30/hr");
+  });
+});

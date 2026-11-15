@@ -1,5 +1,10 @@
 import type { AnalyticsSettings } from "../types/analytics";
-import type { ApplicationStatus } from "../types/application";
+import type {
+  ApplicationStatus,
+  JobType,
+  Priority,
+  WorkMode,
+} from "../types/application";
 import type { NotificationState, UserSettings } from "../types/settings";
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [
@@ -38,6 +43,28 @@ export const REQUIRED_APPLICATION_COLUMNS = [
   "status",
   "actions",
 ];
+
+// Display wording for stored values, matching the form options.
+export const WORK_MODE_LABELS: Record<WorkMode, string> = {
+  unknown: "Unknown",
+  remote: "Remote",
+  hybrid: "Hybrid",
+  onsite: "Onsite",
+};
+
+export const JOB_TYPE_LABELS: Record<JobType, string> = {
+  internship: "Internship",
+  "part-time": "Part-time",
+  "full-time": "Full-time",
+  contract: "Contract",
+  other: "Other",
+};
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
 
 export const APPLICATION_SOURCES = [
   "LinkedIn",
