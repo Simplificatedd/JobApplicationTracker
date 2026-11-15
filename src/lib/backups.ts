@@ -903,7 +903,10 @@ function isUserSettings(value: unknown) {
     (value.enableQuickLocation === undefined ||
       typeof value.enableQuickLocation === "boolean") &&
     (value.quickLocation === undefined ||
-      typeof value.quickLocation === "string")
+      typeof value.quickLocation === "string") &&
+    // Optional so backups exported before the full job titles setting still import.
+    (value.showFullJobTitles === undefined ||
+      typeof value.showFullJobTitles === "boolean")
   );
 }
 

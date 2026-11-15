@@ -59,6 +59,12 @@ describe("default user settings", () => {
     expect(DEFAULT_USER_SETTINGS.enableDraggableColumnWidths).toBe(false);
   });
 
+  it("cuts off long job titles until full titles are switched on", () => {
+    expect(DEFAULT_USER_SETTINGS.showFullJobTitles).toBe(false);
+    expect(normalizeUserSettings({}).showFullJobTitles).toBe(false);
+    expect(normalizeUserSettings({ showFullJobTitles: true }).showFullJobTitles).toBe(true);
+  });
+
   it("shows the Singapore quick location button by default", () => {
     expect(DEFAULT_USER_SETTINGS).toMatchObject({
       enableQuickLocation: true,

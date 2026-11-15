@@ -490,6 +490,30 @@ describe("parseBackupFile", () => {
       .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
   });
 
+  it("accepts settings exported before the full job titles option", async () => {
+    const settings: Partial<typeof DEFAULT_USER_SETTINGS> = {
+      ...DEFAULT_USER_SETTINGS,
+    };
+    delete settings.showFullJobTitles;
+    const snapshot = { ...createSnapshot(), settings };
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).resolves
+      .toMatchObject({ schemaVersion: BACKUP_SCHEMA_VERSION });
+  });
+
+  it("rejects a malformed full job titles setting", async () => {
+    const snapshot = createSnapshot({
+      settings: {
+        ...DEFAULT_USER_SETTINGS,
+        showFullJobTitles: "yes" as unknown as boolean,
+      },
+    });
+
+    await expect(parseBackupFile(createBackupFile(snapshot))).rejects.toThrow(
+      "invalid tracker settings",
+    );
+  });
+
   it("rejects malformed quick location settings", async () => {
     const snapshot = createSnapshot({
       settings: {

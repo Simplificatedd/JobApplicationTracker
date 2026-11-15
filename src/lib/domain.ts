@@ -87,6 +87,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   addJobPresentation: "modal",
   visibleApplicationColumns: DEFAULT_VISIBLE_APPLICATION_COLUMNS,
   enableDraggableColumnWidths: false,
+  showFullJobTitles: false,
   rememberTableState: true,
   enableDeleteActiveApplications: false,
   enableNotificationBell: true,

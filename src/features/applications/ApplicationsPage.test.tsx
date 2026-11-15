@@ -711,3 +711,23 @@ describe("detail panel actions", () => {
     expect(detailPanel(page.render())?.application.id).toBe(titleMatch.id);
   });
 });
+
+describe("Show full job titles setting (#273)", () => {
+  const wrapClass = "[[data-full-job-titles=true]_&amp;]:whitespace-normal";
+  const titleTags = (html: string) =>
+    [...html.matchAll(/<span class="[^"]*\btruncate\b[^"]*font-semibold[^"]*">Software Engineer</g)].map((match) => match[0]);
+
+  it("cuts titles off by default and wraps them when switched on", () => {
+    const off = renderPage("", { applications: [titleMatch] });
+    const on = renderPage("", {
+      applications: [titleMatch],
+      settings: { ...DEFAULT_USER_SETTINGS, showFullJobTitles: true },
+    });
+
+    expect(off).toContain('data-full-job-titles="false"');
+    expect(on).toContain('data-full-job-titles="true"');
+    // The phone row and the desktop table cell both carry the wrap rule.
+    expect(titleTags(on)).toHaveLength(2);
+    expect(titleTags(on).every((tag) => tag.includes(wrapClass))).toBe(true);
+  });
+});

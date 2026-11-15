@@ -156,3 +156,13 @@ describe("phone settings text", () => {
     expect(openingTag(sectionDescription, "class=")).toContain("max-md:text-[13px]");
   });
 });
+
+describe("full job titles setting (#273)", () => {
+  it("sits in General, which phones show, because it also changes phone rows", () => {
+    const markup = renderPage();
+    const general = markup.slice(markup.indexOf('id="settings-general"'), markup.indexOf('id="settings-contacts"'));
+
+    expect(general).toContain("Show full job titles");
+    expect(countMatches(markup, "Show full job titles")).toBe(1);
+  });
+});
