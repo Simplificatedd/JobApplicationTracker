@@ -17,7 +17,8 @@
     --color-success: #067647;
     --color-warning: #b54708;
     --color-info: #175cd3;
-    --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.22);
+    /* Solid ring with a surface-coloured gap: at least 3:1 on any background. */
+    --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
     /* Validated categorical chart palette (fixed order, colorblind-checked). */
     --chart-1: #2a78d6;
     --chart-2: #eb6834;
