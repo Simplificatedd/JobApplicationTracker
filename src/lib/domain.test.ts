@@ -4,9 +4,12 @@ import {
   createDateStamp,
   DEFAULT_APPLICATION_STATUS,
   DEFAULT_USER_SETTINGS,
+  JOB_TYPE_LABELS,
   normalizeApplicationStatus,
   normalizeUserSettings,
+  PRIORITY_LABELS,
   REQUIRED_APPLICATION_COLUMNS,
+  WORK_MODE_LABELS,
 } from "./domain";
 
 describe("createDateStamp", () => {
@@ -126,5 +129,24 @@ describe("normalizeUserSettings", () => {
       enableQuickLocation: true,
       quickLocation: "Singapore",
     });
+  });
+});
+
+describe("application value labels", () => {
+  it("uses the same wording as the form options", () => {
+    expect(WORK_MODE_LABELS).toEqual({
+      unknown: "Unknown",
+      remote: "Remote",
+      hybrid: "Hybrid",
+      onsite: "Onsite",
+    });
+    expect(JOB_TYPE_LABELS).toEqual({
+      internship: "Internship",
+      "part-time": "Part-time",
+      "full-time": "Full-time",
+      contract: "Contract",
+      other: "Other",
+    });
+    expect(PRIORITY_LABELS).toEqual({ low: "Low", medium: "Medium", high: "High" });
   });
 });

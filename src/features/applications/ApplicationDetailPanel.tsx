@@ -20,7 +20,12 @@ import {
   getInterviewTypeLabel,
 } from "../../lib/constants";
 import { changedDraftFields } from "../../lib/editIntent";
-import { APPLICATION_SOURCES } from "../../lib/domain";
+import {
+  APPLICATION_SOURCES,
+  JOB_TYPE_LABELS,
+  PRIORITY_LABELS,
+  WORK_MODE_LABELS,
+} from "../../lib/domain";
 import {
   formatDate,
   formatDateRange,
@@ -794,7 +799,9 @@ function ReadOnlyDetails({
           <InfoTile className="max-md:hidden" label="Status">
             <StatusBadge status={application.status} />
           </InfoTile>
-          <InfoTile label="Priority">{application.priority}</InfoTile>
+          <InfoTile label="Priority">
+            {PRIORITY_LABELS[application.priority]}
+          </InfoTile>
           <InfoTile label="Last updated">
             {formatUpdatedAt(application.updatedAt)}
           </InfoTile>
@@ -802,8 +809,14 @@ function ReadOnlyDetails({
 
         <section className="grid gap-3 sm:grid-cols-2">
           <DetailRow label="Location" value={application.location} />
-          <DetailRow label="Work mode" value={application.workMode} />
-          <DetailRow label="Job type" value={application.jobType} />
+          <DetailRow
+            label="Work mode"
+            value={WORK_MODE_LABELS[application.workMode]}
+          />
+          <DetailRow
+            label="Job type"
+            value={JOB_TYPE_LABELS[application.jobType]}
+          />
           <DetailRow label="Source" value={application.source} />
           <DetailRow label="Date applied" value={formatDate(application.dateApplied)} />
           {application.status === "Offered" || application.offerDeadline ? (
@@ -1413,7 +1426,7 @@ function InfoTile({
   return (
     <div className={`rounded-lg border border-border px-3 py-3 ${className}`}>
       <p className="text-xs font-semibold uppercase text-muted">{label}</p>
-      <div className="mt-2 text-sm font-medium capitalize text-foreground">
+      <div className="mt-2 text-sm font-medium text-foreground">
         {children}
       </div>
     </div>
