@@ -760,7 +760,7 @@ export function RowActionsMenu({
         type="button"
       >
         <MoreHorizontal aria-hidden="true" size={18} />
-        <span className="sr-only">Open row actions</span>
+        <span className="sr-only">Actions for {application.jobTitle}</span>
       </button>
       {isOpen
         ? createPortal(

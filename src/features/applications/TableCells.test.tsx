@@ -28,7 +28,7 @@ vi.mock("react", () => {
   };
 });
 vi.mock("react-dom", () => ({ createPortal: (node: unknown) => node }));
-import { ContactsButton, StatusQuickEditCell } from "./TableCells";
+import { ContactsButton, RowActionsMenu, StatusQuickEditCell } from "./TableCells";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 function elements(node: unknown): Element[] {
@@ -79,5 +79,18 @@ describe("table row control names", () => {
   it("names the Contacts button with the job title and count", () => {
     const button = ContactsButton({ count: 2, jobTitle: "Software Intern" }) as unknown as Element;
     expect(button.props["aria-label"]).toBe("Contacts for Software Intern: 2");
+  });
+
+  it("names the row actions button with the job title", () => {
+    const tree = RowActionsMenu({
+      application: { ...application, jobTitle: "Software Intern" },
+      enableDeleteActiveApplications: false,
+      onArchiveApplication: vi.fn(),
+      onDeleteApplication: vi.fn(),
+      onRestoreApplication: vi.fn(),
+      onUpdateApplication: vi.fn(),
+    });
+    const label = elements(tree).find(e => e.props.className === "sr-only")!;
+    expect([label.props.children].flat().join("")).toBe("Actions for Software Intern");
   });
 });
