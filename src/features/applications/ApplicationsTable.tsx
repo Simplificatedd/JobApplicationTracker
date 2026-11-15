@@ -559,8 +559,25 @@ export function ApplicationsTable({
             className="hidden min-h-0 min-w-0 overflow-auto overscroll-contain xl:block xl:flex-1"
             data-pinned-edge-end={scrollEdges.hasMoreAfter}
             data-pinned-edge-start={scrollEdges.hasMoreBefore}
+            // Browsers leave a partly visible control where it is on focus,
+            // so a keyboard user's control can stay half under a pinned
+            // column; bring it fully into view (respecting the padding below).
+            onFocus={(event) => {
+              if (event.target.matches(":focus-visible")) {
+                event.target.scrollIntoView({
+                  block: "nearest",
+                  inline: "nearest",
+                });
+              }
+            }}
             onScroll={updateScrollEdges}
             ref={tableViewportRef}
+            style={{
+              scrollPaddingInline: getPinnedScrollPadding(
+                visibleColumnIds,
+                columnWidths,
+              ),
+            }}
           >
             <table
               className="table-fixed border-separate border-spacing-0 text-left"
@@ -692,6 +709,21 @@ export function ApplicationsTable({
       )}
     </section>
   );
+}
+
+// The pinned Job Title and Actions columns cover whatever scrolls beneath
+// them. Padding the scroll area by their widths, plus room for the focus ring,
+// makes keyboard focus scroll a control clear of them instead of leaving it
+// hidden underneath.
+const FOCUS_RING_ROOM = 8;
+
+export function getPinnedScrollPadding(
+  visibleColumnIds: readonly ApplicationColumnId[],
+  columnWidths: Record<ApplicationColumnId, number>,
+) {
+  const inset = (id: ApplicationColumnId) =>
+    (visibleColumnIds.includes(id) ? columnWidths[id] : 0) + FOCUS_RING_ROOM;
+  return `${inset("jobTitle")}px ${inset("actions")}px`;
 }
 
 export function stretchColumnWidthsToViewport(

@@ -17,7 +17,8 @@
     --color-success: #067647;
     --color-warning: #b54708;
     --color-info: #175cd3;
-    --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.22);
+    /* Solid ring with a surface-coloured gap: at least 3:1 on any background. */
+    --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
     /* Validated categorical chart palette (fixed order, colorblind-checked). */
     --chart-1: #2a78d6;
     --chart-2: #eb6834;
@@ -68,6 +69,19 @@
   textarea:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
+  }
+
+  /* Table cells clip overflow so long values truncate, which would hide an
+     outer ring, so buttons inside them draw it inset instead. */
+  td button:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
+  /* When a scroll area (dialog, panel, list) brings a focused control into
+     view, leave room for its ring instead of stopping flush with the edge.
+     The page scroller itself is left alone so section links land as before. */
+  body * {
+    scroll-padding-block: 0.5rem;
   }
 
   /* iOS zooms into focused fields under 16px, so text entry stays at 16px

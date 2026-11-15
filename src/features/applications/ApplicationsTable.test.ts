@@ -31,6 +31,7 @@ import {
   ApplicationsTable,
   DEFAULT_COLUMN_WIDTHS,
   getBaseWidthForDisplayedWidth,
+  getPinnedScrollPadding,
   stretchColumnWidthsToViewport,
 } from "./ApplicationsTable";
 
@@ -89,6 +90,45 @@ describe("stretchColumnWidthsToViewport", () => {
 
   it("leaves widths alone when the viewport is narrower than the table", () => {
     expect(stretchColumnWidthsToViewport(visibleColumns, DEFAULT_COLUMN_WIDTHS, 926)).toEqual(DEFAULT_COLUMN_WIDTHS);
+  });
+});
+
+describe("keyboard focus beside pinned columns", () => {
+  it("pads the scroll area by the pinned Job Title and Actions widths plus ring room", () => {
+    expect(getPinnedScrollPadding(["jobTitle", "status", "actions"], DEFAULT_COLUMN_WIDTHS)).toBe(
+      `${DEFAULT_COLUMN_WIDTHS.jobTitle + 8}px ${DEFAULT_COLUMN_WIDTHS.actions + 8}px`,
+    );
+  });
+
+  it("leaves only ring room for a hidden pinned column", () => {
+    expect(getPinnedScrollPadding(["status", "actions"], DEFAULT_COLUMN_WIDTHS)).toBe(
+      `8px ${DEFAULT_COLUMN_WIDTHS.actions + 8}px`,
+    );
+    expect(getPinnedScrollPadding(["jobTitle", "status"], DEFAULT_COLUMN_WIDTHS)).toBe(
+      `${DEFAULT_COLUMN_WIDTHS.jobTitle + 8}px 8px`,
+    );
+  });
+
+  it("scrolls a keyboard-focused control fully into view, but not a clicked one", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+    const focus = (focusVisible: boolean) => {
+      const target = { matches: () => focusVisible, scrollIntoView: vi.fn() };
+      (viewport.props.onFocus as (event: { target: typeof target }) => void)({ target });
+      return target.scrollIntoView;
+    };
+
+    expect(focus(true)).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
+    expect(focus(false)).not.toHaveBeenCalled();
+  });
+
+  it("is applied to the table's scroll area", () => {
+    const { all } = renderTable(926);
+    const viewport = all.find((e) => "data-pinned-edge-start" in e.props)!;
+
+    expect((viewport.props.style as { scrollPaddingInline: string }).scrollPaddingInline).toBe(
+      getPinnedScrollPadding(["jobTitle", "actions"], DEFAULT_COLUMN_WIDTHS),
+    );
   });
 });
 
