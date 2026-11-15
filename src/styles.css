@@ -71,6 +71,12 @@
     box-shadow: var(--focus-ring);
   }
 
+  /* Table cells clip overflow so long values truncate, which would hide an
+     outer ring, so buttons inside them draw it inset instead. */
+  td button:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+
   /* iOS zooms into focused fields under 16px, so text entry stays at 16px
      on touch screens. Utilities set smaller sizes, hence the !important. */
   @media (pointer: coarse) {
