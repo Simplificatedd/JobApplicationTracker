@@ -252,7 +252,7 @@ export function SettingsPage({
               description="Preview a tracker backup before replacing your cloud data."
               label="Import backup"
             />
-            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/50 focus-within:shadow-[var(--focus-ring)]">
+            <label className="relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center transition hover:border-emerald-400 hover:bg-emerald-50/50 focus-within:shadow-[shadow:var(--focus-ring)]">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
                 <FileUp aria-hidden="true" size={20} />
               </span>
@@ -962,7 +962,7 @@ function ToggleField({
         {/* slate-500 keeps the off track above 3:1 against the white panel. */}
         <span
           aria-hidden="true"
-          className="h-6 w-11 rounded-full bg-slate-500 transition peer-checked:bg-primary peer-focus-visible:shadow-[var(--focus-ring)]"
+          className="h-6 w-11 rounded-full bg-slate-500 transition peer-checked:bg-primary peer-focus-visible:shadow-[shadow:var(--focus-ring)]"
         />
         <span
           aria-hidden="true"

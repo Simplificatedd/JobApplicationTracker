@@ -213,4 +213,25 @@ describe("settings switches (#260)", () => {
       expect(track).not.toMatch(/peer-checked:bg-(?!primary)/);
     });
   });
+
+  it("draws the focus ring as a box-shadow, not a shadow colour (#280)", async () => {
+    const [{ default: postcss }, { default: tailwindcss }, { default: config }] = await Promise.all([
+      import("postcss"),
+      import("tailwindcss"),
+      import("../../../tailwind.config"),
+    ]);
+    const source = readFileSync(new URL("./SettingsPage.tsx", import.meta.url), "utf8");
+    const { css } = await postcss([
+      tailwindcss({ ...config, content: [{ raw: source, extension: "tsx" }] }),
+    ]).process("@tailwind utilities;", { from: undefined });
+
+    // Without the shadow: type hint Tailwind sets only --tw-shadow-color. Split so Tailwind's scan of this file skips it.
+    expect(source).not.toContain(["shadow-", "[var(--focus-ring)]"].join(""));
+    expect(css).not.toContain("--tw-shadow-color: var(--focus-ring)");
+    for (const variant of ["peer-focus-visible", "focus-within"]) {
+      const rule = css.match(new RegExp(`\\.${variant}\\\\:shadow-\\\\\\[shadow\\\\:var[^{]*\\{([^}]*)\\}`))?.[1];
+      expect(rule).toContain("--tw-shadow: var(--focus-ring)");
+      expect(rule).toContain("box-shadow:");
+    }
+  });
 });
