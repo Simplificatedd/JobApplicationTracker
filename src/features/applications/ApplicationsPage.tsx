@@ -263,6 +263,7 @@ export function ApplicationsPage({
     baseApplications,
     interviews,
     assessments,
+    now,
   );
   const selectedApplication = useMemo(
     () =>
@@ -370,12 +371,12 @@ export function ApplicationsPage({
           tone="warning"
         />
         <SummaryMetric
-          label="Interviews"
+          label="Upcoming interviews"
           value={String(summary.interviews)}
           tone="info"
         />
         <SummaryMetric
-          label="Assessments"
+          label="Open assessments"
           value={String(summary.assessments)}
           tone="info"
         />

@@ -633,7 +633,7 @@ describe("compact phone summary", () => {
   it("keeps all four values, their labels and the count scope toggle", () => {
     const html = summary(renderPage(""));
 
-    for (const label of ["Needs attention", "Interviews", "Assessments"]) expect(html).toContain(`>${label}</p>`);
+    for (const label of ["Needs attention", "Upcoming interviews", "Open assessments"]) expect(html).toContain(`>${label}</p>`);
     expect(html).toContain('aria-label="Applications shown"');
     expect(html.match(/text-2xl/g)).toHaveLength(4);
   });
