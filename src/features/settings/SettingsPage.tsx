@@ -384,16 +384,6 @@ export function SettingsPage({
             onChange={(value) => onUpdateSettings({ quickLocation: value })}
             value={settings.quickLocation}
           />
-          <UnavailableSettingField
-            description="Add Job currently uses one complete form. A guided step-by-step mode is not available yet."
-            label="Add job form"
-            value="Single form"
-          />
-          <UnavailableSettingField
-            description="Add Job currently opens as a dialog over the workspace. A full-page mode is not available yet."
-            label="Add job opens as"
-            value="Dialog"
-          />
         </SettingsSection>
 
         <SettingsSection
@@ -625,8 +615,6 @@ const SECTION_ACCENTS: Record<
     navActive: string;
     navIcon: string;
     strip: string;
-    // Classes for a switch's "on" track inside the section.
-    switchOn: string;
     tile: string;
   }
 > = {
@@ -635,7 +623,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-blue-50 text-blue-700",
     navIcon: "text-blue-500",
     strip: "bg-blue-500",
-    switchOn: "peer-checked:bg-blue-500",
     tile: "bg-blue-50 text-blue-600",
   },
   data: {
@@ -643,7 +630,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-emerald-50 text-emerald-700",
     navIcon: "text-emerald-500",
     strip: "bg-emerald-500",
-    switchOn: "peer-checked:bg-emerald-500",
     tile: "bg-emerald-50 text-emerald-600",
   },
   general: {
@@ -651,7 +637,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-violet-50 text-violet-700",
     navIcon: "text-violet-500",
     strip: "bg-violet-500",
-    switchOn: "peer-checked:bg-violet-500",
     tile: "bg-violet-50 text-violet-600",
   },
   contacts: {
@@ -659,7 +644,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-amber-50 text-amber-700",
     navIcon: "text-amber-500",
     strip: "bg-amber-400",
-    switchOn: "peer-checked:bg-amber-500",
     tile: "bg-amber-50 text-amber-600",
   },
   table: {
@@ -667,7 +651,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-sky-50 text-sky-700",
     navIcon: "text-sky-500",
     strip: "bg-sky-500",
-    switchOn: "peer-checked:bg-sky-500",
     tile: "bg-sky-50 text-sky-600",
   },
   alerts: {
@@ -675,7 +658,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-rose-50 text-rose-700",
     navIcon: "text-rose-500",
     strip: "bg-rose-500",
-    switchOn: "peer-checked:bg-rose-500",
     tile: "bg-rose-50 text-rose-600",
   },
   reset: {
@@ -683,20 +665,38 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-red-50 text-red-700",
     navIcon: "text-red-500",
     strip: "bg-red-500",
-    switchOn: "peer-checked:bg-red-500",
     tile: "bg-red-50 text-red-600",
   },
 };
 
 // Highlights the last section whose top has scrolled up to where a jump to
 // it lands (its scroll-margin-top, below the sticky header and, below lg,
-// the section strip), or the final section once the page is at the bottom.
-// The 28px tolerance keeps the original 140px threshold at lg, where
-// sections land 112px from the top.
+// the section strip). The 28px tolerance keeps the original 140px threshold
+// at lg, where sections land 112px from the top.
 const ACTIVE_SECTION_TOLERANCE = 28;
 
-export function isSectionReached(sectionTop: number, scrollMarginTop: number) {
-  return sectionTop <= scrollMarginTop + ACTIVE_SECTION_TOLERANCE;
+export function isSectionReached(
+  sectionTop: number,
+  scrollMarginTop: number,
+  bottomCatchUp = 0,
+) {
+  return sectionTop <= scrollMarginTop + ACTIVE_SECTION_TOLERANCE + bottomCatchUp;
+}
+
+// The last sections can never scroll up to that line. Over the final stretch
+// of the page, lower the line by one pixel per pixel scrolled, so they take
+// turns and the last one is reached exactly at the bottom instead of the
+// highlight jumping past them.
+export function getBottomCatchUp(
+  lastSectionTop: number,
+  scrollMarginTop: number,
+  remainingScroll: number,
+) {
+  const lastTopAtBottom = lastSectionTop - remainingScroll;
+  const gapAtBottom =
+    lastTopAtBottom - (scrollMarginTop + ACTIVE_SECTION_TOLERANCE);
+
+  return Math.max(0, gapAtBottom - remainingScroll);
 }
 
 function useActiveSection() {
@@ -716,30 +716,42 @@ function useActiveSection() {
         return;
       }
 
-      const isAtBottom =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - 2;
-      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
-
-      SETTINGS_SECTIONS.forEach((section) => {
+      // 2px of slack so a fractional scroll position still counts as the bottom.
+      const remainingScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight -
+          window.innerHeight -
+          window.scrollY -
+          2,
+      );
+      const sections = SETTINGS_SECTIONS.flatMap((section) => {
         const element = document.getElementById(`settings-${section.id}`);
 
-        if (
-          element &&
-          // A section hidden on phones has no box and would always count.
-          element.getClientRects().length > 0 &&
-          isSectionReached(
-            element.getBoundingClientRect().top,
-            parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
-          )
-        ) {
+        // A section hidden on phones has no box and would always count.
+        return element && element.getClientRects().length > 0
+          ? [
+              {
+                id: section.id,
+                scrollMarginTop:
+                  parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
+                top: element.getBoundingClientRect().top,
+              },
+            ]
+          : [];
+      });
+      const last = sections[sections.length - 1];
+      const bottomCatchUp = last
+        ? getBottomCatchUp(last.top, last.scrollMarginTop, remainingScroll)
+        : 0;
+      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
+
+      sections.forEach((section) => {
+        if (isSectionReached(section.top, section.scrollMarginTop, bottomCatchUp)) {
           current = section.id;
         }
       });
 
-      setActiveSection(
-        isAtBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current,
-      );
+      setActiveSection(current);
     }
 
     updateActiveSection();
@@ -812,9 +824,8 @@ function SettingsNav({
   );
 }
 
-const SectionAccentContext = createContext<{ choice: string; switchOn: string }>({
+const SectionAccentContext = createContext<{ choice: string }>({
   choice: "text-foreground",
-  switchOn: "peer-checked:bg-primary",
 });
 
 function SettingsSection({
@@ -932,8 +943,6 @@ function ToggleField({
   label: string;
   onChange: (checked: boolean) => void;
 }) {
-  const accent = useContext(SectionAccentContext);
-
   return (
     <label
       className={`flex items-start justify-between gap-4 py-3 ${
@@ -950,9 +959,10 @@ function ToggleField({
           role="switch"
           type="checkbox"
         />
+        {/* slate-500 keeps the off track above 3:1 against the white panel. */}
         <span
           aria-hidden="true"
-          className={`h-6 w-11 rounded-full bg-slate-300 transition peer-focus-visible:shadow-[var(--focus-ring)] ${accent.switchOn}`}
+          className="h-6 w-11 rounded-full bg-slate-500 transition peer-checked:bg-primary peer-focus-visible:shadow-[var(--focus-ring)]"
         />
         <span
           aria-hidden="true"
@@ -1014,29 +1024,6 @@ function ToggleButtonField({
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function UnavailableSettingField({
-  description,
-  label,
-  value,
-}: {
-  description: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-      <SettingLabel
-        badge="Coming soon"
-        description={description}
-        label={label}
-      />
-      <span className="inline-flex h-8 shrink-0 items-center self-start rounded-lg border border-dashed border-border px-3 text-sm font-medium text-muted">
-        {value}
-      </span>
     </div>
   );
 }
@@ -1134,11 +1121,9 @@ function TextField({
 }
 
 function SettingLabel({
-  badge,
   description,
   label,
 }: {
-  badge?: string;
   description: string;
   label: string;
 }) {
@@ -1146,11 +1131,6 @@ function SettingLabel({
     <span className="min-w-0">
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground max-md:text-[15px]">
         {label.replace(/:$/, "")}
-        {badge ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
-            {badge}
-          </span>
-        ) : null}
       </span>
       {description ? (
         <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">

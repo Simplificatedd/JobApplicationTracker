@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
-import { isSectionReached, SettingsPage } from "./SettingsPage";
+import { getBottomCatchUp, isSectionReached, SettingsPage } from "./SettingsPage";
 
 function renderPage() {
   return renderToStaticMarkup(
@@ -48,6 +48,28 @@ describe("isSectionReached", () => {
 
   it("does not count a section that is still well below its landing point", () => {
     expect(isSectionReached(400, 149)).toBe(false);
+  });
+});
+
+describe("getBottomCatchUp (#260)", () => {
+  // Tablet, 900px tall: sections land 149px down, and at the bottom of the
+  // page Notifications sits 316px down and Reset 741px down.
+  it("leaves the line alone until the final stretch of the page", () => {
+    expect(getBottomCatchUp(1741, 149, 1000)).toBe(0);
+    expect(getBottomCatchUp(1305, 149, 564)).toBe(0);
+  });
+
+  it("highlights Notifications before Reset instead of skipping it", () => {
+    const catchUp = getBottomCatchUp(941, 149, 200);
+
+    expect(isSectionReached(516, 149, catchUp)).toBe(true);
+    expect(isSectionReached(941, 149, catchUp)).toBe(false);
+    // Earlier, the previous section still holds.
+    expect(isSectionReached(616, 149, getBottomCatchUp(1041, 149, 300))).toBe(false);
+  });
+
+  it("reaches the last section exactly at the bottom", () => {
+    expect(isSectionReached(741, 149, getBottomCatchUp(741, 149, 0))).toBe(true);
   });
 });
 
@@ -164,5 +186,31 @@ describe("full job titles setting (#273)", () => {
 
     expect(general).toContain("Show full job titles");
     expect(countMatches(markup, "Show full job titles")).toBe(1);
+  });
+});
+
+describe("unavailable Add Job settings (#260)", () => {
+  it("shows no Coming soon rows and keeps the working General settings", () => {
+    const markup = renderPage();
+
+    expect(markup).not.toContain("Coming soon");
+    expect(markup).not.toContain("Add job form");
+    expect(markup).not.toContain("Add job opens as");
+    expect(markup).toContain("Quick location button");
+    expect(markup).toContain("Show full job titles");
+  });
+});
+
+describe("settings switches (#260)", () => {
+  it("uses the primary colour for every switch and a 3:1 off track", () => {
+    const markup = renderPage();
+    const tracks = markup.match(/<span aria-hidden="true" class="h-6 w-11[^"]*"/g) ?? [];
+
+    expect(tracks.length).toBeGreaterThan(5);
+    tracks.forEach((track) => {
+      expect(track).toContain("peer-checked:bg-primary");
+      expect(track).toContain("bg-slate-500");
+      expect(track).not.toMatch(/peer-checked:bg-(?!primary)/);
+    });
   });
 });
