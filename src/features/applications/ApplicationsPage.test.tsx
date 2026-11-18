@@ -190,7 +190,7 @@ describe("application search results in the table", () => {
     jobTitle: "Archived Software Engineer",
     archivedAt: "2026-09-03T00:00:00.000Z",
   };
-  const archivedBadge = />Archived<\/span>/;
+  const archivedBadge = /rounded-full[^"]*">Archived<\/span>/;
 
   const total = { ...tablePreferences, includeArchived: true };
 
@@ -420,9 +420,9 @@ describe("applications page on narrow screens", () => {
   it("keeps the scoped metric's label for screen readers but hides it beside the toggle on phones", () => {
     const html = renderPage("");
 
-    expect(html).toMatch(/<p class="[^"]*\bmax-sm:sr-only\b[^"]*">Active<\/p>/);
+    expect(html).toMatch(/<span class="[^"]*\bmax-sm:sr-only\b[^"]*">Active<\/span>/);
     // Metrics without a toggle keep their visible label at every width.
-    expect(html).toMatch(/<p class="(?![^"]*sr-only)min-w-0 truncate text-sm font-medium text-muted[^"]*">Needs attention<\/p>/);
+    expect(html).toMatch(/<span class="(?![^"]*sr-only)min-w-0 truncate text-sm font-medium text-muted[^"]*">Needs attention<\/span>/);
   });
 
   it("renders compact cards that switch layout by container width", () => {
@@ -609,7 +609,7 @@ describe("compact phone summary", () => {
     [...html.matchAll(pattern)].map((match) => match[1].split(" "));
 
   it("puts each value beside its label with tighter spacing below md", () => {
-    const tiles = classesOf(summary(renderPage("")), /<div class="(surface-panel[^"]*)"/g);
+    const tiles = classesOf(summary(renderPage("")), /<(?:div|button)\b[^>]*\sclass="(surface-panel[^"]*)"/g);
 
     expect(tiles).toHaveLength(4);
     for (const classes of tiles) {
@@ -621,8 +621,8 @@ describe("compact phone summary", () => {
 
   it("shrinks values and lets labels wrap on phones only", () => {
     const html = summary(renderPage(""));
-    const values = classesOf(html, /<p class="(mt-1 text-2xl[^"]*)"/g);
-    const labels = classesOf(html, /<p class="(min-w-0 truncate[^"]*)"/g);
+    const values = classesOf(html, /<span class="(mt-1 text-2xl[^"]*)"/g);
+    const labels = classesOf(html, /<span class="(min-w-0 truncate[^"]*)"/g);
 
     expect(values).toHaveLength(4);
     for (const classes of values) expect(classes).toEqual(expect.arrayContaining(["text-2xl", "max-md:text-xl", "max-md:mt-0"]));
@@ -633,7 +633,7 @@ describe("compact phone summary", () => {
   it("keeps all four values, their labels and the count scope toggle", () => {
     const html = summary(renderPage(""));
 
-    for (const label of ["Needs attention", "Upcoming interviews", "Open assessments"]) expect(html).toContain(`>${label}</p>`);
+    for (const label of ["Needs attention", "Upcoming interviews", "Open assessments"]) expect(html).toContain(`>${label}</span>`);
     expect(html).toContain('aria-label="Applications shown"');
     expect(html.match(/text-2xl/g)).toHaveLength(4);
   });
@@ -734,7 +734,7 @@ describe("Show full job titles setting (#273)", () => {
 
 describe("summary tile colours (#256)", () => {
   const valueClasses = (html: string) =>
-    [...html.matchAll(/<p class="mt-1 text-2xl[^"]*?(text-(?:foreground|warning|info))">([^<]*)<\/p>/g)].map(
+    [...html.matchAll(/<span class="mt-1 text-2xl[^"]*?(text-(?:foreground|warning|info))">([^<]*)<\/span>/g)].map(
       (match) => `${match[2]}:${match[1]}`,
     );
 
@@ -755,5 +755,39 @@ describe("summary tile colours (#256)", () => {
     });
 
     expect(valueClasses(html)[2]).toBe("1:text-info");
+  });
+});
+
+describe("Needs attention tile (#256)", () => {
+  const tiles = (tree: ReturnType<typeof ApplicationsPage>) =>
+    tree.props.children[0].props.children as ReactElement<{
+      label: string;
+      onPressedChange?: (pressed: boolean) => void;
+      pressed?: boolean;
+    }>[];
+  const attentionTile = (tree: ReturnType<typeof ApplicationsPage>) =>
+    tiles(tree).find((tile) => tile.props.label === "Needs attention")!;
+
+  it("is a toggle button and the other stats are not", () => {
+    const html = renderPage("");
+
+    expect(html).toMatch(/<button aria-pressed="false" type="button" class="surface-panel[^"]*aria-pressed:border-primary[^"]*"><span[^>]*><span[^>]*>Needs attention</);
+    expect(html.match(/<button aria-pressed="(?:true|false)" type="button" class="surface-panel/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<button[^>]*>(?:<span[^>]*>)+(?:Upcoming interviews|Open assessments)</);
+  });
+
+  it("turns the Needs attention filter on and off, in step with the Filters dialog", () => {
+    const page = mountPage();
+    let tree = page.render();
+
+    expect(attentionTile(tree).props.pressed).toBe(false);
+    attentionTile(tree).props.onPressedChange!(true);
+    tree = page.render();
+    expect(attentionTile(tree).props.pressed).toBe(true);
+    expect(toolbar(tree).needsAttentionOnly).toBe(true);
+
+    toolbar(tree).onNeedsAttentionOnlyChange!(false);
+    tree = page.render();
+    expect(attentionTile(tree).props.pressed).toBe(false);
   });
 });

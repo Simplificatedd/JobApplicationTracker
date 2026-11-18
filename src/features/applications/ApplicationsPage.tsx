@@ -367,6 +367,8 @@ export function ApplicationsPage({
         />
         <SummaryMetric
           label="Needs attention"
+          onPressedChange={setNeedsAttentionOnly}
+          pressed={needsAttentionOnly}
           value={String(attentionCount)}
           tone="warning"
         />
@@ -569,11 +571,16 @@ function nextSort(
 function SummaryMetric({
   action,
   label,
+  onPressedChange,
+  pressed,
   value,
   tone = "neutral",
 }: {
   action?: ReactNode;
   label: string;
+  // With both set, the tile is a toggle button for a filter.
+  onPressedChange?: (pressed: boolean) => void;
+  pressed?: boolean;
   value: string;
   tone?: "neutral" | "warning" | "info";
 }) {
@@ -587,31 +594,49 @@ function SummaryMetric({
         ? "text-info"
         : "text-foreground";
 
+  const isToggle = onPressedChange !== undefined && pressed !== undefined;
+  const Tile = isToggle ? "button" : "div";
+
+  // Spans rather than p/div inside, since a button may only hold phrasing
+  // content; the classes give them the same layout.
   return (
     // Phones and short desktop windows put the value beside its label so the
     // list starts higher up.
-    <div className="surface-panel rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2 short:flex short:items-center short:gap-x-3 short:py-1.5">
+    <Tile
+      {...(isToggle
+        ? {
+            "aria-pressed": pressed,
+            onClick: () => onPressedChange(!pressed),
+            type: "button" as const,
+          }
+        : {})}
+      className={`surface-panel block rounded-lg px-4 py-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-2 max-md:px-3 max-md:py-2 short:flex short:items-center short:gap-x-3 short:py-1.5 ${
+        isToggle
+          ? "w-full text-left transition hover:border-primary aria-pressed:border-primary aria-pressed:bg-blue-50 aria-pressed:outline aria-pressed:outline-1 aria-pressed:outline-primary"
+          : ""
+      }`}
+    >
       {/* min-h matches the count scope toggle so paired metrics line up. */}
       {/* Short desktop windows keep the label and toggle on one line, so a
           long label like "Total applications" truncates instead of wrapping. */}
       {/* On phones the label wraps before the value drops to its own line:
           a zero basis with an automatic minimum makes wrapping use the
           label's narrowest width rather than its single-line width. */}
-      <div className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1 short:flex-1 short:flex-nowrap">
+      <span className="flex min-h-[26px] min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 max-md:min-w-[auto] max-md:flex-1 short:flex-1 short:flex-nowrap">
         {/* The scope toggle already names the count on phones, where the
             label would push it onto a second line, so the label is only
             visually hidden there. */}
-        <p
-          className={`min-w-0 truncate text-sm font-medium text-muted max-md:whitespace-normal max-md:text-[13px] max-md:leading-4 ${
+        <span
+          className={`min-w-0 truncate text-sm font-medium text-muted max-md:whitespace-normal max-md:text-[13px] max-md:leading-4 block ${
             action ? "max-sm:sr-only" : ""
           }`}
         >
           {label}
-        </p>
+        </span>
         {action}
-      </div>
-      <p className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl short:mt-0 short:text-lg ${toneClass}`}>{value}</p>
-    </div>
+      </span>
+      <span className={`mt-1 text-2xl font-semibold max-md:mt-0 max-md:text-xl short:mt-0 short:text-lg block ${toneClass}`}>{value}</span>
+    </Tile>
   );
 }
 
