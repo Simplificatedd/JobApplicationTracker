@@ -671,13 +671,32 @@ const SECTION_ACCENTS: Record<
 
 // Highlights the last section whose top has scrolled up to where a jump to
 // it lands (its scroll-margin-top, below the sticky header and, below lg,
-// the section strip), or the final section once the page is at the bottom.
-// The 28px tolerance keeps the original 140px threshold at lg, where
-// sections land 112px from the top.
+// the section strip). The 28px tolerance keeps the original 140px threshold
+// at lg, where sections land 112px from the top.
 const ACTIVE_SECTION_TOLERANCE = 28;
 
-export function isSectionReached(sectionTop: number, scrollMarginTop: number) {
-  return sectionTop <= scrollMarginTop + ACTIVE_SECTION_TOLERANCE;
+export function isSectionReached(
+  sectionTop: number,
+  scrollMarginTop: number,
+  bottomCatchUp = 0,
+) {
+  return sectionTop <= scrollMarginTop + ACTIVE_SECTION_TOLERANCE + bottomCatchUp;
+}
+
+// The last sections can never scroll up to that line. Over the final stretch
+// of the page, lower the line by one pixel per pixel scrolled, so they take
+// turns and the last one is reached exactly at the bottom instead of the
+// highlight jumping past them.
+export function getBottomCatchUp(
+  lastSectionTop: number,
+  scrollMarginTop: number,
+  remainingScroll: number,
+) {
+  const lastTopAtBottom = lastSectionTop - remainingScroll;
+  const gapAtBottom =
+    lastTopAtBottom - (scrollMarginTop + ACTIVE_SECTION_TOLERANCE);
+
+  return Math.max(0, gapAtBottom - remainingScroll);
 }
 
 function useActiveSection() {
@@ -697,30 +716,42 @@ function useActiveSection() {
         return;
       }
 
-      const isAtBottom =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - 2;
-      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
-
-      SETTINGS_SECTIONS.forEach((section) => {
+      // 2px of slack so a fractional scroll position still counts as the bottom.
+      const remainingScroll = Math.max(
+        0,
+        document.documentElement.scrollHeight -
+          window.innerHeight -
+          window.scrollY -
+          2,
+      );
+      const sections = SETTINGS_SECTIONS.flatMap((section) => {
         const element = document.getElementById(`settings-${section.id}`);
 
-        if (
-          element &&
-          // A section hidden on phones has no box and would always count.
-          element.getClientRects().length > 0 &&
-          isSectionReached(
-            element.getBoundingClientRect().top,
-            parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
-          )
-        ) {
+        // A section hidden on phones has no box and would always count.
+        return element && element.getClientRects().length > 0
+          ? [
+              {
+                id: section.id,
+                scrollMarginTop:
+                  parseFloat(getComputedStyle(element).scrollMarginTop) || 0,
+                top: element.getBoundingClientRect().top,
+              },
+            ]
+          : [];
+      });
+      const last = sections[sections.length - 1];
+      const bottomCatchUp = last
+        ? getBottomCatchUp(last.top, last.scrollMarginTop, remainingScroll)
+        : 0;
+      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id;
+
+      sections.forEach((section) => {
+        if (isSectionReached(section.top, section.scrollMarginTop, bottomCatchUp)) {
           current = section.id;
         }
       });
 
-      setActiveSection(
-        isAtBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current,
-      );
+      setActiveSection(current);
     }
 
     updateActiveSection();

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
-import { isSectionReached, SettingsPage } from "./SettingsPage";
+import { getBottomCatchUp, isSectionReached, SettingsPage } from "./SettingsPage";
 
 function renderPage() {
   return renderToStaticMarkup(
@@ -48,6 +48,28 @@ describe("isSectionReached", () => {
 
   it("does not count a section that is still well below its landing point", () => {
     expect(isSectionReached(400, 149)).toBe(false);
+  });
+});
+
+describe("getBottomCatchUp (#260)", () => {
+  // Tablet, 900px tall: sections land 149px down, and at the bottom of the
+  // page Notifications sits 316px down and Reset 741px down.
+  it("leaves the line alone until the final stretch of the page", () => {
+    expect(getBottomCatchUp(1741, 149, 1000)).toBe(0);
+    expect(getBottomCatchUp(1305, 149, 564)).toBe(0);
+  });
+
+  it("highlights Notifications before Reset instead of skipping it", () => {
+    const catchUp = getBottomCatchUp(941, 149, 200);
+
+    expect(isSectionReached(516, 149, catchUp)).toBe(true);
+    expect(isSectionReached(941, 149, catchUp)).toBe(false);
+    // Earlier, the previous section still holds.
+    expect(isSectionReached(616, 149, getBottomCatchUp(1041, 149, 300))).toBe(false);
+  });
+
+  it("reaches the last section exactly at the bottom", () => {
+    expect(isSectionReached(741, 149, getBottomCatchUp(741, 149, 0))).toBe(true);
   });
 });
 
