@@ -423,7 +423,8 @@ export function ApplicationsTable({
     resizeObserver.observe(viewportElement);
 
     return () => resizeObserver.disconnect();
-  }, []);
+    // An empty result unmounts the viewport, so observe the new one when rows return.
+  }, [hasApplications]);
 
   // The base widths that make `column` display at `displayedWidth` once the
   // other columns are stretched, so a resize lands where the pointer is.
