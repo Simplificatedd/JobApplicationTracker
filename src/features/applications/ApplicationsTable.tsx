@@ -42,6 +42,8 @@ interface ApplicationsTableProps {
   applications: JobApplication[];
   coverLetters: ResumeFile[];
   columnWidths: ApplicationColumnWidths;
+  // An optional action under the empty state, such as Clear filters.
+  emptyAction?: ReactNode;
   emptyBody?: string;
   emptyTitle?: string;
   enableDraggableColumnWidths: boolean;
@@ -326,6 +328,7 @@ export function ApplicationsTable({
   applications,
   coverLetters,
   columnWidths: savedColumnWidths,
+  emptyAction,
   emptyBody = "New entries will appear here once they are added.",
   emptyTitle = "No applications yet",
   enableDraggableColumnWidths,
@@ -512,6 +515,7 @@ export function ApplicationsTable({
             <p className="mt-2 text-sm text-muted">
               {emptyBody}
             </p>
+            {emptyAction ? <div className="mt-4">{emptyAction}</div> : null}
           </div>
         </div>
       ) : (
