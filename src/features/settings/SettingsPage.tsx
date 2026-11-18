@@ -384,16 +384,6 @@ export function SettingsPage({
             onChange={(value) => onUpdateSettings({ quickLocation: value })}
             value={settings.quickLocation}
           />
-          <UnavailableSettingField
-            description="Add Job currently uses one complete form. A guided step-by-step mode is not available yet."
-            label="Add job form"
-            value="Single form"
-          />
-          <UnavailableSettingField
-            description="Add Job currently opens as a dialog over the workspace. A full-page mode is not available yet."
-            label="Add job opens as"
-            value="Dialog"
-          />
         </SettingsSection>
 
         <SettingsSection
@@ -1018,29 +1008,6 @@ function ToggleButtonField({
   );
 }
 
-function UnavailableSettingField({
-  description,
-  label,
-  value,
-}: {
-  description: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-      <SettingLabel
-        badge="Coming soon"
-        description={description}
-        label={label}
-      />
-      <span className="inline-flex h-8 shrink-0 items-center self-start rounded-lg border border-dashed border-border px-3 text-sm font-medium text-muted">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function NumberField({
   description,
   label,
@@ -1134,11 +1101,9 @@ function TextField({
 }
 
 function SettingLabel({
-  badge,
   description,
   label,
 }: {
-  badge?: string;
   description: string;
   label: string;
 }) {
@@ -1146,11 +1111,6 @@ function SettingLabel({
     <span className="min-w-0">
       <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground max-md:text-[15px]">
         {label.replace(/:$/, "")}
-        {badge ? (
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-muted">
-            {badge}
-          </span>
-        ) : null}
       </span>
       {description ? (
         <span className="mt-0.5 block text-xs leading-5 text-muted max-md:text-[13px]">

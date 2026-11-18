@@ -166,3 +166,15 @@ describe("full job titles setting (#273)", () => {
     expect(countMatches(markup, "Show full job titles")).toBe(1);
   });
 });
+
+describe("unavailable Add Job settings (#260)", () => {
+  it("shows no Coming soon rows and keeps the working General settings", () => {
+    const markup = renderPage();
+
+    expect(markup).not.toContain("Coming soon");
+    expect(markup).not.toContain("Add job form");
+    expect(markup).not.toContain("Add job opens as");
+    expect(markup).toContain("Quick location button");
+    expect(markup).toContain("Show full job titles");
+  });
+});
