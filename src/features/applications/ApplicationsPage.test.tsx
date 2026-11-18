@@ -863,3 +863,24 @@ describe("result count line (#257)", () => {
     expect(statusLine(renderToStaticMarkup(tree))).toContain('class="sr-only"');
   });
 });
+
+describe("no-results empty state (#257)", () => {
+  const emptyState = (html: string) => {
+    const start = html.indexOf('<div class="flex min-h-[280px]');
+    return start === -1 ? "" : html.slice(start, html.indexOf("</section>", start));
+  };
+
+  it("offers Clear filters when search or filters hide every entry", () => {
+    const html = emptyState(renderPage("no such job"));
+
+    expect(html).toContain("No matching applications");
+    expect(html).toMatch(/<button class="inline-flex h-10[^"]*max-md:h-11" type="button">Clear filters<\/button>/);
+  });
+
+  it("leaves the first-run empty state without an action", () => {
+    const html = emptyState(renderPage("", { applications: [] }));
+
+    expect(html).toContain("No applications yet");
+    expect(html).not.toContain("<button");
+  });
+});

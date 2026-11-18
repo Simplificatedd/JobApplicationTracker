@@ -468,6 +468,17 @@ export function ApplicationsPage({
         applications={visibleApplications}
         coverLetters={coverLetters}
         columnWidths={columnWidths}
+        emptyAction={
+          isNarrowed ? (
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
+              onClick={clearFilters}
+              type="button"
+            >
+              Clear filters
+            </button>
+          ) : undefined
+        }
         emptyBody={
           searchQuery.trim()
             ? showsArchivedInActiveView
