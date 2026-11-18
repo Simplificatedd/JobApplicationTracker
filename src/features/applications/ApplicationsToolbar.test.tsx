@@ -2,8 +2,14 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { APPLICATION_TABLE_COLUMNS } from "./ApplicationsTable";
-import { ColumnsModal, PhoneSortSelect } from "./ApplicationsToolbar";
-import { DEFAULT_SORT_STATE } from "./applicationFilters";
+import {
+  ApplicationsToolbar,
+  ColumnsModal,
+  MoreFiltersModal,
+  PhoneSortSelect,
+} from "./ApplicationsToolbar";
+import type { ApplicationFilters } from "./applicationFilters";
+import { DEFAULT_APPLICATION_FILTERS, DEFAULT_SORT_STATE } from "./applicationFilters";
 
 function renderColumnsModal(onResetColumnWidths?: () => void) {
   return renderToStaticMarkup(
@@ -112,5 +118,88 @@ describe("phone filter dialog scroll lock", () => {
     // The dialog only renders after Filters is pressed, so check the source.
     expect(filters.slice(0, filters.indexOf("</NativeModal>"))).toMatch(/<NativeModal\s+className="applications-filter-dialog /);
     expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.applications-filter-dialog\[open\]\)\s*\{\s*overflow:\s*hidden/);
+  });
+});
+
+function renderFiltersModal(filters: Partial<ApplicationFilters> = {}, needsAttentionOnly = false) {
+  return renderToStaticMarkup(
+    <MoreFiltersModal
+      companyOptions={["Acme"]}
+      currentFilters={{ ...DEFAULT_APPLICATION_FILTERS, ...filters }}
+      locationOptions={["Singapore"]}
+      needsAttentionOnly={needsAttentionOnly}
+      onClose={vi.fn()}
+    />,
+  );
+}
+
+// Each select's label text, and whether it is visible.
+const selectLabels = (markup: string) =>
+  [...markup.matchAll(/<label class="relative block min-w-0"><span class="([^"]*)">([^<]*)<\/span>/g)].map(
+    ([, className, label]) => ({ label, visible: className !== "sr-only" }),
+  );
+
+describe("Filters dialog labels (#258)", () => {
+  it("shows every field's name above its select, even once a value is picked", () => {
+    const labels = selectLabels(renderFiltersModal({ company: "Acme", priority: "high" }));
+
+    expect(labels).toHaveLength(24);
+    expect(labels.filter((field) => !field.visible)).toEqual([]);
+    expect(labels.map((field) => field.label)).toEqual(
+      expect.arrayContaining(["Company", "Priority", "Status", "Role end date"]),
+    );
+  });
+
+  it("keeps the inline toolbar filters' labels for screen readers only", () => {
+    const labels = selectLabels(
+      renderToStaticMarkup(
+        <ApplicationsToolbar
+          companyOptions={[]}
+          filters={DEFAULT_APPLICATION_FILTERS}
+          locationOptions={[]}
+          needsAttentionOnly={false}
+          searchQuery=""
+          sort={DEFAULT_SORT_STATE}
+          visibleApplicationColumns={[]}
+        />,
+      ),
+    );
+
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.filter((field) => field.visible)).toEqual([]);
+  });
+});
+
+describe("Filters dialog layout (#258)", () => {
+  const common = ["Company", "Location", "Applied date", "Job type", "Work mode", "Last updated"];
+  const commonKeys = ["company", "location", "dateApplied", "jobType", "workMode", "updatedAt"];
+  const moreSection = (markup: string) => markup.slice(markup.indexOf("<details"), markup.indexOf("</details>"));
+  const isOpen = (markup: string) => /<details class="[^"]*" open="">/.test(markup);
+
+  it("puts Needs attention and the common filters before More filters", () => {
+    const markup = renderFiltersModal();
+    const beforeMore = markup.slice(0, markup.indexOf("<details"));
+
+    expect(beforeMore.indexOf("Needs attention")).toBeLessThan(beforeMore.indexOf(">Company<"));
+    expect(selectLabels(beforeMore).map((field) => field.label)).toEqual(common);
+    expect(moreSection(markup)).toMatch(/<summary[^>]*>More filters</);
+    expect(selectLabels(moreSection(markup))).toHaveLength(18);
+  });
+
+  it("starts closed unless a filter inside it is already active", () => {
+    expect(isOpen(renderFiltersModal())).toBe(false);
+    expect(isOpen(renderFiltersModal({ company: "Acme" }, true))).toBe(false);
+
+    for (const key of Object.keys(DEFAULT_APPLICATION_FILTERS) as (keyof ApplicationFilters)[]) {
+      expect(isOpen(renderFiltersModal({ [key]: "x" })), key).toBe(!commonKeys.includes(key));
+    }
+  });
+});
+
+describe("More filters focus ring (#258)", () => {
+  it("gives the summary the same focus ring as other controls", () => {
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/summary:focus-visible,[^{]*\{\s*outline: none;\s*box-shadow: var\(--focus-ring\);/);
   });
 });
