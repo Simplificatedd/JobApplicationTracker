@@ -519,12 +519,15 @@ const COLUMN_DESCRIPTIONS: Record<ApplicationColumnId, string> = {
 function StatusFilter({
   currentFilters,
   onFilterChange,
+  showLabel,
 }: {
   currentFilters: ApplicationFilters;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+  showLabel?: boolean;
 }) {
   return (
     <FilterSelect
+      showLabel={showLabel}
       icon={SlidersHorizontal}
       label="Status"
       onChange={(value) =>
@@ -547,12 +550,15 @@ function StatusFilter({
 function FollowUpFilter({
   currentFilters,
   onFilterChange,
+  showLabel,
 }: {
   currentFilters: ApplicationFilters;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+  showLabel?: boolean;
 }) {
   return (
     <FilterSelect
+      showLabel={showLabel}
       icon={ClipboardCheck}
       label="Follow-up"
       onChange={(value) =>
@@ -572,12 +578,15 @@ function FollowUpFilter({
 function InterviewDateFilter({
   currentFilters,
   onFilterChange,
+  showLabel,
 }: {
   currentFilters: ApplicationFilters;
   onFilterChange?: (filters: Partial<ApplicationFilters>) => void;
+  showLabel?: boolean;
 }) {
   return (
     <FilterSelect
+      showLabel={showLabel}
       icon={CalendarDays}
       label="Scheduled stage"
       onChange={(value) =>
@@ -594,7 +603,7 @@ function InterviewDateFilter({
   );
 }
 
-function MoreFiltersModal({
+export function MoreFiltersModal({
   companyOptions,
   currentFilters,
   locationOptions,
@@ -639,6 +648,7 @@ function MoreFiltersModal({
 
         <div className="grid gap-3 overflow-y-auto px-4 py-5 sm:grid-cols-2 sm:px-6">
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Company"
             onChange={(value) => onFilterChange?.({ company: value })}
@@ -653,21 +663,25 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <StatusFilter
+            showLabel
             currentFilters={currentFilters}
             onFilterChange={onFilterChange}
           />
 
           <FollowUpFilter
+            showLabel
             currentFilters={currentFilters}
             onFilterChange={onFilterChange}
           />
 
           <InterviewDateFilter
+            showLabel
             currentFilters={currentFilters}
             onFilterChange={onFilterChange}
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Job description"
             onChange={(value) =>
               onFilterChange?.({
@@ -678,6 +692,7 @@ function MoreFiltersModal({
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Application URL"
             onChange={(value) =>
               onFilterChange?.({
@@ -688,6 +703,7 @@ function MoreFiltersModal({
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Applied date"
             onChange={(value) =>
               onFilterChange?.({
@@ -698,6 +714,7 @@ function MoreFiltersModal({
           />
 
           <FilterSelect
+            showLabel
             icon={CalendarDays}
             label="Offer deadline"
             onChange={(value) =>
@@ -715,6 +732,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <PresenceFilterSelect
+            showLabel
             label="Role start date"
             onChange={(value) =>
               onFilterChange?.({
@@ -725,6 +743,7 @@ function MoreFiltersModal({
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Role end date"
             onChange={(value) =>
               onFilterChange?.({
@@ -735,6 +754,7 @@ function MoreFiltersModal({
           />
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Follow-up auto-reset"
             onChange={(value) =>
@@ -753,6 +773,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Round"
             onChange={(value) =>
@@ -769,6 +790,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Stage type"
             onChange={(value) =>
@@ -795,6 +817,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={FileText}
             label="Resume"
             onChange={(value) =>
@@ -810,6 +833,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Contacts"
             onChange={(value) =>
@@ -825,6 +849,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <PresenceFilterSelect
+            showLabel
             label="Cover letter"
             onChange={(value) =>
               onFilterChange?.({
@@ -836,6 +861,7 @@ function MoreFiltersModal({
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Salary / Pay"
             onChange={(value) =>
               onFilterChange?.({
@@ -846,6 +872,7 @@ function MoreFiltersModal({
           />
 
           <PresenceFilterSelect
+            showLabel
             label="Notes"
             onChange={(value) =>
               onFilterChange?.({
@@ -856,6 +883,7 @@ function MoreFiltersModal({
           />
 
           <FilterSelect
+            showLabel
             icon={CalendarDays}
             label="Last updated"
             onChange={(value) =>
@@ -872,6 +900,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Source"
             onChange={(value) => onFilterChange?.({ source: value })}
@@ -886,6 +915,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Job type"
             onChange={(value) =>
@@ -902,6 +932,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={MapPin}
             label="Location"
             onChange={(value) => onFilterChange?.({ location: value })}
@@ -916,6 +947,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Priority"
             onChange={(value) =>
@@ -930,6 +962,7 @@ function MoreFiltersModal({
           </FilterSelect>
 
           <FilterSelect
+            showLabel
             icon={SlidersHorizontal}
             label="Work mode"
             onChange={(value) =>
@@ -983,14 +1016,17 @@ function MoreFiltersModal({
 function PresenceFilterSelect({
   label,
   onChange,
+  showLabel,
   value,
 }: {
   label: string;
   onChange?: (value: string) => void;
+  showLabel?: boolean;
   value?: string;
 }) {
   return (
     <FilterSelect
+      showLabel={showLabel}
       icon={FileText}
       label={label}
       onChange={onChange}
@@ -1054,34 +1090,46 @@ function FilterSelect({
   icon: Icon,
   label,
   onChange,
+  showLabel = false,
   value,
 }: {
   children: ReactNode;
   icon: typeof SlidersHorizontal;
   label: string;
   onChange?: (value: string) => void;
+  // Shows the label above the select, so the field name stays visible once
+  // a value is picked. The compact inline toolbar filters leave it off.
+  showLabel?: boolean;
   value?: string;
 }) {
   return (
     <label className="relative block min-w-0">
-      <Icon
-        aria-hidden="true"
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-        size={16}
-      />
-      <span className="sr-only">{label}</span>
-      <select
-        className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground max-md:h-11"
-        onChange={(event) => onChange?.(event.target.value)}
-        value={value}
+      <span
+        className={
+          showLabel ? "mb-1 block text-xs font-medium text-muted" : "sr-only"
+        }
       >
-        {children}
-      </select>
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-        size={16}
-      />
+        {label}
+      </span>
+      <span className="relative block">
+        <Icon
+          aria-hidden="true"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+          size={16}
+        />
+        <select
+          className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm font-medium text-foreground max-md:h-11"
+          onChange={(event) => onChange?.(event.target.value)}
+          value={value}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+          size={16}
+        />
+      </span>
     </label>
   );
 }
