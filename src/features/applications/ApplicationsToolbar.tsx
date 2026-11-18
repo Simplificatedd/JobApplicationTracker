@@ -603,6 +603,28 @@ function InterviewDateFilter({
   );
 }
 
+// The filters inside the More filters disclosure.
+const MORE_FILTER_KEYS: (keyof ApplicationFilters)[] = [
+  "status",
+  "followUp",
+  "interview",
+  "jobDescription",
+  "applicationUrl",
+  "offerDeadline",
+  "roleStartDate",
+  "roleEndDate",
+  "followUpPromptDays",
+  "interviewRound",
+  "interviewType",
+  "resume",
+  "contacts",
+  "coverLetterVersion",
+  "salary",
+  "notes",
+  "source",
+  "priority",
+];
+
 export function MoreFiltersModal({
   companyOptions,
   currentFilters,
@@ -622,6 +644,12 @@ export function MoreFiltersModal({
   onNeedsAttentionOnlyChange?: (value: boolean) => void;
   onResetFilters?: () => void;
 }) {
+  const [hasActiveMoreFilter] = useState(() =>
+    MORE_FILTER_KEYS.some(
+      (key) => currentFilters[key] !== DEFAULT_APPLICATION_FILTERS[key],
+    ),
+  );
+
   return (
     // Same focus and dismissal handling as the Columns dialog; on phones the
     // page behind is also scroll-locked (see styles.css).
@@ -647,6 +675,18 @@ export function MoreFiltersModal({
         </header>
 
         <div className="grid gap-3 overflow-y-auto px-4 py-5 sm:grid-cols-2 sm:px-6">
+          <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground sm:col-span-2">
+            <input
+              checked={needsAttentionOnly}
+              className="h-4 w-4 shrink-0 rounded border-border text-primary"
+              onChange={(event) =>
+                onNeedsAttentionOnlyChange?.(event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span className="truncate">Needs attention</span>
+          </label>
+
           <FilterSelect
             showLabel
             icon={SlidersHorizontal}
@@ -662,45 +702,20 @@ export function MoreFiltersModal({
             ))}
           </FilterSelect>
 
-          <StatusFilter
+          <FilterSelect
             showLabel
-            currentFilters={currentFilters}
-            onFilterChange={onFilterChange}
-          />
-
-          <FollowUpFilter
-            showLabel
-            currentFilters={currentFilters}
-            onFilterChange={onFilterChange}
-          />
-
-          <InterviewDateFilter
-            showLabel
-            currentFilters={currentFilters}
-            onFilterChange={onFilterChange}
-          />
-
-          <PresenceFilterSelect
-            showLabel
-            label="Job description"
-            onChange={(value) =>
-              onFilterChange?.({
-                jobDescription: value as ApplicationFilters["jobDescription"],
-              })
-            }
-            value={currentFilters.jobDescription}
-          />
-
-          <PresenceFilterSelect
-            showLabel
-            label="Application URL"
-            onChange={(value) =>
-              onFilterChange?.({
-                applicationUrl: value as ApplicationFilters["applicationUrl"],
-              })
-            }
-            value={currentFilters.applicationUrl}
-          />
+            icon={MapPin}
+            label="Location"
+            onChange={(value) => onFilterChange?.({ location: value })}
+            value={currentFilters.location}
+          >
+            <option value="">Location</option>
+            {locationOptions.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </FilterSelect>
 
           <PresenceFilterSelect
             showLabel
@@ -712,207 +727,6 @@ export function MoreFiltersModal({
             }
             value={currentFilters.dateApplied}
           />
-
-          <FilterSelect
-            showLabel
-            icon={CalendarDays}
-            label="Offer deadline"
-            onChange={(value) =>
-              onFilterChange?.({
-                offerDeadline: value as ApplicationFilters["offerDeadline"],
-              })
-            }
-            value={currentFilters.offerDeadline}
-          >
-            <option value="">Offer deadline</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="blank">Blank</option>
-            <option value="overdue">Overdue</option>
-            <option value="upcoming">Next 7 days</option>
-          </FilterSelect>
-
-          <PresenceFilterSelect
-            showLabel
-            label="Role start date"
-            onChange={(value) =>
-              onFilterChange?.({
-                roleStartDate: value as ApplicationFilters["roleStartDate"],
-              })
-            }
-            value={currentFilters.roleStartDate}
-          />
-
-          <PresenceFilterSelect
-            showLabel
-            label="Role end date"
-            onChange={(value) =>
-              onFilterChange?.({
-                roleEndDate: value as ApplicationFilters["roleEndDate"],
-              })
-            }
-            value={currentFilters.roleEndDate}
-          />
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Follow-up auto-reset"
-            onChange={(value) =>
-              onFilterChange?.({
-                followUpPromptDays: value as ApplicationFilters["followUpPromptDays"],
-              })
-            }
-            value={currentFilters.followUpPromptDays}
-          >
-            <option value="">Follow-up auto-reset</option>
-            <option value="off">Off</option>
-            <option value="1">1 day</option>
-            <option value="3">3 days</option>
-            <option value="7">7 days</option>
-            <option value="14_plus">14+ days</option>
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Round"
-            onChange={(value) =>
-              onFilterChange?.({
-                interviewRound: value as ApplicationFilters["interviewRound"],
-              })
-            }
-            value={currentFilters.interviewRound}
-          >
-            <option value="">Round</option>
-            <option value="1">Round 1</option>
-            <option value="2">Round 2</option>
-            <option value="3_plus">Round 3+</option>
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Stage type"
-            onChange={(value) =>
-              onFilterChange?.({
-                interviewType: value as InterviewType | "",
-              })
-            }
-            value={currentFilters.interviewType}
-          >
-            <option value="">Stage type</option>
-            {currentFilters.interviewType &&
-            !INTERVIEW_TYPE_OPTIONS.some(
-              (option) => option.value === currentFilters.interviewType,
-            ) ? (
-              <option value={currentFilters.interviewType}>
-                {getInterviewTypeLabel(currentFilters.interviewType)}
-              </option>
-            ) : null}
-            {INTERVIEW_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={FileText}
-            label="Resume"
-            onChange={(value) =>
-              onFilterChange?.({
-                resume: value as ApplicationFilters["resume"],
-              })
-            }
-            value={currentFilters.resume}
-          >
-            <option value="">Resume</option>
-            <option value="assigned">Assigned</option>
-            <option value="unassigned">Unassigned</option>
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Contacts"
-            onChange={(value) =>
-              onFilterChange?.({
-                contacts: value as ApplicationFilters["contacts"],
-              })
-            }
-            value={currentFilters.contacts}
-          >
-            <option value="">Contacts</option>
-            <option value="linked">Linked</option>
-            <option value="none">None</option>
-          </FilterSelect>
-
-          <PresenceFilterSelect
-            showLabel
-            label="Cover letter"
-            onChange={(value) =>
-              onFilterChange?.({
-                coverLetterVersion:
-                  value as ApplicationFilters["coverLetterVersion"],
-              })
-            }
-            value={currentFilters.coverLetterVersion}
-          />
-
-          <PresenceFilterSelect
-            showLabel
-            label="Salary / Pay"
-            onChange={(value) =>
-              onFilterChange?.({
-                salary: value as ApplicationFilters["salary"],
-              })
-            }
-            value={currentFilters.salary}
-          />
-
-          <PresenceFilterSelect
-            showLabel
-            label="Notes"
-            onChange={(value) =>
-              onFilterChange?.({
-                notes: value as ApplicationFilters["notes"],
-              })
-            }
-            value={currentFilters.notes}
-          />
-
-          <FilterSelect
-            showLabel
-            icon={CalendarDays}
-            label="Last updated"
-            onChange={(value) =>
-              onFilterChange?.({
-                updatedAt: value as ApplicationFilters["updatedAt"],
-              })
-            }
-            value={currentFilters.updatedAt}
-          >
-            <option value="">Last updated</option>
-            <option value="today">Today</option>
-            <option value="7_days">Past 7 days</option>
-            <option value="30_days">Past 30 days</option>
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Source"
-            onChange={(value) => onFilterChange?.({ source: value })}
-            value={currentFilters.source}
-          >
-            <option value="">Source</option>
-            {APPLICATION_SOURCES.map((source) => (
-              <option key={source} value={source}>
-                {source}
-              </option>
-            ))}
-          </FilterSelect>
 
           <FilterSelect
             showLabel
@@ -933,36 +747,6 @@ export function MoreFiltersModal({
 
           <FilterSelect
             showLabel
-            icon={MapPin}
-            label="Location"
-            onChange={(value) => onFilterChange?.({ location: value })}
-            value={currentFilters.location}
-          >
-            <option value="">Location</option>
-            {locationOptions.map((location) => (
-              <option key={location} value={location}>
-                {location}
-              </option>
-            ))}
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
-            icon={SlidersHorizontal}
-            label="Priority"
-            onChange={(value) =>
-              onFilterChange?.({ priority: value as Priority | "" })
-            }
-            value={currentFilters.priority}
-          >
-            <option value="">Priority</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </FilterSelect>
-
-          <FilterSelect
-            showLabel
             icon={SlidersHorizontal}
             label="Work mode"
             onChange={(value) =>
@@ -977,17 +761,278 @@ export function MoreFiltersModal({
             <option value="unknown">Unknown</option>
           </FilterSelect>
 
-          <label className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground sm:col-span-2">
-            <input
-              checked={needsAttentionOnly}
-              className="h-4 w-4 shrink-0 rounded border-border text-primary"
-              onChange={(event) =>
-                onNeedsAttentionOnlyChange?.(event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span className="truncate">Needs attention</span>
-          </label>
+          <FilterSelect
+            showLabel
+            icon={CalendarDays}
+            label="Last updated"
+            onChange={(value) =>
+              onFilterChange?.({
+                updatedAt: value as ApplicationFilters["updatedAt"],
+              })
+            }
+            value={currentFilters.updatedAt}
+          >
+            <option value="">Last updated</option>
+            <option value="today">Today</option>
+            <option value="7_days">Past 7 days</option>
+            <option value="30_days">Past 30 days</option>
+          </FilterSelect>
+
+          {/* Open on arrival when a filter inside is already active; the
+              dialog mounts fresh each time, so this is worked out once. */}
+          <details
+            className="group sm:col-span-2"
+            open={hasActiveMoreFilter}
+          >
+            <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 text-sm font-semibold text-foreground max-md:h-11 [&::-webkit-details-marker]:hidden">
+              More filters
+              <ChevronDown
+                aria-hidden="true"
+                className="shrink-0 text-muted transition-transform group-open:rotate-180"
+                size={16}
+              />
+            </summary>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <StatusFilter
+                showLabel
+                currentFilters={currentFilters}
+                onFilterChange={onFilterChange}
+              />
+
+              <FollowUpFilter
+                showLabel
+                currentFilters={currentFilters}
+                onFilterChange={onFilterChange}
+              />
+
+              <InterviewDateFilter
+                showLabel
+                currentFilters={currentFilters}
+                onFilterChange={onFilterChange}
+              />
+
+              <PresenceFilterSelect
+                showLabel
+                label="Job description"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    jobDescription: value as ApplicationFilters["jobDescription"],
+                  })
+                }
+                value={currentFilters.jobDescription}
+              />
+
+              <PresenceFilterSelect
+                showLabel
+                label="Application URL"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    applicationUrl: value as ApplicationFilters["applicationUrl"],
+                  })
+                }
+                value={currentFilters.applicationUrl}
+              />
+
+              <FilterSelect
+                showLabel
+                icon={CalendarDays}
+                label="Offer deadline"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    offerDeadline: value as ApplicationFilters["offerDeadline"],
+                  })
+                }
+                value={currentFilters.offerDeadline}
+              >
+                <option value="">Offer deadline</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="blank">Blank</option>
+                <option value="overdue">Overdue</option>
+                <option value="upcoming">Next 7 days</option>
+              </FilterSelect>
+
+              <PresenceFilterSelect
+                showLabel
+                label="Role start date"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    roleStartDate: value as ApplicationFilters["roleStartDate"],
+                  })
+                }
+                value={currentFilters.roleStartDate}
+              />
+
+              <PresenceFilterSelect
+                showLabel
+                label="Role end date"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    roleEndDate: value as ApplicationFilters["roleEndDate"],
+                  })
+                }
+                value={currentFilters.roleEndDate}
+              />
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Follow-up auto-reset"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    followUpPromptDays: value as ApplicationFilters["followUpPromptDays"],
+                  })
+                }
+                value={currentFilters.followUpPromptDays}
+              >
+                <option value="">Follow-up auto-reset</option>
+                <option value="off">Off</option>
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option value="7">7 days</option>
+                <option value="14_plus">14+ days</option>
+              </FilterSelect>
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Round"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    interviewRound: value as ApplicationFilters["interviewRound"],
+                  })
+                }
+                value={currentFilters.interviewRound}
+              >
+                <option value="">Round</option>
+                <option value="1">Round 1</option>
+                <option value="2">Round 2</option>
+                <option value="3_plus">Round 3+</option>
+              </FilterSelect>
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Stage type"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    interviewType: value as InterviewType | "",
+                  })
+                }
+                value={currentFilters.interviewType}
+              >
+                <option value="">Stage type</option>
+                {currentFilters.interviewType &&
+                !INTERVIEW_TYPE_OPTIONS.some(
+                  (option) => option.value === currentFilters.interviewType,
+                ) ? (
+                  <option value={currentFilters.interviewType}>
+                    {getInterviewTypeLabel(currentFilters.interviewType)}
+                  </option>
+                ) : null}
+                {INTERVIEW_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </FilterSelect>
+
+              <FilterSelect
+                showLabel
+                icon={FileText}
+                label="Resume"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    resume: value as ApplicationFilters["resume"],
+                  })
+                }
+                value={currentFilters.resume}
+              >
+                <option value="">Resume</option>
+                <option value="assigned">Assigned</option>
+                <option value="unassigned">Unassigned</option>
+              </FilterSelect>
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Contacts"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    contacts: value as ApplicationFilters["contacts"],
+                  })
+                }
+                value={currentFilters.contacts}
+              >
+                <option value="">Contacts</option>
+                <option value="linked">Linked</option>
+                <option value="none">None</option>
+              </FilterSelect>
+
+              <PresenceFilterSelect
+                showLabel
+                label="Cover letter"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    coverLetterVersion:
+                      value as ApplicationFilters["coverLetterVersion"],
+                  })
+                }
+                value={currentFilters.coverLetterVersion}
+              />
+
+              <PresenceFilterSelect
+                showLabel
+                label="Salary / Pay"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    salary: value as ApplicationFilters["salary"],
+                  })
+                }
+                value={currentFilters.salary}
+              />
+
+              <PresenceFilterSelect
+                showLabel
+                label="Notes"
+                onChange={(value) =>
+                  onFilterChange?.({
+                    notes: value as ApplicationFilters["notes"],
+                  })
+                }
+                value={currentFilters.notes}
+              />
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Source"
+                onChange={(value) => onFilterChange?.({ source: value })}
+                value={currentFilters.source}
+              >
+                <option value="">Source</option>
+                {APPLICATION_SOURCES.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </FilterSelect>
+
+              <FilterSelect
+                showLabel
+                icon={SlidersHorizontal}
+                label="Priority"
+                onChange={(value) =>
+                  onFilterChange?.({ priority: value as Priority | "" })
+                }
+                value={currentFilters.priority}
+              >
+                <option value="">Priority</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </FilterSelect>
+            </div>
+          </details>
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-4 sm:px-6">

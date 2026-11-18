@@ -169,3 +169,37 @@ describe("Filters dialog labels (#258)", () => {
     expect(labels.filter((field) => field.visible)).toEqual([]);
   });
 });
+
+describe("Filters dialog layout (#258)", () => {
+  const common = ["Company", "Location", "Applied date", "Job type", "Work mode", "Last updated"];
+  const commonKeys = ["company", "location", "dateApplied", "jobType", "workMode", "updatedAt"];
+  const moreSection = (markup: string) => markup.slice(markup.indexOf("<details"), markup.indexOf("</details>"));
+  const isOpen = (markup: string) => /<details class="[^"]*" open="">/.test(markup);
+
+  it("puts Needs attention and the common filters before More filters", () => {
+    const markup = renderFiltersModal();
+    const beforeMore = markup.slice(0, markup.indexOf("<details"));
+
+    expect(beforeMore.indexOf("Needs attention")).toBeLessThan(beforeMore.indexOf(">Company<"));
+    expect(selectLabels(beforeMore).map((field) => field.label)).toEqual(common);
+    expect(moreSection(markup)).toMatch(/<summary[^>]*>More filters</);
+    expect(selectLabels(moreSection(markup))).toHaveLength(18);
+  });
+
+  it("starts closed unless a filter inside it is already active", () => {
+    expect(isOpen(renderFiltersModal())).toBe(false);
+    expect(isOpen(renderFiltersModal({ company: "Acme" }, true))).toBe(false);
+
+    for (const key of Object.keys(DEFAULT_APPLICATION_FILTERS) as (keyof ApplicationFilters)[]) {
+      expect(isOpen(renderFiltersModal({ [key]: "x" })), key).toBe(!commonKeys.includes(key));
+    }
+  });
+});
+
+describe("More filters focus ring (#258)", () => {
+  it("gives the summary the same focus ring as other controls", () => {
+    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
+
+    expect(css).toMatch(/summary:focus-visible,[^{]*\{\s*outline: none;\s*box-shadow: var\(--focus-ring\);/);
+  });
+});
