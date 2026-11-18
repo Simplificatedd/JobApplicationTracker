@@ -247,6 +247,10 @@ export function ApplicationsPage({
   const isFiltered =
     countActiveFilters(filters, needsAttentionOnly) > 0 &&
     baseApplications.length > 0;
+  const isNarrowed =
+    baseApplications.length > 0 &&
+    (countActiveFilters(filters, needsAttentionOnly) > 0 ||
+      searchQuery.trim() !== "");
   const attentionCount = baseApplications.filter(
     (application) =>
       deriveApplicationNotifications(
@@ -330,6 +334,13 @@ export function ApplicationsPage({
     };
   }
   const deleteAndCloseApplication = closeAfter(deleteApplication);
+
+  // Unlike Reset, keeps sort, columns, widths and the Active/Total choice.
+  function clearFilters() {
+    setFilters(DEFAULT_APPLICATION_FILTERS);
+    setNeedsAttentionOnly(false);
+    setSearchQuery("");
+  }
 
   function resetTableView() {
     setColumnWidths(mergeColumnWidths(null));
@@ -424,6 +435,34 @@ export function ApplicationsPage({
           {coverLetterActionError}
         </p>
       ) : null}
+
+      {/* Always rendered so the live region exists before its text changes;
+          visually hidden while nothing is narrowing the list. */}
+      <div
+        className={
+          isNarrowed
+            ? "flex flex-wrap items-center gap-x-2 text-sm text-muted xl:shrink-0"
+            : "sr-only"
+        }
+      >
+        <p role="status">
+          {isNarrowed
+            ? `Showing ${visibleApplications.length} of ${baseApplications.length}`
+            : ""}
+        </p>
+        {isNarrowed ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <button
+              className="touch-target rounded font-semibold text-primary hover:underline"
+              onClick={clearFilters}
+              type="button"
+            >
+              Clear filters
+            </button>
+          </>
+        ) : null}
+      </div>
 
       <ApplicationsTable
         applications={visibleApplications}

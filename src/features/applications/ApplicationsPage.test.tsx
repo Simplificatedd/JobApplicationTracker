@@ -791,3 +791,75 @@ describe("Needs attention tile (#256)", () => {
     expect(attentionTile(tree).props.pressed).toBe(false);
   });
 });
+
+describe("result count line (#257)", () => {
+  // The first button in the tree whose text is `text`.
+  function buttonProps(node: unknown, text: string): { onClick: () => void } | undefined {
+    if (Array.isArray(node)) return node.map((child) => buttonProps(child, text)).find(Boolean);
+    if (!node || typeof node !== "object" || !("props" in node)) return undefined;
+    const element = node as ReactElement<{ children?: unknown; onClick?: () => void }>;
+    return element.type === "button" && element.props.children === text
+      ? (element.props as { onClick: () => void })
+      : buttonProps(element.props.children, text);
+  }
+  const statusLine = (html: string) => {
+    const start = html.lastIndexOf("<div", html.indexOf('<p role="status">'));
+    return html.slice(start, html.indexOf("</div>", start) + 6);
+  };
+
+  it("stays as an empty, visually hidden live region while nothing narrows the list", () => {
+    const line = statusLine(renderPage(""));
+
+    expect(line).toContain('<div class="sr-only"><p role="status"></p></div>');
+  });
+
+  it("shows how many entries search and filters leave, with Clear filters", () => {
+    expect(statusLine(renderPage("platform"))).toContain("Showing 1 of 2");
+    expect(statusLine(renderPage("platform"))).toContain(">Clear filters</button>");
+
+    const page = mountPage();
+    toolbar(page.render()).onNeedsAttentionOnlyChange!(true);
+    expect(statusLine(renderToStaticMarkup(page.render()))).toContain("Showing 0 of 2");
+  });
+
+  it("counts the Archive view on its own", () => {
+    const archived = { ...titleMatch, id: "archived", archivedAt: "2026-09-03T00:00:00.000Z" };
+
+    expect(
+      statusLine(renderPage("software", { applications: [archived, descriptionMatch], viewMode: "archive" })),
+    ).toContain("Showing 1 of 1");
+  });
+
+  it("clears search and filters but keeps sort, columns, widths and the Active/Total choice", () => {
+    const resetTablePreferences = vi.fn();
+    const updateSettings = vi.fn();
+    const sort = { column: "company", direction: "ascending" } as const;
+    const page = mountPage({
+      resetTablePreferences,
+      tablePreferences: { ...tablePreferences, columnWidths: { company: 300 }, includeArchived: true, sort },
+      updateSettings,
+    });
+    let tree = page.render();
+    toolbar(tree).onSearchQueryChange!("platform");
+    toolbar(tree).onFilterChange!({ status: "Interviewing" });
+    toolbar(tree).onNeedsAttentionOnlyChange!(true);
+    tree = page.render();
+
+    buttonProps(tree, "Clear filters")!.onClick();
+    tree = page.render();
+    const after = toolbar(tree);
+
+    expect(after.searchQuery).toBe("");
+    expect(after.filters).toEqual(DEFAULT_APPLICATION_FILTERS);
+    expect(after.needsAttentionOnly).toBe(false);
+    expect(after.sort).toEqual(sort);
+    expect(
+      tree.props.children.find((child: ReactElement) => child?.type === ApplicationsTable).props
+        .columnWidths.company,
+    ).toBe(300);
+    expect(renderToStaticMarkup(tree)).toContain("Total applications");
+    expect(resetTablePreferences).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
+    expect(statusLine(renderToStaticMarkup(tree))).toContain('class="sr-only"');
+  });
+});
