@@ -577,8 +577,11 @@ function SummaryMetric({
   value: string;
   tone?: "neutral" | "warning" | "info";
 }) {
+  // Nothing to act on, so a zero count is not highlighted.
   const toneClass =
-    tone === "warning"
+    value === "0"
+      ? "text-foreground"
+      : tone === "warning"
       ? "text-warning"
       : tone === "info"
         ? "text-info"

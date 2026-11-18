@@ -731,3 +731,29 @@ describe("Show full job titles setting (#273)", () => {
     expect(titleTags(on).every((tag) => tag.includes(wrapClass))).toBe(true);
   });
 });
+
+describe("summary tile colours (#256)", () => {
+  const valueClasses = (html: string) =>
+    [...html.matchAll(/<p class="mt-1 text-2xl[^"]*?(text-(?:foreground|warning|info))">([^<]*)<\/p>/g)].map(
+      (match) => `${match[2]}:${match[1]}`,
+    );
+
+  it("shows zero counts in the neutral colour", () => {
+    expect(valueClasses(renderPage(""))).toEqual([
+      "2:text-foreground",
+      "0:text-foreground",
+      "0:text-foreground",
+      "0:text-foreground",
+    ]);
+  });
+
+  it("keeps the info colour for a count above zero", () => {
+    const html = renderPage("", {
+      interviews: [
+        { id: "interview", applicationId: titleMatch.id, dateTime: "2999-01-01T09:00" } as never,
+      ],
+    });
+
+    expect(valueClasses(html)[2]).toBe("1:text-info");
+  });
+});
