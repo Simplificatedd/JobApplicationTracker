@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { AppShell, type ViewKey } from "./components/AppShell";
 import { AddApplicationModal } from "./features/applications/AddApplicationModal";
 import { ApplicationsPage } from "./features/applications/ApplicationsPage";
@@ -150,10 +150,18 @@ function StorageErrorBanner({
   );
 }
 
-function StorageLoading() {
+export function StorageLoading() {
   return (
-    <section className="surface-panel flex min-h-[280px] items-center justify-center rounded-lg px-6 py-12 text-center">
+    <section
+      className="surface-panel flex min-h-[280px] items-center justify-center rounded-lg px-6 py-12 text-center"
+      role="status"
+    >
       <div>
+        <Loader2
+          aria-hidden="true"
+          className="mx-auto mb-3 text-primary motion-safe:animate-spin"
+          size={24}
+        />
         <p className="text-base font-semibold text-foreground">
           Loading your cloud tracker
         </p>
