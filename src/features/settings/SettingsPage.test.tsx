@@ -178,3 +178,17 @@ describe("unavailable Add Job settings (#260)", () => {
     expect(markup).toContain("Show full job titles");
   });
 });
+
+describe("settings switches (#260)", () => {
+  it("uses the primary colour for every switch and a 3:1 off track", () => {
+    const markup = renderPage();
+    const tracks = markup.match(/<span aria-hidden="true" class="h-6 w-11[^"]*"/g) ?? [];
+
+    expect(tracks.length).toBeGreaterThan(5);
+    tracks.forEach((track) => {
+      expect(track).toContain("peer-checked:bg-primary");
+      expect(track).toContain("bg-slate-500");
+      expect(track).not.toMatch(/peer-checked:bg-(?!primary)/);
+    });
+  });
+});

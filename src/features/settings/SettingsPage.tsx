@@ -615,8 +615,6 @@ const SECTION_ACCENTS: Record<
     navActive: string;
     navIcon: string;
     strip: string;
-    // Classes for a switch's "on" track inside the section.
-    switchOn: string;
     tile: string;
   }
 > = {
@@ -625,7 +623,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-blue-50 text-blue-700",
     navIcon: "text-blue-500",
     strip: "bg-blue-500",
-    switchOn: "peer-checked:bg-blue-500",
     tile: "bg-blue-50 text-blue-600",
   },
   data: {
@@ -633,7 +630,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-emerald-50 text-emerald-700",
     navIcon: "text-emerald-500",
     strip: "bg-emerald-500",
-    switchOn: "peer-checked:bg-emerald-500",
     tile: "bg-emerald-50 text-emerald-600",
   },
   general: {
@@ -641,7 +637,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-violet-50 text-violet-700",
     navIcon: "text-violet-500",
     strip: "bg-violet-500",
-    switchOn: "peer-checked:bg-violet-500",
     tile: "bg-violet-50 text-violet-600",
   },
   contacts: {
@@ -649,7 +644,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-amber-50 text-amber-700",
     navIcon: "text-amber-500",
     strip: "bg-amber-400",
-    switchOn: "peer-checked:bg-amber-500",
     tile: "bg-amber-50 text-amber-600",
   },
   table: {
@@ -657,7 +651,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-sky-50 text-sky-700",
     navIcon: "text-sky-500",
     strip: "bg-sky-500",
-    switchOn: "peer-checked:bg-sky-500",
     tile: "bg-sky-50 text-sky-600",
   },
   alerts: {
@@ -665,7 +658,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-rose-50 text-rose-700",
     navIcon: "text-rose-500",
     strip: "bg-rose-500",
-    switchOn: "peer-checked:bg-rose-500",
     tile: "bg-rose-50 text-rose-600",
   },
   reset: {
@@ -673,7 +665,6 @@ const SECTION_ACCENTS: Record<
     navActive: "bg-red-50 text-red-700",
     navIcon: "text-red-500",
     strip: "bg-red-500",
-    switchOn: "peer-checked:bg-red-500",
     tile: "bg-red-50 text-red-600",
   },
 };
@@ -802,9 +793,8 @@ function SettingsNav({
   );
 }
 
-const SectionAccentContext = createContext<{ choice: string; switchOn: string }>({
+const SectionAccentContext = createContext<{ choice: string }>({
   choice: "text-foreground",
-  switchOn: "peer-checked:bg-primary",
 });
 
 function SettingsSection({
@@ -922,8 +912,6 @@ function ToggleField({
   label: string;
   onChange: (checked: boolean) => void;
 }) {
-  const accent = useContext(SectionAccentContext);
-
   return (
     <label
       className={`flex items-start justify-between gap-4 py-3 ${
@@ -940,9 +928,10 @@ function ToggleField({
           role="switch"
           type="checkbox"
         />
+        {/* slate-500 keeps the off track above 3:1 against the white panel. */}
         <span
           aria-hidden="true"
-          className={`h-6 w-11 rounded-full bg-slate-300 transition peer-focus-visible:shadow-[var(--focus-ring)] ${accent.switchOn}`}
+          className="h-6 w-11 rounded-full bg-slate-500 transition peer-checked:bg-primary peer-focus-visible:shadow-[var(--focus-ring)]"
         />
         <span
           aria-hidden="true"
