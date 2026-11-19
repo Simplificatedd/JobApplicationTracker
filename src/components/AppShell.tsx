@@ -452,7 +452,6 @@ export function AppShell({
                 className={`flex min-w-0 items-center gap-3 md:pl-12 ${headerTitlePadding}`}
               >
                 <div className="min-w-0">
-                  <p className={`hidden text-sm text-muted sm:block ${isApplicationsView ? "short:hidden" : ""}`}>Workspace</p>
                   <h1 className="truncate text-xl font-semibold text-foreground sm:text-2xl">
                     {pageTitle[currentView]}
                   </h1>

@@ -119,13 +119,8 @@ describe("AppShell responsive layout", () => {
     },
   );
 
-  it("hides the Workspace eyebrow on phones, and on short desktop table views", () => {
-    expect(renderShell()).toContain(
-      '<p class="hidden text-sm text-muted sm:block short:hidden">Workspace</p>',
-    );
-    expect(classOf(renderShell({ currentView: "settings" }), ">Workspace<")).not.toContain(
-      "short:hidden",
-    );
+  it.each(["applications", "settings"] as const)("shows no Workspace label above the %s title (#265)", (currentView) => {
+    expect(renderShell({ currentView })).not.toContain(">Workspace<");
   });
 });
 
