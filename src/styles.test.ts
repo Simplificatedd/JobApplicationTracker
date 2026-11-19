@@ -10,6 +10,13 @@ describe("phone form fields", () => {
   });
 });
 
+describe("modal scroll lock (#286)", () => {
+  it("locks the page behind any open modal at every width without shifting it", () => {
+    expect(css).toMatch(/^ {2}html:has\(\.native-modal\[open\]\) \{ overflow: hidden; \}$/m);
+    expect(css).toMatch(/html \{[^}]*scrollbar-gutter: stable;/);
+  });
+});
+
 describe("tailwind variants", () => {
   it("keeps max-* variants and lets short: override xl:", async () => {
     const [{ default: postcss }, { default: tailwindcss }, { default: config }] = await Promise.all([

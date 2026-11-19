@@ -42,6 +42,9 @@
 
   html {
     min-width: 320px;
+    /* Keep the scrollbar's space when a modal locks scrolling, so the page
+       doesn't shift sideways. */
+    scrollbar-gutter: stable;
     background: var(--color-background);
     color: var(--color-foreground);
   }
@@ -278,18 +281,9 @@
   .native-modal:not([open]) { display: none; }
   .native-modal::backdrop { background: transparent; }
 
-  /* An inert page can still scroll; lock it behind the full-screen phone
-     notifications panel even when its list is too short to scroll. */
-  html:has(.notifications-panel[open]) { overflow: hidden; }
-
-  /* The same for the detail panel, the full-screen Add job form and the
-     Filters dialog (the phone filter entry point); at md and up the page
-     scrollbar stays put. */
-  @media not all and (min-width: 768px) {
-    html:has(.application-detail-panel[open]),
-    html:has(.add-application-dialog[open]),
-    html:has(.applications-filter-dialog[open]) { overflow: hidden; }
-  }
+  /* An inert page can still scroll; lock it behind every open modal, even
+     when the modal's own content is too short to scroll. */
+  html:has(.native-modal[open]) { overflow: hidden; }
 
   .modal-overlay {
     /* Overlays are pinned to the viewport, so they must not pick up

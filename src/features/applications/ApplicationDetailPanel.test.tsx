@@ -131,15 +131,7 @@ describe("phone detail panel scroll lock", () => {
 
     expect(dialog).toContain("application-detail-panel");
     // The panel body keeps its own scroll and doesn't hand it to the page.
-    expect(markup).toContain("flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain");
-  });
-
-  it("locks page scrolling only below md and only while the panel is open", () => {
-    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
-
-    expect(css).toMatch(
-      /not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.application-detail-panel\[open\]\)[^{]*\{\s*overflow:\s*hidden/,
-    );
+    expect(markup).toContain("flex-1 overflow-y-auto overscroll-contain px-4 py-5");
   });
 });
 
