@@ -21,6 +21,7 @@ import {
   validateFollowUpSchedule,
 } from "../../lib/followUps";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
+import { getMeetingPlatformName } from "../../lib/meetingPlatforms";
 import { NativeModal } from "../../components/NativeModal";
 import { usePhoneLayout } from "../../hooks/usePhoneLayout";
 import { useVisibleViewportStyle } from "../../hooks/useVisibleViewport";
@@ -188,7 +189,14 @@ export function AddApplicationModal({
     key: Key,
     value: AddApplicationFormState[Key],
   ) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "interviewMeetingUrl" && !current.interviewPlatform.trim()) {
+        next.interviewPlatform =
+          getMeetingPlatformName(next.interviewMeetingUrl) ?? current.interviewPlatform;
+      }
+      return next;
+    });
     if (key === "jobTitle") {
       setTitleError("");
     }
