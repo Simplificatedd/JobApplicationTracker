@@ -561,3 +561,32 @@ describe("Salary / Pay in the Edit form (#268)", () => {
     expect(salaryInput().props.value).toBe("$30/hr");
   });
 });
+
+// #259: the Edit form uses the same sections, in the same order, as the Add form.
+describe("Edit form sections (#259)", () => {
+  it("groups every field under Role, Application, Documents, Follow-up and Other", () => {
+    const props = { ...detailProps(), application: { ...application, status: "Offered" as const } };
+    const view = () => render(() => ApplicationDetailPanel(props));
+    call(button(view(), "Edit").props.onClick);
+    const form = named(view(), "EditForm");
+    const sections = elements(call(form.type, form.props))
+      .filter(e => typeof e.type === "function" && (e.type as { name: string }).name === "FormSection")
+      .map(section => ({
+        title: section.props.title,
+        labels: elements(section.props.children)
+          .filter(e => typeof e.type === "function" && typeof e.props.label === "string")
+          .map(e => e.props.label),
+      }));
+
+    expect(sections).toEqual([
+      { title: "Role", labels: ["Job Title", "Company", "Status", "Offer Deadline", "Job Description"] },
+      {
+        title: "Application",
+        labels: ["Date Applied", "Application URL", "Source", "Location", "Work Mode", "Job Type", "Role Start", "Role End"],
+      },
+      { title: "Documents", labels: ["Resume", "Cover Letter"] },
+      { title: "Follow-up", labels: [] },
+      { title: "Other", labels: ["Priority", "Salary / Pay", "Notes"] },
+    ]);
+  });
+});

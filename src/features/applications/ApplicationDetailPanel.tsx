@@ -75,6 +75,7 @@ import {
   AssessmentsSection,
   type AssessmentSectionProps,
 } from "./AssessmentsSection";
+import { FormSection } from "./FormSection";
 import { InterviewsSection } from "./InterviewsSection";
 import { suggestStatusAfterRemoval } from "../../lib/stageStatus";
 import {
@@ -1099,300 +1100,310 @@ function EditForm({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Field label="Job Title">
-        <input
-          className="field-control"
-          onChange={(event) => updateDraft("jobTitle", event.target.value)}
-          value={draft.jobTitle}
-        />
-      </Field>
-      <Field label="Company">
-        <input
-          className="field-control"
-          onChange={(event) => updateDraft("company", event.target.value)}
-          value={draft.company}
-        />
-      </Field>
-      <Field label="Status">
-        <select
-          className="field-control"
-          onChange={(event) =>
-            updateDraft("status", event.target.value as ApplicationStatus)
-          }
-          value={draft.status}
-        >
-          {APPLICATION_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Priority">
-        <select
-          className="field-control"
-          onChange={(event) =>
-            updateDraft("priority", event.target.value as Priority)
-          }
-          value={draft.priority}
-        >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-      </Field>
-      <Field label="Salary / Pay">
-        <input
-          className="field-control"
-          onChange={(event) => updateDraft("salary", event.target.value)}
-          type="text"
-          value={draft.salary}
-        />
-      </Field>
-      {draft.status === "Offered" ? (
-        <Field label="Offer Deadline">
+    <div className="grid gap-6">
+      <FormSection id="edit-section-role" title="Role">
+        <Field label="Job Title">
           <input
             className="field-control"
-            onChange={(event) =>
-              updateDraft("offerDeadline", event.target.value)
-            }
-            type="datetime-local"
-            value={draft.offerDeadline}
+            onChange={(event) => updateDraft("jobTitle", event.target.value)}
+            value={draft.jobTitle}
           />
         </Field>
-      ) : null}
-      <Field label="Location">
-        <input
-          className="field-control"
-          onChange={(event) => updateDraft("location", event.target.value)}
-          value={draft.location}
-        />
-      </Field>
-      <Field label="Work Mode">
-        <select
-          className="field-control"
-          onChange={(event) => updateDraft("workMode", event.target.value as WorkMode)}
-          value={draft.workMode}
-        >
-          <option value="unknown">Unknown</option>
-          <option value="remote">Remote</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="onsite">Onsite</option>
-        </select>
-      </Field>
-      <Field label="Job Type">
-        <select
-          className="field-control"
-          onChange={(event) => updateDraft("jobType", event.target.value as JobType)}
-          value={draft.jobType}
-        >
-          <option value="internship">Internship</option>
-          <option value="part-time">Part-time</option>
-          <option value="full-time">Full-time</option>
-          <option value="contract">Contract</option>
-          <option value="other">Other</option>
-        </select>
-      </Field>
-      <Field label="Source">
-        <select
-          className="field-control"
-          onChange={(event) => updateDraft("source", event.target.value)}
-          value={draft.source}
-        >
-          <option value=""></option>
-          {APPLICATION_SOURCES.map((source) => (
-            <option key={source} value={source}>
-              {source}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-        <Field label="Resume">
+        <Field label="Company">
+          <input
+            className="field-control"
+            onChange={(event) => updateDraft("company", event.target.value)}
+            value={draft.company}
+          />
+        </Field>
+        <Field label="Status">
           <select
             className="field-control"
-            onChange={(event) => updateDraft("resumeId", event.target.value)}
-            value={draft.resumeId}
+            onChange={(event) =>
+              updateDraft("status", event.target.value as ApplicationStatus)
+            }
+            value={draft.status}
           >
-            <option value="">Unassigned</option>
-            {resumes.map((resume) => (
-              <option key={resume.id} value={resume.id}>
-                {resume.displayName}
+            {APPLICATION_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
               </option>
             ))}
           </select>
-          <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Upload aria-hidden="true" size={16} />
-              Upload new resume
-            </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <input
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control md:col-span-2"
-                onChange={(event) =>
-                  setResumeUploadFile(event.target.files?.[0] ?? null)
-                }
-                type="file"
-              />
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateDraft("resumeUploadName", event.target.value)
-                }
-                placeholder="Display name"
-                type="text"
-                value={draft.resumeUploadName}
-              />
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateDraft("resumeUploadVersion", event.target.value)
-                }
-                placeholder="Version label"
-                type="text"
-                value={draft.resumeUploadVersion}
-              />
-            </div>
-            {resumeUploadError ? (
-              <p className="mt-2 text-xs font-medium text-destructive">
-                {resumeUploadError}
-              </p>
-            ) : null}
-          </div>
         </Field>
-        <Field label="Cover Letter">
+        {draft.status === "Offered" ? (
+          <Field label="Offer Deadline">
+            <input
+              className="field-control"
+              onChange={(event) =>
+                updateDraft("offerDeadline", event.target.value)
+              }
+              type="datetime-local"
+              value={draft.offerDeadline}
+            />
+          </Field>
+        ) : null}
+        <Field className="md:col-span-2" label="Job Description">
+          <textarea
+            className="field-control min-h-32 resize-y"
+            onChange={(event) => updateDraft("jobDescription", event.target.value)}
+            value={draft.jobDescription}
+          />
+        </Field>
+      </FormSection>
+      <FormSection id="edit-section-application" title="Application">
+        <DateField
+          label="Date Applied"
+          name="dateApplied"
+          draft={draft}
+          setDraft={setDraft}
+        />
+        <Field label="Application URL">
+          <input
+            className="field-control"
+            onChange={(event) => updateDraft("applicationUrl", event.target.value)}
+            type="url"
+            value={draft.applicationUrl}
+          />
+        </Field>
+        <Field label="Source">
           <select
             className="field-control"
-            onChange={(event) => updateDraft("coverLetterId", event.target.value)}
-            value={draft.coverLetterId}
+            onChange={(event) => updateDraft("source", event.target.value)}
+            value={draft.source}
           >
-            <option value="">Unassigned</option>
-            {coverLetters.map((coverLetter) => (
-              <option key={coverLetter.id} value={coverLetter.id}>
-                {coverLetter.displayName}
+            <option value=""></option>
+            {APPLICATION_SOURCES.map((source) => (
+              <option key={source} value={source}>
+                {source}
               </option>
             ))}
           </select>
-          <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Upload aria-hidden="true" size={16} />
-              Upload new cover letter
-            </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <input
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="field-control md:col-span-2"
-                onChange={(event) =>
-                  setCoverLetterUploadFile(event.target.files?.[0] ?? null)
-                }
-                type="file"
-              />
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateDraft("coverLetterUploadName", event.target.value)
-                }
-                placeholder="Display name"
-                type="text"
-                value={draft.coverLetterUploadName}
-              />
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateDraft("coverLetterUploadVersion", event.target.value)
-                }
-                placeholder="Version label"
-                type="text"
-                value={draft.coverLetterUploadVersion}
-              />
-            </div>
-            {coverLetterUploadError ? (
-              <p className="mt-2 text-xs font-medium text-destructive">
-                {coverLetterUploadError}
-              </p>
-            ) : null}
-          </div>
         </Field>
-      </div>
-      <Field label="Application URL">
-        <input
-          className="field-control"
-          onChange={(event) => updateDraft("applicationUrl", event.target.value)}
-          type="url"
-          value={draft.applicationUrl}
+        <Field label="Location">
+          <input
+            className="field-control"
+            onChange={(event) => updateDraft("location", event.target.value)}
+            value={draft.location}
+          />
+        </Field>
+        <Field label="Work Mode">
+          <select
+            className="field-control"
+            onChange={(event) => updateDraft("workMode", event.target.value as WorkMode)}
+            value={draft.workMode}
+          >
+            <option value="unknown">Unknown</option>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="onsite">Onsite</option>
+          </select>
+        </Field>
+        <Field label="Job Type">
+          <select
+            className="field-control"
+            onChange={(event) => updateDraft("jobType", event.target.value as JobType)}
+            value={draft.jobType}
+          >
+            <option value="internship">Internship</option>
+            <option value="part-time">Part-time</option>
+            <option value="full-time">Full-time</option>
+            <option value="contract">Contract</option>
+            <option value="other">Other</option>
+          </select>
+        </Field>
+        <DateField
+          label="Role Start"
+          name="roleStartDate"
+          draft={draft}
+          setDraft={setDraft}
         />
-      </Field>
-      <DateField
-        label="Date Applied"
-        name="dateApplied"
-        draft={draft}
-        setDraft={setDraft}
-      />
-      <DateField
-        label="Role Start"
-        name="roleStartDate"
-        draft={draft}
-        setDraft={setDraft}
-      />
-      <DateField
-        label="Role End"
-        name="roleEndDate"
-        draft={draft}
-        setDraft={setDraft}
-      />
-      <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">
-          Follow-up
-        </h3>
-        <FollowUpScheduleControls
-          date={draft.followUpDate}
-          error={followUpError}
-          onDateChange={(value) => {
-            onFollowUpChange();
-            updateDraft("followUpDate", value);
-          }}
-          onRequirementChange={(value) => {
-            onFollowUpChange();
-            updateDraft("followUpNeeded", value === "compulsory");
-          }}
-          requirement={draft.followUpNeeded ? "compulsory" : "optional"}
+        <DateField
+          label="Role End"
+          name="roleEndDate"
+          draft={draft}
+          setDraft={setDraft}
         />
-      </section>
-      <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">
-          Follow-up auto-reset
-        </h3>
-        <FollowUpAutoResetControls
-          defaultPromptDays={7}
-          enabled={draft.followUpAutoResetEnabled}
-          error={followUpAutoResetError}
-          onEnabledChange={(value) => {
-            onFollowUpAutoResetChange();
-            updateDraft("followUpAutoResetEnabled", value);
-          }}
-          onPromptDaysChange={(value) => {
-            onFollowUpAutoResetChange();
-            updateDraft("followUpPromptDays", value);
-          }}
-          promptDays={draft.followUpPromptDays}
-        />
-      </section>
-      <Field className="md:col-span-2" label="Job Description">
-        <textarea
-          className="field-control min-h-32 resize-y"
-          onChange={(event) => updateDraft("jobDescription", event.target.value)}
-          value={draft.jobDescription}
-        />
-      </Field>
-      <Field className="md:col-span-2" label="Notes">
-        <textarea
-          className="field-control min-h-28 resize-y"
-          onChange={(event) => updateDraft("notes", event.target.value)}
-          value={draft.notes}
-        />
-      </Field>
+      </FormSection>
+      <FormSection id="edit-section-documents" title="Documents">
+        <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+          <Field label="Resume">
+            <select
+              className="field-control"
+              onChange={(event) => updateDraft("resumeId", event.target.value)}
+              value={draft.resumeId}
+            >
+              <option value="">Unassigned</option>
+              {resumes.map((resume) => (
+                <option key={resume.id} value={resume.id}>
+                  {resume.displayName}
+                </option>
+              ))}
+            </select>
+            <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Upload aria-hidden="true" size={16} />
+                Upload new resume
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <input
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="field-control md:col-span-2"
+                  onChange={(event) =>
+                    setResumeUploadFile(event.target.files?.[0] ?? null)
+                  }
+                  type="file"
+                />
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateDraft("resumeUploadName", event.target.value)
+                  }
+                  placeholder="Display name"
+                  type="text"
+                  value={draft.resumeUploadName}
+                />
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateDraft("resumeUploadVersion", event.target.value)
+                  }
+                  placeholder="Version label"
+                  type="text"
+                  value={draft.resumeUploadVersion}
+                />
+              </div>
+              {resumeUploadError ? (
+                <p className="mt-2 text-xs font-medium text-destructive">
+                  {resumeUploadError}
+                </p>
+              ) : null}
+            </div>
+          </Field>
+          <Field label="Cover Letter">
+            <select
+              className="field-control"
+              onChange={(event) => updateDraft("coverLetterId", event.target.value)}
+              value={draft.coverLetterId}
+            >
+              <option value="">Unassigned</option>
+              {coverLetters.map((coverLetter) => (
+                <option key={coverLetter.id} value={coverLetter.id}>
+                  {coverLetter.displayName}
+                </option>
+              ))}
+            </select>
+            <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Upload aria-hidden="true" size={16} />
+                Upload new cover letter
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <input
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="field-control md:col-span-2"
+                  onChange={(event) =>
+                    setCoverLetterUploadFile(event.target.files?.[0] ?? null)
+                  }
+                  type="file"
+                />
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateDraft("coverLetterUploadName", event.target.value)
+                  }
+                  placeholder="Display name"
+                  type="text"
+                  value={draft.coverLetterUploadName}
+                />
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateDraft("coverLetterUploadVersion", event.target.value)
+                  }
+                  placeholder="Version label"
+                  type="text"
+                  value={draft.coverLetterUploadVersion}
+                />
+              </div>
+              {coverLetterUploadError ? (
+                <p className="mt-2 text-xs font-medium text-destructive">
+                  {coverLetterUploadError}
+                </p>
+              ) : null}
+            </div>
+          </Field>
+        </div>
+      </FormSection>
+      <FormSection id="edit-section-follow-up" title="Follow-up">
+        <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+          <h4 className="mb-3 text-sm font-semibold text-foreground">
+            Schedule
+          </h4>
+          <FollowUpScheduleControls
+            date={draft.followUpDate}
+            error={followUpError}
+            onDateChange={(value) => {
+              onFollowUpChange();
+              updateDraft("followUpDate", value);
+            }}
+            onRequirementChange={(value) => {
+              onFollowUpChange();
+              updateDraft("followUpNeeded", value === "compulsory");
+            }}
+            requirement={draft.followUpNeeded ? "compulsory" : "optional"}
+          />
+        </section>
+        <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+          <h4 className="mb-3 text-sm font-semibold text-foreground">
+            Auto-reset
+          </h4>
+          <FollowUpAutoResetControls
+            defaultPromptDays={7}
+            enabled={draft.followUpAutoResetEnabled}
+            error={followUpAutoResetError}
+            onEnabledChange={(value) => {
+              onFollowUpAutoResetChange();
+              updateDraft("followUpAutoResetEnabled", value);
+            }}
+            onPromptDaysChange={(value) => {
+              onFollowUpAutoResetChange();
+              updateDraft("followUpPromptDays", value);
+            }}
+            promptDays={draft.followUpPromptDays}
+          />
+        </section>
+      </FormSection>
+      <FormSection id="edit-section-other" title="Other">
+        <Field label="Priority">
+          <select
+            className="field-control"
+            onChange={(event) =>
+              updateDraft("priority", event.target.value as Priority)
+            }
+            value={draft.priority}
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+        <Field label="Salary / Pay">
+          <input
+            className="field-control"
+            onChange={(event) => updateDraft("salary", event.target.value)}
+            type="text"
+            value={draft.salary}
+          />
+        </Field>
+        <Field className="md:col-span-2" label="Notes">
+          <textarea
+            className="field-control min-h-28 resize-y"
+            onChange={(event) => updateDraft("notes", event.target.value)}
+            value={draft.notes}
+          />
+        </Field>
+      </FormSection>
     </div>
   );
 }
