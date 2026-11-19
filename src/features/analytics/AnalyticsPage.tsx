@@ -175,17 +175,15 @@ export function AnalyticsPage({
           <div className="flex min-w-0 items-center gap-3">
             <BarChart3 aria-hidden="true" className="text-muted" size={22} />
             <div className="min-w-0">
+              {/* The page header already says "Analytics". */}
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Analytics
-                </h2>
                 <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold uppercase text-info">
                   Beta
                 </span>
+                <p className="text-sm text-muted">
+                  Local snapshots from your tracker data.
+                </p>
               </div>
-              <p className="mt-1 text-sm text-muted">
-                Local snapshots from your tracker data.
-              </p>
             </div>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">

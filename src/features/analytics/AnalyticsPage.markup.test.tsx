@@ -89,3 +89,20 @@ describe("phone chart toggles", () => {
     expect(source).toContain("inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition max-md:min-h-11");
   });
 });
+
+describe("Analytics heading (#266)", () => {
+  it("leaves Analytics to the page header and keeps the Beta badge and description", () => {
+    const markup = renderPage();
+
+    expect(markup).not.toMatch(/<h[1-6][^>]*>Analytics<\/h[1-6]>/);
+    expect(markup).toContain(">Beta</span>");
+    expect(markup).toContain("Local snapshots from your tracker data.");
+  });
+
+  it("puts chart titles directly under the page h1, with no skipped level", () => {
+    const levels = [...renderPage().matchAll(/<h([1-6])\b/g)].map((match) => Number(match[1]));
+
+    expect(levels.length).toBeGreaterThan(0);
+    expect(new Set(levels)).toEqual(new Set([2]));
+  });
+});
