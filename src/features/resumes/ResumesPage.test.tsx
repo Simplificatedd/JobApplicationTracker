@@ -137,7 +137,28 @@ describe("document upload panel on phones", () => {
   it("gives the phone Upload and name/version buttons 44px targets", () => {
     const markup = renderPage();
 
-    expect(markup).toMatch(/class="[^"]*max-md:h-11[^"]*"[^>]*><svg[\s\S]*?<\/svg>Upload<\/button>/);
+    expect(markup).toMatch(/class="[^"]*max-md:h-11[^"]*"[^>]*><svg[\s\S]*?<\/svg>Upload resume<\/button>/);
     expect(markup).toMatch(/class="[^"]*max-md:h-11 md:hidden"[^>]*>[\s\S]*?Add name and version<\/button>/);
+  });
+});
+
+// #264: say what the upload controls do.
+describe("upload wording (#264)", () => {
+  it.each([
+    ["resume", "Upload resume"],
+    ["cover letter", "Upload cover letter"],
+  ] as const)("names the %s button after the header action", (documentKind, label) => {
+    expect(renderPage({ documentKind })).toMatch(new RegExp(`</svg>${label}</button>`));
+  });
+
+  it("explains that name and version are optional and picking a file starts the upload", () => {
+    const markup = renderPage();
+    const hintId = /<p class="mt-2 text-xs text-muted" id="([^"]+)">Optional: add a name and version, then choose a PDF or DOCX file. Uploading starts when you pick the file.<\/p>/.exec(
+      markup.replace(/\s+/g, " "),
+    )?.[1];
+
+    expect(hintId).toBeTruthy();
+    expect(markup).toContain(`aria-describedby="${hintId}"`);
+    expect(markup).toContain(">Display name<");
   });
 });
