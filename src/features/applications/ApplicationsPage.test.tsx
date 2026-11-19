@@ -730,6 +730,17 @@ describe("Show full job titles setting (#273)", () => {
     expect(titleTags(on)).toHaveLength(2);
     expect(titleTags(on).every((tag) => tag.includes(wrapClass))).toBe(true);
   });
+
+  it("lines the desktop Archived badge up with a wrapped title's first line (#275)", () => {
+    const html = renderPage("", {
+      applications: [{ ...titleMatch, archivedAt: "2026-09-03T00:00:00.000Z" }],
+      settings: { ...DEFAULT_USER_SETTINGS, showFullJobTitles: true },
+      tablePreferences: { ...tablePreferences, includeArchived: true },
+    });
+    const wrapper = /<span class="(flex min-w-0 items-center gap-2[^"]*)"><span[^>]*>Software Engineer<\/span><span[^>]*>Archived</.exec(html);
+
+    expect(wrapper?.[1]).toContain("[[data-full-job-titles=true]_&amp;]:items-start");
+  });
 });
 
 describe("summary tile colours (#256)", () => {
