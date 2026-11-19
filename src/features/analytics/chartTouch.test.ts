@@ -75,7 +75,7 @@ describe.each(charts)("%s on touch screens", (_name, render) => {
 });
 
 describe("activity heatmap on touch screens", () => {
-  it("keeps a tapped day's summary when the finger lifts and clears for a mouse", async () => {
+  async function renderHeatmap() {
     const { AnalyticsPage } = await import("./AnalyticsPage");
     const { DEFAULT_ANALYTICS_SETTINGS, DEFAULT_USER_SETTINGS } = await import("../../lib/domain");
     const { application } = await import("../../test/assessmentFixtures");
@@ -90,12 +90,24 @@ describe("activity heatmap on touch screens", () => {
       applications: [{ ...application, dateApplied: "2026-09-20" }], assessments: [], interviews: [],
       onUpdateAnalyticsSettings: vi.fn(), userSettings: DEFAULT_USER_SETTINGS,
     });
-    const heatmap = callNamed(callNamed(page, "ActivityCalendar"), "ActivityHeatmap");
+    return callNamed(callNamed(page, "ActivityCalendar"), "ActivityHeatmap");
+  }
+
+  it("keeps a tapped day's summary when the finger lifts and clears for a mouse", async () => {
+    const heatmap = await renderHeatmap();
     const day = elements(heatmap).find((e) => e.type === "button" && typeof e.props.onPointerLeave === "function")!;
 
     (day.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "touch" });
     expect(state.setActive).not.toHaveBeenCalled();
     (day.props.onPointerLeave as (event: { pointerType: string }) => void)({ pointerType: "mouse" });
+    expect(state.setActive).toHaveBeenCalledWith(null);
+  });
+
+  it("clears a tapped day's summary when the heatmap scrolls", async () => {
+    const heatmap = await renderHeatmap();
+    const scroller = elements(heatmap).find((e) => typeof e.props.onScroll === "function")!;
+
+    (scroller.props.onScroll as () => void)();
     expect(state.setActive).toHaveBeenCalledWith(null);
   });
 });
