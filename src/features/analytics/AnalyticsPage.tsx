@@ -150,6 +150,8 @@ export function AnalyticsPage({
     deriveApplicationsBySource(rangedApplications),
   );
   const [isCustomizing, setIsCustomizing] = useState(false);
+  const rangeStripRef = useRef<HTMLDivElement>(null);
+  useScrollStrip(rangeStripRef, 2);
   const customizePanelId = useId();
   const visibleCharts = new Set(analyticsSettings.visibleCharts);
   const visibleChartCount = chartOptions.filter((chart) =>
@@ -187,21 +189,30 @@ export function AnalyticsPage({
             </div>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-            <SegmentedControl
-              label="Analytics date range"
-              onChange={setDateRange}
-              options={DATE_RANGE_OPTIONS}
-              value={dateRange}
-            />
-            <SegmentedControl
-              label="Analytics time grouping"
-              onChange={(value) =>
-                onUpdateAnalyticsSettings({ defaultTimeGrouping: value })
-              }
-              options={TIME_GROUPING_OPTIONS}
-              value={analyticsSettings.defaultTimeGrouping}
-            />
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50 max-md:h-11">
+            {/* Below md the two range controls share one sideways-scrolling
+                row; from md the wrapper drops out of the layout. */}
+            <div
+              className="scroll-strip flex min-w-0 gap-2 max-md:w-full md:contents"
+              ref={rangeStripRef}
+            >
+              <SegmentedControl
+                label="Analytics date range"
+                onChange={setDateRange}
+                options={DATE_RANGE_OPTIONS}
+                value={dateRange}
+              />
+              <SegmentedControl
+                label="Analytics time grouping"
+                onChange={(value) =>
+                  onUpdateAnalyticsSettings({ defaultTimeGrouping: value })
+                }
+                options={TIME_GROUPING_OPTIONS}
+                value={analyticsSettings.defaultTimeGrouping}
+              />
+            </div>
+            {/* On phones these two share the second row, and Customize wraps
+                below rather than squeezing either label. */}
+            <label className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-slate-50 touch:h-11 max-md:flex-1 max-md:gap-1.5 max-md:px-2">
               <input
                 checked={analyticsSettings.includeArchived}
                 className="h-4 w-4 rounded border-border text-primary"
@@ -217,7 +228,7 @@ export function AnalyticsPage({
             <button
               aria-controls={customizePanelId}
               aria-expanded={isCustomizing}
-              className={`touch-target inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition max-md:h-11 ${
+              className={`touch-target inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-medium transition touch:h-11 max-md:flex-1 max-md:gap-1.5 max-md:px-2 ${
                 isCustomizing
                   ? "border-primary bg-blue-50 text-primary"
                   : "border-border text-foreground hover:bg-slate-50"
@@ -225,7 +236,8 @@ export function AnalyticsPage({
               onClick={() => setIsCustomizing((current) => !current)}
               type="button"
             >
-              <Settings2 aria-hidden="true" size={16} />
+              {/* Decorative; hidden on phones so both second-row controls fit. */}
+              <Settings2 aria-hidden="true" className="max-sm:hidden" size={16} />
               Customize
               <span className="rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-muted">
                 {visibleChartCount}/{chartOptions.length}
@@ -623,14 +635,16 @@ function SegmentedControl<Value extends string>({
   return (
     <div
       aria-label={label}
-      className="scroll-strip inline-flex h-9 max-w-full items-center rounded-lg border border-border bg-background p-1 touch:h-auto"
+      // Inside the phone row strip the row scrolls, so the control keeps its
+      // full width there.
+      className="scroll-strip inline-flex h-9 max-w-full shrink-0 items-center rounded-lg border border-border bg-background p-1 touch:h-11 max-md:max-w-none"
       ref={stripRef}
       role="radiogroup"
     >
       {options.map((option) => (
         <button
           aria-checked={option.value === value}
-          className={`h-full shrink-0 whitespace-nowrap rounded-md px-2.5 touch:h-11 text-sm font-medium transition sm:px-3 ${
+          className={`touch-target h-full shrink-0 whitespace-nowrap rounded-md px-2.5 text-sm font-medium transition sm:px-3 ${
             option.value === value
               ? "bg-surface text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
