@@ -178,8 +178,18 @@ may still ask for a payment method to enable some products. See
 <summary><strong>Can friends or classmates use my deployment?</strong></summary>
 
 Yes. Add their emails to the Access Allow policy. Each person's tracker data and
-files are kept separate by their verified sign-in, so nobody sees anyone else's
-applications.
+files are kept separate by their verified sign-in, so other users can't see
+anyone else's applications in the app.
+
+Two things to tell them first:
+
+- As the Cloudflare account owner, you can read everyone's tracker data and
+  files in the Cloudflare dashboard (D1 and R2).
+- Everyone shares one set of storage limits. Each person can store up to
+  100 MiB of resumes, but the 5 GiB resume total, the 512 MiB tracker data total
+  and the monthly R2 read and write budgets cover the whole deployment, so one
+  heavy user can use up room the others need. See
+  [usage limits](docs/privacy-and-security.md#cost-and-usage-guardrails).
 
 </details>
 
