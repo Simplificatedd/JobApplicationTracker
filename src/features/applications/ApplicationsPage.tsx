@@ -136,6 +136,8 @@ export function ApplicationsPage({
   const [contactsApplicationId, setContactsApplicationId] = useState<
     string | null
   >(null);
+  // Opened from a job's Add contact button: start in the new contact's Name.
+  const [focusNewContact, setFocusNewContact] = useState(false);
   const {
     actionError: resumeActionError,
     downloadResume,
@@ -507,7 +509,10 @@ export function ApplicationsPage({
         onArchiveApplication={archiveApplication}
         onDeleteApplication={deleteAndCloseApplication}
         onOpenApplication={setSelectedApplicationId}
-        onOpenContacts={setContactsApplicationId}
+        onOpenContacts={(id) => {
+          setFocusNewContact(false);
+          setContactsApplicationId(id);
+        }}
         onColumnWidthsChange={setColumnWidths}
         onRestoreApplication={restoreApplication}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
@@ -554,6 +559,10 @@ export function ApplicationsPage({
           onDeleteInterview={deleteInterview}
           onDownloadCoverLetter={downloadCoverLetter}
           onDownloadResume={downloadResume}
+          onOpenContacts={() => {
+            setFocusNewContact(true);
+            setContactsApplicationId(selectedApplication.id);
+          }}
           onPreviewResume={previewResume}
           onPreviewCoverLetter={previewCoverLetter}
           onUpdate={updateApplication}
@@ -577,6 +586,7 @@ export function ApplicationsPage({
             (contact) => contact.applicationId === contactsApplication.id,
           )}
           displayMode={settings.contactsDisplayMode}
+          focusNewContact={focusNewContact}
           onAddContact={addContact}
           onClose={() => setContactsApplicationId(null)}
           onDeleteContact={deleteContact}

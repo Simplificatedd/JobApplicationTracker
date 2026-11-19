@@ -731,3 +731,112 @@ describe("Edit form sections (#259)", () => {
     ]);
   });
 });
+
+describe("Edit notes in the detail panel (#288)", () => {
+  function setup(overrides: Partial<ComponentProps<typeof ApplicationDetailPanel>> = {}) {
+    const props = {
+      ...detailProps(),
+      application: { ...application, notes: "Call Friday" },
+      onUpdate: vi.fn().mockResolvedValue({ ok: true }),
+      ...overrides,
+    };
+    // The panel, its read-only details and the notes section, with stable hook slots.
+    const view = () => render(() => {
+      const panel = ApplicationDetailPanel(props);
+      const details = named(panel, "ReadOnlyDetails");
+      const notes = named(call(details.type, details.props), "NotesSection");
+      return { panel, notes: call(notes.type, notes.props) };
+    });
+    const notes = () => view().notes;
+    const textarea = () => elements(notes()).find(e => e.type === "textarea");
+    const type = (value: string) => call(textarea()!.props.onChange, { target: { value } });
+    return { props, view, notes, textarea, type };
+  }
+
+  it("edits the current notes in place and saves only the notes, trimmed", async () => {
+    const { props, notes, textarea, type } = setup();
+    call(button(notes(), "Edit notes").props.onClick);
+    expect(textarea()!.props.value).toBe("Call Friday");
+    expect(button(notes(), "Edit notes")).toBeUndefined();
+    type("  Call Friday\nAsk about team  ");
+    await call(button(notes(), "Save notes").props.onClick);
+    expect(props.onUpdate).toHaveBeenCalledWith(
+      application.id, { notes: "Call Friday\nAsk about team" }, undefined, undefined, props.application,
+    );
+    expect(textarea()).toBeUndefined();
+  });
+
+  it("removes the notes when cleared, and saves nothing when unchanged", async () => {
+    const { props, notes, type } = setup();
+    call(button(notes(), "Edit notes").props.onClick);
+    await call(button(notes(), "Save notes").props.onClick);
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    call(button(notes(), "Edit notes").props.onClick);
+    type("");
+    await call(button(notes(), "Save notes").props.onClick);
+    expect((props.onUpdate as Mock).mock.calls[0][1]).toEqual({ notes: undefined });
+  });
+
+  it("asks before Cancel discards changed notes", () => {
+    const { props, notes, textarea, type } = setup();
+    call(button(notes(), "Edit notes").props.onClick);
+    type("Changed");
+    call(button(notes(), "Cancel").props.onClick);
+    call(named(notes(), "UnsavedChangesDialog").props.onCancel);
+    expect(textarea()!.props.value).toBe("Changed");
+    call(button(notes(), "Cancel").props.onClick);
+    call(named(notes(), "UnsavedChangesDialog").props.onConfirm);
+    expect(textarea()).toBeUndefined();
+    expect(props.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("closes without asking when nothing changed", () => {
+    const { notes, textarea } = setup();
+    call(button(notes(), "Edit notes").props.onClick);
+    call(button(notes(), "Cancel").props.onClick);
+    expect(named(notes(), "UnsavedChangesDialog")).toBeUndefined();
+    expect(textarea()).toBeUndefined();
+  });
+
+  it("keeps the panel open while notes are being edited", () => {
+    const { props, view, notes } = setup();
+    call(button(notes(), "Edit notes").props.onClick);
+    view();
+    call(named(view().panel, "NativeModal").props.onRequestClose);
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows a rejected save and keeps the draft", async () => {
+    const { props, notes, textarea, type } = setup();
+    (props.onUpdate as Mock).mockResolvedValue({ ok: false, error: "Notes changed in another session." });
+    call(button(notes(), "Edit notes").props.onClick);
+    type("Mine");
+    await call(button(notes(), "Save notes").props.onClick);
+    expect(elements(notes()).find(e => e.props.role === "alert")?.props.children).toBe("Notes changed in another session.");
+    expect(textarea()!.props.value).toBe("Mine");
+  });
+
+  it("offers no Edit notes on an archived application", () => {
+    const { notes } = setup({ application: { ...application, notes: "x", archivedAt: application.updatedAt } });
+    expect(button(notes(), "Edit notes")).toBeUndefined();
+  });
+});
+
+describe("Add contact in the detail panel (#287)", () => {
+  const details = (props: ComponentProps<typeof ApplicationDetailPanel>) => render(() => {
+    const element = named(ApplicationDetailPanel(props), "ReadOnlyDetails");
+    return call(element.type, element.props);
+  });
+
+  it("opens the Contacts panel from the Contacts section", () => {
+    const props = { ...detailProps(), onOpenContacts: vi.fn() };
+    call(button(details(props), "Add contact").props.onClick);
+    expect(props.onOpenContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the button on archived applications and when nothing can open contacts", () => {
+    const archived = { ...detailProps(), application: { ...application, archivedAt: application.updatedAt }, onOpenContacts: vi.fn() };
+    expect(button(details(archived), "Add contact")).toBeUndefined();
+    expect(button(details(detailProps()), "Add contact")).toBeUndefined();
+  });
+});
