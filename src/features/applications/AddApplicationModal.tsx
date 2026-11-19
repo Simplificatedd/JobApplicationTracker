@@ -496,6 +496,9 @@ export function AddApplicationModal({
           id="add-application-form"
           onSubmit={handleSubmit}
         >
+          <p className="mb-4 text-xs text-muted">
+            <span className="text-destructive">*</span> Required
+          </p>
           <div className="grid gap-6">
             <FormSection id="add-section-role" title="Role">
               <Field label="Job title" required>

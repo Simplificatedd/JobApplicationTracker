@@ -125,3 +125,13 @@ describe("Add job upload fields (#259)", () => {
     expect(markup).not.toMatch(/<label(?:(?!<\/label>).)*<label/s);
   });
 });
+
+describe("Add job required note (#259)", () => {
+  it("explains the asterisk before the first section", () => {
+    const markup = renderModal();
+    const note = markup.indexOf('<span class="text-destructive">*</span> Required</p>');
+
+    expect(note).toBeGreaterThan(-1);
+    expect(note).toBeLessThan(markup.indexOf('id="add-section-role"'));
+  });
+});
