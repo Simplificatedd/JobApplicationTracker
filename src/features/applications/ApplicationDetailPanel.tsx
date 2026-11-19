@@ -546,7 +546,7 @@ export function ApplicationDetailPanel({
 
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
         {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the open edit before closing details.</p> : null}
-        <div className="flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
           {isEditing ? (
             <EditForm
               coverLetterUploadError={coverLetterUploadError}

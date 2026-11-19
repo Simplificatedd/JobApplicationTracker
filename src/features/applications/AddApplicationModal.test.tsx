@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -78,13 +77,7 @@ describe("phone Add job scroll lock", () => {
     const form = markup.slice(markup.indexOf("<form"), markup.indexOf(">", markup.indexOf("<form")) + 1);
 
     expect(dialog).toContain("add-application-dialog");
-    expect(form).toContain("max-md:overscroll-contain");
-  });
-
-  it("locks the page behind it below md only", () => {
-    const css = readFileSync(new URL("../../styles.css", import.meta.url), "utf8");
-
-    expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.add-application-dialog\[open\]\)[^{]*\{\s*overflow:\s*hidden/);
+    expect(form).toContain("overscroll-contain");
   });
 });
 

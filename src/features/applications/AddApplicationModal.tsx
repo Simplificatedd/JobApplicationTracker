@@ -500,7 +500,7 @@ export function AddApplicationModal({
         </div>
 
         <form
-          className="overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6"
+          className="overflow-y-auto overscroll-contain px-4 py-5 sm:px-6"
           id="add-application-form"
           onSubmit={handleSubmit}
         >
