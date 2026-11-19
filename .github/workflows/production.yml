@@ -47,13 +47,13 @@ jobs:
       PRODUCTION_R2_BUCKET: ${{ vars.PRODUCTION_R2_BUCKET }}
       WRANGLER_SEND_METRICS: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.RELEASE_SHA }}
           # Full history lets the preflight compare against the deployed commit.
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
           cache: npm
