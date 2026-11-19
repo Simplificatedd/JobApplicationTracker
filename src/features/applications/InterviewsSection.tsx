@@ -1,5 +1,5 @@
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import {
   getInterviewTypeLabel,
   INTERVIEW_MODE_OPTIONS,
@@ -14,6 +14,7 @@ import {
   shouldShowProctored,
 } from "../../lib/interviews";
 import { getSafeHttpUrl } from "../../lib/urls";
+import { getMeetingPlatformName } from "../../lib/meetingPlatforms";
 import type { MutationResult } from "../../store/useTrackerStore";
 import type {
   Application,
@@ -345,14 +346,21 @@ function InterviewForm({
   isNew: boolean;
   isSaving: boolean;
   onCancel: () => void;
-  onChange: (draft: InterviewDraft) => void;
+  onChange: Dispatch<SetStateAction<InterviewDraft | null>>;
   onSave: () => void;
 }) {
   function update<Key extends keyof InterviewDraft>(
     key: Key,
     value: InterviewDraft[Key],
   ) {
-    onChange({ ...draft, [key]: value });
+    onChange((current) => {
+      if (!current) return current;
+      const next = { ...current, [key]: value };
+      if (key === "meetingUrl" && !current.platform.trim()) {
+        next.platform = getMeetingPlatformName(next.meetingUrl) ?? current.platform;
+      }
+      return next;
+    });
   }
 
   function updateStageType(value: InterviewType) {
