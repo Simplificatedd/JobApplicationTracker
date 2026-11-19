@@ -47,6 +47,7 @@ import {
   FollowUpAutoResetControls,
   FollowUpScheduleControls,
 } from "./FollowUpControls";
+import { FormSection } from "./FormSection";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface AddApplicationModalProps {
@@ -495,515 +496,525 @@ export function AddApplicationModal({
           id="add-application-form"
           onSubmit={handleSubmit}
         >
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Job Title" required>
-              <input
-                data-initial-focus
-                aria-describedby={titleError ? "job-title-error" : undefined}
-                aria-invalid={titleError ? "true" : "false"}
-                className="field-control"
-                onChange={(event) => updateForm("jobTitle", event.target.value)}
-                required
-                type="text"
-                value={form.jobTitle}
-              />
-              {titleError ? (
-                <p className="mt-1 text-xs font-medium text-destructive" id="job-title-error">
-                  {titleError}
-                </p>
-              ) : null}
-            </Field>
+          <div className="grid gap-6">
+            <FormSection id="add-section-role" title="Role">
+              <Field label="Job Title" required>
+                <input
+                  data-initial-focus
+                  aria-describedby={titleError ? "job-title-error" : undefined}
+                  aria-invalid={titleError ? "true" : "false"}
+                  className="field-control"
+                  onChange={(event) => updateForm("jobTitle", event.target.value)}
+                  required
+                  type="text"
+                  value={form.jobTitle}
+                />
+                {titleError ? (
+                  <p className="mt-1 text-xs font-medium text-destructive" id="job-title-error">
+                    {titleError}
+                  </p>
+                ) : null}
+              </Field>
 
-            <Field className="md:col-span-2" label="Job Description">
-              <textarea
-                className="field-control min-h-28 resize-y"
-                onChange={(event) =>
-                  updateForm("jobDescription", event.target.value)
-                }
-                value={form.jobDescription}
-              />
-            </Field>
-
-            <Field label="Company">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("company", event.target.value)}
-                type="text"
-                value={form.company}
-              />
-            </Field>
-
-            <Field label="Status">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("status", event.target.value as ApplicationStatus | "")
-                }
-                value={form.status}
-              >
-                {APPLICATION_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {form.status === "Offered" ? (
-              <Field label="Offer Deadline">
+              <Field label="Company">
                 <input
                   className="field-control"
-                  onChange={(event) =>
-                    updateForm("offerDeadline", event.target.value)
-                  }
-                  type="datetime-local"
-                  value={form.offerDeadline}
+                  onChange={(event) => updateForm("company", event.target.value)}
+                  type="text"
+                  value={form.company}
                 />
               </Field>
-            ) : null}
 
-            {form.status === "Online Assessment" ? (
-              <p className="text-sm text-muted md:col-span-2">
-                Add individual assessments in the job’s Assessments section
-                after saving.
-              </p>
-            ) : null}
-            {form.status === "Interviewing" ? (
-              <section
-                aria-labelledby="initial-interview-details-heading"
-                className="grid gap-4 rounded-lg border border-border bg-surface-raised p-4 md:col-span-2 md:grid-cols-2"
-              >
-                <h3
-                  className="text-sm font-semibold text-foreground md:col-span-2"
-                  id="initial-interview-details-heading"
+              <Field label="Status">
+                <select
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("status", event.target.value as ApplicationStatus | "")
+                  }
+                  value={form.status}
                 >
-                  Interview or assessment details
-                </h3>
+                  {APPLICATION_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-                <Field label="Round number">
-                  <input
-                    aria-describedby={
-                      interviewRoundError ? "interview-round-error" : undefined
-                    }
-                    aria-invalid={interviewRoundError ? "true" : "false"}
-                    className="field-control"
-                    min="1"
-                    onChange={(event) =>
-                      updateForm("interviewRound", event.target.value)
-                    }
-                    step="1"
-                    type="number"
-                    value={form.interviewRound}
-                  />
-                  {interviewRoundError ? (
-                    <p
-                      className="mt-1 text-xs font-medium text-destructive"
-                      id="interview-round-error"
-                    >
-                      {interviewRoundError}
-                    </p>
-                  ) : null}
-                </Field>
-
-                <Field label="Scheduled date/time">
+              {form.status === "Offered" ? (
+                <Field label="Offer Deadline">
                   <input
                     className="field-control"
                     onChange={(event) =>
-                      updateForm("interviewDateTime", event.target.value)
+                      updateForm("offerDeadline", event.target.value)
                     }
                     type="datetime-local"
-                    value={form.interviewDateTime}
+                    value={form.offerDeadline}
                   />
                 </Field>
+              ) : null}
 
-                <Field label="Stage type">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateInterviewType(
-                        event.target
-                          .value as AddApplicationFormState["interviewType"],
-                      )
-                    }
-                    value={form.interviewType}
+              {form.status === "Online Assessment" ? (
+                <p className="text-sm text-muted md:col-span-2">
+                  Add individual assessments in the job’s Assessments section
+                  after saving.
+                </p>
+              ) : null}
+              {form.status === "Interviewing" ? (
+                <section
+                  aria-labelledby="initial-interview-details-heading"
+                  className="grid gap-4 rounded-lg border border-border bg-surface-raised p-4 md:col-span-2 md:grid-cols-2"
+                >
+                  <h4
+                    className="text-sm font-semibold text-foreground md:col-span-2"
+                    id="initial-interview-details-heading"
                   >
-                    {INTERVIEW_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    Interview or assessment details
+                  </h4>
 
-                <Field label="Format">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateInterviewMode(
-                        event.target
-                          .value as AddApplicationFormState["interviewMode"],
-                      )
-                    }
-                    value={form.interviewMode}
-                  >
-                    {INTERVIEW_MODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Location or address">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewLocation", event.target.value)
-                    }
-                    type="text"
-                    value={form.interviewLocation}
-                  />
-                </Field>
-
-                <Field label="Link">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewMeetingUrl", event.target.value)
-                    }
-                    type="url"
-                    value={form.interviewMeetingUrl}
-                  />
-                </Field>
-
-                <Field label="Platform or provider">
-                  <input
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("interviewPlatform", event.target.value)
-                    }
-                    type="text"
-                    value={form.interviewPlatform}
-                  />
-                </Field>
-
-                {shouldShowProctored(
-                  form.interviewType ?? "unknown",
-                  form.interviewProctored,
-                ) ? (
-                  <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
+                  <Field label="Round number">
                     <input
-                      checked={form.interviewProctored}
-                      className="h-4 w-4 rounded border-border text-primary"
-                      onChange={(event) =>
-                        updateForm("interviewProctored", event.target.checked)
+                      aria-describedby={
+                        interviewRoundError ? "interview-round-error" : undefined
                       }
-                      type="checkbox"
+                      aria-invalid={interviewRoundError ? "true" : "false"}
+                      className="field-control"
+                      min="1"
+                      onChange={(event) =>
+                        updateForm("interviewRound", event.target.value)
+                      }
+                      step="1"
+                      type="number"
+                      value={form.interviewRound}
                     />
-                    <span>This assessment is proctored</span>
-                  </label>
-                ) : null}
+                    {interviewRoundError ? (
+                      <p
+                        className="mt-1 text-xs font-medium text-destructive"
+                        id="interview-round-error"
+                      >
+                        {interviewRoundError}
+                      </p>
+                    ) : null}
+                  </Field>
 
-                <InterviewDeadlineFields
-                  breakpoint="md"
-                  deadline={form.interviewDeadline}
-                  onChange={updateInterviewDeadlineFields}
-                  receivedAt={form.interviewDeadlineReceivedAt}
+                  <Field label="Scheduled date/time">
+                    <input
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("interviewDateTime", event.target.value)
+                      }
+                      type="datetime-local"
+                      value={form.interviewDateTime}
+                    />
+                  </Field>
+
+                  <Field label="Stage type">
+                    <select
+                      className="field-control"
+                      onChange={(event) =>
+                        updateInterviewType(
+                          event.target
+                            .value as AddApplicationFormState["interviewType"],
+                        )
+                      }
+                      value={form.interviewType}
+                    >
+                      {INTERVIEW_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Format">
+                    <select
+                      className="field-control"
+                      onChange={(event) =>
+                        updateInterviewMode(
+                          event.target
+                            .value as AddApplicationFormState["interviewMode"],
+                        )
+                      }
+                      value={form.interviewMode}
+                    >
+                      {INTERVIEW_MODE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Location or address">
+                    <input
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("interviewLocation", event.target.value)
+                      }
+                      type="text"
+                      value={form.interviewLocation}
+                    />
+                  </Field>
+
+                  <Field label="Link">
+                    <input
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("interviewMeetingUrl", event.target.value)
+                      }
+                      type="url"
+                      value={form.interviewMeetingUrl}
+                    />
+                  </Field>
+
+                  <Field label="Platform or provider">
+                    <input
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("interviewPlatform", event.target.value)
+                      }
+                      type="text"
+                      value={form.interviewPlatform}
+                    />
+                  </Field>
+
+                  {shouldShowProctored(
+                    form.interviewType ?? "unknown",
+                    form.interviewProctored,
+                  ) ? (
+                    <label className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground">
+                      <input
+                        checked={form.interviewProctored}
+                        className="h-4 w-4 rounded border-border text-primary"
+                        onChange={(event) =>
+                          updateForm("interviewProctored", event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>This assessment is proctored</span>
+                    </label>
+                  ) : null}
+
+                  <InterviewDeadlineFields
+                    breakpoint="md"
+                    deadline={form.interviewDeadline}
+                    onChange={updateInterviewDeadlineFields}
+                    receivedAt={form.interviewDeadlineReceivedAt}
+                  />
+                </section>
+              ) : null}
+
+              <Field className="md:col-span-2" label="Job Description">
+                <textarea
+                  className="field-control min-h-28 resize-y"
+                  onChange={(event) =>
+                    updateForm("jobDescription", event.target.value)
+                  }
+                  value={form.jobDescription}
+                />
+              </Field>
+            </FormSection>
+
+            <FormSection id="add-section-application" title="Application">
+              <Field label="Applied Date">
+                <input
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("dateApplied", event.target.value)
+                  }
+                  type="date"
+                  value={form.dateApplied}
+                />
+              </Field>
+
+              <Field label="Application URL">
+                <input
+                  className="field-control"
+                  onChange={(event) => updateForm("applicationUrl", event.target.value)}
+                  type="url"
+                  value={form.applicationUrl}
+                />
+              </Field>
+
+              <Field label="Source">
+                <select
+                  className="field-control"
+                  onChange={(event) => updateForm("source", event.target.value)}
+                  value={form.source}
+                >
+                  <option value=""></option>
+                  {APPLICATION_SOURCES.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Location">
+                <div className="flex gap-2">
+                  <input
+                    // The quick location button sits inside this label too, so
+                    // name the field explicitly rather than via the label text.
+                    aria-label="Location"
+                    className="field-control min-w-0 flex-1"
+                    onChange={(event) =>
+                      updateForm("location", event.target.value)
+                    }
+                    type="text"
+                    value={form.location}
+                  />
+                  {quickLocation ? (
+                    <button
+                      aria-label={`Set location to ${quickLocation}`}
+                      className="inline-flex h-10 max-w-[45%] shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
+                      onClick={() => updateForm("location", quickLocation)}
+                      title={`Set location to ${quickLocation}`}
+                      type="button"
+                    >
+                      <MapPin aria-hidden="true" className="shrink-0" size={16} />
+                      <span className="truncate">{quickLocation}</span>
+                    </button>
+                  ) : null}
+                </div>
+              </Field>
+
+              <Field label="Work Mode">
+                <select
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("workMode", event.target.value as WorkMode)
+                  }
+                  value={form.workMode}
+                >
+                  <option value="unknown">Unknown</option>
+                  <option value="remote">Remote</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="onsite">Onsite</option>
+                </select>
+              </Field>
+
+              <Field label="Job Type">
+                <select
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("jobType", event.target.value as JobType)
+                  }
+                  value={form.jobType}
+                >
+                  <option value="internship">Internship</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="other">Other</option>
+                </select>
+              </Field>
+
+              <Field label="Role Start Date">
+                <input
+                  className="field-control"
+                  onChange={(event) => updateForm("roleStartDate", event.target.value)}
+                  type="date"
+                  value={form.roleStartDate}
+                />
+              </Field>
+
+              <Field label="Role End Date">
+                <input
+                  className="field-control"
+                  onChange={(event) => updateForm("roleEndDate", event.target.value)}
+                  type="date"
+                  value={form.roleEndDate}
+                />
+              </Field>
+            </FormSection>
+
+            <FormSection id="add-section-documents" title="Documents">
+              <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                <Field label="Resume">
+                  <select
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("resumeId", event.target.value)
+                    }
+                    value={form.resumeId}
+                  >
+                    <option value="">No resume selected</option>
+                    {resumes.map((resume) => (
+                      <option key={resume.id} value={resume.id}>
+                        {resume.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Upload aria-hidden="true" size={16} />
+                      Upload new resume
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <input
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="field-control md:col-span-2"
+                        onChange={(event) =>
+                          setResumeUploadFile(event.target.files?.[0] ?? null)
+                        }
+                        type="file"
+                      />
+                      <input
+                        className="field-control"
+                        onChange={(event) =>
+                          updateForm("resumeUploadName", event.target.value)
+                        }
+                        placeholder="Display name"
+                        type="text"
+                        value={form.resumeUploadName}
+                      />
+                      <input
+                        className="field-control"
+                        onChange={(event) =>
+                          updateForm("resumeUploadVersion", event.target.value)
+                        }
+                        placeholder="Version label"
+                        type="text"
+                        value={form.resumeUploadVersion}
+                      />
+                    </div>
+                    {resumeUploadError ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">
+                        {resumeUploadError}
+                      </p>
+                    ) : null}
+                  </div>
+                </Field>
+
+                <Field label="Cover Letter">
+                  <select
+                    className="field-control"
+                    onChange={(event) =>
+                      updateForm("coverLetterId", event.target.value)
+                    }
+                    value={form.coverLetterId}
+                  >
+                    <option value="">No cover letter selected</option>
+                    {coverLetters.map((coverLetter) => (
+                      <option key={coverLetter.id} value={coverLetter.id}>
+                        {coverLetter.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Upload aria-hidden="true" size={16} />
+                      Upload new cover letter
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <input
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="field-control md:col-span-2"
+                        onChange={(event) =>
+                          setCoverLetterUploadFile(event.target.files?.[0] ?? null)
+                        }
+                        type="file"
+                      />
+                      <input
+                        className="field-control"
+                        onChange={(event) =>
+                          updateForm("coverLetterUploadName", event.target.value)
+                        }
+                        placeholder="Display name"
+                        type="text"
+                        value={form.coverLetterUploadName}
+                      />
+                      <input
+                        className="field-control"
+                        onChange={(event) =>
+                          updateForm("coverLetterUploadVersion", event.target.value)
+                        }
+                        placeholder="Version label"
+                        type="text"
+                        value={form.coverLetterUploadVersion}
+                      />
+                    </div>
+                    {coverLetterUploadError ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">
+                        {coverLetterUploadError}
+                      </p>
+                    ) : null}
+                  </div>
+                </Field>
+              </div>
+            </FormSection>
+
+            <FormSection id="add-section-follow-up" title="Follow-up">
+              <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+                <h4 className="mb-3 text-sm font-semibold text-foreground">
+                  Schedule
+                </h4>
+                <FollowUpScheduleControls
+                  date={form.followUpDate}
+                  error={followUpError}
+                  onDateChange={(value) => updateForm("followUpDate", value)}
+                  onRequirementChange={(value) =>
+                    updateForm("followUpNeeded", value === "compulsory")
+                  }
+                  requirement={
+                    form.followUpNeeded ? "compulsory" : "optional"
+                  }
                 />
               </section>
-            ) : null}
 
-            <Field label="Applied Date">
-              <input
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("dateApplied", event.target.value)
-                }
-                type="date"
-                value={form.dateApplied}
-              />
-            </Field>
-
-            <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-              <Field label="Resume">
-                <select
-                  className="field-control"
-                  onChange={(event) =>
-                    updateForm("resumeId", event.target.value)
+              <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
+                <h4 className="mb-3 text-sm font-semibold text-foreground">
+                  Auto-reset
+                </h4>
+                <FollowUpAutoResetControls
+                  defaultPromptDays={defaultFollowUpPromptDays}
+                  enabled={form.followUpAutoResetEnabled}
+                  error={followUpAutoResetError}
+                  onEnabledChange={(value) =>
+                    updateForm("followUpAutoResetEnabled", value)
                   }
-                  value={form.resumeId}
-                >
-                  <option value="">No resume selected</option>
-                  {resumes.map((resume) => (
-                    <option key={resume.id} value={resume.id}>
-                      {resume.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Upload aria-hidden="true" size={16} />
-                    Upload new resume
-                  </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <input
-                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="field-control md:col-span-2"
-                      onChange={(event) =>
-                        setResumeUploadFile(event.target.files?.[0] ?? null)
-                      }
-                      type="file"
-                    />
-                    <input
-                      className="field-control"
-                      onChange={(event) =>
-                        updateForm("resumeUploadName", event.target.value)
-                      }
-                      placeholder="Display name"
-                      type="text"
-                      value={form.resumeUploadName}
-                    />
-                    <input
-                      className="field-control"
-                      onChange={(event) =>
-                        updateForm("resumeUploadVersion", event.target.value)
-                      }
-                      placeholder="Version label"
-                      type="text"
-                      value={form.resumeUploadVersion}
-                    />
-                  </div>
-                  {resumeUploadError ? (
-                    <p className="mt-2 text-xs font-medium text-destructive">
-                      {resumeUploadError}
-                    </p>
-                  ) : null}
-                </div>
-              </Field>
-
-              <Field label="Cover Letter">
-                <select
-                  className="field-control"
-                  onChange={(event) =>
-                    updateForm("coverLetterId", event.target.value)
+                  onPromptDaysChange={(value) =>
+                    updateForm("followUpPromptDays", value)
                   }
-                  value={form.coverLetterId}
-                >
-                  <option value="">No cover letter selected</option>
-                  {coverLetters.map((coverLetter) => (
-                    <option key={coverLetter.id} value={coverLetter.id}>
-                      {coverLetter.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Upload aria-hidden="true" size={16} />
-                    Upload new cover letter
-                  </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <input
-                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="field-control md:col-span-2"
-                      onChange={(event) =>
-                        setCoverLetterUploadFile(event.target.files?.[0] ?? null)
-                      }
-                      type="file"
-                    />
-                    <input
-                      className="field-control"
-                      onChange={(event) =>
-                        updateForm("coverLetterUploadName", event.target.value)
-                      }
-                      placeholder="Display name"
-                      type="text"
-                      value={form.coverLetterUploadName}
-                    />
-                    <input
-                      className="field-control"
-                      onChange={(event) =>
-                        updateForm("coverLetterUploadVersion", event.target.value)
-                      }
-                      placeholder="Version label"
-                      type="text"
-                      value={form.coverLetterUploadVersion}
-                    />
-                  </div>
-                  {coverLetterUploadError ? (
-                    <p className="mt-2 text-xs font-medium text-destructive">
-                      {coverLetterUploadError}
-                    </p>
-                  ) : null}
-                </div>
-              </Field>
-            </div>
-
-            <Field label="Location">
-              <div className="flex gap-2">
-                <input
-                  // The quick location button sits inside this label too, so
-                  // name the field explicitly rather than via the label text.
-                  aria-label="Location"
-                  className="field-control min-w-0 flex-1"
-                  onChange={(event) =>
-                    updateForm("location", event.target.value)
-                  }
-                  type="text"
-                  value={form.location}
+                  promptDays={form.followUpPromptDays}
                 />
-                {quickLocation ? (
-                  <button
-                    aria-label={`Set location to ${quickLocation}`}
-                    className="inline-flex h-10 max-w-[45%] shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
-                    onClick={() => updateForm("location", quickLocation)}
-                    title={`Set location to ${quickLocation}`}
-                    type="button"
-                  >
-                    <MapPin aria-hidden="true" className="shrink-0" size={16} />
-                    <span className="truncate">{quickLocation}</span>
-                  </button>
-                ) : null}
-              </div>
-            </Field>
+              </section>
+            </FormSection>
 
-            <Field label="Work Mode">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("workMode", event.target.value as WorkMode)
-                }
-                value={form.workMode}
-              >
-                <option value="unknown">Unknown</option>
-                <option value="remote">Remote</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="onsite">Onsite</option>
-              </select>
-            </Field>
+            <FormSection id="add-section-other" title="Other">
+              <Field label="Priority">
+                <select
+                  className="field-control"
+                  onChange={(event) =>
+                    updateForm("priority", event.target.value as Priority)
+                  }
+                  value={form.priority}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </Field>
 
-            <Field label="Job Type">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("jobType", event.target.value as JobType)
-                }
-                value={form.jobType}
-              >
-                <option value="internship">Internship</option>
-                <option value="part-time">Part-time</option>
-                <option value="full-time">Full-time</option>
-                <option value="contract">Contract</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
+              <Field label="Salary / Pay">
+                <input
+                  className="field-control"
+                  onChange={(event) => updateForm("salary", event.target.value)}
+                  type="text"
+                  value={form.salary}
+                />
+              </Field>
 
-            <Field label="Source">
-              <select
-                className="field-control"
-                onChange={(event) => updateForm("source", event.target.value)}
-                value={form.source}
-              >
-                <option value=""></option>
-                {APPLICATION_SOURCES.map((source) => (
-                  <option key={source} value={source}>
-                    {source}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Application URL">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("applicationUrl", event.target.value)}
-                type="url"
-                value={form.applicationUrl}
-              />
-            </Field>
-
-            <Field label="Role Start Date">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("roleStartDate", event.target.value)}
-                type="date"
-                value={form.roleStartDate}
-              />
-            </Field>
-
-            <Field label="Role End Date">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("roleEndDate", event.target.value)}
-                type="date"
-                value={form.roleEndDate}
-              />
-            </Field>
-
-            <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Follow-up
-              </h3>
-              <FollowUpScheduleControls
-                date={form.followUpDate}
-                error={followUpError}
-                onDateChange={(value) => updateForm("followUpDate", value)}
-                onRequirementChange={(value) =>
-                  updateForm("followUpNeeded", value === "compulsory")
-                }
-                requirement={
-                  form.followUpNeeded ? "compulsory" : "optional"
-                }
-              />
-            </section>
-
-            <section className="rounded-lg border border-border bg-surface-raised p-4 md:col-span-2">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Follow-up auto-reset
-              </h3>
-              <FollowUpAutoResetControls
-                defaultPromptDays={defaultFollowUpPromptDays}
-                enabled={form.followUpAutoResetEnabled}
-                error={followUpAutoResetError}
-                onEnabledChange={(value) =>
-                  updateForm("followUpAutoResetEnabled", value)
-                }
-                onPromptDaysChange={(value) =>
-                  updateForm("followUpPromptDays", value)
-                }
-                promptDays={form.followUpPromptDays}
-              />
-            </section>
-
-            <Field label="Priority">
-              <select
-                className="field-control"
-                onChange={(event) =>
-                  updateForm("priority", event.target.value as Priority)
-                }
-                value={form.priority}
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </Field>
-
-            <Field label="Salary / Pay">
-              <input
-                className="field-control"
-                onChange={(event) => updateForm("salary", event.target.value)}
-                type="text"
-                value={form.salary}
-              />
-            </Field>
-
-            <Field className="md:col-span-2" label="Notes">
-              <textarea
-                className="field-control min-h-28 resize-y"
-                onChange={(event) => updateForm("notes", event.target.value)}
-                value={form.notes}
-              />
-            </Field>
+              <Field className="md:col-span-2" label="Notes">
+                <textarea
+                  className="field-control min-h-28 resize-y"
+                  onChange={(event) => updateForm("notes", event.target.value)}
+                  value={form.notes}
+                />
+              </Field>
+            </FormSection>
           </div>
         </form>
 

@@ -87,3 +87,26 @@ describe("phone Add job scroll lock", () => {
     expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.add-application-dialog\[open\]\)[^{]*\{\s*overflow:\s*hidden/);
   });
 });
+
+// #259: the Add and Edit forms share one section layout.
+describe("Add job form sections (#259)", () => {
+  function sections(markup: string) {
+    return markup.split('<section aria-labelledby="add-section-').slice(1).map((part) => ({
+      title: /<h3[^>]*>([^<]+)<\/h3>/.exec(part)?.[1],
+      labels: [...part.matchAll(/text-sm font-medium text-foreground">([^<]+)/g)].map((match) => match[1]),
+    }));
+  }
+
+  it("groups every field under Role, Application, Documents, Follow-up and Other", () => {
+    expect(sections(renderModal())).toEqual([
+      { title: "Role", labels: ["Job Title", "Company", "Status", "Job Description"] },
+      {
+        title: "Application",
+        labels: ["Applied Date", "Application URL", "Source", "Location", "Work Mode", "Job Type", "Role Start Date", "Role End Date"],
+      },
+      { title: "Documents", labels: ["Resume", "Cover Letter"] },
+      { title: "Follow-up", labels: [] },
+      { title: "Other", labels: ["Priority", "Salary / Pay", "Notes"] },
+    ]);
+  });
+});
