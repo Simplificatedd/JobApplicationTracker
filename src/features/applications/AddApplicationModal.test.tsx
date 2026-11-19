@@ -87,3 +87,51 @@ describe("phone Add job scroll lock", () => {
     expect(css).toMatch(/not all and \(min-width:\s*768px\)\s*\{[^}]*html:has\(\.add-application-dialog\[open\]\)[^{]*\{\s*overflow:\s*hidden/);
   });
 });
+
+// #259: the Add and Edit forms share one section layout.
+describe("Add job form sections (#259)", () => {
+  function sections(markup: string) {
+    return markup.split('<section aria-labelledby="add-section-').slice(1).map((part) => ({
+      title: /<h3[^>]*>([^<]+)<\/h3>/.exec(part)?.[1],
+      labels: [...part.matchAll(/text-sm font-medium text-foreground">([^<]+)/g)].map((match) => match[1]),
+    }));
+  }
+
+  it("groups every field under Role, Application, Documents, Follow-up and Other", () => {
+    expect(sections(renderModal())).toEqual([
+      { title: "Role", labels: ["Job title", "Company", "Status", "Job description"] },
+      {
+        title: "Application",
+        labels: ["Applied date", "Application URL", "Source", "Location", "Work mode", "Job type", "Role start date", "Role end date"],
+      },
+      { title: "Documents", labels: ["Resume", "Cover letter"] },
+      { title: "Follow-up", labels: [] },
+      { title: "Other", labels: ["Priority", "Salary / Pay", "Notes"] },
+    ]);
+  });
+});
+
+describe("Add job upload fields (#259)", () => {
+  it("labels Display name and Version label visibly, outside the document select's label", () => {
+    const markup = renderModal();
+
+    expect(markup).not.toContain('placeholder="Display name"');
+    expect(markup).not.toContain('placeholder="Version label"');
+    expect(markup.match(/<label class="block"><span[^>]*>Display name<\/span><input/g)).toHaveLength(2);
+    expect(markup.match(/<label class="block"><span[^>]*>Version label<\/span><input/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Resume file"');
+    expect(markup).toContain('aria-label="Cover letter file"');
+    // No label may contain another label.
+    expect(markup).not.toMatch(/<label(?:(?!<\/label>).)*<label/s);
+  });
+});
+
+describe("Add job required note (#259)", () => {
+  it("explains the asterisk before the first section", () => {
+    const markup = renderModal();
+    const note = markup.indexOf('<span class="text-destructive">*</span> Required</p>');
+
+    expect(note).toBeGreaterThan(-1);
+    expect(note).toBeLessThan(markup.indexOf('id="add-section-role"'));
+  });
+});
