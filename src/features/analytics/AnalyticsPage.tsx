@@ -826,7 +826,9 @@ function ActivityHeatmap({ days }: { days: CalendarDay[] }) {
 
   return (
     <div className="relative">
-      <div className="overflow-x-auto pb-1" ref={scrollRef}>
+      {/* The summary is placed where the day was when shown; scrolling moves the
+          days away from it, so close it. */}
+      <div className="overflow-x-auto pb-1" onScroll={() => setActiveDay(null)} ref={scrollRef}>
         <div className="inline-flex gap-[3px]">
           <div className="mr-1 grid grid-rows-[14px_repeat(7,13px)] gap-[3px] text-[10px] leading-[13px] text-muted">
             <span />
