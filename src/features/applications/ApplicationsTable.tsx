@@ -1012,7 +1012,7 @@ function ApplicationColumnCell({
     );
 
     return showArchivedBadge ? (
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="flex min-w-0 items-center gap-2 [[data-full-job-titles=true]_&]:items-start">
         {title}
         <ArchivedBadge />
       </span>
