@@ -209,6 +209,7 @@ export function ResumesPage({
           >
             <input
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              aria-describedby={`${uploadDetailsId}-hint`}
               className="field-control"
               id={`${isCoverLetter ? "cover-letter" : "resume"}-upload-file-input`}
               onChange={(event) => handleUpload(event.target.files?.[0])}
@@ -219,7 +220,7 @@ export function ResumesPage({
           <Field
             className={showUploadDetails ? "" : "max-md:hidden"}
             id={`${uploadDetailsId}-name`}
-            label="Display Name"
+            label="Display name"
           >
             <input
               className="field-control"
@@ -249,7 +250,7 @@ export function ResumesPage({
             type="button"
           >
             <Upload aria-hidden="true" size={16} />
-            {isUploading ? "Checking..." : "Upload"}
+            {isUploading ? "Checking..." : `Upload ${documentKind}`}
           </button>
           <button
             aria-controls={`${uploadDetailsId}-name ${uploadDetailsId}-version`}
@@ -266,6 +267,10 @@ export function ResumesPage({
             {showUploadDetails ? "Hide name and version" : "Add name and version"}
           </button>
         </div>
+        <p className="mt-2 text-xs text-muted" id={`${uploadDetailsId}-hint`}>
+          Optional: add a name and version, then choose a PDF or DOCX file.
+          Uploading starts when you pick the file.
+        </p>
         {uploadError || actionError ? (
           <InlineAlert message={uploadError || actionError} tone="danger" />
         ) : uploadMessage ? (
