@@ -88,7 +88,8 @@ export function ChartCard({
         className={`flex min-w-0 items-start justify-between gap-3 ${action ? "max-sm:flex-wrap" : ""}`}
       >
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          {/* h2: the page h1 is the only heading above the chart cards. */}
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
           {description ? (
             <p className="mt-0.5 text-xs text-muted">{description}</p>
           ) : null}

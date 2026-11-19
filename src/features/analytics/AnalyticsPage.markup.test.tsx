@@ -70,14 +70,45 @@ describe("phone key metrics", () => {
   });
 });
 
-describe("phone analytics header", () => {
-  it("gives Include archived and Customize 44px on phones", () => {
-    const markup = renderPage();
-    const includeArchived = markup.slice(markup.lastIndexOf("<label", markup.indexOf("Include archived")));
-    const customize = markup.slice(markup.lastIndexOf("<button", markup.indexOf("Customize")));
+describe("phone analytics header (#261)", () => {
+  const openingTag = (markup: string, tag: string, text: string) => {
+    const start = markup.lastIndexOf(`<${tag}`, markup.indexOf(text));
+    return markup.slice(start, markup.indexOf(">", start));
+  };
 
-    expect(includeArchived.slice(0, includeArchived.indexOf(">"))).toContain("max-md:h-11");
-    expect(customize.slice(0, customize.indexOf(">"))).toContain("max-md:h-11");
+  it("sizes every header control with the same touch variant", () => {
+    const markup = renderPage();
+    const controls = [
+      openingTag(markup, "div", 'aria-label="Analytics date range"'),
+      openingTag(markup, "div", 'aria-label="Analytics time grouping"'),
+      openingTag(markup, "label", "Include archived"),
+      openingTag(markup, "button", "Customize"),
+    ];
+
+    for (const tag of controls) {
+      expect(tag).toContain("h-9");
+      expect(tag).toContain("touch:h-11");
+      expect(tag).not.toMatch(/max-md:h-11|touch:h-auto/);
+    }
+  });
+
+  it("puts both range controls in one phone row strip that drops out from md", () => {
+    const markup = renderPage();
+    const strip = /<div class="scroll-strip flex min-w-0 gap-2 max-md:w-full md:contents"[^>]*>(.*?)<label/.exec(markup)?.[1] ?? "";
+
+    expect(strip).toContain('aria-label="Analytics date range"');
+    expect(strip).toContain('aria-label="Analytics time grouping"');
+    // Inside the strip the row scrolls, so each control keeps its full width.
+    expect(openingTag(markup, "div", 'aria-label="Analytics date range"')).toContain("max-md:max-w-none");
+  });
+
+  it("shares the second phone row between Include archived and Customize", () => {
+    const markup = renderPage();
+
+    for (const tag of [openingTag(markup, "label", "Include archived"), openingTag(markup, "button", "Customize")]) {
+      expect(tag).toContain("max-md:flex-1");
+      expect(tag).toContain("whitespace-nowrap");
+    }
   });
 });
 
@@ -87,5 +118,22 @@ describe("phone chart toggles", () => {
 
     // The panel only renders after Customize is pressed, so check the source.
     expect(source).toContain("inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition max-md:min-h-11");
+  });
+});
+
+describe("Analytics heading (#266)", () => {
+  it("leaves Analytics to the page header and keeps the Beta badge and description", () => {
+    const markup = renderPage();
+
+    expect(markup).not.toMatch(/<h[1-6][^>]*>Analytics<\/h[1-6]>/);
+    expect(markup).toContain(">Beta</span>");
+    expect(markup).toContain("Local snapshots from your tracker data.");
+  });
+
+  it("puts chart titles directly under the page h1, with no skipped level", () => {
+    const levels = [...renderPage().matchAll(/<h([1-6])\b/g)].map((match) => Number(match[1]));
+
+    expect(levels.length).toBeGreaterThan(0);
+    expect(new Set(levels)).toEqual(new Set([2]));
   });
 });
