@@ -161,7 +161,8 @@ export function ApplicationDetailPanel({
   const editViewportStyle = useVisibleViewportStyle(isEditing && isPhone);
   const [interviewEditorOpen, setInterviewEditorOpen] = useState(false);
   const [assessmentEditorOpen, setAssessmentEditorOpen] = useState(false);
-  const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen;
+  const [notesEditorOpen, setNotesEditorOpen] = useState(false);
+  const nestedEditorOpen = interviewEditorOpen || assessmentEditorOpen || notesEditorOpen;
   const [isActionPending, setIsActionPending] = useState(false);
   const [actionError, setActionError] = useState("");
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
@@ -544,7 +545,7 @@ export function ApplicationDetailPanel({
         ) : null}
 
         {actionError ? <p className="px-4 py-2 text-sm font-medium text-destructive" role="alert">{actionError}</p> : null}
-        {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the interview or assessment edit before closing details.</p> : null}
+        {nestedEditorOpen ? <p className="px-4 py-2 text-sm text-muted" role="status">Save or cancel the open edit before closing details.</p> : null}
         <div className="flex-1 overflow-y-auto px-4 py-5 max-md:overscroll-contain sm:px-6">
           {isEditing ? (
             <EditForm
@@ -567,6 +568,7 @@ export function ApplicationDetailPanel({
             <ReadOnlyDetails
               onInterviewEditingChange={setInterviewEditorOpen}
               onAssessmentEditingChange={setAssessmentEditorOpen}
+              onNotesEditingChange={setNotesEditorOpen}
               onOpenContacts={onOpenContacts}
               activities={activities}
               application={application}
@@ -627,6 +629,7 @@ export function ApplicationDetailPanel({
 function ReadOnlyDetails({
   onInterviewEditingChange,
   onAssessmentEditingChange,
+  onNotesEditingChange,
   onOpenContacts,
   assessments,
   assessmentActions,
@@ -651,6 +654,7 @@ function ReadOnlyDetails({
 }: {
   onInterviewEditingChange: (editing: boolean) => void;
   onAssessmentEditingChange: (editing: boolean) => void;
+  onNotesEditingChange: (editing: boolean) => void;
   onOpenContacts?: () => void;
   activities: Activity[];
   application: Application;
@@ -928,7 +932,14 @@ function ReadOnlyDetails({
         value={application.jobDescription}
       />
     ),
-    notes: <TextBlock key="notes" label="Notes" value={application.notes} />,
+    notes: (
+      <NotesSection
+        application={application}
+        key="notes"
+        onEditingChange={onNotesEditingChange}
+        onUpdate={onUpdate}
+      />
+    ),
     schedule: (
       <Fragment key="schedule">
         {statusChangeError ? (
@@ -1587,6 +1598,151 @@ function DocumentDetail({
 // The outlined section button, as on Add interview and Add assessment.
 const SECTION_ACTION_CLASS =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11";
+
+// Notes change more often than anything else, so they edit in place instead of
+// through the full Edit form. Only notes are sent on save.
+function NotesSection({
+  application,
+  onEditingChange,
+  onUpdate,
+}: {
+  application: Application;
+  onEditingChange: (editing: boolean) => void;
+  onUpdate: ApplicationDetailPanelProps["onUpdate"];
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [editBase, setEditBase] = useState<Application | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [isDiscardWarningOpen, setIsDiscardWarningOpen] = useState(false);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  const editorOpen = draft !== null || isSaving;
+
+  useEffect(() => {
+    onEditingChange(editorOpen);
+    return () => onEditingChange(false);
+  }, [editorOpen, onEditingChange]);
+
+  useEffect(() => {
+    if (draft === null && returnFocus.current) {
+      returnFocus.current = false;
+      editButtonRef.current?.focus();
+    }
+  }, [draft]);
+
+  const isDirty = draft !== null && draft !== (editBase?.notes ?? "");
+
+  function close() {
+    returnFocus.current = true;
+    setIsDiscardWarningOpen(false);
+    setError("");
+    setDraft(null);
+  }
+
+  function requestCancel() {
+    if (isSaving) return;
+    if (isDirty) setIsDiscardWarningOpen(true);
+    else close();
+  }
+
+  async function save() {
+    if (draft === null || !editBase) return;
+    if (!isDirty) {
+      close();
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+    const result = await onUpdate(
+      application.id,
+      { notes: trimOptional(draft) },
+      undefined,
+      undefined,
+      editBase,
+    );
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    close();
+  }
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground" id="notes-heading">
+          Notes
+        </h3>
+        {draft === null && !application.archivedAt ? (
+          <button
+            className={SECTION_ACTION_CLASS}
+            onClick={() => {
+              setEditBase(structuredClone(application));
+              setDraft(application.notes ?? "");
+              setError("");
+            }}
+            ref={editButtonRef}
+            type="button"
+          >
+            <Pencil aria-hidden="true" size={16} />
+            Edit notes
+          </button>
+        ) : null}
+      </div>
+      {draft === null ? (
+        <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-raised px-3 py-3 text-sm leading-6 text-foreground">
+          {application.notes ? <LinkifiedText text={application.notes} /> : ""}
+        </p>
+      ) : (
+        <div className="mt-2 space-y-3">
+          <textarea
+            aria-labelledby="notes-heading"
+            autoFocus
+            className="field-control min-h-28 resize-y"
+            disabled={isSaving}
+            onChange={(event) => setDraft(event.target.value)}
+            value={draft}
+          />
+          {error ? (
+            <p className="text-sm font-medium text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11"
+              disabled={isSaving}
+              onClick={requestCancel}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 max-md:min-h-11"
+              disabled={isSaving}
+              onClick={save}
+              type="button"
+            >
+              {isSaving ? "Saving…" : "Save notes"}
+            </button>
+          </div>
+        </div>
+      )}
+      {isDiscardWarningOpen ? (
+        <UnsavedChangesDialog
+          body="Discard your changes to the notes?"
+          onCancel={() => setIsDiscardWarningOpen(false)}
+          onConfirm={close}
+        />
+      ) : null}
+    </section>
+  );
+}
 
 function TextBlock({ label, value }: { label: string; value?: string }) {
   return (
