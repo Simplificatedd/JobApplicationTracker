@@ -731,3 +731,22 @@ describe("Edit form sections (#259)", () => {
     ]);
   });
 });
+
+describe("Add contact in the detail panel (#287)", () => {
+  const details = (props: ComponentProps<typeof ApplicationDetailPanel>) => render(() => {
+    const element = named(ApplicationDetailPanel(props), "ReadOnlyDetails");
+    return call(element.type, element.props);
+  });
+
+  it("opens the Contacts panel from the Contacts section", () => {
+    const props = { ...detailProps(), onOpenContacts: vi.fn() };
+    call(button(details(props), "Add contact").props.onClick);
+    expect(props.onOpenContacts).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the button on archived applications and when nothing can open contacts", () => {
+    const archived = { ...detailProps(), application: { ...application, archivedAt: application.updatedAt }, onOpenContacts: vi.fn() };
+    expect(button(details(archived), "Add contact")).toBeUndefined();
+    expect(button(details(detailProps()), "Add contact")).toBeUndefined();
+  });
+});

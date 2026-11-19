@@ -11,6 +11,8 @@ interface ContactsPanelProps {
   application: Application;
   contacts: ApplicationContact[];
   displayMode: "side_panel" | "modal";
+  // Focus the new contact's Name on open instead of the dialog itself.
+  focusNewContact?: boolean;
   onAddContact: (
     input: ContactInput,
   ) => Promise<MutationResult<ApplicationContact>>;
@@ -45,6 +47,7 @@ export function ContactsPanel({
   application,
   contacts,
   displayMode,
+  focusNewContact = false,
   onAddContact,
   onClose,
   onDeleteContact,
@@ -145,6 +148,7 @@ export function ContactsPanel({
           <section className="rounded-lg border border-border bg-surface-raised p-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <ContactField
+                initialFocus={focusNewContact}
                 label="Name"
                 onChange={(value) =>
                   setNewContact((current) => ({ ...current, name: value }))
@@ -450,12 +454,14 @@ function ContactCard({
 }
 
 function ContactField({
+  initialFocus = false,
   label,
   onChange,
   required = false,
   type = "text",
   value,
 }: {
+  initialFocus?: boolean;
   label: string;
   onChange: (value: string) => void;
   required?: boolean;
@@ -470,6 +476,7 @@ function ContactField({
       </span>
       <input
         className="field-control"
+        data-initial-focus={initialFocus || undefined}
         onChange={(event) => onChange(event.target.value)}
         type={type}
         value={value}

@@ -9,6 +9,7 @@ import {
   ExternalLink,
   MoreHorizontal,
   Pencil,
+  Plus,
   RotateCcw,
   Trash2,
   Upload,
@@ -101,6 +102,8 @@ interface ApplicationDetailPanelProps extends AssessmentSectionProps {
   onDeleteInterview: (id: string) => Promise<MutationResult>;
   onDownloadCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onDownloadResume: (resume: ResumeMetadata) => Promise<void>;
+  // Opens the Contacts panel ready to add a contact; omitted, no Add contact button.
+  onOpenContacts?: () => void;
   onPreviewResume: (resume: ResumeMetadata) => Promise<void>;
   onPreviewCoverLetter: (coverLetter: CoverLetterMetadata) => Promise<void>;
   onUpdate: (
@@ -141,6 +144,7 @@ export function ApplicationDetailPanel({
   onDeleteInterview,
   onDownloadCoverLetter,
   onDownloadResume,
+  onOpenContacts,
   onPreviewResume,
   onPreviewCoverLetter,
   onRestore,
@@ -563,6 +567,7 @@ export function ApplicationDetailPanel({
             <ReadOnlyDetails
               onInterviewEditingChange={setInterviewEditorOpen}
               onAssessmentEditingChange={setAssessmentEditorOpen}
+              onOpenContacts={onOpenContacts}
               activities={activities}
               application={application}
               contacts={contacts}
@@ -622,6 +627,7 @@ export function ApplicationDetailPanel({
 function ReadOnlyDetails({
   onInterviewEditingChange,
   onAssessmentEditingChange,
+  onOpenContacts,
   assessments,
   assessmentActions,
   activities,
@@ -645,6 +651,7 @@ function ReadOnlyDetails({
 }: {
   onInterviewEditingChange: (editing: boolean) => void;
   onAssessmentEditingChange: (editing: boolean) => void;
+  onOpenContacts?: () => void;
   activities: Activity[];
   application: Application;
   contacts: ApplicationContact[];
@@ -948,7 +955,19 @@ function ReadOnlyDetails({
     ),
     contacts: (
       <section key="contacts">
-        <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-foreground">Contacts</h3>
+          {onOpenContacts && !application.archivedAt ? (
+            <button
+              className={SECTION_ACTION_CLASS}
+              onClick={onOpenContacts}
+              type="button"
+            >
+              <Plus aria-hidden="true" size={16} />
+              Add contact
+            </button>
+          ) : null}
+        </div>
         <div className="mt-3 grid gap-2">
           {contacts.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted">
@@ -1564,6 +1583,10 @@ function DocumentDetail({
     </div>
   );
 }
+
+// The outlined section button, as on Add interview and Add assessment.
+const SECTION_ACTION_CLASS =
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11";
 
 function TextBlock({ label, value }: { label: string; value?: string }) {
   return (
