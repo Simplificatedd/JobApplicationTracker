@@ -1227,19 +1227,21 @@ function EditForm({
       </FormSection>
       <FormSection id="edit-section-documents" title="Documents">
         <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-          <Field label="Resume">
-            <select
-              className="field-control"
-              onChange={(event) => updateDraft("resumeId", event.target.value)}
-              value={draft.resumeId}
-            >
-              <option value="">Unassigned</option>
-              {resumes.map((resume) => (
-                <option key={resume.id} value={resume.id}>
-                  {resume.displayName}
-                </option>
-              ))}
-            </select>
+          <div>
+            <Field label="Resume">
+              <select
+                className="field-control"
+                onChange={(event) => updateDraft("resumeId", event.target.value)}
+                value={draft.resumeId}
+              >
+                <option value="">Unassigned</option>
+                {resumes.map((resume) => (
+                  <option key={resume.id} value={resume.id}>
+                    {resume.displayName}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Upload aria-hidden="true" size={16} />
@@ -1247,6 +1249,7 @@ function EditForm({
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <input
+                  aria-label="Resume file"
                   accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="field-control md:col-span-2"
                   onChange={(event) =>
@@ -1254,24 +1257,32 @@ function EditForm({
                   }
                   type="file"
                 />
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateDraft("resumeUploadName", event.target.value)
-                  }
-                  placeholder="Display name"
-                  type="text"
-                  value={draft.resumeUploadName}
-                />
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateDraft("resumeUploadVersion", event.target.value)
-                  }
-                  placeholder="Version label"
-                  type="text"
-                  value={draft.resumeUploadVersion}
-                />
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-foreground">
+                    Display name
+                  </span>
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateDraft("resumeUploadName", event.target.value)
+                    }
+                    type="text"
+                    value={draft.resumeUploadName}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-foreground">
+                    Version label
+                  </span>
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateDraft("resumeUploadVersion", event.target.value)
+                    }
+                    type="text"
+                    value={draft.resumeUploadVersion}
+                  />
+                </label>
               </div>
               {resumeUploadError ? (
                 <p className="mt-2 text-xs font-medium text-destructive">
@@ -1279,20 +1290,22 @@ function EditForm({
                 </p>
               ) : null}
             </div>
-          </Field>
-          <Field label="Cover letter">
-            <select
-              className="field-control"
-              onChange={(event) => updateDraft("coverLetterId", event.target.value)}
-              value={draft.coverLetterId}
-            >
-              <option value="">Unassigned</option>
-              {coverLetters.map((coverLetter) => (
-                <option key={coverLetter.id} value={coverLetter.id}>
-                  {coverLetter.displayName}
-                </option>
-              ))}
-            </select>
+          </div>
+          <div>
+            <Field label="Cover letter">
+              <select
+                className="field-control"
+                onChange={(event) => updateDraft("coverLetterId", event.target.value)}
+                value={draft.coverLetterId}
+              >
+                <option value="">Unassigned</option>
+                {coverLetters.map((coverLetter) => (
+                  <option key={coverLetter.id} value={coverLetter.id}>
+                    {coverLetter.displayName}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Upload aria-hidden="true" size={16} />
@@ -1300,6 +1313,7 @@ function EditForm({
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <input
+                  aria-label="Cover letter file"
                   accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="field-control md:col-span-2"
                   onChange={(event) =>
@@ -1307,24 +1321,32 @@ function EditForm({
                   }
                   type="file"
                 />
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateDraft("coverLetterUploadName", event.target.value)
-                  }
-                  placeholder="Display name"
-                  type="text"
-                  value={draft.coverLetterUploadName}
-                />
-                <input
-                  className="field-control"
-                  onChange={(event) =>
-                    updateDraft("coverLetterUploadVersion", event.target.value)
-                  }
-                  placeholder="Version label"
-                  type="text"
-                  value={draft.coverLetterUploadVersion}
-                />
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-foreground">
+                    Display name
+                  </span>
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateDraft("coverLetterUploadName", event.target.value)
+                    }
+                    type="text"
+                    value={draft.coverLetterUploadName}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-foreground">
+                    Version label
+                  </span>
+                  <input
+                    className="field-control"
+                    onChange={(event) =>
+                      updateDraft("coverLetterUploadVersion", event.target.value)
+                    }
+                    type="text"
+                    value={draft.coverLetterUploadVersion}
+                  />
+                </label>
               </div>
               {coverLetterUploadError ? (
                 <p className="mt-2 text-xs font-medium text-destructive">
@@ -1332,7 +1354,7 @@ function EditForm({
                 </p>
               ) : null}
             </div>
-          </Field>
+          </div>
         </div>
       </FormSection>
       <FormSection id="edit-section-follow-up" title="Follow-up">

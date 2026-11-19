@@ -110,3 +110,18 @@ describe("Add job form sections (#259)", () => {
     ]);
   });
 });
+
+describe("Add job upload fields (#259)", () => {
+  it("labels Display name and Version label visibly, outside the document select's label", () => {
+    const markup = renderModal();
+
+    expect(markup).not.toContain('placeholder="Display name"');
+    expect(markup).not.toContain('placeholder="Version label"');
+    expect(markup.match(/<label class="block"><span[^>]*>Display name<\/span><input/g)).toHaveLength(2);
+    expect(markup.match(/<label class="block"><span[^>]*>Version label<\/span><input/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Resume file"');
+    expect(markup).toContain('aria-label="Cover letter file"');
+    // No label may contain another label.
+    expect(markup).not.toMatch(/<label(?:(?!<\/label>).)*<label/s);
+  });
+});

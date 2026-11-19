@@ -832,21 +832,23 @@ export function AddApplicationModal({
 
             <FormSection id="add-section-documents" title="Documents">
               <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
-                <Field label="Resume">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("resumeId", event.target.value)
-                    }
-                    value={form.resumeId}
-                  >
-                    <option value="">No resume selected</option>
-                    {resumes.map((resume) => (
-                      <option key={resume.id} value={resume.id}>
-                        {resume.displayName}
-                      </option>
-                    ))}
-                  </select>
+                <div>
+                  <Field label="Resume">
+                    <select
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("resumeId", event.target.value)
+                      }
+                      value={form.resumeId}
+                    >
+                      <option value="">No resume selected</option>
+                      {resumes.map((resume) => (
+                        <option key={resume.id} value={resume.id}>
+                          {resume.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
                     <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Upload aria-hidden="true" size={16} />
@@ -854,6 +856,7 @@ export function AddApplicationModal({
                     </div>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <input
+                        aria-label="Resume file"
                         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         className="field-control md:col-span-2"
                         onChange={(event) =>
@@ -861,24 +864,32 @@ export function AddApplicationModal({
                         }
                         type="file"
                       />
-                      <input
-                        className="field-control"
-                        onChange={(event) =>
-                          updateForm("resumeUploadName", event.target.value)
-                        }
-                        placeholder="Display name"
-                        type="text"
-                        value={form.resumeUploadName}
-                      />
-                      <input
-                        className="field-control"
-                        onChange={(event) =>
-                          updateForm("resumeUploadVersion", event.target.value)
-                        }
-                        placeholder="Version label"
-                        type="text"
-                        value={form.resumeUploadVersion}
-                      />
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-foreground">
+                          Display name
+                        </span>
+                        <input
+                          className="field-control"
+                          onChange={(event) =>
+                            updateForm("resumeUploadName", event.target.value)
+                          }
+                          type="text"
+                          value={form.resumeUploadName}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-foreground">
+                          Version label
+                        </span>
+                        <input
+                          className="field-control"
+                          onChange={(event) =>
+                            updateForm("resumeUploadVersion", event.target.value)
+                          }
+                          type="text"
+                          value={form.resumeUploadVersion}
+                        />
+                      </label>
                     </div>
                     {resumeUploadError ? (
                       <p className="mt-2 text-xs font-medium text-destructive">
@@ -886,23 +897,25 @@ export function AddApplicationModal({
                       </p>
                     ) : null}
                   </div>
-                </Field>
+                </div>
 
-                <Field label="Cover letter">
-                  <select
-                    className="field-control"
-                    onChange={(event) =>
-                      updateForm("coverLetterId", event.target.value)
-                    }
-                    value={form.coverLetterId}
-                  >
-                    <option value="">No cover letter selected</option>
-                    {coverLetters.map((coverLetter) => (
-                      <option key={coverLetter.id} value={coverLetter.id}>
-                        {coverLetter.displayName}
-                      </option>
-                    ))}
-                  </select>
+                <div>
+                  <Field label="Cover letter">
+                    <select
+                      className="field-control"
+                      onChange={(event) =>
+                        updateForm("coverLetterId", event.target.value)
+                      }
+                      value={form.coverLetterId}
+                    >
+                      <option value="">No cover letter selected</option>
+                      {coverLetters.map((coverLetter) => (
+                        <option key={coverLetter.id} value={coverLetter.id}>
+                          {coverLetter.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3">
                     <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Upload aria-hidden="true" size={16} />
@@ -910,6 +923,7 @@ export function AddApplicationModal({
                     </div>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <input
+                        aria-label="Cover letter file"
                         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         className="field-control md:col-span-2"
                         onChange={(event) =>
@@ -917,24 +931,32 @@ export function AddApplicationModal({
                         }
                         type="file"
                       />
-                      <input
-                        className="field-control"
-                        onChange={(event) =>
-                          updateForm("coverLetterUploadName", event.target.value)
-                        }
-                        placeholder="Display name"
-                        type="text"
-                        value={form.coverLetterUploadName}
-                      />
-                      <input
-                        className="field-control"
-                        onChange={(event) =>
-                          updateForm("coverLetterUploadVersion", event.target.value)
-                        }
-                        placeholder="Version label"
-                        type="text"
-                        value={form.coverLetterUploadVersion}
-                      />
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-foreground">
+                          Display name
+                        </span>
+                        <input
+                          className="field-control"
+                          onChange={(event) =>
+                            updateForm("coverLetterUploadName", event.target.value)
+                          }
+                          type="text"
+                          value={form.coverLetterUploadName}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-foreground">
+                          Version label
+                        </span>
+                        <input
+                          className="field-control"
+                          onChange={(event) =>
+                            updateForm("coverLetterUploadVersion", event.target.value)
+                          }
+                          type="text"
+                          value={form.coverLetterUploadVersion}
+                        />
+                      </label>
                     </div>
                     {coverLetterUploadError ? (
                       <p className="mt-2 text-xs font-medium text-destructive">
@@ -942,7 +964,7 @@ export function AddApplicationModal({
                       </p>
                     ) : null}
                   </div>
-                </Field>
+                </div>
               </div>
             </FormSection>
 
