@@ -1102,7 +1102,7 @@ function EditForm({
   return (
     <div className="grid gap-6">
       <FormSection id="edit-section-role" title="Role">
-        <Field label="Job Title">
+        <Field label="Job title">
           <input
             className="field-control"
             onChange={(event) => updateDraft("jobTitle", event.target.value)}
@@ -1132,7 +1132,7 @@ function EditForm({
           </select>
         </Field>
         {draft.status === "Offered" ? (
-          <Field label="Offer Deadline">
+          <Field label="Offer deadline">
             <input
               className="field-control"
               onChange={(event) =>
@@ -1143,7 +1143,7 @@ function EditForm({
             />
           </Field>
         ) : null}
-        <Field className="md:col-span-2" label="Job Description">
+        <Field className="md:col-span-2" label="Job description">
           <textarea
             className="field-control min-h-32 resize-y"
             onChange={(event) => updateDraft("jobDescription", event.target.value)}
@@ -1153,7 +1153,7 @@ function EditForm({
       </FormSection>
       <FormSection id="edit-section-application" title="Application">
         <DateField
-          label="Date Applied"
+          label="Applied date"
           name="dateApplied"
           draft={draft}
           setDraft={setDraft}
@@ -1187,7 +1187,7 @@ function EditForm({
             value={draft.location}
           />
         </Field>
-        <Field label="Work Mode">
+        <Field label="Work mode">
           <select
             className="field-control"
             onChange={(event) => updateDraft("workMode", event.target.value as WorkMode)}
@@ -1199,7 +1199,7 @@ function EditForm({
             <option value="onsite">Onsite</option>
           </select>
         </Field>
-        <Field label="Job Type">
+        <Field label="Job type">
           <select
             className="field-control"
             onChange={(event) => updateDraft("jobType", event.target.value as JobType)}
@@ -1213,13 +1213,13 @@ function EditForm({
           </select>
         </Field>
         <DateField
-          label="Role Start"
+          label="Role start date"
           name="roleStartDate"
           draft={draft}
           setDraft={setDraft}
         />
         <DateField
-          label="Role End"
+          label="Role end date"
           name="roleEndDate"
           draft={draft}
           setDraft={setDraft}
@@ -1280,7 +1280,7 @@ function EditForm({
               ) : null}
             </div>
           </Field>
-          <Field label="Cover Letter">
+          <Field label="Cover letter">
             <select
               className="field-control"
               onChange={(event) => updateDraft("coverLetterId", event.target.value)}

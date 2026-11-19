@@ -579,12 +579,12 @@ describe("Edit form sections (#259)", () => {
       }));
 
     expect(sections).toEqual([
-      { title: "Role", labels: ["Job Title", "Company", "Status", "Offer Deadline", "Job Description"] },
+      { title: "Role", labels: ["Job title", "Company", "Status", "Offer deadline", "Job description"] },
       {
         title: "Application",
-        labels: ["Date Applied", "Application URL", "Source", "Location", "Work Mode", "Job Type", "Role Start", "Role End"],
+        labels: ["Applied date", "Application URL", "Source", "Location", "Work mode", "Job type", "Role start date", "Role end date"],
       },
-      { title: "Documents", labels: ["Resume", "Cover Letter"] },
+      { title: "Documents", labels: ["Resume", "Cover letter"] },
       { title: "Follow-up", labels: [] },
       { title: "Other", labels: ["Priority", "Salary / Pay", "Notes"] },
     ]);

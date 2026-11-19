@@ -498,7 +498,7 @@ export function AddApplicationModal({
         >
           <div className="grid gap-6">
             <FormSection id="add-section-role" title="Role">
-              <Field label="Job Title" required>
+              <Field label="Job title" required>
                 <input
                   data-initial-focus
                   aria-describedby={titleError ? "job-title-error" : undefined}
@@ -542,7 +542,7 @@ export function AddApplicationModal({
               </Field>
 
               {form.status === "Offered" ? (
-                <Field label="Offer Deadline">
+                <Field label="Offer deadline">
                   <input
                     className="field-control"
                     onChange={(event) =>
@@ -705,7 +705,7 @@ export function AddApplicationModal({
                 </section>
               ) : null}
 
-              <Field className="md:col-span-2" label="Job Description">
+              <Field className="md:col-span-2" label="Job description">
                 <textarea
                   className="field-control min-h-28 resize-y"
                   onChange={(event) =>
@@ -717,7 +717,7 @@ export function AddApplicationModal({
             </FormSection>
 
             <FormSection id="add-section-application" title="Application">
-              <Field label="Applied Date">
+              <Field label="Applied date">
                 <input
                   className="field-control"
                   onChange={(event) =>
@@ -780,7 +780,7 @@ export function AddApplicationModal({
                 </div>
               </Field>
 
-              <Field label="Work Mode">
+              <Field label="Work mode">
                 <select
                   className="field-control"
                   onChange={(event) =>
@@ -795,7 +795,7 @@ export function AddApplicationModal({
                 </select>
               </Field>
 
-              <Field label="Job Type">
+              <Field label="Job type">
                 <select
                   className="field-control"
                   onChange={(event) =>
@@ -811,7 +811,7 @@ export function AddApplicationModal({
                 </select>
               </Field>
 
-              <Field label="Role Start Date">
+              <Field label="Role start date">
                 <input
                   className="field-control"
                   onChange={(event) => updateForm("roleStartDate", event.target.value)}
@@ -820,7 +820,7 @@ export function AddApplicationModal({
                 />
               </Field>
 
-              <Field label="Role End Date">
+              <Field label="Role end date">
                 <input
                   className="field-control"
                   onChange={(event) => updateForm("roleEndDate", event.target.value)}
@@ -888,7 +888,7 @@ export function AddApplicationModal({
                   </div>
                 </Field>
 
-                <Field label="Cover Letter">
+                <Field label="Cover letter">
                   <select
                     className="field-control"
                     onChange={(event) =>

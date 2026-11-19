@@ -99,12 +99,12 @@ describe("Add job form sections (#259)", () => {
 
   it("groups every field under Role, Application, Documents, Follow-up and Other", () => {
     expect(sections(renderModal())).toEqual([
-      { title: "Role", labels: ["Job Title", "Company", "Status", "Job Description"] },
+      { title: "Role", labels: ["Job title", "Company", "Status", "Job description"] },
       {
         title: "Application",
-        labels: ["Applied Date", "Application URL", "Source", "Location", "Work Mode", "Job Type", "Role Start Date", "Role End Date"],
+        labels: ["Applied date", "Application URL", "Source", "Location", "Work mode", "Job type", "Role start date", "Role end date"],
       },
-      { title: "Documents", labels: ["Resume", "Cover Letter"] },
+      { title: "Documents", labels: ["Resume", "Cover letter"] },
       { title: "Follow-up", labels: [] },
       { title: "Other", labels: ["Priority", "Salary / Pay", "Notes"] },
     ]);
