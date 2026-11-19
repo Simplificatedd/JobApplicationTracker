@@ -52,6 +52,80 @@ const named = (node: unknown, name: string) => elements(node).find(e => typeof e
 const button = (node: unknown, label: string) => elements(node).find(e => e.type === "button" && text(e.props.children).trim() === label)!;
 function render<T>(component: () => T): T { host.cursor = 0; const tree = component(); host.effects.splice(0).forEach(effect => effect()); return tree; }
 const call = (fn: unknown, ...args: unknown[]) => (fn as (...args: unknown[]) => unknown)(...args);
+
+function fieldInput(tree: unknown, label: string) {
+  const field = elements(tree).find(element => element.props.label === label)!;
+  return elements(field.props.children).find(element => element.type === "input")!;
+}
+
+describe.each(["Add", "Edit"])("%s interview platform from link", (mode) => {
+  function setup() {
+    const props: ComponentProps<typeof InterviewsSection> = {
+      application, interviews: mode === "Edit" ? [interview(1)] : [],
+      onAdd: vi.fn().mockResolvedValue({ ok: true }), onUpdate: vi.fn().mockResolvedValue({ ok: true }),
+      onDelete: vi.fn(), onConvert: vi.fn(),
+    };
+    const view = () => render(() => InterviewsSection(props));
+    const tree = view();
+    if (mode === "Add") call(button(tree, "Add interview").props.onClick);
+    else call(named(tree, "InterviewCard").props.onEdit);
+    const form = () => {
+      const element = named(view(), "InterviewForm");
+      return call(element.type, element.props);
+    };
+    const input = (label: string) => fieldInput(form(), label);
+    const change = (label: string, value: string) => call(input(label).props.onChange, { target: { value } });
+    return { props, view, input, change };
+  }
+
+  it.each(["", " \t "])("fills a blank platform (%j) and keeps it when the link changes", (blank) => {
+    const { input, change } = setup();
+    change("Platform or provider", blank);
+    change("Link", "https://us02web.zoom.us/123");
+    expect(input("Platform or provider").props.value).toBe("Zoom");
+    change("Link", "https://teams.microsoft.com/meeting");
+    expect(input("Platform or provider").props.value).toBe("Zoom");
+    expect(input("Link").props.value).toBe("https://teams.microsoft.com/meeting");
+  });
+
+  it("keeps a typed value even when both handlers run before a render", () => {
+    const { input } = setup();
+    const platform = input("Platform or provider"), link = input("Link");
+    call(platform.props.onChange, { target: { value: " Recruiter portal " } });
+    call(link.props.onChange, { target: { value: "https://zoom.us/123" } });
+    expect(input("Platform or provider").props.value).toBe(" Recruiter portal ");
+  });
+
+  it("lets the user edit or clear the filled value and fills again on a link edit", () => {
+    const { input, change } = setup();
+    change("Link", "https://zoom.us/123");
+    const platform = input("Platform or provider");
+    expect(platform.props.disabled).toBeUndefined();
+    expect(platform.props.readOnly).toBeUndefined();
+    change("Platform or provider", "My provider");
+    expect(input("Platform or provider").props.value).toBe("My provider");
+    const link = input("Link");
+    change("Platform or provider", "");
+    expect(input("Platform or provider").props.value).toBe("");
+    call(link.props.onChange, { target: { value: "https://meet.google.com/abc" } });
+    expect(input("Platform or provider").props.value).toBe("Google Meet");
+  });
+
+  it.each(["https://example.com", "not a url"])("leaves the platform blank for %s", (url) => {
+    const { input, change } = setup();
+    change("Link", url);
+    expect(input("Platform or provider").props.value).toBe("");
+  });
+
+  it("submits the autofilled platform as a field change", () => {
+    const { props, view, change } = setup();
+    change("Link", "https://app.hirevue.com/123");
+    call(named(view(), "InterviewForm").props.onSave);
+    const save = mode === "Add" ? props.onAdd : props.onUpdate;
+    const input = (save as Mock).mock.calls[0][mode === "Add" ? 0 : 1];
+    expect(input).toMatchObject({ platform: "HireVue", meetingUrl: "https://app.hirevue.com/123" });
+  });
+});
 const listeners = vi.hoisted(() => new Map<string, (event: unknown) => void>());
 beforeEach(() => {
   host.cursor = 0; host.slots = []; host.effects = []; host.cleanups = []; listeners.clear();
