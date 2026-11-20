@@ -15,7 +15,7 @@ def assert_validation_only(ci):
         raise AssertionError("CI may only contain the validation job")
     if re.search(r"\bsecrets\s*(?:\.|\[)|environment:|pages deploy|wrangler-action|deployments:", ci):
         raise AssertionError("CI must not acquire deployment credentials or publish")
-    if re.findall(r"^ *uses: (.+)$", ci, re.M) != ["actions/checkout@v4", "actions/setup-node@v4"]:
+    if re.findall(r"^ *uses: (.+)$", ci, re.M) != ["actions/checkout@v5", "actions/setup-node@v5"]:
         raise AssertionError("Additional actions require deployment-safety review")
     commands = re.findall(r"^ *run: (.+)$", ci, re.M)
     if commands != ["npm ci", "npm run check", "python3 -B -m unittest discover -s scripts -p 'test_*.py'"]:
