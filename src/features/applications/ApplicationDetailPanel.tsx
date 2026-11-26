@@ -180,6 +180,7 @@ export function ApplicationDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
+  const [titleError, setTitleError] = useState("");
   const actionsRef = useRef<HTMLDivElement>(null);
   const actionsTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -234,12 +235,19 @@ export function ApplicationDetailPanel({
     setCoverLetterUploadError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
+    setTitleError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(true);
   }
 
   async function saveChanges() {
+    if (!draft.jobTitle.trim()) {
+      setTitleError("Job Title is required.");
+      return;
+    }
+
+    setTitleError("");
     const followUpValidationError = validateFollowUpSchedule(
       draft.followUpNeeded ? "compulsory" : "optional",
       draft.followUpDate,
@@ -314,6 +322,7 @@ export function ApplicationDetailPanel({
     setCoverLetterUploadError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
+    setTitleError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(false);
@@ -554,6 +563,7 @@ export function ApplicationDetailPanel({
               draft={draft}
               followUpAutoResetError={followUpAutoResetError}
               followUpError={followUpError}
+              titleError={titleError}
               onFollowUpAutoResetChange={() =>
                 setFollowUpAutoResetError("")
               }
@@ -1108,6 +1118,7 @@ function EditForm({
   setDraft,
   setCoverLetterUploadFile,
   setResumeUploadFile,
+  titleError,
 }: {
   coverLetterUploadError: string;
   coverLetters: CoverLetterMetadata[];
@@ -1121,7 +1132,11 @@ function EditForm({
   setDraft: React.Dispatch<React.SetStateAction<ApplicationDraft>>;
   setCoverLetterUploadFile: (file: File | null) => void;
   setResumeUploadFile: (file: File | null) => void;
+  titleError: string;
 }) {
+  // Hidden again as soon as a title is typed.
+  const showTitleError = Boolean(titleError) && !draft.jobTitle.trim();
+
   function updateDraft<Key extends keyof ApplicationDraft>(
     key: Key,
     value: ApplicationDraft[Key],
@@ -1132,12 +1147,20 @@ function EditForm({
   return (
     <div className="grid gap-6">
       <FormSection id="edit-section-role" title="Role">
-        <Field label="Job title">
+        <Field label="Job title" required>
           <input
+            aria-describedby={showTitleError ? "edit-job-title-error" : undefined}
+            aria-invalid={showTitleError ? "true" : "false"}
             className="field-control"
             onChange={(event) => updateDraft("jobTitle", event.target.value)}
+            required
             value={draft.jobTitle}
           />
+          {showTitleError ? (
+            <p className="mt-1 text-xs font-medium text-destructive" id="edit-job-title-error">
+              {titleError}
+            </p>
+          ) : null}
         </Field>
         <Field label="Company">
           <input
@@ -1773,15 +1796,18 @@ function Field({
   children,
   className = "",
   label,
+  required = false,
 }: {
   children: React.ReactNode;
   className?: string;
   label: string;
+  required?: boolean;
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 block text-sm font-medium text-foreground">
+      <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-foreground">
         {label}
+        {required ? <span className="text-destructive">*</span> : null}
       </span>
       {children}
     </label>
