@@ -8,6 +8,7 @@ import {
 } from "../../lib/constants";
 import {
   APPLICATION_SOURCES,
+  createDateStamp,
   DEFAULT_APPLICATION_STATUS,
 } from "../../lib/domain";
 import {
@@ -118,7 +119,7 @@ function createInitialFormState(): AddApplicationFormState {
     jobType: "internship",
     source: "",
     applicationUrl: "",
-    dateApplied: "",
+    dateApplied: createDateStamp(),
     roleStartDate: "",
     roleEndDate: "",
     followUpNeeded: false,
