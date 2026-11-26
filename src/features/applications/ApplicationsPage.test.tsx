@@ -801,6 +801,18 @@ describe("Needs attention tile (#256)", () => {
     tree = page.render();
     expect(attentionTile(tree).props.pressed).toBe(false);
   });
+
+  it("leaves out reminders dismissed in the bell (#344)", () => {
+    const overdue = { ...titleMatch, followUpDate: "2026-09-01" };
+    const now = new Date("2026-09-10T12:00:00");
+    const count = (dismissedNotificationIds: string[]) =>
+      mountPage({ applications: [overdue], dismissedNotificationIds, now }).render();
+    const value = (tree: ReturnType<typeof ApplicationsPage>) =>
+      (attentionTile(tree).props as { value?: string }).value;
+
+    expect(value(count([]))).toBe("1");
+    expect(value(count(["follow_up:title:2026-09-01"]))).toBe("0");
+  });
 });
 
 describe("result count line (#257)", () => {
