@@ -37,9 +37,12 @@ files plus the staged files must fit the 100 MiB user quota.** Restoring a full
 100 MiB library is supported into an account with enough free upload capacity.
 A replacement restore near quota can fail safely even when its final library
 would fit. Do not delete live files to manufacture space before a restore.
+After the cloud confirms the restore, files that only the replaced workspace
+used are deleted, so repeated restores do not fill the quota. If that cleanup
+fails, the restore stays committed and the document cleanup warning is shown.
 Failed ordinary document cleanup is reported separately from a confirmed save.
-Unused files may remain; this MVP does not promise automatic orphan reclamation
-or atomic replacement-quota accounting.
+Unused files may remain after a failed cleanup; this MVP does not promise
+automatic orphan reclamation or atomic replacement-quota accounting.
 
 ## Failed or interrupted restores
 

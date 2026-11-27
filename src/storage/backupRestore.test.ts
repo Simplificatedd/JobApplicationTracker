@@ -53,22 +53,37 @@ describe("backup restore persistence and failure boundaries", () => {
     expect(committed.coverLetters[0]).toEqual({ ...parsed.snapshot.coverLetters[0], storageKey: keys[1] });
     expect(await (await adapter.getResumeFile(keys[0]))!.text()).toBe("%PDF-original");
     expect(await (await adapter.getResumeFile(keys[1]))!.text()).toBe("%PDF-cover");
-    expect(await api.files.get(original.metadata.storageKey)!.text()).toBe(await original.record.file.text());
+    // The replaced workspace's file is freed once the commit is confirmed (#342).
+    expect(api.files.has(original.metadata.storageKey)).toBe(false);
     expect((await cache.exportSnapshot()).resumes).toEqual(committed.resumes);
     await adapter.refresh();
     expect(adapter.getCurrentSnapshot()).toEqual(committed);
     await adapter.importSnapshot(parsed.snapshot, files);
     expect(api.state.snapshot.resumes).toHaveLength(1);
     expect(api.state.snapshot.applications).toEqual(parsed.snapshot.applications);
+    // Restoring the same backup twice does not grow stored files.
+    expect(api.files.size).toBe(2);
   });
 
-  it("restores an empty workspace while retaining old files until reconciliation", async () => {
-    const { api, adapter, remove } = await setup();
+  it("frees the replaced workspace's files after a confirmed empty restore (#342)", async () => {
+    const { api, adapter, original, remove } = await setup();
     const empty = await parseBackupFile(await createFullBackupFile({ snapshot: snapshot({ applications: [] }), resumeFiles: [] }));
     await adapter.importSnapshot(empty.snapshot);
     expect(api.state.snapshot.applications).toEqual([]);
     expect(api.state.snapshot.resumes).toEqual([]);
-    expect(remove).not.toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(api.files.size).toBe(0);
+    expect(adapter.getDocumentCleanupWarning()).toBeNull();
+    expect(api.files.has(original.metadata.storageKey)).toBe(false);
+  });
+
+  it("keeps a confirmed restore and warns when freeing old files fails (#342)", async () => {
+    const { api, adapter, remove } = await setup();
+    const empty = await parseBackupFile(await createFullBackupFile({ snapshot: snapshot({ applications: [] }), resumeFiles: [] }));
+    remove.mockRejectedValueOnce(new CloudApiError("Storage unavailable", 503));
+    await adapter.importSnapshot(empty.snapshot);
+    expect(api.state.snapshot.resumes).toEqual([]);
+    expect(adapter.getDocumentCleanupWarning()).toContain("could not be deleted");
   });
 
   it("preserves metadata-only legacy documents and their application links", async () => {
@@ -189,7 +204,7 @@ describe("backup restore persistence and failure boundaries", () => {
   });
 
   it("retries an equivalent revision conflict without reuploading", async () => {
-    const { adapter, api, parsed, files, save, upload, remove } = await setup();
+    const { adapter, api, parsed, files, save, upload, remove, original } = await setup();
     save.mockImplementationOnce(async () => {
       api.state = { ...api.state, revision: api.state.revision + 1 };
       throw new CloudRevisionConflictError(structuredClone(api.state));
@@ -197,7 +212,9 @@ describe("backup restore persistence and failure boundaries", () => {
     await adapter.importSnapshot(parsed.snapshot, files);
     expect(save).toHaveBeenCalledTimes(2);
     expect(upload).toHaveBeenCalledTimes(2);
-    expect(remove).not.toHaveBeenCalled();
+    // Only the replaced workspace's file, once the retry is confirmed.
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove.mock.calls[0][0]).toBe(original.metadata.storageKey);
     expect(adapter.getCurrentSnapshot()).toEqual(api.state.snapshot);
   });
 

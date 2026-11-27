@@ -245,6 +245,10 @@ function removeRecords<T extends { id: string }>(
 
 // The UI already validated extension/signature and recorded its fallback MIME.
 // Preserve bytes and explicit browser MIME; fill only an absent MIME from metadata.
+function documentKeys(snapshot: StorageSnapshot) {
+  return [...snapshot.resumes, ...snapshot.coverLetters].map((document) => document.storageKey);
+}
+
 function documentBlob(file: Blob, storageKey: string, snapshot: StorageSnapshot) {
   if (file.type) return file;
   const document = [...snapshot.resumes, ...snapshot.coverLetters].find(item => item.storageKey === storageKey);
@@ -1051,6 +1055,15 @@ export function createCloudStorageAdapter({
             cloudState = saved;
             // Cache failure after an acknowledged commit remains a warning.
             await refreshCache(saved, prepared.files);
+            // The commit is confirmed, so files only the replaced workspace
+            // used are unreferenced; free them so restores don't fill the quota.
+            const kept = new Set(documentKeys(normalized));
+            const cleanup = await Promise.allSettled(
+              documentKeys(before)
+                .filter((key) => !kept.has(key))
+                .map((key) => cloudRequest(api.deleteResumeFile(key, accountId()))),
+            );
+            if (cleanup.some((result) => result.status === "rejected")) reportCleanupFailure();
             return;
           } catch (error) {
             if (!(error instanceof CloudRevisionConflictError) || !error.current) {
