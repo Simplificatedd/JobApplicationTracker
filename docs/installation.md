@@ -2,8 +2,9 @@
 
 Use this guide for a **new, empty installation**. It creates one Cloudflare Pages
 project, one D1 database and one private R2 bucket in your account, with Cloudflare
-Access for sign-in. GitHub Actions checks the code and deploys only when you
-manually run the production workflow. A custom domain is not required.
+Access for sign-in. GitHub Actions checks the code. You run the first production
+deployment manually (step 7); after that, pushes to `main` deploy automatically
+once CI passes. A custom domain is not required.
 
 Already have a working installation? Use [deployment and updates](deployment.md)
 instead. Do not recreate its storage or repeat first-installation setup.
