@@ -6,6 +6,7 @@ For an established installation, see [deployment and updates](deployment.md).
 
 | Symptom | Check |
 | --- | --- |
+| Can't sign in, or the sign-in page or site won't load | Check [Cloudflare's status page](https://www.cloudflarestatus.com) for Access or Pages incidents before changing your setup. During an outage, wait and try again; nothing in the tracker needs fixing. |
 | `That account does not have access` | The identity provider succeeded, but the user did not match the Allow policy. Test the exact email and verify the selector. |
 | `No Access cookie found. Please login first.` | Open the normal production root URL again. Avoid private browsing modes that block Access cookies, and confirm the hostname is covered by the production Access application. |
 | Cloud sync is not active | Verify the actual deployed code, production `DB`/`RESUME_FILES` bindings and Access settings (ordinary variables or encrypted secrets). No control database or bootstrap is needed. |

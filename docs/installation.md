@@ -258,6 +258,7 @@ configuration on your behalf.
 
 | Symptom | Fix |
 | --- | --- |
+| Sign-in or the site worked before but now fails | Check [Cloudflare's status page](https://www.cloudflarestatus.com) for Access or Pages incidents before changing any settings. |
 | Environment settings are unavailable | Use your own public fork on GitHub Free, or a plan supporting private-repository environments. Enable Actions in the fork. |
 | Deployment is skipped or the environment rejects the branch | Dispatch from `main`; check the environment's selected **Branch** rule is exactly `main`. |
 | `Missing deployment credential` / HTTP 403 during preflight | Check the two environment secret names, token expiry, Pages Edit permission and account scope. Wrangler login on your laptop does not authenticate GitHub Actions. |
