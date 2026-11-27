@@ -19,6 +19,8 @@ missing or inconsistent; it never silently omits an attachment.
   including normalized settings, migrated assessments/projections, unknown fields,
   JSON escaping, and fresh document storage keys used during restoration.
   Base64 payloads and the backup envelope do not count toward this snapshot limit.
+  **Settings → Backup and export** shows the current size (approximate), and a
+  warning banner appears above 80% of the limit.
 - Zero-byte legacy metadata entries represent missing attachments. Their metadata
   and application associations are retained; a full backup cannot recover bytes
   that were never stored. Preview/download actions reject these entries without

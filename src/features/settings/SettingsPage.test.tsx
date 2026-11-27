@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
 import { getBottomCatchUp, isSectionReached, parseDayField, SettingsPage } from "./SettingsPage";
 
-function renderPage() {
+function renderPage(trackerDataBytes = 0) {
   return renderToStaticMarkup(
     <SettingsPage
       cloudAccountEmail="user@example.com"
@@ -16,6 +16,7 @@ function renderPage() {
       onResetSettings={vi.fn()}
       onUpdateSettings={vi.fn()}
       settings={DEFAULT_USER_SETTINGS}
+      trackerDataBytes={trackerDataBytes}
     />,
   );
 }
@@ -261,5 +262,14 @@ describe("export file names (#358)", () => {
     expect(source).toContain("job-applications-${createDateStamp()}.csv");
     expect(source).toContain('"backup"}-${createDateStamp()}.json');
     expect(source).not.toContain("toISOString().slice(0, 10)");
+  });
+});
+
+describe("tracker data size (#347)", () => {
+  it("shows usage in MB and flags it near the limit", () => {
+    expect(renderPage(1_200_000)).toContain("Tracker data: 1.2 MB of 1.9 MB.");
+    expect(renderPage(1_200_000)).not.toContain("Close to the limit");
+    expect(renderPage(1_600_000)).toContain("Close to the limit");
+    expect(renderPage(4_200)).toContain("Tracker data: 5 KB of 1.9 MB.");
   });
 });

@@ -22,6 +22,7 @@ import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
 import { createDateStamp, DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
+import { formatDataSize, getCloudSnapshotSizeWarning, MAX_CLOUD_SNAPSHOT_BYTES } from "../../storage/snapshotSize";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
@@ -34,6 +35,7 @@ interface SettingsPageProps {
   onResetSettings: () => void;
   onUpdateSettings: (settings: Partial<UserSettings>) => void;
   settings: UserSettings;
+  trackerDataBytes: number;
 }
 
 export function SettingsPage({
@@ -46,7 +48,9 @@ export function SettingsPage({
   onResetSettings,
   onUpdateSettings,
   settings,
+  trackerDataBytes,
 }: SettingsPageProps) {
+  const sizeWarning = getCloudSnapshotSizeWarning(trackerDataBytes);
   const [backupError, setBackupError] = useState("");
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const [backupPreview, setBackupPreview] =
@@ -241,6 +245,9 @@ export function SettingsPage({
             />
           </div>
           <div className="pb-4 text-sm text-muted">
+            <p className={sizeWarning ? "mb-2 font-semibold text-amber-800" : "mb-2"}>
+              Tracker data: {formatDataSize(trackerDataBytes)} of {formatDataSize(MAX_CLOUD_SNAPSHOT_BYTES)}.{sizeWarning ? " Close to the limit." : ""}
+            </p>
             <p>Full backups support up to 100 MiB of documents, 10 MiB per file, and the cloud tracker-data limit. Restoring requires available cloud upload space.</p>
             <button className="mt-2 font-semibold text-primary hover:underline max-md:h-11" onClick={() => exportFullBackup(true)} type="button">
               Export recovery archive

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { snapshot } from "../test/assessmentFixtures";
 import { snapshotWithBytes } from "../test/snapshotSize";
 import {
+  CLOUD_SNAPSHOT_SIZE_MESSAGE,
+  CLOUD_SNAPSHOT_WARNING_BYTES,
   CloudSnapshotSizeError,
+  getCloudSnapshotSizeWarning,
   D1_MAX_ROW_BYTES,
   MAX_CLOUD_SNAPSHOT_BYTES,
   serializeCloudSnapshot,
@@ -41,5 +44,13 @@ describe("cloud snapshot byte policy", () => {
     data.contacts = [];
     data.resumes.push({ id: "doc", storageKey: "file", displayName: "Resume", originalFileName: "r.pdf", downloadFileName: "r.pdf", fileExtension: "pdf", mimeType: "application/pdf", contentHash: "hash", fileSize: 100_000_000, uploadedAt: "now", updatedAt: "now", notes: "x".repeat(MAX_CLOUD_SNAPSHOT_BYTES) });
     expect(() => serializeCloudSnapshot(data)).toThrow(CloudSnapshotSizeError);
+  });
+});
+
+describe("getCloudSnapshotSizeWarning (#347)", () => {
+  it("warns above 80% of the limit, in MB", () => {
+    expect(getCloudSnapshotSizeWarning(CLOUD_SNAPSHOT_WARNING_BYTES)).toBeNull();
+    expect(getCloudSnapshotSizeWarning(1_600_000)).toMatch(/^Tracker data is 1\.6 MB of the 1\.9 MB cloud limit\./);
+    expect(CLOUD_SNAPSHOT_SIZE_MESSAGE).toContain("1.9 MB cloud limit");
   });
 });

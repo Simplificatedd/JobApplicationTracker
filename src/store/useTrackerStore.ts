@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -77,6 +78,7 @@ import {
 import { createMutationQueue } from "../lib/mutationQueue";
 import { cloudStorageAdapter } from "../storage/cloudStorageAdapter";
 import { CloudApiError } from "../storage/cloudApi";
+import { utf8ByteLength } from "../storage/snapshotSize";
 import { assertRecordIdentity, equalStoredValue, StorageConflictError } from "../storage/mutationRebase";
 import type {
   ResumeBlobRecord,
@@ -141,6 +143,7 @@ export interface TrackerStore extends AssessmentActions {
   settings: UserSettings;
   storageError: string | null;
   tablePreferences: TablePreferences | null;
+  trackerDataBytes: number;
   addContact: (input: ContactInput) => Promise<MutationResult<ApplicationContact>>;
   addInterview: (input: InterviewInput) => Promise<MutationResult<Interview>>;
   appendActivity: (
@@ -242,6 +245,12 @@ export function useTrackerStore(): TrackerStore {
   const [storageRetryKey, setStorageRetryKey] = useState(0);
   const [tablePreferences, setTablePreferences] =
     useAccountState<TablePreferences | null>(null, accountInvalidated);
+  // Approximates the saved snapshot (same records, without envelope fields) for the size meter.
+  const trackerDataBytes = useMemo(() => utf8ByteLength(JSON.stringify({
+    activities, analyticsSettings, applications, assessments, contacts, coverLetters,
+    interviews, notificationState, resumes, settings, tablePreferences,
+  })), [activities, analyticsSettings, applications, assessments, contacts, coverLetters,
+    interviews, notificationState, resumes, settings, tablePreferences]);
   const analyticsMutationQueue = useRef(createMutationQueue()).current;
   const [applicationMutationQueue] = useState(createMutationQueue);
   const notificationMutationQueue = useRef(createMutationQueue()).current;
@@ -1858,6 +1867,7 @@ export function useTrackerStore(): TrackerStore {
     settings,
     storageError,
     tablePreferences,
+    trackerDataBytes,
     addContact: (...args) => trackAction(addContact, ...args),
     addInterview: (...args) => trackAction(addInterview, ...args),
     appendActivity: (...args) => trackAction(appendActivity, ...args),

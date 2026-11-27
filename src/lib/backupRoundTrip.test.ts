@@ -61,8 +61,8 @@ describe("full backup export/import contract", () => {
       const file = await createFullBackupFile({ snapshot: data, resumeFiles: [] });
       expect(serializeCloudSnapshot((await parseBackupFile(file)).snapshot).bytes).toBe(MAX_CLOUD_SNAPSHOT_BYTES + offset);
     } else {
-      await expect(parseBackupFile(raw)).rejects.toThrow("1,900,000-byte");
-      await expect(createFullBackupFile({ snapshot: data, resumeFiles: [] })).rejects.toThrow("1,900,000-byte");
+      await expect(parseBackupFile(raw)).rejects.toThrow("1.9 MB cloud limit");
+      await expect(createFullBackupFile({ snapshot: data, resumeFiles: [] })).rejects.toThrow("1.9 MB cloud limit");
       expect(raw.size).toBeGreaterThan(0); // Lossless recovery export remains available.
     }
   });
@@ -70,22 +70,22 @@ describe("full backup export/import contract", () => {
   it("rejects migration and settings expansion during preview/export", async () => {
     const legacy = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES - 1);
     expect(utf8ByteLength(JSON.stringify(legacy))).toBeLessThan(MAX_CLOUD_SNAPSHOT_BYTES);
-    await expect(parseBackupFile(backupFile({ ...populatedBackup(), snapshot: legacy, resumeFiles: [], coverLetterFiles: [] }))).rejects.toThrow("1,900,000-byte");
-    await expect(createFullBackupFile({ snapshot: legacy, resumeFiles: [] })).rejects.toThrow("1,900,000-byte");
+    await expect(parseBackupFile(backupFile({ ...populatedBackup(), snapshot: legacy, resumeFiles: [], coverLetterFiles: [] }))).rejects.toThrow("1.9 MB cloud limit");
+    await expect(createFullBackupFile({ snapshot: legacy, resumeFiles: [] })).rejects.toThrow("1.9 MB cloud limit");
   });
 
   it("reserves staging-key growth during preview before any restore can start", async () => {
     const doc = backupDocument("a");
     const data = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES, { ...normalized(), resumes: [doc.metadata] });
-    expect(() => serializeCloudSnapshot(remapRestoreFiles(data, [doc.payload]).snapshot)).toThrow("1,900,000-byte");
-    await expect(createFullBackupFile({ snapshot: data, resumeFiles: [doc.payload] })).rejects.toThrow("1,900,000-byte");
+    expect(() => serializeCloudSnapshot(remapRestoreFiles(data, [doc.payload]).snapshot)).toThrow("1.9 MB cloud limit");
+    await expect(createFullBackupFile({ snapshot: data, resumeFiles: [doc.payload] })).rejects.toThrow("1.9 MB cloud limit");
   });
 
   it.each(["界", "😀", "\n", '"', "\\", "\u0000", "\ud800"])("counts UTF-8 and escaped JSON for %j", async (character) => {
     const data = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES, normalized());
     data.applications[0].notes = data.applications[0].notes!.slice(1) + character;
     expect(utf8ByteLength(JSON.stringify(data))).toBeGreaterThan(MAX_CLOUD_SNAPSHOT_BYTES);
-    await expect(createFullBackupFile({ snapshot: data, resumeFiles: [] })).rejects.toThrow("1,900,000-byte");
+    await expect(createFullBackupFile({ snapshot: data, resumeFiles: [] })).rejects.toThrow("1.9 MB cloud limit");
   });
 
   it.each([1, 2, 3])("supports schema %i and preserves its Offered semantics", async (schemaVersion) => {

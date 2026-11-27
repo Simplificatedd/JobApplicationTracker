@@ -39,6 +39,12 @@ vi.mock("react", () => ({
     if (!previous || deps.some((dep, i) => !Object.is(dep, previous.deps[i]))) host.slots[slot] = { callback, deps };
     return (host.slots[slot] as { callback: unknown }).callback;
   },
+  useMemo(factory: () => unknown, deps: unknown[]) {
+    const slot = host.cursor++;
+    const previous = host.slots[slot] as { value: unknown; deps: unknown[] } | undefined;
+    if (!previous || deps.some((dep, i) => !Object.is(dep, previous.deps[i]))) host.slots[slot] = { value: factory(), deps };
+    return (host.slots[slot] as { value: unknown }).value;
+  },
   useEffect(effect: () => unknown, deps: unknown[]) {
     const slot = host.cursor++;
     const previous = host.slots[slot] as { deps: unknown[]; cleanup?: () => void } | undefined;
@@ -936,11 +942,11 @@ describe("store with two independent revision-aware cloud adapters", () => {
     const { store, b } = await sessions();
     const large = snapshotWithBytes(MAX_CLOUD_SNAPSHOT_BYTES + 100, b.getCurrentSnapshot());
     storage.exportSnapshot.mockResolvedValue(large);
-    await expect(store.exportFullBackup()).rejects.toThrow("1,900,000-byte");
+    await expect(store.exportFullBackup()).rejects.toThrow("1.9 MB cloud limit");
     const recovery = await store.exportRecoveryBackup();
     const data = JSON.parse(await recovery.text());
     expect(data.snapshot).toEqual(JSON.parse(JSON.stringify(large)));
-    await expect(parseBackupFile(recovery)).rejects.toThrow("1,900,000-byte");
+    await expect(parseBackupFile(recovery)).rejects.toThrow("1.9 MB cloud limit");
     expect((await createBackupFile({ snapshot: large, resumeFiles: [] })).size).toBe(recovery.size);
   });
 

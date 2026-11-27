@@ -142,7 +142,7 @@ describe("cloud snapshot storage budget", () => {
       await expect(saving).resolves.toMatchObject({ revision: 1 });
       expect(utf8ByteLength(fake.rows.get("owner")!.snapshot_json)).toBe(MAX_CLOUD_SNAPSHOT_BYTES + offset);
     } else {
-      await expect(saving).rejects.toMatchObject({ status: 413, message: expect.stringContaining("1,900,000-byte") });
+      await expect(saving).rejects.toMatchObject({ status: 413, message: expect.stringContaining("1.9 MB cloud limit") });
       expect(prepare).not.toHaveBeenCalled();
     }
   });
