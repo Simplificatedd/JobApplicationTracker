@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_USER_SETTINGS } from "../../lib/domain";
-import { getBottomCatchUp, isSectionReached, SettingsPage } from "./SettingsPage";
+import { getBottomCatchUp, isSectionReached, parseDayField, SettingsPage } from "./SettingsPage";
 
 function renderPage() {
   return renderToStaticMarkup(
@@ -233,5 +233,24 @@ describe("settings switches (#260)", () => {
       expect(rule).toContain("--tw-shadow: var(--focus-ring)");
       expect(rule).toContain("box-shadow:");
     }
+  });
+});
+
+describe("parseDayField (#345)", () => {
+  it("saves a retyped value and keeps the previous one for empty or invalid text", () => {
+    expect(parseDayField("5", 3, 1, 365)).toBe(5);
+    expect(parseDayField("", 3, 1, 365)).toBe(3);
+    expect(parseDayField("abc", 3, 1, 365)).toBe(3);
+  });
+
+  it("rounds down and clamps to the allowed range", () => {
+    expect(parseDayField("1.7", 3, 1, 365)).toBe(1);
+    expect(parseDayField("0", 3, 1, 365)).toBe(1);
+    expect(parseDayField("-3", 3, 1, 365)).toBe(1);
+    expect(parseDayField("99999", 3, 1, 365)).toBe(365);
+  });
+
+  it("caps both day inputs at 365", () => {
+    expect(countMatches(renderPage(), 'max="365"')).toBe(2);
   });
 });
