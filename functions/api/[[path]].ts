@@ -3,6 +3,7 @@ import {
   errorResponse,
   HttpError,
   jsonResponse,
+  requireBindings,
   requireSameOriginMutation,
 } from "../lib/http";
 import {
@@ -45,6 +46,7 @@ export const onRequest: PagesFunction<CloudflareEnv> = async (context) => {
         context.request.headers.get(MUTATION_PROTOCOL_HEADER) !== MUTATION_PROTOCOL_VERSION) {
         throw new HttpError(426, MUTATION_PROTOCOL_ERROR);
       }
+      requireBindings(context.env, route === "state" ? ["DB"] : ["DB", "RESUME_FILES"]);
     }
 
     if (route === "state") {

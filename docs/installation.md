@@ -2,8 +2,9 @@
 
 Use this guide for a **new, empty installation**. It creates one Cloudflare Pages
 project, one D1 database and one private R2 bucket in your account, with Cloudflare
-Access for sign-in. GitHub Actions checks the code and deploys only when you
-manually run the production workflow. A custom domain is not required.
+Access for sign-in. GitHub Actions checks the code. You run the first production
+deployment manually (step 7); after that, pushes to `main` deploy automatically
+once CI passes. A custom domain is not required.
 
 Already have a working installation? Use [deployment and updates](deployment.md)
 instead. Do not recreate its storage or repeat first-installation setup.
@@ -257,6 +258,7 @@ configuration on your behalf.
 
 | Symptom | Fix |
 | --- | --- |
+| Sign-in or the site worked before but now fails | Check [Cloudflare's status page](https://www.cloudflarestatus.com) for Access or Pages incidents before changing any settings. |
 | Environment settings are unavailable | Use your own public fork on GitHub Free, or a plan supporting private-repository environments. Enable Actions in the fork. |
 | Deployment is skipped or the environment rejects the branch | Dispatch from `main`; check the environment's selected **Branch** rule is exactly `main`. |
 | `Missing deployment credential` / HTTP 403 during preflight | Check the two environment secret names, token expiry, Pages Edit permission and account scope. Wrangler login on your laptop does not authenticate GitHub Actions. |

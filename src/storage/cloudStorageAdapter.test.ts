@@ -523,6 +523,21 @@ describe("cloud storage adapter", () => {
     expect(() => adapter.getCurrentSnapshot()).toThrow("Signed-in account changed");
   });
 
+  it.each([401, 403])("says the session expired on %i but still stops all work (#364)", async (status) => {
+    const api = new FakeCloudApi();
+    api.state = { revision: 1, snapshot: createSnapshot(), updatedAt: application.updatedAt };
+    const changed = vi.fn();
+    const adapter = createCloudStorageAdapter({ api, cache: createCache(`cloud-expired-${status}`), onAccountChanged: changed });
+    await adapter.initialize();
+    api.saveState = async () => {
+      throw new CloudApiError("Access denied.", status);
+    };
+    await expect(adapter.commitMutation({ applications: [application], creates: { applications: [application.id] } }))
+      .rejects.toThrow("Your session has expired");
+    expect(changed).toHaveBeenCalledWith(expect.stringContaining("Your session has expired"));
+    await expect(adapter.listApplications()).rejects.toThrow("Your session has expired");
+  });
+
   it("uses cloud state as authoritative and refreshes the local cache", async () => {
     const cache = createCache("cloud-authoritative");
     await cache.initialize();
