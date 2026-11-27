@@ -755,6 +755,7 @@ export function RowActionsMenu({
         aria-expanded={isOpen}
         aria-haspopup="menu"
         className="icon-button h-9 w-9 max-w-full"
+        data-row-actions={application.id}
         onClick={() => setIsOpen((current) => !current)}
         ref={triggerRef}
         type="button"

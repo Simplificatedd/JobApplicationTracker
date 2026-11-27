@@ -8,6 +8,9 @@ export function firstVisible(selector: string) {
   );
 }
 
+// Open modals, newest last. Only the top one answers an Escape that reaches <body>.
+const openModals: HTMLDialogElement[] = [];
+
 export function NativeModal({ children, className, fallbackFocus, labelledBy, onRequestClose, role }: {
   children: ReactNode;
   className: string;
@@ -31,8 +34,18 @@ export function NativeModal({ children, className, fallbackFocus, labelledBy, on
     const cancel = (event: Event) => {
       event.preventDefault(); event.stopPropagation(); onRequestClose();
     };
+    // If the focused control was removed, focus falls to <body> and the dialog's
+    // own onKeyDown never sees Escape, so handle it here for the top modal.
+    const escapeFromBody = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.target !== document.body || openModals[openModals.length - 1] !== dialog) return;
+      event.preventDefault(); onRequestClose();
+    };
     dialog.addEventListener("cancel", cancel);
-    return () => dialog.removeEventListener("cancel", cancel);
+    document.addEventListener("keydown", escapeFromBody);
+    return () => {
+      dialog.removeEventListener("cancel", cancel);
+      document.removeEventListener("keydown", escapeFromBody);
+    };
   }, [onRequestClose]);
   useEffect(() => {
     const dialog = ref.current;
@@ -42,8 +55,10 @@ export function NativeModal({ children, className, fallbackFocus, labelledBy, on
     // inertness remain, but platform close requests must not bypass that guard.
     dialog.setAttribute("closedby", "none");
     if (!dialog.open) dialog.showModal();
+    openModals.push(dialog);
     dialog.querySelector<HTMLElement>("[data-initial-focus]")?.focus();
     return () => {
+      openModals.splice(openModals.indexOf(dialog), 1);
       if (dialog.open) dialog.close();
       // React can detach the dialog before passive cleanup; keep opener return.
       if (!(opener instanceof HTMLElement)) return;

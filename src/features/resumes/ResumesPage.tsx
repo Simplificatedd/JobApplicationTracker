@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { EmptyState } from "../../components/EmptyState";
+import { firstVisible } from "../../components/NativeModal";
+import { keepFocusAfterRemoval } from "../../lib/keepFocusAfterRemoval";
 import { useResumeFileActions } from "../../hooks/useResumeFileActions";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { changedDraftFields } from "../../lib/editIntent";
@@ -178,7 +180,10 @@ export function ResumesPage({
         ? `Delete "${resume.displayName}" and remove it from ${linkedCount} linked application${linkedCount === 1 ? "" : "s"}?`
         : `Delete "${resume.displayName}" permanently?`;
 
+    // Read before confirm() so the item is known even if focus moves.
+    const item = document.activeElement?.closest("[data-document-item]");
     if (window.confirm(message)) {
+      keepFocusAfterRemoval(item, "[data-document-item]", () => firstVisible("[data-document-upload]"), "button");
       onDeleteResume(resume.id);
     }
   }
@@ -245,6 +250,7 @@ export function ResumesPage({
           </Field>
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11 md:self-end"
+            data-document-upload
             disabled={isUploading}
             onClick={() => fileInputRef.current?.click()}
             type="button"
@@ -489,7 +495,7 @@ function ResumeRow({
   const { draft, isEditing } = editor;
 
   return (
-    <tr className="text-sm text-foreground">
+    <tr className="text-sm text-foreground" data-document-item>
       <Td>
         {isEditing ? (
           <div className="space-y-2">
@@ -597,7 +603,7 @@ function ResumeCard({
   const { draft, isEditing } = editor;
 
   return (
-    <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground">
+    <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground" data-document-item>
       {isEditing ? (
         <div className="grid gap-3">
           <Field label="Display name">

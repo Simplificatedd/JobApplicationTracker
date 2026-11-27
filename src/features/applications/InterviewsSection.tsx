@@ -1,5 +1,6 @@
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import { useEditorFocus } from "../../hooks/useEditorFocus";
 import {
   getInterviewTypeLabel,
   INTERVIEW_MODE_OPTIONS,
@@ -75,18 +76,21 @@ export function InterviewsSection({
   const sortedInterviews = sortInterviewHistory(interviews);
 
   const editorOpen = Boolean(draft) || isSaving;
+  const { sectionRef, rememberOpener } = useEditorFocus(Boolean(draft), '[data-stage-add="interview"]');
   useEffect(() => {
     onEditingChange?.(editorOpen);
     return () => onEditingChange?.(false);
   }, [editorOpen, onEditingChange]);
 
   function startAdding() {
+    rememberOpener();
     setEditingId("new");
     setDraft(createDraft(undefined, getNextInterviewRound(interviews)));
     setError("");
   }
 
   function startEditing(interview: Interview) {
+    rememberOpener();
     setEditBase(structuredClone(interview));
     setEditingId(interview.id);
     setDraft(createDraft(interview));
@@ -156,7 +160,7 @@ export function InterviewsSection({
   }
 
   return (
-    <section>
+    <section ref={sectionRef}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Interviews</h3>
@@ -387,7 +391,7 @@ function InterviewForm({
   }
 
   return (
-    <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
+    <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4" data-stage-editor>
       <div className="flex items-center justify-between gap-3">
         <h4 className="text-sm font-semibold text-foreground">
           {isNew ? "Add interview" : "Edit interview"}

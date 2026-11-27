@@ -15,7 +15,7 @@ it("prevents native cancel until the guarded close request permits dismissal and
     showModal = vi.fn(() => { this.open = true; });
     close = vi.fn(() => { this.open = false; });
   }
-  const opener = new Element(); vi.stubGlobal("HTMLElement", Element); vi.stubGlobal("document", { activeElement: opener });
+  const opener = new Element(); vi.stubGlobal("HTMLElement", Element); vi.stubGlobal("document", { activeElement: opener, addEventListener: vi.fn(), removeEventListener: vi.fn() });
   const dialog = new Dialog(); host.dialog = dialog;
   const requestClose = vi.fn();
   const modal = NativeModal({ className: "modal-overlay", labelledBy: "title", children: "Editor", onRequestClose: requestClose });
@@ -41,7 +41,7 @@ it("focuses the fallback when the opener is no longer rendered, and the opener o
   }
   vi.stubGlobal("HTMLElement", Element);
   const open = (opener: Element, fallback?: Element) => {
-    vi.stubGlobal("document", { activeElement: opener });
+    vi.stubGlobal("document", { activeElement: opener, addEventListener: vi.fn(), removeEventListener: vi.fn() });
     host.dialog = new Dialog();
     NativeModal({ className: "x", labelledBy: "t", children: null, onRequestClose: vi.fn(), fallbackFocus: fallback && (() => fallback as unknown as HTMLElement) });
     host.cleanups.splice(0).forEach(cleanup => cleanup());
@@ -71,4 +71,28 @@ it("focuses the fallback when the opener is no longer rendered, and the opener o
   const alone = new Element(); alone.rendered = false;
   open(alone);
   expect(alone.focus).toHaveBeenCalled();
+});
+
+it("closes only the top modal on an Escape that reaches body after focus was lost (#304)", () => {
+  class Dialog extends EventTarget {
+    open = false;
+    querySelector() { return null; }
+    setAttribute = vi.fn();
+    showModal = vi.fn(() => { this.open = true; });
+    close = vi.fn(() => { this.open = false; });
+  }
+  // The document is its own body so a dispatched event targets "body".
+  const doc = Object.assign(new EventTarget(), { activeElement: null, body: null as unknown });
+  doc.body = doc;
+  vi.stubGlobal("document", doc); vi.stubGlobal("HTMLElement", class {});
+  const panelClose = vi.fn(); const promptClose = vi.fn();
+  host.dialog = new Dialog(); NativeModal({ className: "x", labelledBy: "t", children: null, onRequestClose: panelClose });
+  host.dialog = new Dialog(); NativeModal({ className: "x", labelledBy: "t", children: null, onRequestClose: promptClose });
+  const escape = () => doc.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" }));
+  escape();
+  expect(promptClose).toHaveBeenCalledTimes(1); expect(panelClose).not.toHaveBeenCalled();
+  // Closing the prompt (its two effect cleanups) makes the panel the top modal.
+  host.cleanups.pop()?.(); host.cleanups.pop()?.();
+  escape();
+  expect(promptClose).toHaveBeenCalledTimes(1); expect(panelClose).toHaveBeenCalledTimes(1);
 });

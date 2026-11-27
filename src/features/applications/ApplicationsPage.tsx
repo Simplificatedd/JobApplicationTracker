@@ -22,6 +22,8 @@ import {
 } from "./applicationFilters";
 import { searchApplications } from "./applicationSearch";
 import { countApplicationSummary } from "./applicationSummary";
+import { firstVisible } from "../../components/NativeModal";
+import { keepFocusAfterRemoval } from "../../lib/keepFocusAfterRemoval";
 import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import {
   deriveApplicationNotifications,
@@ -332,6 +334,19 @@ export function ApplicationsPage({
   }
   const deleteAndCloseApplication = closeAfter(deleteApplication);
 
+  // Archive, restore and delete can remove the row whose menu had focus. Move
+  // focus to the neighbouring row's menu (or the search box) instead of <body>.
+  function keepRowFocus(action: (id: string) => Promise<MutationResult>) {
+    return (id: string) => {
+      keepFocusAfterRemoval(
+        firstVisible(`[data-row-actions="${CSS.escape(id)}"]`),
+        "[data-row-actions]",
+        () => firstVisible('input[type="search"]'),
+      );
+      return action(id);
+    };
+  }
+
   // Unlike Reset, keeps sort, columns, widths and the Active/Total choice.
   function clearFilters() {
     setFilters(DEFAULT_APPLICATION_FILTERS);
@@ -501,15 +516,15 @@ export function ApplicationsPage({
         enableDeleteActiveApplications={enableDeleteActiveApplications}
         markArchivedApplications={showsArchivedInActiveView}
         onPreviewResume={previewResume}
-        onArchiveApplication={archiveApplication}
-        onDeleteApplication={deleteAndCloseApplication}
+        onArchiveApplication={keepRowFocus(archiveApplication)}
+        onDeleteApplication={keepRowFocus(deleteAndCloseApplication)}
         onOpenApplication={setSelectedApplicationId}
         onOpenContacts={(id) => {
           setFocusNewContact(false);
           setContactsApplicationId(id);
         }}
         onColumnWidthsChange={setColumnWidths}
-        onRestoreApplication={restoreApplication}
+        onRestoreApplication={keepRowFocus(restoreApplication)}
         onSortChange={(column) => setSort((current) => nextSort(current, column))}
         onUpdateApplication={updateApplication}
         resumes={resumes}
