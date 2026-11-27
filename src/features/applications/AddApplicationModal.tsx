@@ -175,6 +175,8 @@ export function AddApplicationModal({
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
   const [urlError, setUrlError] = useState("");
+  // Shown in the footer beside Save: the form scrolls, so an error inside it can be out of view.
+  const [saveError, setSaveError] = useState("");
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [interviewRoundError, setInterviewRoundError] = useState("");
@@ -235,6 +237,7 @@ export function AddApplicationModal({
     setDuplicateMatch(null);
     setTitleError("");
     setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -253,6 +256,7 @@ export function AddApplicationModal({
     setCoverLetterUploadError("");
     setTitleError("");
     setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -441,6 +445,7 @@ export function AddApplicationModal({
     setDuplicateMatch(null);
     setResumeUploadError("");
     setCoverLetterUploadError("");
+    setSaveError("");
     setIsSaving(true);
     const result = await onCreate(
       input,
@@ -468,8 +473,9 @@ export function AddApplicationModal({
     setIsSaving(false);
 
     if (!result.ok) {
-      setResumeUploadError(result.error);
-      setCoverLetterUploadError(result.error);
+      setSaveError(result.error);
+      if (resumeUploadFile) setResumeUploadError(result.error);
+      if (coverLetterUploadFile) setCoverLetterUploadError(result.error);
       return;
     }
 
@@ -480,6 +486,7 @@ export function AddApplicationModal({
     setCoverLetterUploadError("");
     setTitleError("");
     setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     onClose();
@@ -1077,6 +1084,11 @@ export function AddApplicationModal({
         </form>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 max-md:grid max-md:grid-cols-2 max-md:py-3 sm:px-6">
+          {saveError ? (
+            <p className="basis-full text-sm font-medium text-destructive max-md:col-span-2" role="alert">
+              {saveError}
+            </p>
+          ) : null}
           <button
             className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             disabled={isSaving}
