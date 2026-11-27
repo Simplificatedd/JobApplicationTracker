@@ -179,7 +179,7 @@ describe("cloud API client", () => {
 
   it("says could not be reached only for connection failures (#355)", async () => {
     const offline = createCloudApiClient({ fetcher: vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch")), retryDelays: [] });
-    await expect(offline.getSession()).rejects.toThrow("Cloud storage could not be reached. Failed to fetch");
+    await expect(offline.getSession()).rejects.toThrow("Cloud storage could not be reached (Failed to fetch). Check https://www.cloudflarestatus.com for outages.");
 
     const serverError = createCloudApiClient({ fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: "The cloud storage service could not complete the request." }, { status: 500 })), retryDelays: [] });
     await expect(serverError.getSession()).rejects.toThrow(/^The cloud storage service could not complete the request\.$/);

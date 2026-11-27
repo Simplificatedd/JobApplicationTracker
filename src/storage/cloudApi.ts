@@ -99,9 +99,7 @@ export function createCloudApiClient(
     throw new CloudApiError(
       stateWrite
         ? "The save outcome could not be confirmed. Reload the tracker and inspect the current data before retrying."
-        : lastError instanceof Error
-        ? `Cloud storage could not be reached. ${lastError.message}`
-        : "Cloud storage could not be reached.",
+        : `Cloud storage could not be reached${lastError instanceof Error ? ` (${lastError.message})` : ""}. Check https://www.cloudflarestatus.com for outages.`,
       0,
     );
   }
