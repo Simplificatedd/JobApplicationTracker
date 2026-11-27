@@ -21,7 +21,7 @@ import { useScrollActiveIntoView } from "../../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
 import type { BackupImportPreview } from "../../lib/backups";
-import { DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
+import { createDateStamp, DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import type { UserSettings } from "../../types/settings";
 
 interface SettingsPageProps {
@@ -76,7 +76,7 @@ export function SettingsPage({
     try {
       downloadBlob(
         await (recovery ? onExportRecoveryBackup() : onExportFullBackup()),
-        `job-tracker-${recovery ? "recovery" : "backup"}-${new Date().toISOString().slice(0, 10)}.json`,
+        `job-tracker-${recovery ? "recovery" : "backup"}-${createDateStamp()}.json`,
       );
       setBackupStatus(recovery
         ? "Recovery archive exported. It preserves available data but may need repair before import. See docs/backups.md."
@@ -89,7 +89,7 @@ export function SettingsPage({
   function exportCsv() {
     downloadBlob(
       onExportApplicationsCsv(),
-      `job-applications-${new Date().toISOString().slice(0, 10)}.csv`,
+      `job-applications-${createDateStamp()}.csv`,
     );
     setBackupStatus("CSV exported.");
   }

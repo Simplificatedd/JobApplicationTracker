@@ -114,6 +114,35 @@ describe("createApplicationsCsv", () => {
     expect(csv).toContain("follow_up_prompt_days");
     expect(csv).toContain("compulsory,2026-10-08,yes,7");
   });
+
+  it("marks archived applications and exports the fields shown in the app (#348)", async () => {
+    const csv = await createApplicationsCsv({
+      applications: [
+        createApplication({
+          archivedAt: timestamp,
+          contactsCount: 2,
+          jobDescription: "=SUM(A1)",
+          priority: "high",
+          roleEndDate: "2027-08-31",
+          roleStartDate: "2027-06-01",
+          salary: "3000/month",
+          workMode: "hybrid",
+        }),
+        createApplication({ id: "app-2" }),
+      ],
+      resumes: [],
+    }).text();
+    const [header, archived, active] = csv.split("\n");
+
+    expect(header).toMatch(/,archived,work_mode,priority,salary,role_start_date,role_end_date,contacts_count,job_description$/);
+    expect(archived).toMatch(/,yes,hybrid,high,3000\/month,2027-06-01,2027-08-31,2,"\t=SUM\(A1\)"$/);
+    expect(active).toMatch(/,no,unknown,medium,,,,0,$/);
+  });
+
+  it("starts with a UTF-8 byte order mark (#356)", async () => {
+    const bytes = new Uint8Array(await createApplicationsCsv({ applications: [createApplication({ company: "Zürich AG" })], resumes: [] }).arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
 });
 
 describe("parseBackupFile", () => {
