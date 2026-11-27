@@ -31,5 +31,9 @@ jobs:
       - name: Verify repository
         run: npm run check
 
+      # Catches date bugs that UTC hides: the furthest-ahead and a behind-UTC zone.
+      - name: Test in other time zones
+        run: TZ=Pacific/Kiritimati npx vitest run && TZ=Pacific/Honolulu npx vitest run
+
       - name: Test offline backup recovery
         run: python3 -B -m unittest discover -s scripts -p 'test_*.py'
