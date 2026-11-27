@@ -251,7 +251,7 @@ export function useTrackerStore(): TrackerStore {
   useEffect(() => {
     let isActive = true;
 
-    const handleAccountChanged = () => {
+    const handleAccountChanged = (event: Event) => {
       if (accountInvalidated.current) return;
       isActive = false;
       setActivities([]);
@@ -266,7 +266,10 @@ export function useTrackerStore(): TrackerStore {
       setResumes([]);
       setSettings(DEFAULT_USER_SETTINGS);
       setTablePreferences(null);
-      setStorageError("Signed-in account changed. Reload the tracker.");
+      setStorageError(
+        (event as CustomEvent<string>).detail ??
+          "Signed-in account changed. Reload the tracker.",
+      );
       setCacheWarning(null);
       setDocumentCleanupWarning(null);
       setIsStorageLoading(false);

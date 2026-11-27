@@ -245,6 +245,9 @@ function removeRecords<T extends { id: string }>(
 
 // The UI already validated extension/signature and recorded its fallback MIME.
 // Preserve bytes and explicit browser MIME; fill only an absent MIME from metadata.
+const ACCOUNT_CHANGED_MESSAGE = "Signed-in account changed. Reload the tracker.";
+const SESSION_EXPIRED_MESSAGE = "Your session has expired. Reload the tracker to sign in again.";
+
 function documentKeys(snapshot: StorageSnapshot) {
   return [...snapshot.resumes, ...snapshot.coverLetters].map((document) => document.storageKey);
 }
@@ -285,8 +288,8 @@ export function createCloudStorageAdapter({
     window.confirm(
       `Local tracker data was found without an account owner. It may belong to another account. Import it into ${account.email}? The original local data will be kept.`,
     ),
-  onAccountChanged = () => {
-    window.dispatchEvent(new Event("tracker-account-changed"));
+  onAccountChanged = (message: string) => {
+    window.dispatchEvent(new CustomEvent("tracker-account-changed", { detail: message }));
     window.location.reload();
   },
 }: {
@@ -295,13 +298,14 @@ export function createCloudStorageAdapter({
   cacheForAccount?: (accountId: string) => StorageAdapter;
   legacyCache?: StorageAdapter;
   confirmLegacyMigration?: (account: CloudAccount) => boolean | Promise<boolean>;
-  onAccountChanged?: () => void;
+  onAccountChanged?: (message: string) => void;
 } = {}): CloudStorageAdapter {
   let account: CloudAccount | null = null;
   let cache: StorageAdapter | null = null;
   let cloudState: CloudStateEnvelope | null = null;
   let initializePromise: Promise<StorageSnapshot> | null = null;
   let accountIdentityChanged = false;
+  let invalidatedMessage = ACCOUNT_CHANGED_MESSAGE;
   let accountGeneration = 0;
   let mutationQueue = Promise.resolve();
   let documentCleanupWarning: string | null = null;
@@ -371,21 +375,22 @@ export function createCloudStorageAdapter({
     return account.id;
   }
 
-  function accountChanged() {
+  function accountChanged(message = ACCOUNT_CHANGED_MESSAGE) {
     if (accountIdentityChanged) assertActive();
+    invalidatedMessage = message;
     accountIdentityChanged = true;
     accountGeneration += 1;
     account = null;
     cache = null;
     cloudState = null;
     initializePromise = null;
-    onAccountChanged();
-    throw new Error("Signed-in account changed. Reload the tracker.");
+    onAccountChanged(message);
+    throw new Error(message);
   }
 
   function assertActive(generation = accountGeneration) {
     if (accountIdentityChanged || generation !== accountGeneration) {
-      throw new Error("Signed-in account changed. Reload the tracker.");
+      throw new Error(invalidatedMessage);
     }
   }
 
@@ -421,9 +426,10 @@ export function createCloudStorageAdapter({
       return result;
     } catch (error) {
       assertActive(generation);
-      if (error instanceof CloudApiError && (error.status === 412 ||
-        (account && (error.status === 401 || error.status === 403)))) {
-        accountChanged();
+      if (error instanceof CloudApiError && error.status === 412) accountChanged();
+      // Still stop everything: the next sign-in may be a different account.
+      if (error instanceof CloudApiError && account && (error.status === 401 || error.status === 403)) {
+        accountChanged(SESSION_EXPIRED_MESSAGE);
       }
       throw error;
     }
