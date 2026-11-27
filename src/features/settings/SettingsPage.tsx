@@ -58,6 +58,11 @@ export function SettingsPage({
   const backupWarning = backupPreview ? getBackupImportWarning(backupPreview) : null;
   const [backupStatus, setBackupStatus] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [resetStatus, setResetStatus] = useState("");
+  // Each step replaces the focused button, so move focus to the next step's
+  // control: Cancel when confirming, Reset preferences afterwards.
+  const focusResetButton = useRef(false);
+  const focusResetCancel = useRef(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   // Remounts the file input so the same file can be chosen again after cancel.
   const [importInputKey, setImportInputKey] = useState(0);
@@ -571,15 +576,20 @@ export function SettingsPage({
           title="Reset preferences"
         >
           <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs leading-5 text-muted max-md:text-[13px]">
-              Your applications, contacts and files are not affected.
-            </p>
+            <div>
+              <p className="text-xs leading-5 text-muted max-md:text-[13px]">
+                Your applications, contacts and files are not affected.
+              </p>
+              <p className="text-sm font-medium text-foreground" role="status">{resetStatus}</p>
+            </div>
             {isConfirmingReset ? (
               <div className="flex flex-wrap gap-2 max-sm:grid">
                 <button
                   className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 max-md:h-11 text-sm font-semibold text-white hover:bg-red-700"
                   onClick={() => {
                     onResetSettings();
+                    setResetStatus("Preferences reset to defaults.");
+                    focusResetButton.current = true;
                     setIsConfirmingReset(false);
                   }}
                   type="button"
@@ -589,7 +599,16 @@ export function SettingsPage({
                 </button>
                 <button
                   className="touch-target h-9 rounded-lg border border-border px-3 text-sm max-md:h-11 font-semibold text-foreground hover:bg-slate-50"
-                  onClick={() => setIsConfirmingReset(false)}
+                  onClick={() => {
+                    focusResetButton.current = true;
+                    setIsConfirmingReset(false);
+                  }}
+                  ref={(button) => {
+                    if (button && focusResetCancel.current) {
+                      focusResetCancel.current = false;
+                      button.focus();
+                    }
+                  }}
                   type="button"
                 >
                   Cancel
@@ -598,7 +617,17 @@ export function SettingsPage({
             ) : (
               <button
                 className="touch-target inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-red-200 max-md:h-11 px-3 text-sm font-semibold text-destructive hover:bg-red-50"
-                onClick={() => setIsConfirmingReset(true)}
+                onClick={() => {
+                  setResetStatus("");
+                  focusResetCancel.current = true;
+                  setIsConfirmingReset(true);
+                }}
+                ref={(button) => {
+                  if (button && focusResetButton.current) {
+                    focusResetButton.current = false;
+                    button.focus();
+                  }
+                }}
                 type="button"
               >
                 <RotateCcw aria-hidden="true" size={16} />

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { usePhoneLayout } from "../hooks/usePhoneLayout";
 import { formatDate, formatDateTime } from "../lib/format";
+import { keepFocusAfterRemoval } from "../lib/keepFocusAfterRemoval";
 import { dateTimeEditValue, isValidDateTime, toDateTimeLocal } from "../lib/dateTime";
 import {
   createHandledFollowUpUpdate,
@@ -304,9 +305,20 @@ function NotificationItem({
       ? formatDate(notification.dueAt)
       : formatDateTime(notification.dueAt);
 
+  // Dismiss and Handled remove this card; keep focus in the panel afterwards.
+  function keepPanelFocus() {
+    keepFocusAfterRemoval(
+      document.activeElement?.closest("[data-notification-item]"),
+      "[data-notification-item]",
+      () => firstVisible('[aria-label="Close notifications"]'),
+      "button",
+    );
+  }
+
   return (
     <article
       className={`rounded-lg border px-3 py-3 ${getNotificationTone(notification.severity)}`}
+      data-notification-item
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -323,7 +335,10 @@ function NotificationItem({
         <button
           aria-label={`Dismiss ${notification.title}`}
           className="icon-button h-8 w-8 shrink-0 bg-surface max-md:h-11 max-md:w-11"
-          onClick={() => onDismiss(notification.id)}
+          onClick={() => {
+            keepPanelFocus();
+            onDismiss(notification.id);
+          }}
           title="Dismiss"
           type="button"
         >
@@ -343,12 +358,13 @@ function NotificationItem({
           <>
             <SmallActionButton
               label="Follow-up handled"
-              onClick={() =>
+              onClick={() => {
+                keepPanelFocus();
                 onUpdateApplication(
                   notification.applicationId,
                   createHandledFollowUpUpdate(notification.application),
-                )
-              }
+                );
+              }}
             >
               <CalendarCheck aria-hidden="true" size={14} />
               Handled
