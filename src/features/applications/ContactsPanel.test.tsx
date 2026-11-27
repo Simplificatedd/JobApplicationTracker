@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { application } from "../../test/assessmentFixtures";
-import { ContactsPanel } from "./ContactsPanel";
+import { ContactsPanel, contactDraftToUpdate, getContactErrors } from "./ContactsPanel";
 
 function renderPanel(overrides: Partial<ComponentProps<typeof ContactsPanel>> = {}) {
   return renderToStaticMarkup(
@@ -36,5 +36,26 @@ describe("contacts form layout (#329)", () => {
     const markup = renderPanel();
     expect(markup).toMatch(/class="icon-button shrink-0"[^>]*>.*?Close contacts/);
     expect(markup.indexOf("<textarea")).toBeLessThan(markup.indexOf(">Add</button>"));
+  });
+});
+
+describe("contact email and LinkedIn checks (#310)", () => {
+  const draft = { name: "Sam", role: "", email: "", phone: "", linkedInUrl: "", notes: "" };
+
+  it("rejects an invalid email or LinkedIn URL and accepts valid ones", () => {
+    expect(getContactErrors({ ...draft, email: "not-an-email", linkedInUrl: "not a url" })).toEqual({
+      email: expect.stringContaining("Enter an email address"),
+      linkedInUrl: expect.stringContaining("Enter a web address"),
+    });
+    expect(getContactErrors({ ...draft, email: " sam@example.com ", linkedInUrl: "linkedin.com/in/sam" })).toEqual({});
+  });
+
+  it("skips unchanged saved values and saves LinkedIn with https://", () => {
+    const saved = { ...draft, email: "old-invalid" };
+    expect(getContactErrors(saved, saved)).toEqual({});
+    const original = { id: "c1", applicationId: "a1", name: "Sam", createdAt: "", updatedAt: "" };
+    expect(contactDraftToUpdate({ ...draft, linkedInUrl: "linkedin.com/in/sam" }, original as never)).toEqual({
+      linkedInUrl: "https://linkedin.com/in/sam",
+    });
   });
 });

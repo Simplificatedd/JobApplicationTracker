@@ -1,9 +1,9 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { NativeModal } from "../../components/NativeModal";
 import { changedDraftFields } from "../../lib/editIntent";
-import { getSafeHttpUrl } from "../../lib/urls";
+import { getSafeHttpUrl, normalizeApplicationUrl } from "../../lib/urls";
 import type { ContactInput, MutationResult } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
 
@@ -34,6 +34,10 @@ interface ContactDraft {
   role: string;
 }
 
+type ContactErrors = Partial<Record<"email" | "linkedInUrl", string>>;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const emptyDraft: ContactDraft = {
   email: "",
   linkedInUrl: "",
@@ -58,6 +62,8 @@ export function ContactsPanel({
   const [isAdding, setIsAdding] = useState(false);
   const [newContact, setNewContact] = useState(emptyDraft);
   const [operationError, setOperationError] = useState("");
+  const [newContactErrors, setNewContactErrors] = useState<ContactErrors>({});
+  const fieldId = useId();
 
 
   const panelClass =
@@ -72,13 +78,19 @@ export function ContactsPanel({
       return;
     }
 
+    const errors = getContactErrors(newContact);
+    setNewContactErrors(errors);
+    if (focusFirstError(errors, fieldId)) {
+      return;
+    }
+
     setIsAdding(true);
     setOperationError("");
     const result = await onAddContact({
       applicationId: application.id,
       name,
       email: trimOptional(newContact.email),
-      linkedInUrl: trimOptional(newContact.linkedInUrl),
+      linkedInUrl: normalizeLinkedInUrl(newContact.linkedInUrl),
       notes: trimOptional(newContact.notes),
       phone: trimOptional(newContact.phone),
       role: trimOptional(newContact.role),
@@ -106,8 +118,14 @@ export function ContactsPanel({
     onClose();
   }
 
+  function updateNewContact(key: keyof ContactDraft, value: string) {
+    setNewContact((current) => ({ ...current, [key]: value }));
+    setNewContactErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
   function discardAndClose() {
     setNewContact(emptyDraft);
+    setNewContactErrors({});
     setIsDiscardWarningOpen(false);
     onClose();
   }
@@ -164,10 +182,10 @@ export function ContactsPanel({
                 value={newContact.role}
               />
               <ContactField
+                error={newContactErrors.email}
+                id={`${fieldId}-email`}
                 label="Email"
-                onChange={(value) =>
-                  setNewContact((current) => ({ ...current, email: value }))
-                }
+                onChange={(value) => updateNewContact("email", value)}
                 type="email"
                 value={newContact.email}
               />
@@ -179,10 +197,10 @@ export function ContactsPanel({
                 value={newContact.phone}
               />
               <ContactField
+                error={newContactErrors.linkedInUrl}
+                id={`${fieldId}-linkedInUrl`}
                 label="LinkedIn URL"
-                onChange={(value) =>
-                  setNewContact((current) => ({ ...current, linkedInUrl: value }))
-                }
+                onChange={(value) => updateNewContact("linkedInUrl", value)}
                 type="url"
                 value={newContact.linkedInUrl}
               />
@@ -275,6 +293,8 @@ function ContactCard({
   const [operationError, setOperationError] = useState("");
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
   const [editBase, setEditBase] = useState(() => structuredClone(contact));
+  const [errors, setErrors] = useState<ContactErrors>({});
+  const fieldId = useId();
 
 
   useEffect(() => {
@@ -288,6 +308,12 @@ function ContactCard({
   }, [contact.id, isEditing, onEditingChange]);
 
   async function confirm() {
+    const draftErrors = getContactErrors(draft, toDraft(editBase));
+    setErrors(draftErrors);
+    if (focusFirstError(draftErrors, fieldId)) {
+      return;
+    }
+
     setIsSaving(true);
     setOperationError("");
     const result = await onUpdateContact(
@@ -305,6 +331,7 @@ function ContactCard({
 
   function cancel() {
     setDraft(toDraft(contact));
+    setErrors({});
     setIsEditing(false);
   }
 
@@ -334,11 +361,14 @@ function ContactCard({
           {(["name", "role", "email", "phone", "linkedInUrl"] as const).map(
             (key) => (
               <ContactField
+                error={key === "email" || key === "linkedInUrl" ? errors[key] : undefined}
+                id={`${fieldId}-${key}`}
                 key={key}
                 label={labelForContactKey(key)}
-                onChange={(value) =>
-                  setDraft((current) => ({ ...current, [key]: value }))
-                }
+                onChange={(value) => {
+                  setDraft((current) => ({ ...current, [key]: value }));
+                  setErrors((current) => ({ ...current, [key]: undefined }));
+                }}
                 value={draft[key]}
               />
             ),
@@ -454,6 +484,8 @@ function ContactCard({
 }
 
 function ContactField({
+  error,
+  id,
   initialFocus = false,
   label,
   onChange,
@@ -461,6 +493,8 @@ function ContactField({
   type = "text",
   value,
 }: {
+  error?: string;
+  id?: string;
   initialFocus?: boolean;
   label: string;
   onChange: (value: string) => void;
@@ -475,22 +509,53 @@ function ContactField({
         {required ? <span className="text-destructive">*</span> : null}
       </span>
       <input
+        aria-describedby={error ? `${id}-error` : undefined}
+        aria-invalid={error ? "true" : "false"}
         className="field-control"
         data-initial-focus={initialFocus || undefined}
+        id={id}
         onChange={(event) => onChange(event.target.value)}
         type={type}
         value={value}
       />
+      {error ? (
+        <span className="mt-1 block text-xs font-medium text-destructive" id={`${id}-error`}>
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
 
 export function contactDraftToUpdate(draft: ContactDraft, original: ApplicationContact): Partial<ContactInput> {
   return changedDraftFields(draft, toDraft(original), {
-    email: trimOptional(draft.email), linkedInUrl: trimOptional(draft.linkedInUrl),
+    email: trimOptional(draft.email), linkedInUrl: normalizeLinkedInUrl(draft.linkedInUrl),
     name: draft.name.trim() || original.name, notes: trimOptional(draft.notes),
     phone: trimOptional(draft.phone), role: trimOptional(draft.role),
   });
+}
+
+// Only changed fields are checked, so an older saved value never blocks other edits.
+export function getContactErrors(draft: ContactDraft, original: ContactDraft = emptyDraft): ContactErrors {
+  const errors: ContactErrors = {};
+  const email = draft.email.trim();
+  if (email && draft.email !== original.email && !EMAIL_PATTERN.test(email)) {
+    errors.email = "Enter an email address, for example name@example.com.";
+  }
+  if (draft.linkedInUrl !== original.linkedInUrl && normalizeApplicationUrl(draft.linkedInUrl).error) {
+    errors.linkedInUrl = "Enter a web address, for example linkedin.com/in/your-name.";
+  }
+  return errors;
+}
+
+function focusFirstError(errors: ContactErrors, fieldId: string) {
+  const key = (["email", "linkedInUrl"] as const).find((field) => errors[field]);
+  if (key) document.getElementById(`${fieldId}-${key}`)?.focus();
+  return Boolean(key);
+}
+
+function normalizeLinkedInUrl(value: string) {
+  return normalizeApplicationUrl(value).url ?? trimOptional(value);
 }
 
 function toDraft(contact: ApplicationContact): ContactDraft {
