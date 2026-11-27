@@ -910,7 +910,8 @@ describe("store with two independent revision-aware cloud adapters", () => {
     vi.spyOn(cache, "importSnapshot").mockRejectedValue(new Error("Cache full"));
     const file = backupFile(populatedBackup());
     const preview = await store.previewBackupImport(file);
-    expect(preview).toMatchObject({ resumes: 1, coverLetters: 1, contacts: 1 });
+    expect(preview.incoming).toMatchObject({ resumes: 1, resumeFiles: 1, coverLetters: 1, contacts: 1 });
+    expect(preview.current).toMatchObject({ applications: api.state.snapshot.applications.length });
     await store.importFullBackup(file);
     expect(RenderStore().applications).toEqual(api.state.snapshot.applications);
     expect(RenderStore().resumes).toEqual(api.state.snapshot.resumes);

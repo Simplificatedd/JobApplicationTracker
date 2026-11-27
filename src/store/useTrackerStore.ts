@@ -32,7 +32,7 @@ import {
   createFullBackupFile,
   getBackupImportPreview,
   parseBackupFile,
-  type BackupImportPreview,
+  type BackupImportComparison,
 } from "../lib/backups";
 import {
   createId,
@@ -169,7 +169,7 @@ export interface TrackerStore extends AssessmentActions {
   getResumeFile: (id: string) => Promise<Blob>;
   getCoverLetterFile: (id: string) => Promise<Blob>;
   importFullBackup: (file: File) => Promise<void>;
-  previewBackupImport: (file: File) => Promise<BackupImportPreview>;
+  previewBackupImport: (file: File) => Promise<BackupImportComparison>;
   resetSettings: () => Promise<boolean>;
   resetTablePreferences: () => Promise<boolean>;
   restoreApplication: (id: string) => Promise<MutationResult>;
@@ -1643,7 +1643,8 @@ export function useTrackerStore(): TrackerStore {
   const exportRecoveryBackup = () => exportBackup(true);
 
   async function previewBackupImport(file: File) {
-    return getBackupImportPreview(await parseBackupFile(file));
+    const incoming = getBackupImportPreview((await parseBackupFile(file)).snapshot);
+    return { current: getBackupImportPreview(cloudStorageAdapter.getCurrentSnapshot()), incoming };
   }
 
   async function importFullBackup(file: File) {

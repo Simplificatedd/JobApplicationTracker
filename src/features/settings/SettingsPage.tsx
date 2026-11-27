@@ -20,7 +20,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useScrollActiveIntoView } from "../../hooks/useScrollActiveIntoView";
 import { useScrollStrip } from "../../hooks/useScrollStrip";
 import { APPLICATION_TABLE_COLUMNS } from "../applications/ApplicationsTable";
-import type { BackupImportPreview } from "../../lib/backups";
+import { getBackupImportWarning, type BackupImportComparison } from "../../lib/backups";
 import { createDateStamp, DEFAULT_VISIBLE_APPLICATION_COLUMNS } from "../../lib/domain";
 import { formatDataSize, getCloudSnapshotSizeWarning, MAX_CLOUD_SNAPSHOT_BYTES } from "../../storage/snapshotSize";
 import type { UserSettings } from "../../types/settings";
@@ -31,7 +31,7 @@ interface SettingsPageProps {
   onExportFullBackup: () => Promise<Blob>;
   onExportRecoveryBackup: () => Promise<Blob>;
   onImportFullBackup: (file: File) => Promise<void>;
-  onPreviewBackupImport: (file: File) => Promise<BackupImportPreview>;
+  onPreviewBackupImport: (file: File) => Promise<BackupImportComparison>;
   onResetSettings: () => void;
   onUpdateSettings: (settings: Partial<UserSettings>) => void;
   settings: UserSettings;
@@ -54,7 +54,8 @@ export function SettingsPage({
   const [backupError, setBackupError] = useState("");
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const [backupPreview, setBackupPreview] =
-    useState<BackupImportPreview | null>(null);
+    useState<BackupImportComparison | null>(null);
+  const backupWarning = backupPreview ? getBackupImportWarning(backupPreview) : null;
   const [backupStatus, setBackupStatus] = useState("");
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const [isImportingBackup, setIsImportingBackup] = useState(false);
@@ -121,8 +122,11 @@ export function SettingsPage({
       return;
     }
 
+    const counts = backupPreview
+      ? ` You have ${backupPreview.current.applications} applications now; the backup has ${backupPreview.incoming.applications}.`
+      : "";
     const confirmed = window.confirm(
-      "Replace all cloud tracker data with this backup? This will sync to every signed-in device.",
+      `Replace all cloud tracker data with this backup?${counts} This will sync to every signed-in device.`,
     );
 
     if (!confirmed) {
@@ -282,19 +286,22 @@ export function SettingsPage({
                   <TriangleAlert aria-hidden="true" size={16} />
                   This backup will replace all of your cloud data
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  <PreviewCount label="Applications" value={backupPreview.applications} />
-                  <PreviewCount label="Contacts" value={backupPreview.contacts} />
-                  <PreviewCount label="Activities" value={backupPreview.activities} />
-                  <PreviewCount label="Interviews" value={backupPreview.interviews} />
-                  <PreviewCount label="Assessments" value={backupPreview.assessments} />
-                  <PreviewCount label="Resumes" value={backupPreview.resumes} />
-                  <PreviewCount label="Files" value={backupPreview.resumeFiles} />
-                  <PreviewCount label="Cover letters" value={backupPreview.coverLetters} />
-                  <PreviewCount
-                    label="Cover letter files"
-                    value={backupPreview.coverLetterFiles}
-                  />
+                <p className="mt-2 text-xs text-muted">Current → Backup</p>
+                {backupWarning ? (
+                  <p className="mt-2 font-semibold text-destructive" role="alert">
+                    {backupWarning} Download a backup of your current data first.
+                  </p>
+                ) : null}
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <PreviewCount current={backupPreview.current.applications} incoming={backupPreview.incoming.applications} label="Applications" />
+                  <PreviewCount current={backupPreview.current.contacts} incoming={backupPreview.incoming.contacts} label="Contacts" />
+                  <PreviewCount current={backupPreview.current.activities} incoming={backupPreview.incoming.activities} label="Activities" />
+                  <PreviewCount current={backupPreview.current.interviews} incoming={backupPreview.incoming.interviews} label="Interviews" />
+                  <PreviewCount current={backupPreview.current.assessments} incoming={backupPreview.incoming.assessments} label="Assessments" />
+                  <PreviewCount current={backupPreview.current.resumes} incoming={backupPreview.incoming.resumes} label="Resumes" />
+                  <PreviewCount current={backupPreview.current.resumeFiles} incoming={backupPreview.incoming.resumeFiles} label="Files" />
+                  <PreviewCount current={backupPreview.current.coverLetters} incoming={backupPreview.incoming.coverLetters} label="Cover letters" />
+                  <PreviewCount current={backupPreview.current.coverLetterFiles} incoming={backupPreview.incoming.coverLetterFiles} label="Cover letter files" />
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 max-md:grid">
                   <button
@@ -305,6 +312,15 @@ export function SettingsPage({
                   >
                     <FileUp aria-hidden="true" size={16} />
                     Replace cloud data
+                  </button>
+                  <button
+                    className="touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
+                    disabled={isImportingBackup}
+                    onClick={() => exportFullBackup()}
+                    type="button"
+                  >
+                    <FileDown aria-hidden="true" size={16} />
+                    Download current backup
                   </button>
                   <button
                     className="touch-target h-9 rounded-lg border border-border bg-surface px-3 max-md:h-11 text-sm font-semibold text-foreground hover:bg-slate-50"
@@ -914,11 +930,13 @@ function ExportTile({
   );
 }
 
-function PreviewCount({ label, value }: { label: string; value: number }) {
+function PreviewCount({ current, incoming, label }: { current: number; incoming: number; label: string }) {
   return (
     <div className="rounded-md bg-surface px-3 py-2">
       <p className="text-xs font-medium text-muted">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+        {current} <span aria-label="becomes">→</span> {incoming}
+      </p>
     </div>
   );
 }

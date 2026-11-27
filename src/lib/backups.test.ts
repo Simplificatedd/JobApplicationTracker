@@ -9,6 +9,8 @@ import {
 import {
   BACKUP_SCHEMA_VERSION,
   createApplicationsCsv,
+  getBackupImportPreview,
+  getBackupImportWarning,
   MAX_BACKUP_FILE_BYTES,
   parseBackupFile,
 } from "./backups";
@@ -670,5 +672,18 @@ describe("parseBackupFile", () => {
       coverLetterFiles: [{ storageKey: "cover-letter-file-1" }],
       snapshot: { coverLetters: [{ id: "cover-letter-1" }] },
     });
+  });
+});
+
+describe("backup import comparison (#349)", () => {
+  const counts = (applications: number) => getBackupImportPreview(createSnapshot({
+    applications: Array.from({ length: applications }, (_, index) => createApplication({ id: `app-${index}` })),
+  }));
+
+  it("warns when the backup is empty or much smaller than current data", () => {
+    expect(getBackupImportWarning({ current: counts(4), incoming: counts(0) })).toBe("This backup has no applications.");
+    expect(getBackupImportWarning({ current: counts(4), incoming: counts(1) })).toContain("(4 → 1)");
+    expect(getBackupImportWarning({ current: counts(4), incoming: counts(2) })).toBeNull();
+    expect(getBackupImportWarning({ current: counts(0), incoming: counts(0) })).toBeNull();
   });
 });

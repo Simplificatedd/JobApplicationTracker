@@ -190,20 +190,35 @@ function normalizeBackup(parsed: unknown): TrackerBackup {
   return normalized;
 }
 
+// Validation pairs every uploaded document (fileSize > 0) with one payload, so
+// counting uploads gives the same file count for a parsed backup and live data.
 export function getBackupImportPreview(
-  backup: TrackerBackup,
+  snapshot: StorageSnapshot,
 ): BackupImportPreview {
   return {
-    activities: backup.snapshot.activities.length,
-    applications: backup.snapshot.applications.length,
-    contacts: backup.snapshot.contacts.length,
-    coverLetterFiles: backup.coverLetterFiles.length,
-    coverLetters: backup.snapshot.coverLetters.length,
-    interviews: backup.snapshot.interviews.length,
-    assessments: (backup.snapshot.assessments ?? []).length,
-    resumeFiles: backup.resumeFiles.length,
-    resumes: backup.snapshot.resumes.length,
+    activities: snapshot.activities.length,
+    applications: snapshot.applications.length,
+    contacts: snapshot.contacts.length,
+    coverLetterFiles: snapshot.coverLetters.filter((item) => item.fileSize > 0).length,
+    coverLetters: snapshot.coverLetters.length,
+    interviews: snapshot.interviews.length,
+    assessments: (snapshot.assessments ?? []).length,
+    resumeFiles: snapshot.resumes.filter((item) => item.fileSize > 0).length,
+    resumes: snapshot.resumes.length,
   };
+}
+
+export interface BackupImportComparison {
+  current: BackupImportPreview;
+  incoming: BackupImportPreview;
+}
+
+export function getBackupImportWarning({ current, incoming }: BackupImportComparison) {
+  if (current.applications === 0) return null;
+  if (incoming.applications === 0) return "This backup has no applications.";
+  return incoming.applications < current.applications / 2
+    ? `This backup has far fewer applications than you have now (${current.applications} → ${incoming.applications}).`
+    : null;
 }
 
 export function createApplicationsCsv({
