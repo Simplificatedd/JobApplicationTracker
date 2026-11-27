@@ -254,3 +254,12 @@ describe("parseDayField (#345)", () => {
     expect(countMatches(renderPage(), 'max="365"')).toBe(2);
   });
 });
+
+describe("export file names (#358)", () => {
+  it("use the local date, not the UTC date", () => {
+    const source = readFileSync(new URL("./SettingsPage.tsx", import.meta.url), "utf8");
+    expect(source).toContain("job-applications-${createDateStamp()}.csv");
+    expect(source).toContain('"backup"}-${createDateStamp()}.json');
+    expect(source).not.toContain("toISOString().slice(0, 10)");
+  });
+});
