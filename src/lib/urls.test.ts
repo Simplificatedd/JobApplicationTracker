@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSafeHttpUrl, splitTextIntoLinkParts } from "./urls";
+import { getSafeHttpUrl, normalizeApplicationUrl, splitTextIntoLinkParts } from "./urls";
 
 describe("getSafeHttpUrl", () => {
   it("accepts and normalizes HTTP URLs", () => {
@@ -141,5 +141,18 @@ describe("splitTextIntoLinkParts", () => {
 
   it("returns no parts for empty text", () => {
     expect(splitTextIntoLinkParts("")).toEqual([]);
+  });
+});
+
+describe("normalizeApplicationUrl (#321)", () => {
+  it("adds https:// to addresses without a scheme and rejects invalid ones", () => {
+    expect(normalizeApplicationUrl("example.com/jobs/1")).toEqual({ url: "https://example.com/jobs/1" });
+    expect(normalizeApplicationUrl(" http://example.com/a ")).toEqual({ url: "http://example.com/a" });
+    expect(normalizeApplicationUrl("  ")).toEqual({});
+    expect(normalizeApplicationUrl("not a url").error).toContain("Enter a web address");
+    expect(normalizeApplicationUrl("javascript:alert(1)").error).toBeDefined();
+    expect(normalizeApplicationUrl("careers example.com/jobs").error).toBeDefined();
+    expect(normalizeApplicationUrl("jobs").error).toBeDefined();
+    expect(normalizeApplicationUrl("https://xn--bcher-kva.example/jobs").url).toBe("https://xn--bcher-kva.example/jobs");
   });
 });

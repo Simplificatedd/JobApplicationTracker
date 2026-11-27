@@ -33,7 +33,7 @@ import {
   formatDateTime,
   formatUpdatedAt,
 } from "../../lib/format";
-import { getSafeHttpUrl } from "../../lib/urls";
+import { getSafeHttpUrl, normalizeApplicationUrl } from "../../lib/urls";
 import {
   createHandledFollowUpUpdate,
   normalizeFollowUpDateInput,
@@ -181,6 +181,7 @@ export function ApplicationDetailPanel({
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [titleError, setTitleError] = useState("");
+  const [urlError, setUrlError] = useState("");
   const actionsRef = useRef<HTMLDivElement>(null);
   const actionsTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -236,6 +237,7 @@ export function ApplicationDetailPanel({
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setTitleError("");
+    setUrlError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(true);
@@ -248,6 +250,16 @@ export function ApplicationDetailPanel({
     }
 
     setTitleError("");
+    // Only check an edited URL, so an older saved value never blocks other edits.
+    const urlChanged = draft.applicationUrl !== (editBase.applicationUrl ?? "");
+    const urlValidationError = urlChanged ? normalizeApplicationUrl(draft.applicationUrl).error : undefined;
+    if (urlValidationError) {
+      setUrlError(urlValidationError);
+      document.getElementById("edit-application-url")?.focus();
+      return;
+    }
+
+    setUrlError("");
     const followUpValidationError = validateFollowUpSchedule(
       draft.followUpNeeded ? "compulsory" : "optional",
       draft.followUpDate,
@@ -323,6 +335,7 @@ export function ApplicationDetailPanel({
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setTitleError("");
+    setUrlError("");
     setResumeUploadFile(null);
     setCoverLetterUploadFile(null);
     setIsEditing(false);
@@ -564,6 +577,7 @@ export function ApplicationDetailPanel({
               followUpAutoResetError={followUpAutoResetError}
               followUpError={followUpError}
               titleError={titleError}
+              urlError={urlError}
               onFollowUpAutoResetChange={() =>
                 setFollowUpAutoResetError("")
               }
@@ -1119,6 +1133,7 @@ function EditForm({
   setCoverLetterUploadFile,
   setResumeUploadFile,
   titleError,
+  urlError,
 }: {
   coverLetterUploadError: string;
   coverLetters: CoverLetterMetadata[];
@@ -1133,9 +1148,11 @@ function EditForm({
   setCoverLetterUploadFile: (file: File | null) => void;
   setResumeUploadFile: (file: File | null) => void;
   titleError: string;
+  urlError: string;
 }) {
   // Hidden again as soon as a title is typed.
   const showTitleError = Boolean(titleError) && !draft.jobTitle.trim();
+  const showUrlError = Boolean(urlError) && Boolean(normalizeApplicationUrl(draft.applicationUrl).error);
 
   function updateDraft<Key extends keyof ApplicationDraft>(
     key: Key,
@@ -1213,11 +1230,20 @@ function EditForm({
         />
         <Field label="Application URL">
           <input
+            aria-describedby={showUrlError ? "edit-application-url-error" : undefined}
+            aria-invalid={showUrlError ? "true" : "false"}
             className="field-control"
+            id="edit-application-url"
+            inputMode="url"
             onChange={(event) => updateDraft("applicationUrl", event.target.value)}
-            type="url"
+            type="text"
             value={draft.applicationUrl}
           />
+          {showUrlError ? (
+            <p className="mt-1 text-xs font-medium text-destructive" id="edit-application-url-error">
+              {urlError}
+            </p>
+          ) : null}
         </Field>
         <Field label="Source">
           <select
@@ -1863,7 +1889,7 @@ export function applicationDraftToUpdate(
     workMode: draft.workMode,
     jobType: draft.jobType,
     source: trimOptional(draft.source),
-    applicationUrl: trimOptional(draft.applicationUrl),
+    applicationUrl: normalizeApplicationUrl(draft.applicationUrl).url ?? trimOptional(draft.applicationUrl),
     dateApplied: trimOptional(draft.dateApplied),
     roleStartDate: trimOptional(draft.roleStartDate),
     roleEndDate: trimOptional(draft.roleEndDate),

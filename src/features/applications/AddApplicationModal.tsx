@@ -50,6 +50,7 @@ import {
   FollowUpScheduleControls,
 } from "./FollowUpControls";
 import { FormSection } from "./FormSection";
+import { normalizeApplicationUrl } from "../../lib/urls";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface AddApplicationModalProps {
@@ -173,6 +174,7 @@ export function AddApplicationModal({
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [interviewRoundError, setInterviewRoundError] = useState("");
@@ -200,6 +202,9 @@ export function AddApplicationModal({
     });
     if (key === "jobTitle") {
       setTitleError("");
+    }
+    if (key === "applicationUrl") {
+      setUrlError("");
     }
     if (key === "interviewRound") {
       setInterviewRoundError("");
@@ -231,6 +236,7 @@ export function AddApplicationModal({
   function closeModal() {
     setDuplicateMatch(null);
     setTitleError("");
+    setUrlError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -248,6 +254,7 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setUrlError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -304,6 +311,13 @@ export function AddApplicationModal({
 
     if (!trimmedTitle) {
       setTitleError("Job Title is required.");
+      return;
+    }
+
+    const applicationUrl = normalizeApplicationUrl(form.applicationUrl);
+    if (applicationUrl.error) {
+      setUrlError(applicationUrl.error);
+      document.getElementById("add-application-url")?.focus();
       return;
     }
 
@@ -371,7 +385,7 @@ export function AddApplicationModal({
       workMode: form.workMode,
       jobType: form.jobType,
       source: trimOptional(form.source),
-      applicationUrl: trimOptional(form.applicationUrl),
+      applicationUrl: applicationUrl.url,
       dateApplied: trimOptional(form.dateApplied),
       roleStartDate: trimOptional(form.roleStartDate),
       roleEndDate: trimOptional(form.roleEndDate),
@@ -466,6 +480,7 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setUrlError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     onClose();
@@ -742,11 +757,20 @@ export function AddApplicationModal({
 
               <Field label="Application URL">
                 <input
+                  aria-describedby={urlError ? "add-application-url-error" : undefined}
+                  aria-invalid={urlError ? "true" : "false"}
                   className="field-control"
+                  id="add-application-url"
+                  inputMode="url"
                   onChange={(event) => updateForm("applicationUrl", event.target.value)}
-                  type="url"
+                  type="text"
                   value={form.applicationUrl}
                 />
+                {urlError ? (
+                  <p className="mt-1 text-xs font-medium text-destructive" id="add-application-url-error">
+                    {urlError}
+                  </p>
+                ) : null}
               </Field>
 
               <Field label="Source">
