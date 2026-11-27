@@ -133,7 +133,7 @@ export function ContactsPanel({
             </h2>
           </div>
           <button
-            className="icon-button"
+            className="icon-button shrink-0"
             disabled={isAdding || Boolean(editingContactId)}
             onClick={requestClose}
             type="button"
@@ -186,15 +186,6 @@ export function ContactsPanel({
                 type="url"
                 value={newContact.linkedInUrl}
               />
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 self-end rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500"
-                disabled={!newContact.name.trim() || isAdding}
-                onClick={addContact}
-                type="button"
-              >
-                <Plus aria-hidden="true" size={16} />
-                {isAdding ? "Adding..." : "Add"}
-              </button>
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-sm font-medium text-foreground">
                   Notes
@@ -210,6 +201,15 @@ export function ContactsPanel({
                   value={newContact.notes}
                 />
               </label>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 justify-self-end rounded-lg sm:col-span-2 bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500"
+                disabled={!newContact.name.trim() || isAdding}
+                onClick={addContact}
+                type="button"
+              >
+                <Plus aria-hidden="true" size={16} />
+                {isAdding ? "Adding..." : "Add"}
+              </button>
             </div>
             {operationError ? (
               <p className="mt-3 text-sm font-medium text-destructive" role="alert">

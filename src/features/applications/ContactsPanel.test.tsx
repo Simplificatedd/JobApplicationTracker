@@ -30,3 +30,11 @@ describe("contacts panel initial focus (#287)", () => {
     expect(renderPanel()).not.toContain("data-initial-focus");
   });
 });
+
+describe("contacts form layout (#329)", () => {
+  it("keeps the close button full size and puts Add after Notes", () => {
+    const markup = renderPanel();
+    expect(markup).toMatch(/class="icon-button shrink-0"[^>]*>.*?Close contacts/);
+    expect(markup.indexOf("<textarea")).toBeLessThan(markup.indexOf(">Add</button>"));
+  });
+});
