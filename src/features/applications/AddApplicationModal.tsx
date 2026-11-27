@@ -186,8 +186,6 @@ export function AddApplicationModal({
     return null;
   }
 
-  const canSave = form.jobTitle.trim().length > 0;
-
   function updateForm<Key extends keyof AddApplicationFormState>(
     key: Key,
     value: AddApplicationFormState[Key],
@@ -311,6 +309,7 @@ export function AddApplicationModal({
 
     if (!trimmedTitle) {
       setTitleError("Job Title is required.");
+      document.getElementById("add-job-title")?.focus();
       return;
     }
 
@@ -530,9 +529,10 @@ export function AddApplicationModal({
                   data-initial-focus
                   aria-describedby={titleError ? "job-title-error" : undefined}
                   aria-invalid={titleError ? "true" : "false"}
+                  aria-required="true"
                   className="field-control"
+                  id="add-job-title"
                   onChange={(event) => updateForm("jobTitle", event.target.value)}
-                  required
                   type="text"
                   value={form.jobTitle}
                 />
@@ -1086,12 +1086,8 @@ export function AddApplicationModal({
             Cancel
           </button>
           <button
-            className={`h-10 rounded-lg px-4 text-sm font-semibold max-md:h-11 ${
-              canSave
-                ? "bg-primary text-primary-foreground hover:bg-blue-700"
-                : "bg-slate-200 text-slate-500"
-            }`}
-            disabled={!canSave || isSaving}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
+            disabled={isSaving}
             form="add-application-form"
             type="submit"
           >
