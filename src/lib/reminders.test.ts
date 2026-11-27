@@ -43,7 +43,8 @@ describe("calculateFollowUpDueDate", () => {
 });
 
 describe("classifyReminderSeverity", () => {
-  const now = new Date("2026-09-20T12:00:00.000Z");
+  // Local noon, so 20 September is "today" in every time zone.
+  const now = new Date(2026, 8, 20, 12);
 
   it("classifies overdue, current, and upcoming dates", () => {
     expect(classifyReminderSeverity("2026-09-19", 3, now)).toBe("overdue");
@@ -179,7 +180,7 @@ describe("deriveApplicationNotifications", () => {
       const notifications = deriveApplicationNotifications(
         { ...baseApplication, followUpDate },
         { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
-        new Date("2026-09-20T12:00:00.000Z"),
+        new Date(2026, 8, 20, 12),
       );
 
       expect(notifications).toHaveLength(1);
