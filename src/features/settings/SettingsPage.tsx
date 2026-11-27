@@ -935,7 +935,7 @@ function PreviewCount({ current, incoming, label }: { current: number; incoming:
     <div className="rounded-md bg-surface px-3 py-2">
       <p className="text-xs font-medium text-muted">{label}</p>
       <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-        {current} <span aria-label="becomes">→</span> {incoming}
+        {current} <span aria-hidden="true">→</span><span className="sr-only"> becomes</span> {incoming}
       </p>
     </div>
   );
