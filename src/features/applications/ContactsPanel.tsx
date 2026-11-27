@@ -1,9 +1,9 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { NativeModal } from "../../components/NativeModal";
 import { changedDraftFields } from "../../lib/editIntent";
-import { getSafeHttpUrl } from "../../lib/urls";
+import { getSafeHttpUrl, normalizeApplicationUrl } from "../../lib/urls";
 import type { ContactInput, MutationResult } from "../../store/useTrackerStore";
 import type { Application, ApplicationContact } from "../../types/application";
 
@@ -34,6 +34,10 @@ interface ContactDraft {
   role: string;
 }
 
+type ContactErrors = Partial<Record<"email" | "linkedInUrl", string>>;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const emptyDraft: ContactDraft = {
   email: "",
   linkedInUrl: "",
@@ -58,6 +62,8 @@ export function ContactsPanel({
   const [isAdding, setIsAdding] = useState(false);
   const [newContact, setNewContact] = useState(emptyDraft);
   const [operationError, setOperationError] = useState("");
+  const [newContactErrors, setNewContactErrors] = useState<ContactErrors>({});
+  const fieldId = useId();
 
 
   const panelClass =
@@ -72,13 +78,19 @@ export function ContactsPanel({
       return;
     }
 
+    const errors = getContactErrors(newContact);
+    setNewContactErrors(errors);
+    if (focusFirstError(errors, fieldId)) {
+      return;
+    }
+
     setIsAdding(true);
     setOperationError("");
     const result = await onAddContact({
       applicationId: application.id,
       name,
       email: trimOptional(newContact.email),
-      linkedInUrl: trimOptional(newContact.linkedInUrl),
+      linkedInUrl: normalizeLinkedInUrl(newContact.linkedInUrl),
       notes: trimOptional(newContact.notes),
       phone: trimOptional(newContact.phone),
       role: trimOptional(newContact.role),
@@ -106,8 +118,14 @@ export function ContactsPanel({
     onClose();
   }
 
+  function updateNewContact(key: keyof ContactDraft, value: string) {
+    setNewContact((current) => ({ ...current, [key]: value }));
+    setNewContactErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
   function discardAndClose() {
     setNewContact(emptyDraft);
+    setNewContactErrors({});
     setIsDiscardWarningOpen(false);
     onClose();
   }
@@ -133,7 +151,7 @@ export function ContactsPanel({
             </h2>
           </div>
           <button
-            className="icon-button"
+            className="icon-button shrink-0"
             disabled={isAdding || Boolean(editingContactId)}
             onClick={requestClose}
             type="button"
@@ -164,10 +182,10 @@ export function ContactsPanel({
                 value={newContact.role}
               />
               <ContactField
+                error={newContactErrors.email}
+                id={`${fieldId}-email`}
                 label="Email"
-                onChange={(value) =>
-                  setNewContact((current) => ({ ...current, email: value }))
-                }
+                onChange={(value) => updateNewContact("email", value)}
                 type="email"
                 value={newContact.email}
               />
@@ -179,22 +197,13 @@ export function ContactsPanel({
                 value={newContact.phone}
               />
               <ContactField
+                error={newContactErrors.linkedInUrl}
+                id={`${fieldId}-linkedInUrl`}
                 label="LinkedIn URL"
-                onChange={(value) =>
-                  setNewContact((current) => ({ ...current, linkedInUrl: value }))
-                }
+                onChange={(value) => updateNewContact("linkedInUrl", value)}
                 type="url"
                 value={newContact.linkedInUrl}
               />
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 self-end rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500"
-                disabled={!newContact.name.trim() || isAdding}
-                onClick={addContact}
-                type="button"
-              >
-                <Plus aria-hidden="true" size={16} />
-                {isAdding ? "Adding..." : "Add"}
-              </button>
               <label className="block sm:col-span-2">
                 <span className="mb-1.5 block text-sm font-medium text-foreground">
                   Notes
@@ -210,6 +219,15 @@ export function ContactsPanel({
                   value={newContact.notes}
                 />
               </label>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 justify-self-end rounded-lg sm:col-span-2 bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-500"
+                disabled={!newContact.name.trim() || isAdding}
+                onClick={addContact}
+                type="button"
+              >
+                <Plus aria-hidden="true" size={16} />
+                {isAdding ? "Adding..." : "Add"}
+              </button>
             </div>
             {operationError ? (
               <p className="mt-3 text-sm font-medium text-destructive" role="alert">
@@ -275,6 +293,10 @@ function ContactCard({
   const [operationError, setOperationError] = useState("");
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
   const [editBase, setEditBase] = useState(() => structuredClone(contact));
+  const [errors, setErrors] = useState<ContactErrors>({});
+  const [copyStatus, setCopyStatus] = useState("");
+  const copyStatusTimer = useRef<number>();
+  const fieldId = useId();
 
 
   useEffect(() => {
@@ -288,6 +310,12 @@ function ContactCard({
   }, [contact.id, isEditing, onEditingChange]);
 
   async function confirm() {
+    const draftErrors = getContactErrors(draft, toDraft(editBase));
+    setErrors(draftErrors);
+    if (focusFirstError(draftErrors, fieldId)) {
+      return;
+    }
+
     setIsSaving(true);
     setOperationError("");
     const result = await onUpdateContact(
@@ -305,6 +333,7 @@ function ContactCard({
 
   function cancel() {
     setDraft(toDraft(contact));
+    setErrors({});
     setIsEditing(false);
   }
 
@@ -334,11 +363,14 @@ function ContactCard({
           {(["name", "role", "email", "phone", "linkedInUrl"] as const).map(
             (key) => (
               <ContactField
+                error={key === "email" || key === "linkedInUrl" ? errors[key] : undefined}
+                id={`${fieldId}-${key}`}
                 key={key}
                 label={labelForContactKey(key)}
-                onChange={(value) =>
-                  setDraft((current) => ({ ...current, [key]: value }))
-                }
+                onChange={(value) => {
+                  setDraft((current) => ({ ...current, [key]: value }));
+                  setErrors((current) => ({ ...current, [key]: undefined }));
+                }}
                 value={draft[key]}
               />
             ),
@@ -406,12 +438,41 @@ function ContactCard({
             {contact.name}
           </p>
           {[contact.role, contact.email, contact.phone].some(Boolean) ? (
-            <p className="mt-1 text-sm text-muted">
-              {[contact.role, contact.email, contact.phone]
+            <p className="mt-1 break-words text-sm text-muted">
+              {[
+                contact.role,
+                contact.email && EMAIL_PATTERN.test(contact.email) ? (
+                  <a className="font-medium text-primary hover:text-blue-700" href={`mailto:${contact.email}`}>
+                    {contact.email}
+                  </a>
+                ) : contact.email,
+                contact.phone && isDialable(contact.phone) ? (
+                  <a
+                    className="font-medium text-primary hover:text-blue-700"
+                    href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                    onClick={(event) => {
+                      void copyPhoneOnComputer(event, contact.phone ?? "").then((status) => {
+                        if (!status) return;
+                        setCopyStatus(status);
+                        window.clearTimeout(copyStatusTimer.current);
+                        copyStatusTimer.current = window.setTimeout(() => setCopyStatus(""), 3000);
+                      });
+                    }}
+                  >
+                    {contact.phone}
+                  </a>
+                ) : contact.phone,
+              ]
                 .filter(Boolean)
-                .join(" / ")}
+                .map((part, index) => (
+                  <Fragment key={index}>
+                    {index > 0 ? " / " : null}
+                    {part}
+                  </Fragment>
+                ))}
             </p>
           ) : null}
+          <p className="mt-1 text-xs font-medium text-muted empty:hidden" role="status">{copyStatus}</p>
           {safeLinkedInUrl ? (
             <a
               className="mt-2 block truncate text-sm font-medium text-primary hover:text-blue-700"
@@ -454,6 +515,8 @@ function ContactCard({
 }
 
 function ContactField({
+  error,
+  id,
   initialFocus = false,
   label,
   onChange,
@@ -461,6 +524,8 @@ function ContactField({
   type = "text",
   value,
 }: {
+  error?: string;
+  id?: string;
   initialFocus?: boolean;
   label: string;
   onChange: (value: string) => void;
@@ -475,22 +540,76 @@ function ContactField({
         {required ? <span className="text-destructive">*</span> : null}
       </span>
       <input
+        aria-describedby={error ? `${id}-error` : undefined}
+        aria-invalid={error ? "true" : "false"}
         className="field-control"
         data-initial-focus={initialFocus || undefined}
+        id={id}
         onChange={(event) => onChange(event.target.value)}
         type={type}
         value={value}
       />
+      {error ? (
+        <span className="mt-1 block text-xs font-medium text-destructive" id={`${id}-error`}>
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
 
 export function contactDraftToUpdate(draft: ContactDraft, original: ApplicationContact): Partial<ContactInput> {
   return changedDraftFields(draft, toDraft(original), {
-    email: trimOptional(draft.email), linkedInUrl: trimOptional(draft.linkedInUrl),
+    email: trimOptional(draft.email), linkedInUrl: normalizeLinkedInUrl(draft.linkedInUrl),
     name: draft.name.trim() || original.name, notes: trimOptional(draft.notes),
     phone: trimOptional(draft.phone), role: trimOptional(draft.role),
   });
+}
+
+// Only plain phone characters, so "ext 12" or letters never get glued onto the dialled number.
+function isDialable(phone: string) {
+  return /^\+?[\d\s().-]+$/.test(phone) && /\d/.test(phone);
+}
+
+// Computers rarely have a phone app, so a click there copies the number; phones still dial.
+export async function copyPhoneOnComputer(
+  event: { currentTarget: Node; preventDefault(): void },
+  phone: string,
+) {
+  if (!window.matchMedia?.("(pointer: fine)").matches || !navigator.clipboard) return undefined;
+  event.preventDefault();
+  const link = event.currentTarget;
+  try {
+    await navigator.clipboard.writeText(phone);
+    return "Phone number copied.";
+  } catch {
+    // Clipboard blocked (browser setting): select the number so the keyboard shortcut works.
+    window.getSelection()?.selectAllChildren(link);
+    return "Couldn't copy automatically. The number is selected: press Ctrl+C (⌘C on Mac).";
+  }
+}
+
+// Only changed fields are checked, so an older saved value never blocks other edits.
+export function getContactErrors(draft: ContactDraft, original: ContactDraft = emptyDraft): ContactErrors {
+  const errors: ContactErrors = {};
+  const email = draft.email.trim();
+  if (email && draft.email !== original.email && !EMAIL_PATTERN.test(email)) {
+    errors.email = "Enter an email address, for example name@example.com.";
+  }
+  if (draft.linkedInUrl !== original.linkedInUrl && normalizeApplicationUrl(draft.linkedInUrl).error) {
+    errors.linkedInUrl = "Enter a web address, for example linkedin.com/in/your-name.";
+  }
+  return errors;
+}
+
+function focusFirstError(errors: ContactErrors, fieldId: string) {
+  const key = (["email", "linkedInUrl"] as const).find((field) => errors[field]);
+  if (key) document.getElementById(`${fieldId}-${key}`)?.focus();
+  return Boolean(key);
+}
+
+function normalizeLinkedInUrl(value: string) {
+  return normalizeApplicationUrl(value).url ?? trimOptional(value);
 }
 
 function toDraft(contact: ApplicationContact): ContactDraft {
