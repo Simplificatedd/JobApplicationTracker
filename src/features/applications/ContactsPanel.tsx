@@ -1,5 +1,5 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { Fragment, useEffect, useId, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { NativeModal } from "../../components/NativeModal";
 import { changedDraftFields } from "../../lib/editIntent";
@@ -436,10 +436,27 @@ function ContactCard({
             {contact.name}
           </p>
           {[contact.role, contact.email, contact.phone].some(Boolean) ? (
-            <p className="mt-1 text-sm text-muted">
-              {[contact.role, contact.email, contact.phone]
+            <p className="mt-1 break-words text-sm text-muted">
+              {[
+                contact.role,
+                contact.email && EMAIL_PATTERN.test(contact.email) ? (
+                  <a className="font-medium text-primary hover:text-blue-700" href={`mailto:${contact.email}`}>
+                    {contact.email}
+                  </a>
+                ) : contact.email,
+                contact.phone && isDialable(contact.phone) ? (
+                  <a className="font-medium text-primary hover:text-blue-700" href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}>
+                    {contact.phone}
+                  </a>
+                ) : contact.phone,
+              ]
                 .filter(Boolean)
-                .join(" / ")}
+                .map((part, index) => (
+                  <Fragment key={index}>
+                    {index > 0 ? " / " : null}
+                    {part}
+                  </Fragment>
+                ))}
             </p>
           ) : null}
           {safeLinkedInUrl ? (
@@ -533,6 +550,11 @@ export function contactDraftToUpdate(draft: ContactDraft, original: ApplicationC
     name: draft.name.trim() || original.name, notes: trimOptional(draft.notes),
     phone: trimOptional(draft.phone), role: trimOptional(draft.role),
   });
+}
+
+// Only plain phone characters, so "ext 12" or letters never get glued onto the dialled number.
+function isDialable(phone: string) {
+  return /^\+?[\d\s().-]+$/.test(phone) && /\d/.test(phone);
 }
 
 // Only changed fields are checked, so an older saved value never blocks other edits.

@@ -59,3 +59,14 @@ describe("contact email and LinkedIn checks (#310)", () => {
     });
   });
 });
+
+describe("contact email and phone links (#310)", () => {
+  it("links a valid email with mailto: and a phone with tel:", () => {
+    const contact = { id: "c1", applicationId: application.id, name: "Sam", email: "sam@example.com", phone: "+65 9123 4567", createdAt: "", updatedAt: "" };
+    const markup = renderPanel({ contacts: [contact] });
+    expect(markup).toContain('href="mailto:sam@example.com"');
+    expect(markup).toContain('href="tel:+6591234567"');
+    expect(renderPanel({ contacts: [{ ...contact, email: "old-invalid" }] })).not.toContain("mailto:");
+    expect(renderPanel({ contacts: [{ ...contact, phone: "+1 415 555 0100 ext 12" }] })).not.toContain("tel:");
+  });
+});
