@@ -177,6 +177,14 @@ describe("cloud API client", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it("says could not be reached only for connection failures (#355)", async () => {
+    const offline = createCloudApiClient({ fetcher: vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch")), retryDelays: [] });
+    await expect(offline.getSession()).rejects.toThrow("Cloud storage could not be reached. Failed to fetch");
+
+    const serverError = createCloudApiClient({ fetcher: vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: "The cloud storage service could not complete the request." }, { status: 500 })), retryDelays: [] });
+    await expect(serverError.getSession()).rejects.toThrow(/^The cloud storage service could not complete the request\.$/);
+  });
+
   it("does not replay snapshot writes after a server failure with an uncertain commit outcome", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ error: "Service unavailable" }, { status: 503 }));
     const client = createCloudApiClient({ fetcher, retryDelays: [0, 0] });

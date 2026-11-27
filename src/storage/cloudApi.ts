@@ -100,8 +100,8 @@ export function createCloudApiClient(
       stateWrite
         ? "The save outcome could not be confirmed. Reload the tracker and inspect the current data before retrying."
         : lastError instanceof Error
-        ? `Cloud storage is unavailable. ${lastError.message}`
-        : "Cloud storage is unavailable.",
+        ? `Cloud storage could not be reached. ${lastError.message}`
+        : "Cloud storage could not be reached.",
       0,
     );
   }

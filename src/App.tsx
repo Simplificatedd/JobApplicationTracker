@@ -77,7 +77,7 @@ export function App() {
     >
       {tracker.storageError ? (
         <StorageErrorBanner
-          message={`Cloud storage could not be reached. ${tracker.storageError}`}
+          message={tracker.storageError}
           onRetry={tracker.retryStorage}
         />
       ) : null}
