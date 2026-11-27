@@ -243,6 +243,14 @@ export function createApplicationsCsv({
         "Missing cover letter")
       : application.coverLetterVersion,
     application.notes,
+    application.archivedAt ? "yes" : "no",
+    application.workMode,
+    application.priority,
+    application.salary,
+    application.roleStartDate,
+    application.roleEndDate,
+    application.contactsCount.toString(),
+    application.jobDescription,
   ]);
   const header = [
     "company",
@@ -263,6 +271,14 @@ export function createApplicationsCsv({
     "resume",
     "cover_letter",
     "notes",
+    "archived",
+    "work_mode",
+    "priority",
+    "salary",
+    "role_start_date",
+    "role_end_date",
+    "contacts_count",
+    "job_description",
   ];
   const csv = [header, ...rows].map(toCsvRow).join("\n");
 
