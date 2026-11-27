@@ -121,14 +121,14 @@ describe("full backup export/import contract", () => {
   it.each(["coverLetters", "assessments"])("rejects explicit null %s instead of silently accepting an incomplete backup", async (collection) => {
     const backup = populatedBackup();
     Object.assign(backup.snapshot, { [collection]: null });
-    await expect(parseBackupFile(backupFile(backup))).rejects.toThrow("required tracker data");
+    await expect(parseBackupFile(backupFile(backup))).rejects.toThrow(`invalid "${collection}" data`);
   });
 
   it("rejects malformed JSON and array-shaped settings", async () => {
     await expect(parseBackupFile(new Blob(["{"]))).rejects.toThrow("valid tracker backup JSON");
     const backup = populatedBackup();
     Object.assign(backup.snapshot, { settings: [] });
-    await expect(parseBackupFile(backupFile(backup))).rejects.toThrow("required tracker data");
+    await expect(parseBackupFile(backupFile(backup))).rejects.toThrow('invalid "settings" data');
   });
 
   it("rejects a library over the aggregate quota before decoding its payloads", async () => {

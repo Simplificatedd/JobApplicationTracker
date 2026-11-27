@@ -287,8 +287,8 @@ export function createApplicationsCsv({
 }
 
 function getBackupValidationError(value: unknown, validateFileContents = true) {
-  if (!isRecord(value)) {
-    return "This backup file does not match the tracker backup schema.";
+  if (!isRecord(value) || value.schemaVersion === undefined) {
+    return "This file is not a tracker backup. Choose a .json file exported from Settings → Backup and export.";
   }
 
   if (
@@ -332,7 +332,7 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
   if (value.snapshot.assessments === undefined) value.snapshot.assessments = [];
 
   if (!isStorageSnapshot(value.snapshot)) {
-    return "This backup file is missing required tracker data.";
+    return `This backup file is missing or has invalid "${getInvalidSnapshotSection(value.snapshot)}" data.`;
   }
 
   const resumeIds = new Set<string>();
@@ -371,9 +371,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
     return "This backup file contains invalid tracker settings.";
   }
 
-  for (const resume of value.snapshot.resumes) {
+  for (const [index, resume] of value.snapshot.resumes.entries()) {
     if (!isResumeMetadata(resume)) {
-      return "This backup file contains invalid resume metadata.";
+      return `This backup file contains invalid resume metadata (resumes item ${index + 1}).`;
     }
 
     if (resume.fileSize > MAX_RESUME_FILE_BYTES) {
@@ -393,9 +393,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
     }
   }
 
-  for (const coverLetter of value.snapshot.coverLetters) {
+  for (const [index, coverLetter] of value.snapshot.coverLetters.entries()) {
     if (!isResumeMetadata(coverLetter)) {
-      return "This backup file contains invalid cover letter metadata.";
+      return `This backup file contains invalid cover letter metadata (coverLetters item ${index + 1}).`;
     }
 
     if (coverLetter.fileSize > MAX_RESUME_FILE_BYTES) {
@@ -422,9 +422,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
 
   const applicationIds = new Set<string>();
 
-  for (const application of value.snapshot.applications) {
+  for (const [index, application] of value.snapshot.applications.entries()) {
     if (!isApplication(application)) {
-      return "This backup file contains invalid application data.";
+      return `This backup file contains invalid application data (applications item ${index + 1}).`;
     }
 
     if (application.resumeId && !resumeIds.has(application.resumeId)) {
@@ -441,9 +441,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
     applicationIds.add(application.id);
   }
 
-  for (const activity of value.snapshot.activities) {
+  for (const [index, activity] of value.snapshot.activities.entries()) {
     if (!isActivity(activity)) {
-      return "This backup file contains invalid activity data.";
+      return `This backup file contains invalid activity data (activities item ${index + 1}).`;
     }
 
     if (!applicationIds.has(activity.applicationId)) {
@@ -451,9 +451,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
     }
   }
 
-  for (const contact of value.snapshot.contacts) {
+  for (const [index, contact] of value.snapshot.contacts.entries()) {
     if (!isApplicationContact(contact)) {
-      return "This backup file contains invalid contact data.";
+      return `This backup file contains invalid contact data (contacts item ${index + 1}).`;
     }
 
     if (!applicationIds.has(contact.applicationId)) {
@@ -479,9 +479,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
     return "This backup file contains inconsistent application contact counts.";
   }
 
-  for (const interview of value.snapshot.interviews) {
+  for (const [index, interview] of value.snapshot.interviews.entries()) {
     if (!isInterview(interview)) {
-      return "This backup file contains invalid interview data.";
+      return `This backup file contains invalid interview data (interviews item ${index + 1}).`;
     }
 
     if (!applicationIds.has(interview.applicationId)) {
@@ -490,9 +490,9 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
   }
 
   const assessmentNumbers = new Set<string>();
-  for (const assessment of value.snapshot.assessments ?? []) {
+  for (const [index, assessment] of (value.snapshot.assessments ?? []).entries()) {
     if (!isAssessment(assessment))
-      return "This backup file contains invalid assessment data.";
+      return `This backup file contains invalid assessment data (assessments item ${index + 1}).`;
     if (!applicationIds.has(assessment.applicationId))
       return "This backup file links assessment data to a missing application.";
     const key = `${assessment.applicationId}:${assessment.number}`;
@@ -590,24 +590,26 @@ function getBackupValidationError(value: unknown, validateFileContents = true) {
   return null;
 }
 
-function isStorageSnapshot(value: unknown): value is StorageSnapshot {
-  if (!isRecord(value)) {
-    return false;
-  }
+const SNAPSHOT_SECTIONS: [string, (value: unknown) => boolean][] = [
+  ["activities", Array.isArray],
+  ["analyticsSettings", isRecord],
+  ["applications", Array.isArray],
+  ["contacts", Array.isArray],
+  ["coverLetters", Array.isArray],
+  ["interviews", Array.isArray],
+  ["assessments", Array.isArray],
+  ["notificationState", isRecord],
+  ["resumes", Array.isArray],
+  ["settings", isRecord],
+  ["tablePreferences", (value) => value === null || isRecord(value)],
+];
 
-  return (
-    Array.isArray(value.activities) &&
-    isRecord(value.analyticsSettings) &&
-    Array.isArray(value.applications) &&
-    Array.isArray(value.contacts) &&
-    Array.isArray(value.coverLetters) &&
-    Array.isArray(value.interviews) &&
-    Array.isArray(value.assessments) &&
-    isRecord(value.notificationState) &&
-    Array.isArray(value.resumes) &&
-    isRecord(value.settings) &&
-    (value.tablePreferences === null || isRecord(value.tablePreferences))
-  );
+function getInvalidSnapshotSection(value: Record<string, unknown>) {
+  return SNAPSHOT_SECTIONS.find(([name, isValid]) => !isValid(value[name]))?.[0];
+}
+
+function isStorageSnapshot(value: unknown): value is StorageSnapshot {
+  return isRecord(value) && getInvalidSnapshotSection(value) === undefined;
 }
 
 function isApplication(value: unknown): value is Application {

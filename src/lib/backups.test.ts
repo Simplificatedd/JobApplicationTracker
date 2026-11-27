@@ -224,6 +224,13 @@ describe("parseBackupFile", () => {
       });
   });
 
+  it("says which file, section or record is wrong (#357)", async () => {
+    await expect(parseBackupFile(new File(['{"hello":1}'], "notes.json"))).rejects.toThrow("not a tracker backup");
+    await expect(parseBackupFile(createBackupFile({ ...createSnapshot(), contacts: undefined }))).rejects.toThrow('invalid "contacts" data');
+    const broken = { ...createApplication({ id: "app-2" }), priority: 5 } as unknown as Application;
+    await expect(parseBackupFile(createBackupFile(createSnapshot({ applications: [createApplication(), broken] })))).rejects.toThrow("(applications item 2)");
+  });
+
   it("rejects invalid follow-up auto-reset flags", async () => {
     const application = {
       ...createApplication(),
