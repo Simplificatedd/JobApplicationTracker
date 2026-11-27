@@ -25,6 +25,10 @@ describe("application edit intent", () => {
     expect(applicationDraftToUpdate({ ...draft(), notes: "New notes" }, application)).toEqual({ notes: "New notes" });
   });
 
+  it("saves an edited URL without a scheme with https:// (#321)", () => {
+    expect(applicationDraftToUpdate({ ...draft(), applicationUrl: "example.com/jobs/1" }, application)).toEqual({ applicationUrl: "https://example.com/jobs/1" });
+  });
+
   it("retains explicit clearing while preserving unchanged imported whitespace", () => {
     const original = { ...application, company: " Imported company ", notes: "Original notes" };
     expect(applicationDraftToUpdate({ ...draft(), company: original.company, notes: "" }, original)).toEqual({ notes: undefined });

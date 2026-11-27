@@ -50,6 +50,7 @@ import {
   FollowUpScheduleControls,
 } from "./FollowUpControls";
 import { FormSection } from "./FormSection";
+import { normalizeApplicationUrl } from "../../lib/urls";
 import { InterviewDeadlineFields } from "./InterviewDeadlineFields";
 
 interface AddApplicationModalProps {
@@ -173,6 +174,9 @@ export function AddApplicationModal({
   const [resumeUploadError, setResumeUploadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [titleError, setTitleError] = useState("");
+  const [urlError, setUrlError] = useState("");
+  // Shown in the footer beside Save: the form scrolls, so an error inside it can be out of view.
+  const [saveError, setSaveError] = useState("");
   const [followUpError, setFollowUpError] = useState("");
   const [followUpAutoResetError, setFollowUpAutoResetError] = useState("");
   const [interviewRoundError, setInterviewRoundError] = useState("");
@@ -183,8 +187,6 @@ export function AddApplicationModal({
   if (!isOpen) {
     return null;
   }
-
-  const canSave = form.jobTitle.trim().length > 0;
 
   function updateForm<Key extends keyof AddApplicationFormState>(
     key: Key,
@@ -200,6 +202,9 @@ export function AddApplicationModal({
     });
     if (key === "jobTitle") {
       setTitleError("");
+    }
+    if (key === "applicationUrl") {
+      setUrlError("");
     }
     if (key === "interviewRound") {
       setInterviewRoundError("");
@@ -231,6 +236,8 @@ export function AddApplicationModal({
   function closeModal() {
     setDuplicateMatch(null);
     setTitleError("");
+    setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -248,6 +255,8 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     setInterviewRoundError("");
@@ -304,6 +313,14 @@ export function AddApplicationModal({
 
     if (!trimmedTitle) {
       setTitleError("Job Title is required.");
+      document.getElementById("add-job-title")?.focus();
+      return;
+    }
+
+    const applicationUrl = normalizeApplicationUrl(form.applicationUrl);
+    if (applicationUrl.error) {
+      setUrlError(applicationUrl.error);
+      document.getElementById("add-application-url")?.focus();
       return;
     }
 
@@ -371,7 +388,7 @@ export function AddApplicationModal({
       workMode: form.workMode,
       jobType: form.jobType,
       source: trimOptional(form.source),
-      applicationUrl: trimOptional(form.applicationUrl),
+      applicationUrl: applicationUrl.url,
       dateApplied: trimOptional(form.dateApplied),
       roleStartDate: trimOptional(form.roleStartDate),
       roleEndDate: trimOptional(form.roleEndDate),
@@ -428,6 +445,7 @@ export function AddApplicationModal({
     setDuplicateMatch(null);
     setResumeUploadError("");
     setCoverLetterUploadError("");
+    setSaveError("");
     setIsSaving(true);
     const result = await onCreate(
       input,
@@ -455,8 +473,9 @@ export function AddApplicationModal({
     setIsSaving(false);
 
     if (!result.ok) {
-      setResumeUploadError(result.error);
-      setCoverLetterUploadError(result.error);
+      setSaveError(result.error);
+      if (resumeUploadFile) setResumeUploadError(result.error);
+      if (coverLetterUploadFile) setCoverLetterUploadError(result.error);
       return;
     }
 
@@ -466,6 +485,8 @@ export function AddApplicationModal({
     setResumeUploadError("");
     setCoverLetterUploadError("");
     setTitleError("");
+    setUrlError("");
+    setSaveError("");
     setFollowUpError("");
     setFollowUpAutoResetError("");
     onClose();
@@ -515,9 +536,10 @@ export function AddApplicationModal({
                   data-initial-focus
                   aria-describedby={titleError ? "job-title-error" : undefined}
                   aria-invalid={titleError ? "true" : "false"}
+                  aria-required="true"
                   className="field-control"
+                  id="add-job-title"
                   onChange={(event) => updateForm("jobTitle", event.target.value)}
-                  required
                   type="text"
                   value={form.jobTitle}
                 />
@@ -742,11 +764,20 @@ export function AddApplicationModal({
 
               <Field label="Application URL">
                 <input
+                  aria-describedby={urlError ? "add-application-url-error" : undefined}
+                  aria-invalid={urlError ? "true" : "false"}
                   className="field-control"
+                  id="add-application-url"
+                  inputMode="url"
                   onChange={(event) => updateForm("applicationUrl", event.target.value)}
-                  type="url"
+                  type="text"
                   value={form.applicationUrl}
                 />
+                {urlError ? (
+                  <p className="mt-1 text-xs font-medium text-destructive" id="add-application-url-error">
+                    {urlError}
+                  </p>
+                ) : null}
               </Field>
 
               <Field label="Source">
@@ -1053,6 +1084,11 @@ export function AddApplicationModal({
         </form>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-4 max-md:grid max-md:grid-cols-2 max-md:py-3 sm:px-6">
+          {saveError ? (
+            <p className="basis-full text-sm font-medium text-destructive max-md:col-span-2" role="alert">
+              {saveError}
+            </p>
+          ) : null}
           <button
             className="h-10 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-slate-50 max-md:h-11"
             disabled={isSaving}
@@ -1062,12 +1098,8 @@ export function AddApplicationModal({
             Cancel
           </button>
           <button
-            className={`h-10 rounded-lg px-4 text-sm font-semibold max-md:h-11 ${
-              canSave
-                ? "bg-primary text-primary-foreground hover:bg-blue-700"
-                : "bg-slate-200 text-slate-500"
-            }`}
-            disabled={!canSave || isSaving}
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
+            disabled={isSaving}
             form="add-application-form"
             type="submit"
           >

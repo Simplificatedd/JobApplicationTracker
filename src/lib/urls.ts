@@ -32,6 +32,19 @@ export function getSafeHttpUrl(value: string | undefined) {
   }
 }
 
+// Application URL fields accept addresses without a scheme and save them with https://.
+// Browsers' URL parsers accept odd hosts (Chrome turns "not a url" into
+// "not%20a%20url"), so also require no spaces and a dotted host name.
+export function normalizeApplicationUrl(value: string): { url?: string; error?: string } {
+  const trimmed = value.trim();
+  if (!trimmed) return {};
+  const url = getSafeHttpUrl(trimmed);
+  const host = url ? new URL(url).hostname : "";
+  return url && !/\s/.test(trimmed) && /^[a-z\d-]+(\.[a-z\d-]+)+$/i.test(host)
+    ? { url }
+    : { error: "Enter a web address, for example careers.example.com/jobs/1." };
+}
+
 export type LinkTextPart =
   | { type: "text"; text: string }
   | { href: string; type: "link"; text: string };

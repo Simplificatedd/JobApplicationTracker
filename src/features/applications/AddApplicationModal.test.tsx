@@ -135,3 +135,14 @@ describe("AddApplicationModal applied date (#303)", () => {
     expect(renderModal()).toContain(`value="${createDateStamp()}"`);
   });
 });
+
+describe("Add job Save button (#335)", () => {
+  it("stays enabled with no title so clicking it can explain what is missing", () => {
+    const markup = renderModal();
+    const save = markup.match(/<button[^>]*type="submit"[^>]*>/)?.[0] ?? "";
+    expect(save).not.toContain("disabled");
+    // No native required bubble: the form's own message and focus handle it.
+    expect(markup).toMatch(/<input[^>]*id="add-job-title"[^>]*aria-required="true"|<input[^>]*aria-required="true"[^>]*id="add-job-title"/);
+    expect(markup.match(/<input[^>]*id="add-job-title"[^>]*>/)?.[0]).not.toContain(" required");
+  });
+});
