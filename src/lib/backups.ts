@@ -280,7 +280,8 @@ export function createApplicationsCsv({
     "contacts_count",
     "job_description",
   ];
-  const csv = [header, ...rows].map(toCsvRow).join("\n");
+  // BOM so Excel reads the file as UTF-8 instead of the system code page.
+  const csv = "\uFEFF" + [header, ...rows].map(toCsvRow).join("\n");
 
   return new Blob([csv], { type: "text/csv;charset=utf-8" });
 }

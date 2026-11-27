@@ -138,6 +138,11 @@ describe("createApplicationsCsv", () => {
     expect(archived).toMatch(/,yes,hybrid,high,3000\/month,2027-06-01,2027-08-31,2,"\t=SUM\(A1\)"$/);
     expect(active).toMatch(/,no,unknown,medium,,,,0,$/);
   });
+
+  it("starts with a UTF-8 byte order mark (#356)", async () => {
+    const bytes = new Uint8Array(await createApplicationsCsv({ applications: [createApplication({ company: "Zürich AG" })], resumes: [] }).arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
 });
 
 describe("parseBackupFile", () => {
