@@ -14,7 +14,6 @@ import {
   DEFAULT_SORT_STATE,
   getApplicationFilterOptions,
   includeSelectedFilterOption,
-  isNeedsAttention,
   normalizeApplicationFilters,
   normalizeApplicationSort,
   sortApplications,
@@ -64,6 +63,7 @@ interface ApplicationsPageProps {
   deleteApplication: (id: string) => Promise<MutationResult>;
   deleteContact: (id: string) => Promise<MutationResult>;
   deleteInterview: (id: string) => Promise<MutationResult>;
+  dismissedNotificationIds?: string[];
   enableDeleteActiveApplications: boolean;
   getResumeFile: (id: string) => Promise<Blob>;
   getCoverLetterFile: (id: string) => Promise<Blob>;
@@ -111,6 +111,7 @@ export function ApplicationsPage({
   deleteApplication,
   deleteContact,
   deleteInterview,
+  dismissedNotificationIds = [],
   enableDeleteActiveApplications,
   getResumeFile,
   getCoverLetterFile,
@@ -204,17 +205,22 @@ export function ApplicationsPage({
     filters,
     interviews,
   );
+  // Matches the bell: a dismissed reminder no longer counts.
+  const dismissedIds = new Set(dismissedNotificationIds);
+  function needsAttention(application: Application) {
+    return deriveApplicationNotifications(
+      application,
+      settings,
+      now,
+      interviews.filter(
+        (interview) => interview.applicationId === application.id,
+      ),
+      assessments.filter((item) => item.applicationId === application.id),
+    ).some((notification) => !dismissedIds.has(notification.id));
+  }
   const focusedApplications = needsAttentionOnly
     ? filteredApplications.filter((application) =>
-        isNeedsAttention(
-          application,
-          settings,
-          now,
-          interviews.filter(
-            (interview) => interview.applicationId === application.id,
-          ),
-          assessments.filter((item) => item.applicationId === application.id),
-        ),
+        needsAttention(application),
       )
     : filteredApplications;
   const visibleApplications = focusedApplications;
@@ -253,18 +259,7 @@ export function ApplicationsPage({
     baseApplications.length > 0 &&
     (countActiveFilters(filters, needsAttentionOnly) > 0 ||
       searchQuery.trim() !== "");
-  const attentionCount = baseApplications.filter(
-    (application) =>
-      deriveApplicationNotifications(
-        application,
-        settings,
-        now,
-        interviews.filter(
-          (interview) => interview.applicationId === application.id,
-        ),
-        assessments.filter((item) => item.applicationId === application.id),
-      ).length > 0,
-  ).length;
+  const attentionCount = baseApplications.filter(needsAttention).length;
   const summary = countApplicationSummary(
     baseApplications,
     interviews,

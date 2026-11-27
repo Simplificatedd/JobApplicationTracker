@@ -196,6 +196,9 @@ function renderView(
         deleteApplication={tracker.deleteApplication}
         deleteContact={tracker.deleteContact}
         deleteInterview={tracker.deleteInterview}
+        dismissedNotificationIds={
+          tracker.notificationState.dismissedNotificationIds
+        }
         enableDeleteActiveApplications={
           tracker.settings.enableDeleteActiveApplications
         }
