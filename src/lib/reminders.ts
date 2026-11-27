@@ -149,42 +149,15 @@ export function deriveApplicationNotifications(
   if (application.status === "Offered") {
     return [
       ...deriveOfferDeadlineNotification(application, settings, now),
+      ...deriveFollowUpNotification(application, settings, now),
       ...deriveAssessmentNotifications(application, assessments, settings, now),
     ];
   }
 
-  const notifications: ReminderNotification[] = deriveAssessmentNotifications(
-    application,
-    assessments,
-    settings,
-    now,
-  );
-  const followUpDueDate = calculateFollowUpDueDate(application);
-
-  if (followUpDueDate) {
-    const severity = classifyReminderSeverity(
-      followUpDueDate,
-      settings.dueSoonDays,
-      now,
-    );
-
-    if (severity !== "upcoming") {
-      notifications.push({
-        application,
-        applicationId: application.id,
-        body: [application.company, severityLabel(severity)]
-          .filter(Boolean)
-          .join(" / "),
-        dueAt: followUpDueDate,
-        group: "followups",
-        id: buildNotificationId(application.id, "follow_up", followUpDueDate),
-        severity,
-        sortAt: parseDateValue(followUpDueDate)?.getTime() ?? 0,
-        title: `Follow up on ${application.jobTitle}`,
-        type: "follow_up",
-      });
-    }
-  }
+  const notifications: ReminderNotification[] = [
+    ...deriveAssessmentNotifications(application, assessments, settings, now),
+    ...deriveFollowUpNotification(application, settings, now),
+  ];
 
   const interviewRecords =
     interviews ?? getProjectedInterviewRecords(application);
@@ -484,6 +457,45 @@ export function severityLabel(severity: ReminderSeverity) {
   }
 
   return "upcoming";
+}
+
+function deriveFollowUpNotification(
+  application: Application,
+  settings: UserSettings,
+  now: Date,
+): ReminderNotification[] {
+  const followUpDueDate = calculateFollowUpDueDate(application);
+
+  if (!followUpDueDate) {
+    return [];
+  }
+
+  const severity = classifyReminderSeverity(
+    followUpDueDate,
+    settings.dueSoonDays,
+    now,
+  );
+
+  if (severity === "upcoming") {
+    return [];
+  }
+
+  return [
+    {
+      application,
+      applicationId: application.id,
+      body: [application.company, severityLabel(severity)]
+        .filter(Boolean)
+        .join(" / "),
+      dueAt: followUpDueDate,
+      group: "followups",
+      id: buildNotificationId(application.id, "follow_up", followUpDueDate),
+      severity,
+      sortAt: parseDateValue(followUpDueDate)?.getTime() ?? 0,
+      title: `Follow up on ${application.jobTitle}`,
+      type: "follow_up",
+    },
+  ];
 }
 
 function buildNotificationId(

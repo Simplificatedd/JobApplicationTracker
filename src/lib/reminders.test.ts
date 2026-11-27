@@ -81,6 +81,18 @@ describe("deriveApplicationNotifications", () => {
     },
   );
 
+  it("reminds about a follow-up date set on an Offered application (#343)", () => {
+    const notifications = deriveApplicationNotifications(
+      { ...baseApplication, followUpDate: "2026-09-21", status: "Offered" },
+      { ...DEFAULT_USER_SETTINGS, dueSoonDays: 3 },
+      new Date("2026-09-20T12:00"),
+    );
+
+    expect(notifications).toEqual([
+      expect.objectContaining({ severity: "due_soon", type: "follow_up" }),
+    ]);
+  });
+
   it("pauses ordinary reminders while an offer is pending", () => {
     const notifications = deriveApplicationNotifications(
       { ...baseApplication, status: "Offered" },
