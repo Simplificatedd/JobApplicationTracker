@@ -34,7 +34,6 @@ import {
   type BackupImportPreview,
 } from "../lib/backups";
 import {
-  createDateStamp,
   createId,
   createTimestamp,
   DEFAULT_ANALYTICS_SETTINGS,
@@ -455,7 +454,6 @@ export function useTrackerStore(): TrackerStore {
     const application: Application = {
       ...input,
       id: createId("app"),
-      dateApplied: input.dateApplied || createDateStamp(),
       resumeId: resumeUpload?.resume.id ?? input.resumeId,
       coverLetterId:
         coverLetterUpload?.coverLetter.id ?? input.coverLetterId,

@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { createDateStamp } from "../../lib/domain";
 import { AddApplicationModal } from "./AddApplicationModal";
 
 function renderModal(
@@ -126,5 +127,11 @@ describe("Add job required note (#259)", () => {
 
     expect(note).toBeGreaterThan(-1);
     expect(note).toBeLessThan(markup.indexOf('id="add-section-role"'));
+  });
+});
+
+describe("AddApplicationModal applied date (#303)", () => {
+  it("starts with today's date, which is what gets saved", () => {
+    expect(renderModal()).toContain(`value="${createDateStamp()}"`);
   });
 });

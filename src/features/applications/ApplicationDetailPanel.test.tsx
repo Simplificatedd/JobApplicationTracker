@@ -174,6 +174,22 @@ describe("phone detail panel buttons", () => {
   });
 });
 
+describe("Edit job title (#302)", () => {
+  // Edit mode only renders after clicking Edit, so check the source.
+  const source = readFileSync(new URL("./ApplicationDetailPanel.tsx", import.meta.url), "utf8");
+
+  it("stops a save with a blank title before anything is sent", () => {
+    const save = source.slice(source.indexOf("async function saveChanges()"));
+
+    expect(save.indexOf('setTitleError("Job Title is required.")')).toBeGreaterThan(-1);
+    expect(save.indexOf('setTitleError("Job Title is required.")')).toBeLessThan(save.indexOf("await onUpdate("));
+  });
+
+  it("marks the title as required like Add job", () => {
+    expect(source).toContain('<Field label="Job title" required>');
+  });
+});
+
 describe("detail panel focus fallback (#217)", () => {
   afterEach(() => vi.unstubAllGlobals());
   const element = (rendered: boolean) => ({ getClientRects: () => (rendered ? [{}] : []) });
