@@ -13,6 +13,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { deriveReminderNotifications } from "./lib/reminders";
 import { useTrackerStore } from "./store/useTrackerStore";
 import { useReminderClock } from "./hooks/useReminderClock";
+import { getCloudSnapshotSizeWarning } from "./storage/snapshotSize";
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewKey>("applications");
@@ -20,6 +21,7 @@ export function App() {
   const [openApplicationId, setOpenApplicationId] = useState<string | null>(null);
   const tracker = useTrackerStore();
   const now = useReminderClock();
+  const sizeWarning = getCloudSnapshotSizeWarning(tracker.trackerDataBytes);
   const notifications = useMemo(
     () =>
       deriveReminderNotifications({
@@ -90,6 +92,7 @@ export function App() {
         />
       ) : null}
       {tracker.documentCleanupWarning ? <StorageErrorBanner message={tracker.documentCleanupWarning} /> : null}
+      {sizeWarning ? <StorageErrorBanner message={sizeWarning} /> : null}
       {tracker.isStorageLoading ? (
         <StorageLoading />
       ) : (
@@ -267,6 +270,7 @@ function renderView(
     <SettingsPage
       cloudAccountEmail={tracker.cloudAccountEmail}
       onExportApplicationsCsv={tracker.exportApplicationsCsv}
+      trackerDataBytes={tracker.trackerDataBytes}
       onExportFullBackup={tracker.exportFullBackup}
       onExportRecoveryBackup={tracker.exportRecoveryBackup}
       onImportFullBackup={tracker.importFullBackup}
