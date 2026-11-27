@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { application } from "../../test/assessmentFixtures";
-import { ContactsPanel, contactDraftToUpdate, getContactErrors } from "./ContactsPanel";
+import { ContactsPanel, contactDraftToUpdate, copyPhoneOnComputer, getContactErrors } from "./ContactsPanel";
 
 function renderPanel(overrides: Partial<ComponentProps<typeof ContactsPanel>> = {}) {
   return renderToStaticMarkup(
@@ -68,5 +68,28 @@ describe("contact email and phone links (#310)", () => {
     expect(markup).toContain('href="tel:+6591234567"');
     expect(renderPanel({ contacts: [{ ...contact, email: "old-invalid" }] })).not.toContain("mailto:");
     expect(renderPanel({ contacts: [{ ...contact, phone: "+1 415 555 0100 ext 12" }] })).not.toContain("tel:");
+  });
+
+  it("copies the phone on a computer and leaves the call link alone on a phone", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const event = { currentTarget: {} as Node, preventDefault: vi.fn() };
+
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: false }) });
+    expect(await copyPhoneOnComputer(event, "+65 9123 4567")).toBeUndefined();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: true }) });
+    expect(await copyPhoneOnComputer(event, "+65 9123 4567")).toBe("Phone number copied.");
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(writeText).toHaveBeenCalledWith("+65 9123 4567");
+
+    // Clipboard blocked: the number is selected for Ctrl+C instead.
+    const selectAllChildren = vi.fn();
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    vi.stubGlobal("window", { matchMedia: () => ({ matches: true }), getSelection: () => ({ selectAllChildren }) });
+    expect(await copyPhoneOnComputer(event, "+65 9123 4567")).toContain("press Ctrl+C");
+    expect(selectAllChildren).toHaveBeenCalledWith(event.currentTarget);
+    vi.unstubAllGlobals();
   });
 });

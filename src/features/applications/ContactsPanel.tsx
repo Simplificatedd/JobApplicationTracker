@@ -1,5 +1,5 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Fragment, useEffect, useId, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { UnsavedChangesDialog } from "../../components/UnsavedChangesDialog";
 import { NativeModal } from "../../components/NativeModal";
 import { changedDraftFields } from "../../lib/editIntent";
@@ -294,6 +294,8 @@ function ContactCard({
   const [draft, setDraft] = useState<ContactDraft>(() => toDraft(contact));
   const [editBase, setEditBase] = useState(() => structuredClone(contact));
   const [errors, setErrors] = useState<ContactErrors>({});
+  const [copyStatus, setCopyStatus] = useState("");
+  const copyStatusTimer = useRef<number>();
   const fieldId = useId();
 
 
@@ -445,7 +447,18 @@ function ContactCard({
                   </a>
                 ) : contact.email,
                 contact.phone && isDialable(contact.phone) ? (
-                  <a className="font-medium text-primary hover:text-blue-700" href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}>
+                  <a
+                    className="font-medium text-primary hover:text-blue-700"
+                    href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}
+                    onClick={(event) => {
+                      void copyPhoneOnComputer(event, contact.phone ?? "").then((status) => {
+                        if (!status) return;
+                        setCopyStatus(status);
+                        window.clearTimeout(copyStatusTimer.current);
+                        copyStatusTimer.current = window.setTimeout(() => setCopyStatus(""), 3000);
+                      });
+                    }}
+                  >
                     {contact.phone}
                   </a>
                 ) : contact.phone,
@@ -459,6 +472,7 @@ function ContactCard({
                 ))}
             </p>
           ) : null}
+          <p className="mt-1 text-xs font-medium text-muted empty:hidden" role="status">{copyStatus}</p>
           {safeLinkedInUrl ? (
             <a
               className="mt-2 block truncate text-sm font-medium text-primary hover:text-blue-700"
@@ -555,6 +569,24 @@ export function contactDraftToUpdate(draft: ContactDraft, original: ApplicationC
 // Only plain phone characters, so "ext 12" or letters never get glued onto the dialled number.
 function isDialable(phone: string) {
   return /^\+?[\d\s().-]+$/.test(phone) && /\d/.test(phone);
+}
+
+// Computers rarely have a phone app, so a click there copies the number; phones still dial.
+export async function copyPhoneOnComputer(
+  event: { currentTarget: Node; preventDefault(): void },
+  phone: string,
+) {
+  if (!window.matchMedia?.("(pointer: fine)").matches || !navigator.clipboard) return undefined;
+  event.preventDefault();
+  const link = event.currentTarget;
+  try {
+    await navigator.clipboard.writeText(phone);
+    return "Phone number copied.";
+  } catch {
+    // Clipboard blocked (browser setting): select the number so the keyboard shortcut works.
+    window.getSelection()?.selectAllChildren(link);
+    return "Couldn't copy automatically. The number is selected: press Ctrl+C (⌘C on Mac).";
+  }
 }
 
 // Only changed fields are checked, so an older saved value never blocks other edits.
