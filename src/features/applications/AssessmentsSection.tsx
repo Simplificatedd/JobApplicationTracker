@@ -1,5 +1,6 @@
 import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useEditorFocus } from "../../hooks/useEditorFocus";
 import {
   ASSESSMENT_TYPES,
   ASSESSMENT_PROGRESS,
@@ -42,12 +43,14 @@ export function AssessmentsSection({
   const [error, setError] = useState("");
 
   const editorOpen = Boolean(draft) || busy;
+  const { sectionRef, rememberOpener } = useEditorFocus(Boolean(draft), '[data-stage-add="assessment"]');
   useEffect(() => {
     onEditingChange?.(editorOpen);
     return () => onEditingChange?.(false);
   }, [editorOpen, onEditingChange]);
 
   function edit(assessment?: Assessment, onlyDeadline = false) {
+    rememberOpener();
     setEditingId(assessment?.id ?? null);
     setOriginal(assessment);
     setDeadlineOnly(onlyDeadline);
@@ -139,7 +142,7 @@ export function AssessmentsSection({
   }
 
   return (
-    <section>
+    <section ref={sectionRef}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Assessments</h3>
@@ -160,7 +163,7 @@ export function AssessmentsSection({
         ) : null}
       </div>
       {draft ? (
-        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4">
+        <div className="mt-3 rounded-lg border border-border bg-surface-raised p-4" data-stage-editor>
           <h4 className="text-sm font-semibold text-foreground">
             {deadlineOnly
               ? "Edit assessment deadline"
