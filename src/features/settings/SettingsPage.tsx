@@ -359,7 +359,7 @@ export function SettingsPage({
             }
           />
           <NumberField
-            description="Whole days before a newly added application should prompt you to follow up. Decimals round down; minimum 1."
+            description="Whole days before a newly added application should prompt you to follow up. Decimals round down; 1 to 365."
             label="Follow-up prompt after:"
             min={1}
             onChange={(value) =>
@@ -524,7 +524,7 @@ export function SettingsPage({
             }
           />
           <NumberField
-            description="Whole days ahead that count as due soon. Decimals round down; minimum 1."
+            description="Whole days ahead that count as due soon. Decimals round down; 1 to 365."
             label="Due soon means within:"
             min={1}
             onChange={(value) => onUpdateSettings({ dueSoonDays: value })}
@@ -1028,9 +1028,17 @@ function ToggleButtonField({
   );
 }
 
+// Empty or non-numeric text keeps the previous value; numbers are clamped.
+export function parseDayField(text: string, previous: number, min: number, max: number) {
+  const parsed = Number(text);
+  if (text.trim() === "" || !Number.isFinite(parsed)) return previous;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
 function NumberField({
   description,
   label,
+  max = 365,
   min,
   onChange,
   suffix,
@@ -1038,24 +1046,38 @@ function NumberField({
 }: {
   description: string;
   label: string;
+  max?: number;
   min: number;
   onChange: (value: number) => void;
   suffix?: string;
   value: number;
 }) {
+  // Raw text while typing, so the field can be cleared; checked on leaving it.
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
+  function commit() {
+    const next = parseDayField(text, value, min, max);
+    setText(String(next));
+    if (next !== value) onChange(next);
+  }
+
   return (
     <label className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <SettingLabel description={description} label={label} />
       <span className="inline-flex shrink-0 items-center gap-2 self-start">
         <input
           className="field-control h-9 w-20 text-right tabular-nums max-md:h-11"
+          max={max}
           min={min}
-          onChange={(event) =>
-            onChange(Math.max(min, Math.floor(Number(event.target.value)) || min))
-          }
+          onBlur={commit}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
           step={1}
           type="number"
-          value={value}
+          value={text}
         />
         {suffix ? (
           <span className="text-sm text-muted">{suffix}</span>
