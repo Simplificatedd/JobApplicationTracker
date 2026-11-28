@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ChevronDown,
+  CircleCheck,
   Download,
   Eye,
   FileText,
@@ -277,11 +278,9 @@ export function ResumesPage({
           Optional: add a name and version, then choose a PDF or DOCX file.
           Uploading starts when you pick the file.
         </p>
-        {uploadError || actionError ? (
-          <InlineAlert message={uploadError || actionError} tone="danger" />
-        ) : uploadMessage ? (
-          <InlineAlert message={uploadMessage} tone="info" />
-        ) : null}
+        {/* Both regions stay in the page so screen readers announce new messages. */}
+        <InlineAlert message={uploadError || actionError} tone="danger" />
+        <InlineAlert message={uploadError || actionError ? "" : uploadMessage} tone="success" />
       </section>
 
       {resumes.length === 0 ? (
@@ -846,23 +845,29 @@ function Field({
   );
 }
 
-function InlineAlert({
+export function InlineAlert({
   message,
   tone,
 }: {
   message: string;
-  tone: "danger" | "info";
+  tone: "danger" | "success";
 }) {
+  const Icon = tone === "danger" ? AlertTriangle : CircleCheck;
   return (
     <div
-      className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+      className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm empty:hidden ${
         tone === "danger"
           ? "border-red-200 bg-red-50 text-destructive"
           : "border-blue-200 bg-blue-50 text-info"
       }`}
+      role={tone === "danger" ? "alert" : "status"}
     >
-      <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
-      <p>{message}</p>
+      {message ? (
+        <>
+          <Icon aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
+          <p>{message}</p>
+        </>
+      ) : null}
     </div>
   );
 }

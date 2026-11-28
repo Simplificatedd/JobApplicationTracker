@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ResumeMetadata } from "../../types/application";
-import { ResumesPage } from "./ResumesPage";
+import { InlineAlert, ResumesPage } from "./ResumesPage";
 
 const resume: ResumeMetadata = {
   id: "resume-1",
@@ -160,5 +160,26 @@ describe("upload wording (#264)", () => {
     expect(hintId).toBeTruthy();
     expect(markup).toContain(`aria-describedby="${hintId}"`);
     expect(markup).toContain(">Display name<");
+  });
+});
+
+// #350: messages are announced, and success doesn't show a warning icon.
+describe("document page messages (#350)", () => {
+  it("keeps empty alert and status regions in the page so new messages are announced", () => {
+    const markup = renderPage();
+
+    expect(markup).toMatch(/<div class="[^"]*empty:hidden[^"]*" role="alert"><\/div>/);
+    expect(markup).toMatch(/<div class="[^"]*empty:hidden[^"]*" role="status"><\/div>/);
+  });
+
+  it("uses a warning icon for errors and a check icon for success", () => {
+    const error = renderToStaticMarkup(<InlineAlert message="Upload failed." tone="danger" />);
+    const success = renderToStaticMarkup(<InlineAlert message="Resume uploaded." tone="success" />);
+
+    expect(error).toContain('role="alert"');
+    expect(error).toContain("lucide-triangle-alert");
+    expect(success).toContain('role="status"');
+    expect(success).toContain("lucide-circle-check");
+    expect(success).not.toContain("lucide-triangle-alert");
   });
 });
