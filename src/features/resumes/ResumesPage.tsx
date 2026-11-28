@@ -436,6 +436,8 @@ function useDocumentMetadataEditor(
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [nameError, setNameError] = useState("");
+  const nameErrorId = useId();
   const [editBase, setEditBase] = useState(() => structuredClone(resume));
   const [draft, setDraft] = useState(() => getDocumentDraft(resume));
 
@@ -446,10 +448,14 @@ function useDocumentMetadataEditor(
   function startEditing() {
     setEditBase(structuredClone(resume));
     setDraft(getDocumentDraft(resume));
+    setNameError("");
     setIsEditing(true);
   }
 
   async function save() {
+    const error = getDocumentDraftError(draft);
+    setNameError(error);
+    if (error) return;
     setIsSaving(true);
     setSaveError("");
     const result = await onUpdate(documentDraftToUpdate(draft, editBase), editBase);
@@ -465,12 +471,18 @@ function useDocumentMetadataEditor(
 
   function cancel() {
     setDraft(getDocumentDraft(resume));
+    setNameError("");
     setIsEditing(false);
   }
+
+  // Hide the error again once a name is typed, like the job title check.
+  const showNameError = Boolean(nameError) && !draft.displayName.trim();
 
   return {
     cancel,
     draft,
+    nameError: showNameError ? nameError : "",
+    nameErrorId,
     isEditing,
     isSaving,
     save,
@@ -499,6 +511,8 @@ function ResumeRow({
         {isEditing ? (
           <div className="space-y-2">
             <input
+              aria-describedby={editor.nameError ? editor.nameErrorId : undefined}
+              aria-invalid={editor.nameError ? "true" : "false"}
               aria-label="Display name"
               className="field-control"
               onChange={(event) =>
@@ -506,6 +520,7 @@ function ResumeRow({
               }
               value={draft.displayName}
             />
+            <NameError editor={editor} />
             <input
               aria-label="Version label"
               className="field-control"
@@ -605,15 +620,21 @@ function ResumeCard({
     <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground" data-document-item>
       {isEditing ? (
         <div className="grid gap-3">
-          <Field label="Display name">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                editor.updateDraft("displayName", event.target.value)
-              }
-              value={draft.displayName}
-            />
-          </Field>
+          {/* The error stays outside the label so it is not read as part of the field's name. */}
+          <div>
+            <Field label="Display name">
+              <input
+                aria-describedby={editor.nameError ? editor.nameErrorId : undefined}
+                aria-invalid={editor.nameError ? "true" : "false"}
+                className="field-control"
+                onChange={(event) =>
+                  editor.updateDraft("displayName", event.target.value)
+                }
+                value={draft.displayName}
+              />
+            </Field>
+            <NameError editor={editor} />
+          </div>
           <Field label="Version label">
             <input
               className="field-control"
@@ -816,6 +837,15 @@ function StorageBadge({ resume }: { resume: ResumeMetadata }) {
   );
 }
 
+// role="alert" so screen readers speak the error when Save is pressed.
+export function NameError({ editor }: { editor: Pick<ReturnType<typeof useDocumentMetadataEditor>, "nameError" | "nameErrorId"> }) {
+  return editor.nameError ? (
+    <p className="mt-1 text-xs font-medium text-destructive" id={editor.nameErrorId} role="alert">
+      {editor.nameError}
+    </p>
+  ) : null;
+}
+
 function SaveError({ message }: { message: string }) {
   return message ? (
     <p className="mt-2 text-xs font-medium text-destructive" role="alert">
@@ -963,6 +993,10 @@ function getLinkedCounts(
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document action failed.";
+}
+
+export function getDocumentDraftError(draft: { displayName: string }) {
+  return draft.displayName.trim() ? "" : "Display name is required.";
 }
 
 export function documentDraftToUpdate(

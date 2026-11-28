@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ResumeMetadata } from "../../types/application";
-import { InlineAlert, ResumesPage } from "./ResumesPage";
+import { getDocumentDraftError, InlineAlert, NameError, ResumesPage } from "./ResumesPage";
 
 const resume: ResumeMetadata = {
   id: "resume-1",
@@ -181,5 +181,24 @@ describe("document page messages (#350)", () => {
     expect(success).toContain('role="status"');
     expect(success).toContain("lucide-circle-check");
     expect(success).not.toContain("lucide-triangle-alert");
+  });
+});
+
+// #359: a cleared display name is reported instead of silently kept.
+describe("document display name check (#359)", () => {
+  it.each(["", "   "])("requires a display name (%j)", (displayName) => {
+    expect(getDocumentDraftError({ displayName })).toBe("Display name is required.");
+  });
+
+  it("accepts any non-blank name", () => {
+    expect(getDocumentDraftError({ displayName: " Resume " })).toBe("");
+  });
+
+  it("announces the error so screen reader users hear why nothing saved", () => {
+    const markup = renderToStaticMarkup(
+      <NameError editor={{ nameError: "Display name is required.", nameErrorId: "name-error" }} />,
+    );
+
+    expect(markup).toBe('<p class="mt-1 text-xs font-medium text-destructive" id="name-error" role="alert">Display name is required.</p>');
   });
 });
