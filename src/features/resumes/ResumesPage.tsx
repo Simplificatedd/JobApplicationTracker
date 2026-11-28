@@ -285,9 +285,19 @@ export function ResumesPage({
 
       {resumes.length === 0 ? (
         <EmptyState
+          action={
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              <Upload aria-hidden="true" size={16} />
+              {`Upload ${documentKind}`}
+            </button>
+          }
           body="Upload PDF or DOCX versions to attach them to applications."
           icon={FileText}
-          kicker={isCoverLetter ? "Cover letters" : "Resumes"}
           title={`${documentLabel} library`}
         />
       ) : (

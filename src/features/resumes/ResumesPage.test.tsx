@@ -202,3 +202,18 @@ describe("document display name check (#359)", () => {
     expect(markup).toBe('<p class="mt-1 text-xs font-medium text-destructive" id="name-error" role="alert">Display name is required.</p>');
   });
 });
+
+// #341: the empty library offers an upload instead of repeating the page title.
+describe("empty document library (#341)", () => {
+  it.each([
+    ["resume", "Upload resume", "Resume library"],
+    ["cover letter", "Upload cover letter", "Cover letter library"],
+  ] as const)("offers %s uploads without a repeated page-title heading", (documentKind, label, title) => {
+    const markup = renderPage({ documentKind, resumes: [] });
+    const empty = /<section class="flex min-h-\[360px\][\s\S]*?<\/section>/.exec(markup)?.[0] ?? "";
+
+    expect(empty).toContain(`>${title}</h2>`);
+    expect(empty).toMatch(new RegExp(`<button[^>]*type="button"><svg[\\s\\S]*?</svg>${label}</button>`));
+    expect(empty).not.toContain("uppercase");
+  });
+});
