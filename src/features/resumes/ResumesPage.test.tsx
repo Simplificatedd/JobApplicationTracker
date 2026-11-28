@@ -54,8 +54,8 @@ describe("document library layouts", () => {
       expect(markup).toContain(`<span>${shortLabel}</span>`);
     }
     // Each action keeps one accessible name per layout: card and table.
-    expect(countMatches(markup, 'aria-label="Preview resume"')).toBe(2);
-    expect(countMatches(markup, 'aria-label="Delete resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Preview resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Delete resume Software Resume"')).toBe(2);
     expect(countMatches(markup, 'title="Delete resume"')).toBe(1);
   });
 
@@ -67,20 +67,20 @@ describe("document library layouts", () => {
     expect(markup).not.toContain("<span>Open</span>");
     expect(markup).not.toContain("Preview resume");
     // One Download per layout (card and table), not two.
-    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download resume Software Resume"')).toBe(2);
   });
 
   it("keeps Preview for PDFs, whose preview opens the file rather than downloading it", () => {
     const markup = renderPage();
 
-    expect(countMatches(markup, 'aria-label="Preview resume"')).toBe(2);
-    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Preview resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download resume Software Resume"')).toBe(2);
   });
 
   it("names the document kind on cover letter cards", () => {
     const markup = renderPage({ documentKind: "cover letter" });
 
-    expect(countMatches(markup, 'aria-label="Download cover letter"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download cover letter Software Resume"')).toBe(2);
   });
 });
 
@@ -104,7 +104,7 @@ describe("document card actions on phones", () => {
 
     expect(card).toContain('class="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap"');
     for (const label of ["Preview resume", "Download resume", "Edit metadata", "Delete resume"]) {
-      expect(card).toMatch(new RegExp(`aria-label="${label}" class="[^"]*max-md:h-11`));
+      expect(card).toMatch(new RegExp(`aria-label="${label} Software Resume" class="[^"]*max-md:h-11`));
     }
     // Icon-only table actions keep their size.
     expect(table).not.toContain("max-md:h-11");
@@ -215,5 +215,18 @@ describe("empty document library (#341)", () => {
     expect(empty).toContain(`>${title}</h2>`);
     expect(empty).toMatch(new RegExp(`<button[^>]*type="button"><svg[\\s\\S]*?</svg>${label}</button>`));
     expect(empty).not.toContain("uppercase");
+  });
+});
+
+// #360: repeated action buttons say which document they act on.
+describe("document action names (#360)", () => {
+  it("adds the document name to each action's screen-reader name and keeps tooltips short", () => {
+    const markup = renderPage({
+      resumes: [resume, { ...resume, id: "resume-2", displayName: "Data Resume", storageKey: "resumes/resume-2" }],
+    });
+
+    expect(countMatches(markup, 'aria-label="Delete resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Delete resume Data Resume"')).toBe(2);
+    expect(countMatches(markup, 'title="Delete resume"')).toBe(2);
   });
 });

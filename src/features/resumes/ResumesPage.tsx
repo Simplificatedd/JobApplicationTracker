@@ -766,6 +766,7 @@ function DocumentActions({
       <>
         <IconAction
           disabled={editor.isSaving}
+          itemName={resume.displayName}
           label="Save metadata"
           onClick={() => void editor.save()}
           shortLabel={editor.isSaving ? "Saving..." : "Save"}
@@ -775,6 +776,7 @@ function DocumentActions({
         </IconAction>
         <IconAction
           disabled={editor.isSaving}
+          itemName={resume.displayName}
           label="Cancel edit"
           onClick={editor.cancel}
           shortLabel="Cancel"
@@ -795,6 +797,7 @@ function DocumentActions({
       {canPreview ? (
         <IconAction
           disabled={isWorking}
+          itemName={resume.displayName}
           label={`Preview ${documentLabel}`}
           onClick={onPreview}
           shortLabel="Preview"
@@ -805,6 +808,7 @@ function DocumentActions({
       ) : null}
       <IconAction
         disabled={isWorking}
+        itemName={resume.displayName}
         label={`Download ${documentLabel}`}
         onClick={onDownload}
         shortLabel="Download"
@@ -813,6 +817,7 @@ function DocumentActions({
         <Download aria-hidden="true" size={16} />
       </IconAction>
       <IconAction
+        itemName={resume.displayName}
         label="Edit metadata"
         onClick={editor.startEditing}
         shortLabel="Edit"
@@ -821,6 +826,7 @@ function DocumentActions({
         <Pencil aria-hidden="true" size={16} />
       </IconAction>
       <IconAction
+        itemName={resume.displayName}
         label={`Delete ${documentLabel}`}
         onClick={onDelete}
         shortLabel="Delete"
@@ -915,6 +921,7 @@ export function InlineAlert({
 function IconAction({
   children,
   disabled = false,
+  itemName,
   label,
   onClick,
   shortLabel,
@@ -923,6 +930,8 @@ function IconAction({
 }: {
   children: React.ReactNode;
   disabled?: boolean;
+  /** Added to the screen-reader name so repeated buttons say which document they act on. */
+  itemName: string;
   label: string;
   onClick: () => void;
   shortLabel: string;
@@ -931,7 +940,7 @@ function IconAction({
 }) {
   return (
     <button
-      aria-label={label}
+      aria-label={`${label} ${itemName}`}
       className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
         showLabel ? "px-3 text-sm font-semibold max-md:h-11" : "w-9"
       } ${

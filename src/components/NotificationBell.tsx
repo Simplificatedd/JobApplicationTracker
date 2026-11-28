@@ -285,7 +285,7 @@ function GroupedNotifications({
   );
 }
 
-function NotificationItem({
+export function NotificationItem({
   notification,
   onDismiss,
   onOpenApplication,
@@ -348,6 +348,7 @@ function NotificationItem({
 
       <div className="mt-3 flex flex-wrap gap-2">
         <SmallActionButton
+          itemName={notification.title}
           label="Open application"
           onClick={() => onOpenApplication(notification.applicationId)}
         >
@@ -357,6 +358,7 @@ function NotificationItem({
         {notification.type === "follow_up" || notification.type === "flagged" ? (
           <>
             <SmallActionButton
+              itemName={notification.title}
               label="Follow-up handled"
               onClick={() => {
                 keepPanelFocus();
@@ -370,6 +372,7 @@ function NotificationItem({
               Handled
             </SmallActionButton>
             <SmallActionButton
+              itemName={notification.title}
               label="Change follow-up date"
               onClick={() =>
                 changeDate(
@@ -387,6 +390,7 @@ function NotificationItem({
         ) : null}
         {notification.type === "interview" ? (
           <SmallActionButton
+            itemName={notification.title}
             label="Change scheduled date and time"
             onClick={() =>
               changeDate(
@@ -403,6 +407,7 @@ function NotificationItem({
         ) : null}
         {notification.type === "deadline" ? (
           <SmallActionButton
+            itemName={notification.title}
             label="Change stage deadline"
             onClick={() =>
               changeDate(
@@ -422,6 +427,7 @@ function NotificationItem({
         notification.assessmentId ? (
           <>
             <SmallActionButton
+              itemName={notification.title}
               label="Mark assessment submitted"
               onClick={() =>
                 onUpdateAssessment(notification.assessmentId!, {
@@ -433,9 +439,10 @@ function NotificationItem({
               Submitted
             </SmallActionButton>
             <SmallActionButton
+              itemName={notification.title}
               label={
                 notification.type === "assessment_start"
-                  ? "Edit scheduled assessment start"
+                  ? "Change assessment start time"
                   : "Edit assessment deadline"
               }
               onClick={() => changeAssessmentDate(notification, onUpdateAssessment)}
@@ -447,6 +454,7 @@ function NotificationItem({
         {notification.type === "offer_deadline" ? (
           <>
             <SmallActionButton
+              itemName={notification.title}
               label="Mark offer accepted"
               onClick={() =>
                 onUpdateApplication(notification.applicationId, {
@@ -458,6 +466,7 @@ function NotificationItem({
               Accepted
             </SmallActionButton>
             <SmallActionButton
+              itemName={notification.title}
               label="Change offer deadline"
               onClick={() =>
                 changeDate(
@@ -480,16 +489,19 @@ function NotificationItem({
 
 function SmallActionButton({
   children,
+  itemName,
   label,
   onClick,
 }: {
   children: React.ReactNode;
+  /** Added to the screen-reader name so repeated buttons say which reminder they act on. */
+  itemName: string;
   label: string;
   onClick: () => void;
 }) {
   return (
     <button
-      aria-label={label}
+      aria-label={`${label}, ${itemName}`}
       className="touch-target inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 text-xs font-semibold text-foreground hover:bg-slate-50 max-md:min-h-11 max-md:px-3 max-md:text-sm"
       onClick={onClick}
       title={label}
