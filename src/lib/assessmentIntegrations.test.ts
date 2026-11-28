@@ -340,7 +340,8 @@ describe("assessment analytics and statuses", () => {
       [app],
       [],
       [],
-      [{ ...assessment, scheduledStart: "2026-09-22T00:00:00.000Z" }],
+      // Local noon, so the event falls on 22 September in every time zone.
+      [{ ...assessment, scheduledStart: new Date(2026, 8, 22, 12).toISOString() }],
     );
     const scheduled = days.find((day) => day.date === "2026-09-22");
     expect(scheduled?.summary).toContain("assessment event");

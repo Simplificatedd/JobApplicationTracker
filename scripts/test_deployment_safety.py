@@ -18,7 +18,12 @@ def assert_validation_only(ci):
     if re.findall(r"^ *uses: (.+)$", ci, re.M) != ["actions/checkout@v5", "actions/setup-node@v5"]:
         raise AssertionError("Additional actions require deployment-safety review")
     commands = re.findall(r"^ *run: (.+)$", ci, re.M)
-    if commands != ["npm ci", "npm run check", "python3 -B -m unittest discover -s scripts -p 'test_*.py'"]:
+    if commands != [
+        "npm ci",
+        "npm run check",
+        "TZ=Pacific/Kiritimati npx vitest run && TZ=Pacific/Honolulu npx vitest run",
+        "python3 -B -m unittest discover -s scripts -p 'test_*.py'",
+    ]:
         raise AssertionError("CI must preserve the reviewed validation commands")
 
 
