@@ -697,7 +697,8 @@ export function AddApplicationModal({
                       onChange={(event) =>
                         updateForm("interviewMeetingUrl", event.target.value)
                       }
-                      type="url"
+                      inputMode="url"
+                      type="text"
                       value={form.interviewMeetingUrl}
                     />
                   </Field>
