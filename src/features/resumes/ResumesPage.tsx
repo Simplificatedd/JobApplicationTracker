@@ -184,9 +184,16 @@ export function ResumesPage({
     // Read before confirm() so the item is known even if focus moves.
     const item = document.activeElement?.closest("[data-document-item]");
     if (window.confirm(message)) {
+      clearUploadStatus();
       keepFocusAfterRemoval(item, "[data-document-item]", () => firstVisible("[data-document-upload]"), "button");
       onDeleteResume(resume.id);
     }
+  }
+
+  // The last upload's message no longer applies once another document action starts.
+  function clearUploadStatus() {
+    setUploadError("");
+    setUploadMessage("");
   }
 
   function getDocumentItemProps(resume: ResumeMetadata): DocumentItemProps {
@@ -195,9 +202,18 @@ export function ResumesPage({
       isWorking: workingResumeId === resume.id,
       linkedCount: linkedCounts.get(resume.id) ?? 0,
       onDelete: () => confirmDelete(resume),
-      onDownload: () => downloadResume(resume),
-      onPreview: () => previewResume(resume),
-      onUpdate: (input, original) => onUpdateResume(resume.id, input, original),
+      onDownload: () => {
+        clearUploadStatus();
+        void downloadResume(resume);
+      },
+      onPreview: () => {
+        clearUploadStatus();
+        void previewResume(resume);
+      },
+      onUpdate: (input, original) => {
+        clearUploadStatus();
+        return onUpdateResume(resume.id, input, original);
+      },
       resume,
     };
   }
