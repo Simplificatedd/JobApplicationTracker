@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { changeAssessmentDate, changeDate, findVisibleNotificationsBell, NotificationBell } from "./NotificationBell";
+import { changeAssessmentDate, changeDate, findVisibleNotificationsBell, NotificationBell, NotificationItem } from "./NotificationBell";
 import { application } from "../test/assessmentFixtures";
 import type { ReminderNotification } from "../lib/reminders";
 const notice: ReminderNotification = {
@@ -51,4 +51,21 @@ it("marks the bell and finds the visible one after the phone panel closes at 768
   vi.stubGlobal("document", { querySelectorAll });
   expect(findVisibleNotificationsBell()).toBe(navigationBell);
   expect(querySelectorAll).toHaveBeenCalledWith("[data-notifications-bell]");
+});
+
+// #360: repeated card buttons say which reminder they act on; tooltips stay short.
+it("adds the reminder title to each card action's screen-reader name (#360)", () => {
+  const handlers = {
+    onDismiss: vi.fn(), onOpenApplication: vi.fn(), onUpdateApplication: vi.fn(),
+    onUpdateAssessment: vi.fn(), onUpdateInterview: vi.fn(),
+  };
+  const render = (notification: ReminderNotification) =>
+    renderToStaticMarkup(createElement(NotificationItem, { notification, ...handlers }));
+  const interview = render({ ...notice, title: "Scheduled stage 1 for ML Intern" });
+  expect(interview).toContain('aria-label="Open application, Scheduled stage 1 for ML Intern"');
+  expect(interview).toContain('aria-label="Change scheduled date and time, Scheduled stage 1 for ML Intern"');
+  expect(interview).toContain('title="Open application"');
+  // The spoken name keeps the visible word ("Time") so voice control can press it.
+  const start = render({ ...notice, assessmentId: "assessment", title: "OA scheduled for ML Intern", type: "assessment_start" });
+  expect(start).toMatch(/aria-label="Change assessment start time, OA scheduled for ML Intern"[^>]*>[\s\S]*?Time<\/button>/);
 });

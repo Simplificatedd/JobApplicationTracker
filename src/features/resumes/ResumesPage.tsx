@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ChevronDown,
+  CircleCheck,
   Download,
   Eye,
   FileText,
@@ -183,9 +184,16 @@ export function ResumesPage({
     // Read before confirm() so the item is known even if focus moves.
     const item = document.activeElement?.closest("[data-document-item]");
     if (window.confirm(message)) {
+      clearUploadStatus();
       keepFocusAfterRemoval(item, "[data-document-item]", () => firstVisible("[data-document-upload]"), "button");
       onDeleteResume(resume.id);
     }
+  }
+
+  // The last upload's message no longer applies once another document action starts.
+  function clearUploadStatus() {
+    setUploadError("");
+    setUploadMessage("");
   }
 
   function getDocumentItemProps(resume: ResumeMetadata): DocumentItemProps {
@@ -194,9 +202,18 @@ export function ResumesPage({
       isWorking: workingResumeId === resume.id,
       linkedCount: linkedCounts.get(resume.id) ?? 0,
       onDelete: () => confirmDelete(resume),
-      onDownload: () => downloadResume(resume),
-      onPreview: () => previewResume(resume),
-      onUpdate: (input, original) => onUpdateResume(resume.id, input, original),
+      onDownload: () => {
+        clearUploadStatus();
+        void downloadResume(resume);
+      },
+      onPreview: () => {
+        clearUploadStatus();
+        void previewResume(resume);
+      },
+      onUpdate: (input, original) => {
+        clearUploadStatus();
+        return onUpdateResume(resume.id, input, original);
+      },
       resume,
     };
   }
@@ -277,18 +294,26 @@ export function ResumesPage({
           Optional: add a name and version, then choose a PDF or DOCX file.
           Uploading starts when you pick the file.
         </p>
-        {uploadError || actionError ? (
-          <InlineAlert message={uploadError || actionError} tone="danger" />
-        ) : uploadMessage ? (
-          <InlineAlert message={uploadMessage} tone="info" />
-        ) : null}
+        {/* Both regions stay in the page so screen readers announce new messages. */}
+        <InlineAlert message={uploadError || actionError} tone="danger" />
+        <InlineAlert message={uploadError || actionError ? "" : uploadMessage} tone="success" />
       </section>
 
       {resumes.length === 0 ? (
         <EmptyState
+          action={
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-blue-700 max-md:h-11"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+            >
+              <Upload aria-hidden="true" size={16} />
+              {`Upload ${documentKind}`}
+            </button>
+          }
           body="Upload PDF or DOCX versions to attach them to applications."
           icon={FileText}
-          kicker={isCoverLetter ? "Cover letters" : "Resumes"}
           title={`${documentLabel} library`}
         />
       ) : (
@@ -437,6 +462,8 @@ function useDocumentMetadataEditor(
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [nameError, setNameError] = useState("");
+  const nameErrorId = useId();
   const [editBase, setEditBase] = useState(() => structuredClone(resume));
   const [draft, setDraft] = useState(() => getDocumentDraft(resume));
 
@@ -447,10 +474,14 @@ function useDocumentMetadataEditor(
   function startEditing() {
     setEditBase(structuredClone(resume));
     setDraft(getDocumentDraft(resume));
+    setNameError("");
     setIsEditing(true);
   }
 
   async function save() {
+    const error = getDocumentDraftError(draft);
+    setNameError(error);
+    if (error) return;
     setIsSaving(true);
     setSaveError("");
     const result = await onUpdate(documentDraftToUpdate(draft, editBase), editBase);
@@ -466,12 +497,18 @@ function useDocumentMetadataEditor(
 
   function cancel() {
     setDraft(getDocumentDraft(resume));
+    setNameError("");
     setIsEditing(false);
   }
+
+  // Hide the error again once a name is typed, like the job title check.
+  const showNameError = Boolean(nameError) && !draft.displayName.trim();
 
   return {
     cancel,
     draft,
+    nameError: showNameError ? nameError : "",
+    nameErrorId,
     isEditing,
     isSaving,
     save,
@@ -500,6 +537,8 @@ function ResumeRow({
         {isEditing ? (
           <div className="space-y-2">
             <input
+              aria-describedby={editor.nameError ? editor.nameErrorId : undefined}
+              aria-invalid={editor.nameError ? "true" : "false"}
               aria-label="Display name"
               className="field-control"
               onChange={(event) =>
@@ -507,6 +546,7 @@ function ResumeRow({
               }
               value={draft.displayName}
             />
+            <NameError editor={editor} />
             <input
               aria-label="Version label"
               className="field-control"
@@ -606,15 +646,21 @@ function ResumeCard({
     <article className="min-w-0 rounded-lg border border-border bg-surface p-4 text-sm text-foreground" data-document-item>
       {isEditing ? (
         <div className="grid gap-3">
-          <Field label="Display name">
-            <input
-              className="field-control"
-              onChange={(event) =>
-                editor.updateDraft("displayName", event.target.value)
-              }
-              value={draft.displayName}
-            />
-          </Field>
+          {/* The error stays outside the label so it is not read as part of the field's name. */}
+          <div>
+            <Field label="Display name">
+              <input
+                aria-describedby={editor.nameError ? editor.nameErrorId : undefined}
+                aria-invalid={editor.nameError ? "true" : "false"}
+                className="field-control"
+                onChange={(event) =>
+                  editor.updateDraft("displayName", event.target.value)
+                }
+                value={draft.displayName}
+              />
+            </Field>
+            <NameError editor={editor} />
+          </div>
           <Field label="Version label">
             <input
               className="field-control"
@@ -736,6 +782,7 @@ function DocumentActions({
       <>
         <IconAction
           disabled={editor.isSaving}
+          itemName={resume.displayName}
           label="Save metadata"
           onClick={() => void editor.save()}
           shortLabel={editor.isSaving ? "Saving..." : "Save"}
@@ -745,6 +792,7 @@ function DocumentActions({
         </IconAction>
         <IconAction
           disabled={editor.isSaving}
+          itemName={resume.displayName}
           label="Cancel edit"
           onClick={editor.cancel}
           shortLabel="Cancel"
@@ -765,6 +813,7 @@ function DocumentActions({
       {canPreview ? (
         <IconAction
           disabled={isWorking}
+          itemName={resume.displayName}
           label={`Preview ${documentLabel}`}
           onClick={onPreview}
           shortLabel="Preview"
@@ -775,6 +824,7 @@ function DocumentActions({
       ) : null}
       <IconAction
         disabled={isWorking}
+        itemName={resume.displayName}
         label={`Download ${documentLabel}`}
         onClick={onDownload}
         shortLabel="Download"
@@ -783,6 +833,7 @@ function DocumentActions({
         <Download aria-hidden="true" size={16} />
       </IconAction>
       <IconAction
+        itemName={resume.displayName}
         label="Edit metadata"
         onClick={editor.startEditing}
         shortLabel="Edit"
@@ -791,6 +842,7 @@ function DocumentActions({
         <Pencil aria-hidden="true" size={16} />
       </IconAction>
       <IconAction
+        itemName={resume.displayName}
         label={`Delete ${documentLabel}`}
         onClick={onDelete}
         shortLabel="Delete"
@@ -815,6 +867,15 @@ function StorageBadge({ resume }: { resume: ResumeMetadata }) {
       {resume.fileSize > 0 ? "Stored" : "Metadata"}
     </span>
   );
+}
+
+// role="alert" so screen readers speak the error when Save is pressed.
+export function NameError({ editor }: { editor: Pick<ReturnType<typeof useDocumentMetadataEditor>, "nameError" | "nameErrorId"> }) {
+  return editor.nameError ? (
+    <p className="mt-1 text-xs font-medium text-destructive" id={editor.nameErrorId} role="alert">
+      {editor.nameError}
+    </p>
+  ) : null;
 }
 
 function SaveError({ message }: { message: string }) {
@@ -846,23 +907,29 @@ function Field({
   );
 }
 
-function InlineAlert({
+export function InlineAlert({
   message,
   tone,
 }: {
   message: string;
-  tone: "danger" | "info";
+  tone: "danger" | "success";
 }) {
+  const Icon = tone === "danger" ? AlertTriangle : CircleCheck;
   return (
     <div
-      className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${
+      className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm empty:hidden ${
         tone === "danger"
           ? "border-red-200 bg-red-50 text-destructive"
           : "border-blue-200 bg-blue-50 text-info"
       }`}
+      role={tone === "danger" ? "alert" : "status"}
     >
-      <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
-      <p>{message}</p>
+      {message ? (
+        <>
+          <Icon aria-hidden="true" className="mt-0.5 shrink-0" size={16} />
+          <p>{message}</p>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -870,6 +937,7 @@ function InlineAlert({
 function IconAction({
   children,
   disabled = false,
+  itemName,
   label,
   onClick,
   shortLabel,
@@ -878,6 +946,8 @@ function IconAction({
 }: {
   children: React.ReactNode;
   disabled?: boolean;
+  /** Added to the screen-reader name so repeated buttons say which document they act on. */
+  itemName: string;
   label: string;
   onClick: () => void;
   shortLabel: string;
@@ -886,7 +956,7 @@ function IconAction({
 }) {
   return (
     <button
-      aria-label={label}
+      aria-label={`${label} ${itemName}`}
       className={`touch-target inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border ${
         showLabel ? "px-3 text-sm font-semibold max-md:h-11" : "w-9"
       } ${
@@ -958,6 +1028,10 @@ function getLinkedCounts(
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document action failed.";
+}
+
+export function getDocumentDraftError(draft: { displayName: string }) {
+  return draft.displayName.trim() ? "" : "Display name is required.";
 }
 
 export function documentDraftToUpdate(

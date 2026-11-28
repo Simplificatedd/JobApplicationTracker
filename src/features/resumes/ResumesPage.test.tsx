@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ResumeMetadata } from "../../types/application";
-import { ResumesPage } from "./ResumesPage";
+import { getDocumentDraftError, InlineAlert, NameError, ResumesPage } from "./ResumesPage";
 
 const resume: ResumeMetadata = {
   id: "resume-1",
@@ -54,8 +54,8 @@ describe("document library layouts", () => {
       expect(markup).toContain(`<span>${shortLabel}</span>`);
     }
     // Each action keeps one accessible name per layout: card and table.
-    expect(countMatches(markup, 'aria-label="Preview resume"')).toBe(2);
-    expect(countMatches(markup, 'aria-label="Delete resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Preview resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Delete resume Software Resume"')).toBe(2);
     expect(countMatches(markup, 'title="Delete resume"')).toBe(1);
   });
 
@@ -67,20 +67,20 @@ describe("document library layouts", () => {
     expect(markup).not.toContain("<span>Open</span>");
     expect(markup).not.toContain("Preview resume");
     // One Download per layout (card and table), not two.
-    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download resume Software Resume"')).toBe(2);
   });
 
   it("keeps Preview for PDFs, whose preview opens the file rather than downloading it", () => {
     const markup = renderPage();
 
-    expect(countMatches(markup, 'aria-label="Preview resume"')).toBe(2);
-    expect(countMatches(markup, 'aria-label="Download resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Preview resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download resume Software Resume"')).toBe(2);
   });
 
   it("names the document kind on cover letter cards", () => {
     const markup = renderPage({ documentKind: "cover letter" });
 
-    expect(countMatches(markup, 'aria-label="Download cover letter"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Download cover letter Software Resume"')).toBe(2);
   });
 });
 
@@ -104,7 +104,7 @@ describe("document card actions on phones", () => {
 
     expect(card).toContain('class="mt-4 grid grid-cols-2 gap-2 md:flex md:flex-wrap"');
     for (const label of ["Preview resume", "Download resume", "Edit metadata", "Delete resume"]) {
-      expect(card).toMatch(new RegExp(`aria-label="${label}" class="[^"]*max-md:h-11`));
+      expect(card).toMatch(new RegExp(`aria-label="${label} Software Resume" class="[^"]*max-md:h-11`));
     }
     // Icon-only table actions keep their size.
     expect(table).not.toContain("max-md:h-11");
@@ -160,5 +160,73 @@ describe("upload wording (#264)", () => {
     expect(hintId).toBeTruthy();
     expect(markup).toContain(`aria-describedby="${hintId}"`);
     expect(markup).toContain(">Display name<");
+  });
+});
+
+// #350: messages are announced, and success doesn't show a warning icon.
+describe("document page messages (#350)", () => {
+  it("keeps empty alert and status regions in the page so new messages are announced", () => {
+    const markup = renderPage();
+
+    expect(markup).toMatch(/<div class="[^"]*empty:hidden[^"]*" role="alert"><\/div>/);
+    expect(markup).toMatch(/<div class="[^"]*empty:hidden[^"]*" role="status"><\/div>/);
+  });
+
+  it("uses a warning icon for errors and a check icon for success", () => {
+    const error = renderToStaticMarkup(<InlineAlert message="Upload failed." tone="danger" />);
+    const success = renderToStaticMarkup(<InlineAlert message="Resume uploaded." tone="success" />);
+
+    expect(error).toContain('role="alert"');
+    expect(error).toContain("lucide-triangle-alert");
+    expect(success).toContain('role="status"');
+    expect(success).toContain("lucide-circle-check");
+    expect(success).not.toContain("lucide-triangle-alert");
+  });
+});
+
+// #359: a cleared display name is reported instead of silently kept.
+describe("document display name check (#359)", () => {
+  it.each(["", "   "])("requires a display name (%j)", (displayName) => {
+    expect(getDocumentDraftError({ displayName })).toBe("Display name is required.");
+  });
+
+  it("accepts any non-blank name", () => {
+    expect(getDocumentDraftError({ displayName: " Resume " })).toBe("");
+  });
+
+  it("announces the error so screen reader users hear why nothing saved", () => {
+    const markup = renderToStaticMarkup(
+      <NameError editor={{ nameError: "Display name is required.", nameErrorId: "name-error" }} />,
+    );
+
+    expect(markup).toBe('<p class="mt-1 text-xs font-medium text-destructive" id="name-error" role="alert">Display name is required.</p>');
+  });
+});
+
+// #341: the empty library offers an upload instead of repeating the page title.
+describe("empty document library (#341)", () => {
+  it.each([
+    ["resume", "Upload resume", "Resume library"],
+    ["cover letter", "Upload cover letter", "Cover letter library"],
+  ] as const)("offers %s uploads without a repeated page-title heading", (documentKind, label, title) => {
+    const markup = renderPage({ documentKind, resumes: [] });
+    const empty = /<section class="flex min-h-\[360px\][\s\S]*?<\/section>/.exec(markup)?.[0] ?? "";
+
+    expect(empty).toContain(`>${title}</h2>`);
+    expect(empty).toMatch(new RegExp(`<button[^>]*type="button"><svg[\\s\\S]*?</svg>${label}</button>`));
+    expect(empty).not.toContain("uppercase");
+  });
+});
+
+// #360: repeated action buttons say which document they act on.
+describe("document action names (#360)", () => {
+  it("adds the document name to each action's screen-reader name and keeps tooltips short", () => {
+    const markup = renderPage({
+      resumes: [resume, { ...resume, id: "resume-2", displayName: "Data Resume", storageKey: "resumes/resume-2" }],
+    });
+
+    expect(countMatches(markup, 'aria-label="Delete resume Software Resume"')).toBe(2);
+    expect(countMatches(markup, 'aria-label="Delete resume Data Resume"')).toBe(2);
+    expect(countMatches(markup, 'title="Delete resume"')).toBe(2);
   });
 });
